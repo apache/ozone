@@ -600,10 +600,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
               archiveOutputStream);
         } finally {
-          try {
-            Files.delete(Objects.requireNonNull(hardLinkFile));
-          } catch (Exception e) {
-            LOG.error("Exception during tmp hard link file deletion" + e);
+          if (Objects.nonNull(hardLinkFile)) {
+            try {
+              Files.delete(Objects.requireNonNull(hardLinkFile));
+            } catch (Exception e) {
+              LOG.error("Exception during hard link file: {} deletion",
+                  hardLinkFile, e);
+            }
           }
         }
       }
