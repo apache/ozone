@@ -602,7 +602,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         } finally {
           if (Objects.nonNull(hardLinkFile)) {
             try {
-              Files.delete(Objects.requireNonNull(hardLinkFile));
+              Files.delete(hardLinkFile);
             } catch (Exception e) {
               LOG.error("Exception during hard link file: {} deletion",
                   hardLinkFile, e);
