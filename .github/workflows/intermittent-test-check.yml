@@ -36,11 +36,16 @@ on:
         description: Number of splits
         default: 2
         required: true
+      fail-fast:
+        description: Stop after first failure
+        default: false
+        required: true
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   TEST_CLASS: ${{ github.event.inputs.test-class}}
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
+  FAIL_FAST: ${{ github.event.inputs.fail-fast }}
 jobs:
   prepare-job:
     runs-on: ubuntu-20.04
@@ -93,6 +98,7 @@ jobs:
     strategy:
       matrix:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
+      fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
     steps:
       - uses: actions/checkout@v3
         with:
