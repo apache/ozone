@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.After;
 import org.junit.Before;
@@ -38,6 +39,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
@@ -65,6 +67,19 @@ public class TestLeaseRecovery {
 
   private OzoneClient client;
   private final OzoneConfiguration conf = new OzoneConfiguration();
+
+  /**
+   * Closing the output stream after lease recovery throws because the key
+   * is no longer open in OM.  This is currently expected (see HDDS-9358).
+   */
+  public static void closeIgnoringKeyNotFound(OutputStream stream)
+      throws IOException {
+    try {
+      stream.close();
+    } catch (OMException e) {
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, e.getResult());
+    }
+  }
 
   @Before
   public void init() throws IOException, InterruptedException,
