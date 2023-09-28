@@ -82,6 +82,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test Key Deleting Service.
@@ -95,6 +98,10 @@ import org.junit.rules.TemporaryFolder;
 public class TestKeyDeletingService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(40));
+
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private static final Logger LOG =
@@ -138,7 +145,7 @@ public class TestKeyDeletingService {
    * @throws IOException - on Failure.
    */
 
-  @Test(timeout = 30000)
+  @Test
   public void checkIfDeleteServiceIsDeletingKeys()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -161,7 +168,7 @@ public class TestKeyDeletingService {
         .getKeyBlocksList().size());
   }
 
-  @Test(timeout = 40000)
+  @Test
   public void checkIfDeleteServiceWithFailingSCM()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -206,7 +213,7 @@ public class TestKeyDeletingService {
         .getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList().size());
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void checkDeletionForEmptyKey()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -253,7 +260,7 @@ public class TestKeyDeletingService {
     Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void checkDeletionForPartiallyCommitKey()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -325,7 +332,7 @@ public class TestKeyDeletingService {
     Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void checkDeletionForKeysWithMultipleVersions()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {

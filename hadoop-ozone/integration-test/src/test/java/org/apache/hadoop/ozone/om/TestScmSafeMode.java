@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.After;
@@ -53,7 +54,6 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +90,7 @@ public class TestScmSafeMode {
 
 
   @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(200));
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -133,7 +133,7 @@ public class TestScmSafeMode {
     }
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSafeModeOperations() throws Exception {
     // Create {numKeys} random names keys.
     TestStorageContainerManagerHelper helper =
@@ -186,7 +186,7 @@ public class TestScmSafeMode {
   /**
    * Tests inSafeMode & forceExitSafeMode api calls.
    */
-  @Test(timeout = 300_000)
+  @Test
   public void testIsScmInSafeModeAndForceExit() throws Exception {
     // Test 1: SCM should be out of safe mode.
     Assert.assertFalse(storageContainerLocationClient.inSafeMode());
@@ -219,7 +219,7 @@ public class TestScmSafeMode {
 
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSCMSafeMode() throws Exception {
     // Test1: Test safe mode  when there are no containers in system.
     cluster.stop();
@@ -297,7 +297,7 @@ public class TestScmSafeMode {
     assertFalse(scm.isInSafeMode());
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSCMSafeModeRestrictedOp() throws Exception {
     cluster.stop();
     cluster = builder.build();
@@ -338,7 +338,7 @@ public class TestScmSafeMode {
         " mode.", scmException.getMessage());
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSCMSafeModeDisabled() throws Exception {
     cluster.shutdown();
 

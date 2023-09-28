@@ -97,6 +97,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -109,7 +110,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -800,7 +800,7 @@ public class TestStorageContainerManager {
   /**
    * Test datanode heartbeat well processed with a 4-layer network topology.
    */
-  @Test(timeout = 180000)
+  @Test
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmId = UUID.randomUUID().toString();
