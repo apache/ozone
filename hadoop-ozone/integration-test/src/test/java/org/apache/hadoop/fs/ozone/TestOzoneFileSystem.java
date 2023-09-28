@@ -1655,7 +1655,7 @@ public class TestOzoneFileSystem {
     trash.moveToTrash(path);
 
     Assert.assertTrue(o3fs.exists(userTrash));
-    Assert.assertTrue(o3fs.exists(userTrashCurrent) || o3fs.listStatus(
+    Assert.assertTrue(o3fs.exists(trashPath) || o3fs.listStatus(
         o3fs.listStatus(userTrash)[0].getPath()).length > 0);
 
     // Wait until the TrashEmptier purges the key

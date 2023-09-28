@@ -448,7 +448,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         String keyPrefix) throws IOException {
       OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
       return metadataManager.listKeys(volumeName, bucketName, startKey,
-              keyPrefix, OZONE_MAX_LIST_KEYS_SIZE).stream()
+              keyPrefix, OZONE_MAX_LIST_KEYS_SIZE).getKeys().stream()
           .map(OmKeyInfo::getKeyName)
           .collect(Collectors.toList());
     }
