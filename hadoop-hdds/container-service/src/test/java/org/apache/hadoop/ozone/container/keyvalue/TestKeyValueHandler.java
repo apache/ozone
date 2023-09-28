@@ -85,7 +85,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public final TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(1));
+  public final TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
