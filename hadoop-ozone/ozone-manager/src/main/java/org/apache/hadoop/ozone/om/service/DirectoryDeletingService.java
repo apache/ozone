@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -264,6 +266,26 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
+          long volumeId = getOzoneManager().getMetadataManager()
+              .getVolumeId(currSnapInfo.getVolumeName());
+          // Get bucketInfo for the snapshot bucket to get bucket layout.
+          String dbBucketKey = getOzoneManager().getMetadataManager()
+              .getBucketKey(currSnapInfo.getVolumeName(),
+                  currSnapInfo.getBucketName());
+          OmBucketInfo bucketInfo = getOzoneManager().getMetadataManager()
+              .getBucketTable().get(dbBucketKey);
+
+          if (bucketInfo == null) {
+            throw new IllegalStateException("Bucket " + "/" +
+                currSnapInfo.getVolumeName() + "/" + currSnapInfo
+                .getBucketName() + " is not found. BucketInfo should not be " +
+                "null for snapshotted bucket. The OM is in unexpected state.");
+          }
+
+          String dbBucketKeyForDir = getOzoneManager().getMetadataManager()
+              .getBucketKey(Long.toString(volumeId),
+                  Long.toString(bucketInfo.getObjectID())) + OM_KEY_PREFIX;
+
           try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
                    rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
               currSnapInfo.getVolumeName(),
@@ -281,7 +303,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               continue;
             }
 
-            Table.KeyValue<String, OmKeyInfo> deletedDirInfo;
             List<Pair<String, OmKeyInfo>> allSubDirList
                 = new ArrayList<>((int) remainNum);
 
@@ -289,39 +310,50 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 OmKeyInfo>> deletedIterator = snapDeletedDirTable.iterator()) {
 
               long startTime = Time.monotonicNow();
-              deletedDirInfo = deletedIterator.next();
+              deletedIterator.seek(dbBucketKeyForDir);
 
-              PurgePathRequest request = prepareDeleteDirRequest(
-                  remainNum, deletedDirInfo.getValue(),
-                  deletedDirInfo.getKey(), allSubDirList,
-                  currOmSnapshot.getKeyManager());
-              if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
-                  request.getSerializedSize())) {
-                if (purgePathRequestList.size() != 0) {
-                  // if message buffer reaches max limit, avoid sending further
-                  remainNum = 0;
+              while (remainNum > 0 && deletedIterator.hasNext()) {
+                Table.KeyValue<String, OmKeyInfo> deletedDirInfo =
+                    deletedIterator.next();
+                String deletedDirKey = deletedDirInfo.getKey();
+
+                // Exit if it is out of the bucket scope.
+                if (!deletedDirKey.startsWith(dbBucketKeyForDir)) {
                   break;
                 }
-                // if directory itself is having a lot of keys / files,
-                // reduce capacity to minimum level
-                remainNum = MIN_ERR_LIMIT_PER_TASK;
-                request = prepareDeleteDirRequest(
+
+                PurgePathRequest request = prepareDeleteDirRequest(
                     remainNum, deletedDirInfo.getValue(),
                     deletedDirInfo.getKey(), allSubDirList,
                     currOmSnapshot.getKeyManager());
-              }
+                if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                    request.getSerializedSize())) {
+                  if (purgePathRequestList.size() != 0) {
+                    // if message buffer reaches max limit, avoid sending further
+                    remainNum = 0;
+                    break;
+                  }
+                  // if directory itself is having a lot of keys / files,
+                  // reduce capacity to minimum level
+                  remainNum = MIN_ERR_LIMIT_PER_TASK;
+                  request = prepareDeleteDirRequest(
+                      remainNum, deletedDirInfo.getValue(),
+                      deletedDirInfo.getKey(), allSubDirList,
+                      currOmSnapshot.getKeyManager());
+                }
 
-              consumedSize += request.getSerializedSize();
-              purgePathRequestList.add(request);
-              remainNum = remainNum - request.getDeletedSubFilesCount();
-              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-              // Count up the purgeDeletedDir, subDirs and subFiles
-              if (request.hasDeletedDir() &&
-                  !request.getDeletedDir().isEmpty()) {
-                dirNum++;
+                consumedSize += request.getSerializedSize();
+                purgePathRequestList.add(request);
+                remainNum = remainNum - request.getDeletedSubFilesCount();
+                remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+                // Count up the purgeDeletedDir, subDirs and subFiles
+                if (request.hasDeletedDir() &&
+                    !request.getDeletedDir().isEmpty()) {
+                  dirNum++;
+                }
+                subDirNum += request.getMarkDeletedSubDirsCount();
+                subFileNum += request.getDeletedSubFilesCount();
               }
-              subDirNum += request.getMarkDeletedSubDirsCount();
-              subFileNum += request.getDeletedSubFilesCount();
 
               optimizeDirDeletesAndSubmitRequest(
                   remainNum, dirNum, subDirNum, subFileNum,
