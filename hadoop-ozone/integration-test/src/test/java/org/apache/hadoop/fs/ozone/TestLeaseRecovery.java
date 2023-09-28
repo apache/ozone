@@ -132,21 +132,27 @@ public class TestLeaseRecovery {
     final Path file = new Path(dir, "file");
 
     RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-    final FSDataOutputStream stream = fs.create(file, true);
 
     final byte[] data = new byte[1 << 20];
     ThreadLocalRandom.current().nextBytes(data);
-    stream.write(data);
-    stream.hsync();
-    assertFalse(fs.isFileClosed(file));
 
-    int count = 0;
-    while (count++ < 15 && !fs.recoverLease(file)) {
-      Thread.sleep(1000);
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      stream.write(data);
+      stream.hsync();
+      assertFalse(fs.isFileClosed(file));
+
+      int count = 0;
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue("File should be closed", fs.recoverLease(file));
+      assertTrue(fs.isFileClosed(file));
+    } finally {
+      closeIgnoringKeyNotFound(stream);
     }
-    // The lease should have been recovered.
-    assertTrue("File should be closed", fs.recoverLease(file));
-    assertTrue(fs.isFileClosed(file));
+
     // open it again, make sure the data is correct
     byte[] readData = new byte[1 << 20];
     try (FSDataInputStream fdis = fs.open(file)) {
