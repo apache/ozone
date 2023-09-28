@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +43,8 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
 
   @Override
   public final List<ContainerBlockInfo> chooseContainerForBlockDeletion(
-      int blockCount, Map<Long, ContainerData> candidateContainers)
+      int blockCount, Map<Long, ContainerData> candidateContainers,
+      OzoneContainer ozoneContainer)
       throws StorageContainerException {
     Preconditions.checkNotNull(candidateContainers,
         "Internal assertion: candidate containers cannot be null");
@@ -63,27 +65,37 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
     // number of blocks to be deleted in an interval, there we return that
     // container but with container we also return an integer so that total
     // blocks don't exceed the number of blocks to be deleted in an interval.
-
+    LOG.info("Ordered container list size: {} for DN: {]", orderedList.size(),
+        ozoneContainer.getDatanodeDetails().getUuid());
     for (ContainerData entry : orderedList) {
       long pendingDeletionBlocks =
           ContainerUtils.getPendingDeletionBlocks(entry);
-
+      LOG.info("Pending deletion block count: {} for DN: {]",
+          pendingDeletionBlocks,
+          ozoneContainer.getDatanodeDetails().getUuid());
       if (pendingDeletionBlocks > 0) {
         long numBlocksToDelete = Math.min(blockCount, pendingDeletionBlocks);
         blockCount -= numBlocksToDelete;
         result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
         //if (LOG.isDebugEnabled()) {
-          LOG.info("Select container {} for block deletion, "
-              + "pending deletion blocks num: {}.", entry.getContainerID(),
-              pendingDeletionBlocks);
+        LOG.info("Select container {} for block deletion, "
+                + "pending deletion blocks num: {} for DN: {}.",
+            entry.getContainerID(),
+            pendingDeletionBlocks,
+            ozoneContainer.getDatanodeDetails().getUuid());
         //}
         if (blockCount == 0) {
+          LOG.info("Number of blocks to delete: {} for DN: {}", blockCount,
+              ozoneContainer.getDatanodeDetails().getUuid());
           break;
         }
       }
     }
-    LOG.info("Chosen {}/{} blocks from {} candidate containers.",
-        (originalBlockCount - blockCount), blockCount, orderedList.size());
+    LOG.info(
+        "Chosen {}/{} blocks from {} candidate containers for DN: {} with " +
+            "result size: {}", (originalBlockCount - blockCount), blockCount,
+        orderedList.size(), ozoneContainer.getDatanodeDetails().getUuid(),
+        result.size());
     return result;
   }
 
