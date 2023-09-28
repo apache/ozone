@@ -307,6 +307,7 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
