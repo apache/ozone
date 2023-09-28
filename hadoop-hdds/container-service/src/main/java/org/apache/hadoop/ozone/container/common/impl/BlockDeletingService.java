@@ -123,7 +123,8 @@ public class BlockDeletingService extends BackgroundService {
       List<ContainerBlockInfo> containers =
           chooseContainerForBlockDeletion(blockLimitPerInterval,
               containerDeletionPolicy);
-      LOG.info("Containers chosen by policy: {}", containers.size());
+      LOG.info("Containers chosen by policy: {} at DN: {}", containers.size(),
+          ozoneContainer.getDatanodeDetails().getUuid());
       BackgroundTask
           containerBlockInfos = null;
       long totalBlocks = 0;
@@ -135,6 +136,9 @@ public class BlockDeletingService extends BackgroundService {
             .setPriority(TASK_PRIORITY_DEFAULT);
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
+        LOG.error(
+            "Background task gets added in queue for deletion, Datanode: {}",
+            ozoneContainer.getDatanodeDetails().getUuid());
         totalBlocks += containerBlockInfo.getNumBlocksToDelete();
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
