@@ -329,7 +329,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
                     request.getSerializedSize())) {
                   if (purgePathRequestList.size() != 0) {
-                    // if message buffer reaches max limit, avoid sending further
+                    // if message buffer reaches max limit,
+                    // avoid sending further
                     remainNum = 0;
                     break;
                   }

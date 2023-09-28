@@ -402,7 +402,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         long startTime = Time.monotonicNow();
         deletedDirIterator.seek(dbBucketKeyForDir);
 
-        while (deletedDirIterator.hasNext()) {
+        while (remainNum > 0 && deletedDirIterator.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> deletedDir =
               deletedDirIterator.next();
           String deletedDirKey = deletedDir.getKey();
