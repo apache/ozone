@@ -36,13 +36,13 @@ public class TestOmConf {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final OzoneManagerRatisServerConfig ratisConf = conf.getObject(
         OzoneManagerRatisServerConfig.class);
-    Assertions.assertEquals(1, ratisConf.getLogAppenderWaitTimeMin(),
+    Assertions.assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
-
-    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
-    ratisConf.setLogAppenderWaitTimeMin(0);
-    conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ZERO, conf);
+
+    ratisConf.setLogAppenderWaitTimeMin(1);
+    conf.setFromObject(ratisConf);
+    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
 
   }
 

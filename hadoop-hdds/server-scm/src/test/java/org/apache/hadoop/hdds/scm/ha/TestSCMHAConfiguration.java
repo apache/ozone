@@ -210,7 +210,7 @@ class TestSCMHAConfiguration {
 
     final ScmRatisServerConfig scmRatisConfig = conf.getObject(
         ScmRatisServerConfig.class);
-    assertEquals(1, scmRatisConfig.getLogAppenderWaitTimeMin(),
+    assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
     final File testDir = GenericTestUtils.getRandomizedTestDir();
@@ -218,7 +218,7 @@ class TestSCMHAConfiguration {
 
     final RaftProperties p = RatisUtil.newRaftProperties(conf);
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    assertEquals(TimeDuration.ONE_MILLISECOND, t,
+    assertEquals(TimeDuration.ZERO, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
