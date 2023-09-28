@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -28,7 +27,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
@@ -37,30 +35,26 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
  */
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotSetPropertyResponse extends OMClientResponse {
-  private final Map<String, SnapshotInfo> updatedSnapInfos;
+  private final SnapshotInfo updatedSnapInfo;
 
   public OMSnapshotSetPropertyResponse(
       @Nonnull OMResponse omResponse,
-      @Nonnull Map<String, SnapshotInfo> updatedSnapInfos) {
+      @Nonnull SnapshotInfo updatedSnapInfo) {
     super(omResponse);
-    this.updatedSnapInfos = updatedSnapInfos;
+    this.updatedSnapInfo = updatedSnapInfo;
   }
 
   public OMSnapshotSetPropertyResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
-    this.updatedSnapInfos = null;
+    this.updatedSnapInfo = null;
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
                               BatchOperation batchOperation)
       throws IOException {
-    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
-        omMetadataManager;
-    for (Map.Entry<String, SnapshotInfo> entry : updatedSnapInfos.entrySet()) {
-      metadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
-          entry.getKey(), entry.getValue());
-    }
+    omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
+        updatedSnapInfo.getTableKey(), updatedSnapInfo);
   }
 }

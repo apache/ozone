@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -34,9 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 
 /**
  * Updates the exclusive size of the snapshot.
@@ -62,35 +62,33 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
         setSnapshotPropertyRequest = getOmRequest()
         .getSetSnapshotPropertyRequest();
 
-    List<SnapshotProperty> snapshotPropertyList = setSnapshotPropertyRequest
-        .getSnapshotPropertyList();
-    Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
+    SnapshotProperty snapshotProperty = setSnapshotPropertyRequest
+        .getSnapshotProperty();
+    SnapshotInfo updatedSnapInfo = null;
 
     try {
-      for (SnapshotProperty snapshotProperty: snapshotPropertyList) {
-        String snapshotKey = snapshotProperty.getSnapshotKey();
-        long exclusiveSize = snapshotProperty.getExclusiveSize();
-        long exclusiveReplicatedSize = snapshotProperty
-            .getExclusiveReplicatedSize();
-        SnapshotInfo snapshotInfo = metadataManager
-            .getSnapshotInfoTable().get(snapshotKey);
+      String snapshotKey = snapshotProperty.getSnapshotKey();
+      long exclusiveSize = snapshotProperty.getExclusiveSize();
+      long exclusiveReplicatedSize = snapshotProperty
+          .getExclusiveReplicatedSize();
+      updatedSnapInfo = metadataManager.getSnapshotInfoTable()
+          .get(snapshotKey);
 
-        if (snapshotInfo == null) {
-          LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
-          continue;
-        }
-
-        // Set Exclusive size.
-        snapshotInfo.setExclusiveSize(exclusiveSize);
-        snapshotInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
-        // Update Table Cache
-        metadataManager.getSnapshotInfoTable().addCacheEntry(
-            new CacheKey<>(snapshotKey),
-            CacheValue.get(trxnLogIndex, snapshotInfo));
-        updatedSnapInfos.put(snapshotKey, snapshotInfo);
+      if (updatedSnapInfo == null) {
+        LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
+        throw new OMException("SnapshotInfo for Snapshot: " + snapshotKey +
+            " is not found", INVALID_SNAPSHOT_ERROR);
       }
+
+      // Set Exclusive size.
+      updatedSnapInfo.setExclusiveSize(exclusiveSize);
+      updatedSnapInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
+      // Update Table Cache
+      metadataManager.getSnapshotInfoTable().addCacheEntry(
+          new CacheKey<>(snapshotKey),
+          CacheValue.get(trxnLogIndex, updatedSnapInfo));
       omClientResponse = new OMSnapshotSetPropertyResponse(
-          omResponse.build(), updatedSnapInfos);
+          omResponse.build(), updatedSnapInfo);
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));

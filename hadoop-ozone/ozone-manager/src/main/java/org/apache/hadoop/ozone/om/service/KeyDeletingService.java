@@ -96,7 +96,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final AtomicBoolean suspended;
   private final Map<String, Long> exclusiveSizeMap;
   private final Map<String, Long> exclusiveReplicatedSizeMap;
-  private final Set<String> completedExclusiveSizeMap;
+  private final Set<String> completedExclusiveSizeSet;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -112,7 +112,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.suspended = new AtomicBoolean(false);
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
-    this.completedExclusiveSizeMap = new HashSet<>();
+    this.completedExclusiveSizeSet = new HashSet<>();
   }
 
   /**
@@ -356,13 +356,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   // snapshot. Here since we are only iterating through
                   // deletedTable we can check the previous and previous to
                   // previous snapshot to achieve the same.
-                  // previousSnapshot - Current Snapshot for which we are
-                  //                  calculating exclusive size.
-                  // currSnapshot - Snapshot's deletedTable which is used to
-                  //              calc current(prev) snapshot's exclusive size.
-                  // previousToPrevSnapshot - Previous to the previous snapshot
-                  //             to check if it's exclusive to the current(prev)
-                  //             snapshot or not.
+                  // previousSnapshot - Snapshot for which exclusive size is
+                  //                    getting calculating.
+                  // currSnapshot - Snapshot's deletedTable is used to calculate
+                  //                previousSnapshot snapshot's exclusive size.
+                  // previousToPrevSnapshot - Snapshot which is used to check
+                  //                if key is exclusive to previousSnapshot.
                   if (previousSnapshot != null) {
                     calculateExclusiveSize(previousSnapshot,
                         previousToPrevSnapshot, keyInfo, bucketInfo, volumeId,
@@ -404,7 +403,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 // will throw NPE when we submit request.
                 if (previousSnapshot != null && exclusiveSizeMap
                     .containsKey(previousSnapshot.getTableKey())) {
-                  completedExclusiveSizeMap.add(
+                  completedExclusiveSizeSet.add(
                       previousSnapshot.getTableKey());
                 }
               }
@@ -502,27 +501,20 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     private void updateSnapshotExclusiveSize() {
 
-      List<SnapshotProperty> snapshotPropertyList = new ArrayList<>();
-      if (completedExclusiveSizeMap.isEmpty()) {
+      if (completedExclusiveSizeSet.isEmpty()) {
         return;
       }
 
-      for (String dbKey: completedExclusiveSizeMap) {
+      for (String dbKey: completedExclusiveSizeSet) {
         SnapshotProperty snapshotProperty = SnapshotProperty.newBuilder()
                 .setSnapshotKey(dbKey)
                 .setExclusiveSize(exclusiveSizeMap.get(dbKey))
                 .setExclusiveReplicatedSize(
                     exclusiveReplicatedSizeMap.get(dbKey))
                 .build();
-        snapshotPropertyList.add(snapshotProperty);
-        exclusiveSizeMap.remove(dbKey);
-        exclusiveReplicatedSizeMap.remove(dbKey);
-      }
-
-      if (!snapshotPropertyList.isEmpty()) {
         SetSnapshotPropertyRequest setSnapshotPropertyRequest =
             SetSnapshotPropertyRequest.newBuilder()
-                .addAllSnapshotProperty(snapshotPropertyList)
+                .setSnapshotProperty(snapshotProperty)
                 .build();
 
         OMRequest omRequest = OMRequest.newBuilder()
@@ -530,10 +522,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
             .setClientId(clientId.toString())
             .build();
-
         submitRequest(omRequest);
+        exclusiveSizeMap.remove(dbKey);
+        exclusiveReplicatedSizeMap.remove(dbKey);
       }
-      completedExclusiveSizeMap.clear();
+      completedExclusiveSizeSet.clear();
     }
 
     private void updateDeepCleanedSnapshots(List<String> deepCleanedSnapshots) {

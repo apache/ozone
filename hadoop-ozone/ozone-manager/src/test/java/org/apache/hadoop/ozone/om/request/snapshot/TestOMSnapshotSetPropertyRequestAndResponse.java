@@ -102,28 +102,30 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
   public void testValidateAndUpdateCache() throws IOException {
     createSnapshotDataForTest();
     assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
-    OzoneManagerProtocolProtos.OMRequest snapshotUpdateSizeRequest =
+    List<OMRequest> snapshotUpdateSizeRequests =
         createSnapshotUpdateSizeRequest();
 
     // Pre-Execute
-    OMSnapshotSetPropertyRequest omSnapshotSetPropertyRequest = new
-        OMSnapshotSetPropertyRequest(snapshotUpdateSizeRequest);
-    OMRequest modifiedOmRequest = omSnapshotSetPropertyRequest
-        .preExecute(ozoneManager);
-    omSnapshotSetPropertyRequest = new
-        OMSnapshotSetPropertyRequest(modifiedOmRequest);
+    for (OMRequest request: snapshotUpdateSizeRequests) {
+      OMSnapshotSetPropertyRequest omSnapshotSetPropertyRequest = new
+          OMSnapshotSetPropertyRequest(request);
+      OMRequest modifiedOmRequest = omSnapshotSetPropertyRequest
+          .preExecute(ozoneManager);
+      omSnapshotSetPropertyRequest = new
+          OMSnapshotSetPropertyRequest(modifiedOmRequest);
 
-    // Validate and Update Cache
-    OMSnapshotSetPropertyResponse omSnapshotSetPropertyResponse =
-        (OMSnapshotSetPropertyResponse) omSnapshotSetPropertyRequest
-            .validateAndUpdateCache(ozoneManager, 200L,
-            DOUBLE_BUFFER_HELPER);
+      // Validate and Update Cache
+      OMSnapshotSetPropertyResponse omSnapshotSetPropertyResponse =
+          (OMSnapshotSetPropertyResponse) omSnapshotSetPropertyRequest
+              .validateAndUpdateCache(ozoneManager, 200L,
+                  DOUBLE_BUFFER_HELPER);
 
-    // Commit to DB.
-    batchOperation = omMetadataManager.getStore().initBatchOperation();
-    omSnapshotSetPropertyResponse.checkAndUpdateDB(omMetadataManager,
-        batchOperation);
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      // Commit to DB.
+      batchOperation = omMetadataManager.getStore().initBatchOperation();
+      omSnapshotSetPropertyResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
 
     // Check if the exclusive size is set.
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
@@ -148,8 +150,9 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
         .getExclusiveReplicatedSize());
   }
 
-  private OMRequest createSnapshotUpdateSizeRequest() throws IOException {
-    List<SnapshotProperty> snapshotPropertyList = new ArrayList<>();
+  private List<OMRequest> createSnapshotUpdateSizeRequest()
+      throws IOException {
+    List<OMRequest> omRequests = new ArrayList<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
              iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
@@ -159,21 +162,20 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveSizeAfterRepl)
             .build();
-        snapshotPropertyList.add(snapshotSize);
+        SetSnapshotPropertyRequest snapshotUpdateSizeRequest =
+            SetSnapshotPropertyRequest.newBuilder()
+                .setSnapshotProperty(snapshotSize)
+                .build();
+
+        OMRequest omRequest = OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
+            .setSetSnapshotPropertyRequest(snapshotUpdateSizeRequest)
+            .setClientId(UUID.randomUUID().toString())
+            .build();
+        omRequests.add(omRequest);
       }
     }
-    SetSnapshotPropertyRequest snapshotUpdateSizeRequest =
-        SetSnapshotPropertyRequest.newBuilder()
-            .addAllSnapshotProperty(snapshotPropertyList)
-            .build();
-
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
-        .setSetSnapshotPropertyRequest(snapshotUpdateSizeRequest)
-        .setClientId(UUID.randomUUID().toString())
-        .build();
-
-    return omRequest;
+    return omRequests;
   }
 
   private void createSnapshotDataForTest() throws IOException {
