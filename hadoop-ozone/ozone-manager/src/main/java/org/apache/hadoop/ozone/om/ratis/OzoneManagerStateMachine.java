@@ -313,7 +313,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     try {
-      final OMRequest request = (OMRequest) trx.getStateMachineContext();
+      // For the Leader, the OMRequest is set in trx in startTransaction.
+      // For Followers, the OMRequest hast to be converted from the log entry.
+      final Object context = trx.getStateMachineContext();
+      final OMRequest request = context != null ? (OMRequest) context
+          : OMRatisHelper.convertByteStringToOMRequest(
+          trx.getStateMachineLogEntry().getLogData());
       long trxLogIndex = trx.getLogEntry().getIndex();
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
