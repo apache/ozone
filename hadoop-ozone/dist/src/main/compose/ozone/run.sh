@@ -15,45 +15,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-declare -i OZONE_DATANODES OZONE_REPLICATION_FACTOR OZONE_SAFEMODE_MIN_DATANODES
+# Get the version string of the bash
+bash_version_string=$(bash --version | head -n 1)
 
-ORIG_DATANODES="${OZONE_DATANODES:-}"
-ORIG_REPLICATION_FACTOR="${OZONE_REPLICATION_FACTOR:-}"
+# Extract the major, minor, and patch version numbers.
+BASH_VERSION_NUM=$(echo "$bash_version_string" | awk -F'[^0-9]*' '{print $2"."$3"."$4}')
 
-# only support replication factor of 1 or 3
-if [[ -v OZONE_REPLICATION_FACTOR ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 1 ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 3 ]]; then
-  # assume invalid replication factor was intended as "number of datanodes"
-  if [[ -z ${ORIG_DATANODES} ]]; then
-    OZONE_DATANODES=${OZONE_REPLICATION_FACTOR}
-  fi
-  unset OZONE_REPLICATION_FACTOR
-fi
+# Extract major and minor for the comparison logic
+BASH_MAJOR_VERSION=$(echo "$BASH_VERSION_NUM" | cut -d. -f1)
+BASH_MINOR_VERSION=$(echo "$BASH_VERSION_NUM" | cut -d. -f2)
 
-# at least 1 datanode
-if [[ -v OZONE_DATANODES ]] && [[ ${OZONE_DATANODES} -lt 1 ]]; then
-  unset OZONE_DATANODES
-fi
-
-if [[ -v OZONE_DATANODES ]] && [[ -v OZONE_REPLICATION_FACTOR ]]; then
-  # ensure enough datanodes for replication factor
-  if [[ ${OZONE_DATANODES} -lt ${OZONE_REPLICATION_FACTOR} ]]; then
-    OZONE_DATANODES=${OZONE_REPLICATION_FACTOR}
-  fi
-elif [[ -v OZONE_DATANODES ]]; then
-  if [[ ${OZONE_DATANODES} -ge 3 ]]; then
-    OZONE_REPLICATION_FACTOR=3
-  else
-    OZONE_REPLICATION_FACTOR=1
-  fi
-elif [[ -v OZONE_REPLICATION_FACTOR ]]; then
-  OZONE_DATANODES=${OZONE_REPLICATION_FACTOR}
+# Check bash version and call the appropriate script with appropriate flags
+if [[ $BASH_MAJOR_VERSION -lt 4 ]] || { [[ $BASH_MAJOR_VERSION -eq 4 ]] && [[ $BASH_MINOR_VERSION -lt 2 ]]; }; then
+    echo "+------------------------------------------------------------------------------------+"
+    echo "|                                                                                    |"
+    echo "|  WARNING: You are running Bash version $BASH_VERSION_NUM.                                     |"
+    echo "|  It is recommended to use Bash 4.2 or newer.                                       |"
+    echo "|  Bash 4.2 was released on February 13, 2011 and addresses vulnerabilities such as: |"
+    echo "|  CVE-2019-18276, CVE-2019-9924, CVE-2016-9401, and CVE-2016-7543.                  |"
+    echo "|                                                                                    |"
+    echo "|  Please consider updating your bash to a more recent version.                      |"
+    echo "|                                                                                    |"
+    echo "+------------------------------------------------------------------------------------+"
+    ./bash_old.sh -v
 else
-  OZONE_DATANODES=1
-  OZONE_REPLICATION_FACTOR=1
+    ./bash_new.sh -v -z
 fi
-
-: ${OZONE_SAFEMODE_MIN_DATANODES:=${OZONE_REPLICATION_FACTOR}}
-
-export OZONE_DATANODES OZONE_REPLICATION_FACTOR OZONE_SAFEMODE_MIN_DATANODES
-
-docker-compose up --scale datanode=${OZONE_DATANODES} --no-recreate "$@"
