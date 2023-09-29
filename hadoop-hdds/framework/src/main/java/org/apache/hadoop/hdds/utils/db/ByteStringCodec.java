@@ -49,7 +49,7 @@ public final class ByteStringCodec implements Codec<ByteString> {
   @Override
   public ByteString fromCodecBuffer(@Nonnull CodecBuffer buffer) {
     final Object wrapped = buffer.getWrapped();
-    return wrapped instanceof ByteString? (ByteString) wrapped
+    return wrapped instanceof ByteString ? (ByteString) wrapped
         : ByteString.copyFrom(buffer.asReadOnlyByteBuffer());
   }
 

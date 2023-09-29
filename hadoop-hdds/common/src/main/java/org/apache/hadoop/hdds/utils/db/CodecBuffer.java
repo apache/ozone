@@ -56,7 +56,7 @@ public class CodecBuffer implements AutoCloseable {
   private static class Factory {
     private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
-    static void set(BiFunction<ByteBuf, Object, CodecBuffer>f) {
+    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f) {
       constructor = f;
       LOG.info("Successfully set constructor to " + f);
     }
