@@ -102,6 +102,10 @@ public class ContainerController {
       LOG.error(warning);
       throw new ContainerNotFoundException(warning);
     } else {
+      LOG.info(
+          "container.getContainerState(): {} for container #{} for DN: {}",
+          container.getContainerState(), containerId, uuid);
+
       if (container.getContainerState() == State.OPEN) {
         LOG.error("About to mark container #{} as closing for DN: {}",
             containerId, uuid);
