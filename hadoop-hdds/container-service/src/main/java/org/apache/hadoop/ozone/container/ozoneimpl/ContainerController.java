@@ -40,6 +40,7 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
@@ -82,12 +83,14 @@ public class ContainerController {
    * Marks the container for closing. Moves the container to CLOSING state.
    *
    * @param containerId Id of the container to update
+   * @param uuid
    * @throws IOException in case of exception
    */
-  public void markContainerForClose(final long containerId)
+  public void markContainerForClose(final long containerId, UUID uuid)
       throws IOException {
     Container container = containerSet.getContainer(containerId);
     if (container == null) {
+      LOG.error("Container #{} is null on DN: {}", containerId, uuid);
       String warning;
       Set<Long> missingContainerSet = containerSet.getMissingContainerSet();
       if (missingContainerSet.contains(containerId)) {
@@ -96,10 +99,12 @@ public class ContainerController {
       } else {
         warning = "The Container is not found. ContainerID: " + containerId;
       }
-      LOG.warn(warning);
+      LOG.error(warning);
       throw new ContainerNotFoundException(warning);
     } else {
       if (container.getContainerState() == State.OPEN) {
+        LOG.error("About to mark container #{} as closing for DN: {}",
+            containerId, uuid);
         getHandler(container).markContainerForClose(container);
       }
     }

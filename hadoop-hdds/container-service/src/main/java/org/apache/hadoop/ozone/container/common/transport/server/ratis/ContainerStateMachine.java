@@ -1071,7 +1071,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // be affected.
     for (Long cid : container2BCSIDMap.keySet()) {
       try {
-        containerController.markContainerForClose(cid);
+        containerController.markContainerForClose(cid, null);
         containerController.quasiCloseContainer(cid,
             "Ratis group removed");
       } catch (IOException e) {

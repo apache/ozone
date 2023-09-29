@@ -372,7 +372,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public void markContainerForClose() throws StorageContainerException {
+  public void markContainerForClose(String datanodeId) throws StorageContainerException {
     writeLock();
     try {
       if (!HddsUtils.isOpenToWriteState(getContainerState())) {
@@ -382,6 +382,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.CLOSING));
+      LOG.info("Container #{} is marked as CLOSING on DN: {}",
+          containerData.getContainerID(), datanodeId);
       // Do not clear the pendingBlockCache here as a follower can still
       // receive transactions from leader in CLOSING state. Refer to
       // KeyValueHandler#checkContainerOpen()

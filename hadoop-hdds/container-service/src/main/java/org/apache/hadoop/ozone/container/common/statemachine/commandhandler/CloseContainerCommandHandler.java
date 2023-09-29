@@ -95,19 +95,21 @@ public class CloseContainerCommandHandler implements CommandHandler {
           ((CloseContainerCommand) command).getProto();
       final ContainerController controller = ozoneContainer.getController();
       final long containerId = closeCommand.getContainerID();
-      LOG.debug("Processing Close Container command container #{}",
-          containerId);
+      LOG.info("Processing Close Container command for container #{} at DN: {}",
+          containerId, ozoneContainer.getDatanodeDetails().getUuid());
       try {
         final Container container = controller.getContainer(containerId);
 
         if (container == null) {
-          LOG.error("Container #{} does not exist in datanode. "
-              + "Container close failed.", containerId);
+          LOG.error("Container #{} does not exist in datanode: {} "
+                  + "Container close failed.", containerId,
+              ozoneContainer.getDatanodeDetails().getUuid());
           return;
         }
 
         // move the container to CLOSING if in OPEN state
-        controller.markContainerForClose(containerId);
+        controller.markContainerForClose(containerId,
+            ozoneContainer.getDatanodeDetails().getUuid());
 
         switch (container.getContainerState()) {
         case OPEN:

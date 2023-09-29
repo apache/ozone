@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -1063,10 +1064,16 @@ public class KeyValueHandler extends Handler {
           containerSet.removeRecoveringContainer(
               container.getContainerData().getContainerID());
           ContainerLogger.logRecovered(container.getContainerData());
+          LOG.error("Container #{} is in recovering state at DN:{}",
+              container.getContainerData().getContainerID(), datanodeId);
         }
-        container.markContainerForClose();
+        LOG.error("Marking container #{} for close at DN: {} ",
+            container.getContainerData().getContainerID(), datanodeId);
+        container.markContainerForClose(datanodeId);
         ContainerLogger.logClosing(container.getContainerData());
         sendICR(container);
+        LOG.error("ICR sent by DN: {} for container #{}", datanodeId,
+            container.getContainerData().getContainerID());
       }
     } finally {
       container.writeUnlock();

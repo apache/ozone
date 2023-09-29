@@ -229,7 +229,8 @@ public class TestCloseContainerCommandHandler {
   public void closeNonExistenceContainer() {
     long containerID = 1L;
     try {
-      controller.markContainerForClose(containerID);
+      controller.markContainerForClose(containerID,
+          ozoneContainer.getDatanodeDetails().getUuid());
     } catch (IOException e) {
 
       GenericTestUtils.assertExceptionContains("The Container " +
@@ -242,7 +243,8 @@ public class TestCloseContainerCommandHandler {
     long containerID = 2L;
     containerSet.getMissingContainerSet().add(containerID);
     try {
-      controller.markContainerForClose(containerID);
+      controller.markContainerForClose(containerID,
+          ozoneContainer.getDatanodeDetails().getUuid());
     } catch (IOException e) {
       GenericTestUtils.assertExceptionContains("The Container is in " +
               "the MissingContainerSet hence we can't close it. " +

@@ -153,7 +153,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public void testCloseUnhealthyContainer() throws IOException {
     keyValueContainer.markContainerUnhealthy();
     thrown.expect(StorageContainerException.class);
-    keyValueContainer.markContainerForClose();
+    keyValueContainer.markContainerForClose("datanodeId");
   }
 
   /**
@@ -187,7 +187,7 @@ public class TestKeyValueContainerMarkUnhealthy {
    */
   @Test
   public void testMarkClosingContainerAsUnhealthy() throws IOException {
-    keyValueContainer.markContainerForClose();
+    keyValueContainer.markContainerForClose("datanodeId");
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
   }
