@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
@@ -37,7 +38,7 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
@@ -53,22 +54,26 @@ public class CodecBuffer implements AutoCloseable {
 
   /** To create {@link CodecBuffer} instances. */
   private static class Factory {
-    private static volatile Function<ByteBuf, CodecBuffer> constructor
+    private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
-    static void set(Function<ByteBuf, CodecBuffer> f) {
+    static void set(BiFunction<ByteBuf, Object, CodecBuffer>f) {
       constructor = f;
       LOG.info("Successfully set constructor to " + f);
     }
 
     static CodecBuffer newCodecBuffer(ByteBuf buf) {
-      return constructor.apply(buf);
+      return newCodecBuffer(buf, null);
+    }
+
+    static CodecBuffer newCodecBuffer(ByteBuf buf, Object wrapped) {
+      return constructor.apply(buf, wrapped);
     }
   }
 
   /** To detect buffer leak. */
   private static class LeakDetector {
-    static CodecBuffer newCodecBuffer(ByteBuf buf) {
-      return new CodecBuffer(buf) {
+    static CodecBuffer newCodecBuffer(ByteBuf buf, Object wrapped) {
+      return new CodecBuffer(buf, wrapped) {
         @Override
         protected void finalize() {
           detectLeaks();
@@ -162,7 +167,13 @@ public class CodecBuffer implements AutoCloseable {
 
   /** Wrap the given array. */
   public static CodecBuffer wrap(byte[] array) {
-    return Factory.newCodecBuffer(Unpooled.wrappedBuffer(array));
+    return Factory.newCodecBuffer(Unpooled.wrappedBuffer(array), array);
+  }
+
+  /** Wrap the given {@link ByteString}. */
+  public static CodecBuffer wrap(ByteString bytes) {
+    return Factory.newCodecBuffer(
+        Unpooled.wrappedBuffer(bytes.asReadOnlyByteBuffer()), bytes);
   }
 
   private static final AtomicInteger LEAK_COUNT = new AtomicInteger();
@@ -176,12 +187,22 @@ public class CodecBuffer implements AutoCloseable {
   }
 
   private final ByteBuf buf;
+  private final Object wrapped;
   private final CompletableFuture<Void> released = new CompletableFuture<>();
 
-  private CodecBuffer(ByteBuf buf) {
+  private CodecBuffer(ByteBuf buf, Object wrapped) {
     this.buf = buf;
+    this.wrapped = wrapped;
     this.elements = getStackTrace(LOG);
     assertRefCnt(1);
+  }
+
+  /**
+   * @return the wrapped object if this buffer is created by wrapping it;
+   *         otherwise, return null.
+   */
+  public Object getWrapped() {
+    return wrapped;
   }
 
   private void assertRefCnt(int expected) {
