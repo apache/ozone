@@ -106,7 +106,10 @@ public class CloseContainerCommandHandler implements CommandHandler {
               ozoneContainer.getDatanodeDetails().getUuid());
           return;
         }
-
+        LOG.info(
+            "Before marking container #{}: for close on DN: {}",
+            container.getContainerState(), containerId,
+            ozoneContainer.getDatanodeDetails().getUuid());
         // move the container to CLOSING if in OPEN state
         controller.markContainerForClose(containerId,
             ozoneContainer.getDatanodeDetails().getUuid());

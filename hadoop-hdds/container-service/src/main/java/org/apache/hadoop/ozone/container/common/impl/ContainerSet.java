@@ -97,10 +97,11 @@ public class ContainerSet implements Iterable<Container<?>> {
 
     long containerId = container.getContainerData().getContainerID();
     if (containerMap.putIfAbsent(containerId, container) == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Container with container Id {} is added to containerMap",
-            containerId);
-      }
+      //if (LOG.isDebugEnabled()) {
+        LOG.info("Container with container Id {} is added to containerMap, " +
+                "NodeId: {}", containerId,
+            container.getContainerData().getOriginNodeId());
+      //}
       // wish we could have done this from ContainerData.setState
       container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {

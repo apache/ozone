@@ -489,7 +489,8 @@ public class KeyValueHandler extends Handler {
    */
   ContainerCommandResponseProto handleCloseContainer(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
-
+    LOG.info("handleCloseContainer start for container: #{} on DN: {}",
+        kvContainer.getContainerData().getContainerID(), datanodeId);
     if (!request.hasCloseContainer()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Update Container request. trace ID: {}",
@@ -1151,6 +1152,9 @@ public class KeyValueHandler extends Handler {
     container.writeLock();
     try {
       final State state = container.getContainerState();
+      LOG.info("closeContainer start for container: #{} having state: {} on " +
+          "DN: {}", container.getContainerData().getContainerID(), state,
+          datanodeId);
       // Close call is idempotent.
       if (state == State.CLOSED) {
         return;

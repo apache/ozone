@@ -199,7 +199,7 @@ public class OzoneContainer {
      * XceiverServerRatis is the write channel
      * XceiverServerGrpc is the read channel
      */
-    controller = new ContainerController(containerSet, handlers);
+    controller = new ContainerController(containerSet, handlers, this);
 
     writeChannel = XceiverServerRatis.newXceiverServerRatis(
         datanodeDetails, config, hddsDispatcher, controller, certClient,

@@ -101,14 +101,14 @@ public class TestCloseContainerCommandHandler {
     container = new KeyValueContainer(data, new OzoneConfiguration());
     containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
-
+    ozoneContainer = mock(OzoneContainer.class);
     containerHandler = mock(Handler.class);
     controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer,
-            containerHandler));
+            containerHandler), ozoneContainer);
 
     writeChannel = mock(XceiverServerSpi.class);
-    ozoneContainer = mock(OzoneContainer.class);
+
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);

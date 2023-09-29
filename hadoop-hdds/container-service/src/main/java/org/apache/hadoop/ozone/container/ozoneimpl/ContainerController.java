@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -50,14 +51,17 @@ import static org.apache.hadoop.ozone.container.common.interfaces.Container.Scan
 public class ContainerController {
 
   private final ContainerSet containerSet;
+  private OzoneContainer ozoneContainer;
   private final Map<ContainerType, Handler> handlers;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerController.class);
 
   public ContainerController(final ContainerSet containerSet,
-      final Map<ContainerType, Handler> handlers) {
+                             final Map<ContainerType, Handler> handlers,
+                             OzoneContainer ozoneContainer) {
     this.containerSet = containerSet;
     this.handlers = handlers;
+    this.ozoneContainer = ozoneContainer;
   }
 
   /**
@@ -165,6 +169,10 @@ public class ContainerController {
    */
   public void closeContainer(final long containerId) throws IOException {
     final Container container = containerSet.getContainer(containerId);
+    LOG.info("closeContainer method call hierarchy: {} for container #{} " +
+            "on DN: {}", Arrays.toString(
+            Thread.currentThread().getStackTrace()), containerId,
+        ozoneContainer.getDatanodeDetails().getUuid());
     getHandler(container).closeContainer(container);
   }
 
