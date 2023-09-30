@@ -22,7 +22,7 @@ minor_version=$(echo $bash_version | cut -d. -f2)
 
 # If bash version is below a certain minimum (4.2 in this case), exit the script
 if [[ "$major_version" -lt 4 ]] || [[ "$major_version" -eq 4 && "$minor_version" -lt 2 ]]; then
-    echo "Your bash version (${bash_version}) is incompatible with this script. Please update your Bash to a more recent version."
+    echo "Your bash version (${bash_version}) is too old to run this script. Please update your Bash to a more recent version."
     exit 1
 fi
 
