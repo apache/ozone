@@ -70,6 +70,8 @@ Additional requirements for running Ozone in pseudo cluster (including acceptanc
 
 After building Ozone locally, you can start your first pseudo cluster:
 
+Kindly ensure you have an updated version of bash to run the run.sh script. If you're on the default Mac terminal, Please update your bash.
+
 ```
 cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
 OZONE_REPLICATION_FACTOR=3 ./run.sh -d
