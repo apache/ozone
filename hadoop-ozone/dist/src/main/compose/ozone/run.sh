@@ -15,6 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Get the version number and break it into major and minor parts
+bash_version=$(bash --version | grep -oE 'version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+')
+major_version=$(echo $bash_version | cut -d. -f1)
+minor_version=$(echo $bash_version | cut -d. -f2)
+
+# If bash version is below a certain minimum (4.2 in this case), exit the script
+if [[ "$major_version" -lt 4 ]] || [[ "$major_version" -eq 4 && "$minor_version" -lt 2 ]]; then
+    echo "Your bash version (${bash_version}) is incompatible with this script. Please update your Bash to a more recent version."
+    exit 1
+fi
+
 declare -i OZONE_DATANODES OZONE_REPLICATION_FACTOR OZONE_SAFEMODE_MIN_DATANODES
 
 ORIG_DATANODES="${OZONE_DATANODES:-}"
