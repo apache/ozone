@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.utils.db;
 import com.google.protobuf.ByteString;
 
 import javax.annotation.Nonnull;
-import java.util.function.IntFunction;
 
 /**
  * Codec to serialize/deserialize a {@link ByteString}.
@@ -42,7 +41,11 @@ public final class ByteStringCodec implements Codec<ByteString> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull ByteString object,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
+    if (allocator.isDirect() && !object.asReadOnlyByteBuffer().isDirect()) {
+      // require direct but the existing buffer is not.
+      return allocator.apply(object.size()).put(object.asReadOnlyByteBuffer());
+    }
     return CodecBuffer.wrap(object);
   }
 

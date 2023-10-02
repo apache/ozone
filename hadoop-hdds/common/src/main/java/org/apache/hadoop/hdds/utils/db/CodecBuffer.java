@@ -23,6 +23,7 @@ import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
+import org.apache.ratis.thirdparty.io.netty.buffer.EmptyByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.MemoizedSupplier;
@@ -131,6 +132,49 @@ public class CodecBuffer implements AutoCloseable {
       ? POOL.heapBuffer(c, c)   // allocate exact size
       : POOL.heapBuffer(-c);    // allocate a resizable buffer
 
+  private static final CodecBuffer EMPTY_BUFFER = new CodecBuffer(
+      new EmptyByteBuf(POOL), null);
+
+  public static CodecBuffer getEmptyBuffer() {
+    return EMPTY_BUFFER;
+  }
+
+  public interface Allocator extends IntFunction<CodecBuffer> {
+    Allocator DIRECT = new Allocator() {
+      @Override
+      public CodecBuffer apply(int capacity) {
+        return allocate(capacity, POOL_DIRECT);
+      }
+
+      @Override
+      public boolean isDirect() {
+        return true;
+      }
+    };
+
+    static Allocator getDirect() {
+      return DIRECT;
+    }
+
+    Allocator HEAP = new Allocator() {
+      @Override
+      public CodecBuffer apply(int capacity) {
+        return allocate(capacity, POOL_HEAP);
+      }
+
+      @Override
+      public boolean isDirect() {
+        return false;
+      }
+    };
+
+    static Allocator getHeap() {
+      return HEAP;
+    }
+
+    boolean isDirect();
+  }
+
   private final StackTraceElement[] elements;
 
   /**
@@ -197,6 +241,10 @@ public class CodecBuffer implements AutoCloseable {
     assertRefCnt(1);
   }
 
+  public boolean isDirect() {
+    return buf.isDirect();
+  }
+
   /**
    * @return the wrapped object if this buffer is created by wrapping it;
    *         otherwise, return null.
@@ -243,7 +291,10 @@ public class CodecBuffer implements AutoCloseable {
   /** Release this buffer and return it back to the pool. */
   public void release() {
     final boolean set = released.complete(null);
-    Preconditions.assertTrue(set, () -> "Already released: " + this);
+    if (!set) {
+      // Allow a zero capacity buffer to be released multiple times.
+      Preconditions.assertSame(0, buf.capacity(), "capacity");
+    }
     if (buf.release()) {
       assertRefCnt(0);
     } else {

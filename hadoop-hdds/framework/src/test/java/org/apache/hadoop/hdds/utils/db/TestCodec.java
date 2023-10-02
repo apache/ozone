@@ -208,6 +208,12 @@ public final class TestCodec {
 
   @Test
   public void testByteStringCodec() throws Exception {
+    for(int i = 0; i < 2; i++) {
+      try (CodecBuffer empty = CodecBuffer.getEmptyBuffer()) {
+        Assertions.assertTrue(empty.isDirect());
+      }
+    }
+
     runTestByteStringCodec(ByteString.EMPTY);
 
     for (int i = 0; i < NUM_LOOPS; i++) {
@@ -288,7 +294,7 @@ public final class TestCodec {
     final Bytes fromArray = new Bytes(array);
 
     try (CodecBuffer buffer = codec.toCodecBuffer(object,
-        CodecBuffer::allocateHeap)) {
+        CodecBuffer.Allocator.HEAP)) {
       final Bytes fromBuffer = new Bytes(buffer);
 
       Assertions.assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
