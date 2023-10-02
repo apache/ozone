@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -293,7 +294,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             Table<String, String> prevRenamedTable = null;
             ReferenceCounted<IOmMetadataReader, SnapshotCache>
                 rcPrevOmSnapshot = null;
-            OmSnapshot omPreviousSnapshot = null;
 
             // Split RepeatedOmKeyInfo and update current snapshot
             // deletedKeyTable and next snapshot deletedKeyTable.
@@ -302,7 +302,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   previousSnapshot.getVolumeName(),
                   previousSnapshot.getBucketName(),
                   getSnapshotPrefix(previousSnapshot.getName()), true);
-              omPreviousSnapshot = (OmSnapshot) rcPrevOmSnapshot.get();
+              OmSnapshot omPreviousSnapshot = (OmSnapshot)
+                  rcPrevOmSnapshot.get();
 
               previousKeyTable = omPreviousSnapshot.getMetadataManager()
                   .getKeyTable(bucketInfo.getBucketLayout());
@@ -313,13 +314,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
             ReferenceCounted<IOmMetadataReader, SnapshotCache>
                 rcPrevToPrevOmSnapshot = null;
-            OmSnapshot omPreviousToPrevSnapshot = null;
             if (previousToPrevSnapshot != null) {
               rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
                   previousToPrevSnapshot.getVolumeName(),
                   previousToPrevSnapshot.getBucketName(),
                   getSnapshotPrefix(previousToPrevSnapshot.getName()), true);
-              omPreviousToPrevSnapshot = (OmSnapshot)
+              OmSnapshot omPreviousToPrevSnapshot = (OmSnapshot)
                   rcPrevToPrevOmSnapshot.get();
 
               previousToPrevKeyTable = omPreviousToPrevSnapshot
@@ -349,20 +349,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 RepeatedOmKeyInfo newRepeatedOmKeyInfo =
                     new RepeatedOmKeyInfo();
                 for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
-                  // To calculate Exclusive Size for current snapshot, Check
-                  // the next snapshot deletedTable if the deleted key is
-                  // referenced in current snapshot and not referenced in the
-                  // previous snapshot then that key is exclusive to the current
-                  // snapshot. Here since we are only iterating through
-                  // deletedTable we can check the previous and previous to
-                  // previous snapshot to achieve the same.
-                  // previousSnapshot - Snapshot for which exclusive size is
-                  //                    getting calculating.
-                  // currSnapshot - Snapshot's deletedTable is used to calculate
-                  //                previousSnapshot snapshot's exclusive size.
-                  // previousToPrevSnapshot - Snapshot which is used to check
-                  //                if key is exclusive to previousSnapshot.
                   if (previousSnapshot != null) {
+                    // Calculates the exclusive size for the previous
+                    // snapshot. See Java Doc for more info.
                     calculateExclusiveSize(previousSnapshot,
                         previousToPrevSnapshot, keyInfo, bucketInfo, volumeId,
                         snapRenamedTable, previousKeyTable, prevRenamedTable,
@@ -424,6 +413,21 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       updateDeepCleanedSnapshots(deepCleanedSnapshots);
     }
 
+    /**
+     * To calculate Exclusive Size for current snapshot, Check
+     * the next snapshot deletedTable if the deleted key is
+     * referenced in current snapshot and not referenced in the
+     * previous snapshot then that key is exclusive to the current
+     * snapshot. Here since we are only iterating through
+     * deletedTable we can check the previous and previous to
+     * previous snapshot to achieve the same.
+     * previousSnapshot - Snapshot for which exclusive size is
+     *                    getting calculating.
+     * currSnapshot - Snapshot's deletedTable is used to calculate
+     *                previousSnapshot snapshot's exclusive size.
+     * previousToPrevSnapshot - Snapshot which is used to check
+     *                 if key is exclusive to previousSnapshot.
+     */
     @SuppressWarnings("checkstyle:ParameterNumber")
     private void calculateExclusiveSize(
         SnapshotInfo previousSnapshot,
@@ -505,7 +509,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         return;
       }
 
-      for (String dbKey: completedExclusiveSizeSet) {
+      Iterator<String> completedSnapshotIterator =
+          completedExclusiveSizeSet.iterator();
+      while (completedSnapshotIterator.hasNext()) {
+        String dbKey = completedSnapshotIterator.next();
         SnapshotProperty snapshotProperty = SnapshotProperty.newBuilder()
                 .setSnapshotKey(dbKey)
                 .setExclusiveSize(exclusiveSizeMap.get(dbKey))
@@ -525,8 +532,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         submitRequest(omRequest);
         exclusiveSizeMap.remove(dbKey);
         exclusiveReplicatedSizeMap.remove(dbKey);
+        completedSnapshotIterator.remove();
       }
-      completedExclusiveSizeSet.clear();
     }
 
     private void updateDeepCleanedSnapshots(List<String> deepCleanedSnapshots) {
