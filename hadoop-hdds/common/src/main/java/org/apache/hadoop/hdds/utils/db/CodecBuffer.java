@@ -139,6 +139,7 @@ public class CodecBuffer implements AutoCloseable {
     return EMPTY_BUFFER;
   }
 
+  /** To allocate {@link CodecBuffer} objects. */
   public interface Allocator extends IntFunction<CodecBuffer> {
     Allocator DIRECT = new Allocator() {
       @Override
@@ -172,6 +173,7 @@ public class CodecBuffer implements AutoCloseable {
       return HEAP;
     }
 
+    /** Does this object allocate direct buffers? */
     boolean isDirect();
   }
 

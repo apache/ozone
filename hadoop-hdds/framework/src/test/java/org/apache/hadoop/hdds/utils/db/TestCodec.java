@@ -208,7 +208,7 @@ public final class TestCodec {
 
   @Test
   public void testByteStringCodec() throws Exception {
-    for(int i = 0; i < 2; i++) {
+    for (int i = 0; i < 2; i++) {
       try (CodecBuffer empty = CodecBuffer.getEmptyBuffer()) {
         Assertions.assertTrue(empty.isDirect());
       }

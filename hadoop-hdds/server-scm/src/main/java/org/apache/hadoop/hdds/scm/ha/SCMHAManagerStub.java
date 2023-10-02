@@ -232,8 +232,8 @@ public final class SCMHAManagerStub implements SCMHAManager {
       } catch (NoSuchMethodException | SecurityException ex) {
         throw new InvalidProtocolBufferException(ex.getMessage());
       } catch (InvocationTargetException e) {
-        final Throwable targetEx = e.getTargetException();
-        throw targetEx instanceof Exception? (Exception) targetEx : e;
+        final Throwable target = e.getTargetException();
+        throw target instanceof Exception ? (Exception) target : e;
       }
     }
 
