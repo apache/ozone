@@ -101,6 +101,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
@@ -124,6 +126,7 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(240)
 public class TestOMDbCheckpointServlet {
+  public static final String JAVA_IO_TMPDIR = "java.io.tmpdir";
   private OzoneConfiguration conf;
   private File tempFile;
   private ServletOutputStream servletOutputStream;
@@ -439,7 +442,9 @@ public class TestOMDbCheckpointServlet {
 
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+    long tmpHardLinkFileCount = tmpHardLinkFileCount();
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    Assertions.assertEquals(tmpHardLinkFileCount, tmpHardLinkFileCount());
 
     // Verify that tarball request count reaches to zero once doGet completes.
     Assertions.assertEquals(0,
@@ -517,6 +522,18 @@ public class TestOMDbCheckpointServlet {
     initialFullSet.remove(unExpectedSstStr);
     Assertions.assertEquals(initialFullSet, finalFullSet,
         "expected snapshot files not found");
+  }
+
+  private static long tmpHardLinkFileCount() throws IOException {
+    Path tmpDirPath = Paths.get(System.getProperty(JAVA_IO_TMPDIR));
+    try (Stream<Path> tmpFiles = Files.list(tmpDirPath)) {
+      return tmpFiles
+          .filter(path -> {
+            String regex = DATA_PREFIX + ".*" + DATA_SUFFIX;
+            return path.getFileName().toString().matches(regex);
+          })
+          .count();
+    }
   }
 
   @Test
