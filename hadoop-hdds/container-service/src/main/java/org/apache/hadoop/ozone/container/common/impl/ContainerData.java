@@ -39,6 +39,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import javax.annotation.Nullable;
@@ -59,6 +63,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.STATE;
  * represented on disk by the .container file.
  */
 public abstract class ContainerData {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerData.class);
 
   //Type of the container.
   // For now, we support only KeyValueContainer.
@@ -217,6 +223,8 @@ public abstract class ContainerData {
 
     if ((oldState == ContainerDataProto.State.OPEN) &&
         (state != oldState)) {
+      LOG.info("old State: {}, new state: {} for DN: {}",
+          oldState, state, originNodeId);
       releaseCommitSpace();
     }
 

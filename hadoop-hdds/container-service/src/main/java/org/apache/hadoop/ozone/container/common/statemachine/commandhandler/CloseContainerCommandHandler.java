@@ -107,8 +107,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
           return;
         }
         LOG.info(
-            "Before marking container #{}: for close on DN: {}",
-            container.getContainerState(), containerId,
+            "Before marking container #{}: having state: {} for close on DN: {}",
+            containerId, container.getContainerState(),
             ozoneContainer.getDatanodeDetails().getUuid());
         // move the container to CLOSING if in OPEN state
         controller.markContainerForClose(containerId,
@@ -119,6 +119,10 @@ public class CloseContainerCommandHandler implements CommandHandler {
         case CLOSING:
           // If the container is part of open pipeline, close it via
           // write channel
+          LOG.info("In CLOSING case for container #{}: having state: {} " +
+                  "for close on DN: {}",
+              containerId, container.getContainerState(),
+              ozoneContainer.getDatanodeDetails().getUuid());
           if (ozoneContainer.getWriteChannel()
               .isExist(closeCommand.getPipelineID())) {
             ContainerCommandRequestProto request =
@@ -131,6 +135,10 @@ public class CloseContainerCommandHandler implements CommandHandler {
             // Non-RATIS containers should have the force close flag set, so
             // they are moved to CLOSED immediately rather than going to
             // quasi-closed
+            LOG.info("Forcely closing container #{}: having state: {} " +
+                    "for close on DN: {}",
+                containerId, container.getContainerState(),
+                ozoneContainer.getDatanodeDetails().getUuid());
             controller.closeContainer(containerId);
           } else {
             controller.quasiCloseContainer(containerId,

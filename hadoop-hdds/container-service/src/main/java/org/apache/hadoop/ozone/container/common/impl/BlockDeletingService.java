@@ -222,7 +222,8 @@ public class BlockDeletingService extends BackgroundService {
         if (originPipelineId == null || originPipelineId.isEmpty()) {
           // In case the pipelineID is empty, just mark it for deletion.
           // TODO: currently EC container goes through this path.
-          LOG.info("isDeletionAllowed: true for DN: {}",
+          LOG.info("isDeletionAllowed: true because origin pipelineId " +
+                  "is empty or null for DN: {}",
               ozoneContainer.getDatanodeDetails().getUuid());
           return true;
         }
