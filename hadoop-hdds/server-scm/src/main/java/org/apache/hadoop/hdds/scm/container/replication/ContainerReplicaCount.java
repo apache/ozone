@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import java.util.List;
 
@@ -37,7 +38,8 @@ public interface ContainerReplicaCount {
 
   boolean isSufficientlyReplicated();
 
-  boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode);
+  boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager);
 
   boolean isOverReplicated();
 
@@ -62,6 +64,8 @@ public interface ContainerReplicaCount {
             containerState, r.getState()));
 
   }
+
+  boolean isHealthyEnoughForOffline();
 
   /**
    * Return true if there are insufficient replicas to recover this container.
