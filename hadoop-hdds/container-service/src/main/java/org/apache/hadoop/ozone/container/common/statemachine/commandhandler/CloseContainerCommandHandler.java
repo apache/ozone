@@ -131,6 +131,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
                     command.getEncodedToken());
             ozoneContainer.getWriteChannel()
                 .submitRequest(request, closeCommand.getPipelineID());
+            LOG.info("Ratis request submitted for closing container #{} on " +
+                "DN: {}", containerId, datanodeDetails.getUuid());
           } else if (closeCommand.getForce()) {
             // Non-RATIS containers should have the force close flag set, so
             // they are moved to CLOSED immediately rather than going to

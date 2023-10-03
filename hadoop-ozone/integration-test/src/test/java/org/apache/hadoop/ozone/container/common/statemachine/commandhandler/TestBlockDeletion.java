@@ -241,17 +241,21 @@ public class TestBlockDeletion {
     // Wait for container to close
     Thread.sleep(2000);
     // make sure the containers are closed on the dn
-    omKeyLocationInfoGroupList.forEach((group) -> {
+    /*omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
       locationInfo.forEach(
           (info) -> {
             cluster.getHddsDatanodes().forEach(dn -> {
-              dn.getDatanodeStateMachine().getContainer().getContainerSet()
-                  .getContainer(info.getContainerID()).getContainerData()
-                  .setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+              Container cn =
+                  dn.getDatanodeStateMachine().getContainer().getContainerSet()
+                      .getContainer(info.getContainerID());
+              if (cn != null) {
+                cn.getContainerData()
+                    .setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+              }
             });
           });
-    });
+    });*/
 
     writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
