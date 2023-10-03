@@ -136,11 +136,19 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       defaultValue = "false")
   private static boolean compact;
 
+  @CommandLine.Option(names = {"--batch-size"},
+      description = "Batch size for processing DB data.",
+      defaultValue = "10000")
+  private int batchSize;
+
+  @CommandLine.Option(names = {"--thread-count"},
+      description = "Thread count for concurrent processing.",
+      defaultValue = "10")
+  private int threadCount;
+
   private static final String KEY_SEPARATOR_SCHEMA_V3 =
       new OzoneConfiguration().getObject(DatanodeConfiguration.class)
           .getContainerSchemaV3KeySeparator();
-  private static final int BATCH_SIZE = 10000;
-  private static final int THREAD_COUNT = 10;
   private static volatile boolean exception;
   private static final long FIRST_SEQUENCE_ID = 0L;
 
@@ -226,7 +234,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         .setNameFormat("DBScanner-%d")
         .build();
     ExecutorService threadPool = new ThreadPoolExecutor(
-        THREAD_COUNT, THREAD_COUNT, 60, TimeUnit.SECONDS,
+        threadCount, threadCount, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(1024), factory,
         new ThreadPoolExecutor.CallerRunsPolicy());
     LogWriter logWriter = new LogWriter(printWriter);
@@ -256,7 +264,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     if (startKey != null) {
       iterator.get().seek(getValueObject(dbColumnFamilyDef));
     }
-    ArrayList<ByteArrayKeyValue> batch = new ArrayList<>(BATCH_SIZE);
+    ArrayList<ByteArrayKeyValue> batch = new ArrayList<>(batchSize);
     // Used to ensure that the output of a multi-threaded parsed Json is in
     // the same order as the RocksDB iterator.
     long sequenceId = FIRST_SEQUENCE_ID;
@@ -268,8 +276,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           iterator.get().key(), iterator.get().value()));
       iterator.get().next();
       count++;
-      if (batch.size() >= BATCH_SIZE) {
-        while (logWriter.getInflightLogCount() > THREAD_COUNT * 10
+      if (batch.size() >= batchSize) {
+        while (logWriter.getInflightLogCount() > threadCount * 10L
             && !exception) {
           // Prevents too many unfinished Tasks from
           // consuming too much memory.
@@ -279,7 +287,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
                 withKey, schemaV3));
         futures.add(future);
-        batch = new ArrayList<>(BATCH_SIZE);
+        batch = new ArrayList<>(batchSize);
         sequenceId++;
       }
     }
