@@ -46,7 +46,7 @@ public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
         .getServer()
         .getProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    Assertions.assertEquals(TimeDuration.ONE_MILLISECOND, t,
+    Assertions.assertEquals(TimeDuration.ZERO, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
