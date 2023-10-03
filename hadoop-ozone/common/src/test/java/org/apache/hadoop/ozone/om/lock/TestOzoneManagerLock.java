@@ -18,23 +18,28 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
+import org.apache.hadoop.util.MetricUtil;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Class tests OzoneManagerLock.
@@ -416,13 +421,22 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
-        lock.acquireReadLock(resource, resourceName);
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        try (MockedStatic<MetricUtil> metricUtilMock =
+                 Mockito.mockStatic(MetricUtil.class)) {
+          metricUtilMock.when(() ->
+                  MetricUtil.executeMetricsUpdateAction(any(Runnable.class)))
+              .thenAnswer((invocation) -> {
+                ((Runnable) invocation.getArguments()[0]).run();
+                return null;
+              });
+          lock.acquireReadLock(resource, resourceName);
+          try {
+            Thread.sleep(500);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          lock.releaseReadLock(resource, resourceName);
         }
-        lock.releaseReadLock(resource, resourceName);
       });
       threads[i].start();
     }
@@ -452,13 +466,22 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
-        lock.acquireWriteLock(resource, resourceName);
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        try (MockedStatic<MetricUtil> metricUtilMock =
+                 Mockito.mockStatic(MetricUtil.class)) {
+          metricUtilMock.when(() ->
+                  MetricUtil.executeMetricsUpdateAction(any(Runnable.class)))
+              .thenAnswer((invocation) -> {
+                ((Runnable) invocation.getArguments()[0]).run();
+                return null;
+              });
+          lock.acquireWriteLock(resource, resourceName);
+          try {
+            Thread.sleep(100);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          lock.releaseWriteLock(resource, resourceName);
         }
-        lock.releaseWriteLock(resource, resourceName);
       });
       threads[i].start();
     }
@@ -489,13 +512,22 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < readThreads.length; i++) {
       readThreads[i] = new Thread(() -> {
-        lock.acquireReadLock(resource, resourceName);
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        try (MockedStatic<MetricUtil> metricUtilMock =
+                 Mockito.mockStatic(MetricUtil.class)) {
+          metricUtilMock.when(() ->
+                  MetricUtil.executeMetricsUpdateAction(any(Runnable.class)))
+              .thenAnswer((invocation) -> {
+                ((Runnable) invocation.getArguments()[0]).run();
+                return null;
+              });
+          lock.acquireReadLock(resource, resourceName);
+          try {
+            Thread.sleep(500);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          lock.releaseReadLock(resource, resourceName);
         }
-        lock.releaseReadLock(resource, resourceName);
       });
       readThreads[i].setName("ReadLockThread-" + i);
       readThreads[i].start();

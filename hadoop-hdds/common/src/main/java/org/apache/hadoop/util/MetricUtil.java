@@ -18,16 +18,29 @@
 package org.apache.hadoop.util;
 
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * Encloses helpers to deal with metrics.
  */
 public final class MetricUtil {
+
+  private static ExecutorService executor = Executors.newFixedThreadPool(10);
+
+  static {
+    ShutdownHookManager.get().addShutdownHook(() -> executor.shutdownNow(),
+        DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+  }
+
   private MetricUtil() {
   }
 
@@ -38,7 +51,8 @@ public final class MetricUtil {
     try {
       return block.get();
     } finally {
-      metric.add(Time.monotonicNowNanos() - start);
+      executeMetricsUpdateAction(() ->
+              metric.add(Time.monotonicNowNanos() - start));
     }
   }
 
@@ -49,7 +63,8 @@ public final class MetricUtil {
     try {
       block.run();
     } finally {
-      metric.add(Time.monotonicNowNanos() - start);
+      executeMetricsUpdateAction(() ->
+              metric.add(Time.monotonicNowNanos() - start));
     }
   }
 
@@ -60,7 +75,15 @@ public final class MetricUtil {
     try {
       return block.get();
     } finally {
-      latencySetter.accept(Time.monotonicNowNanos() - start);
+      executeMetricsUpdateAction(() ->
+              latencySetter.accept(Time.monotonicNowNanos() - start));
     }
   }
+
+  public static void executeMetricsUpdateAction(Runnable action) {
+    if (!executor.isTerminated() && !executor.isShutdown()) {
+      executor.submit(action);
+    }
+  }
+
 }

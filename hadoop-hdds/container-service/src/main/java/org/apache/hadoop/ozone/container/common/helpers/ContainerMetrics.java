@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  *
@@ -116,10 +117,12 @@ public class ContainerMetrics {
 
   public void incContainerOpsLatencies(ContainerProtos.Type type,
                                        long latencyMillis) {
-    opsLatency[type.ordinal()].add(latencyMillis);
-    for (MutableQuantiles q: opsLatQuantiles[type.ordinal()]) {
-      q.add(latencyMillis);
-    }
+    MetricUtil.executeMetricsUpdateAction(() -> {
+      opsLatency[type.ordinal()].add(latencyMillis);
+      for (MutableQuantiles q: opsLatQuantiles[type.ordinal()]) {
+        q.add(latencyMillis);
+      }
+    });
   }
 
   public void incContainerBytesStats(ContainerProtos.Type type, long bytes) {

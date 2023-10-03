@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * Metrics for any event watcher.
@@ -53,7 +54,7 @@ public class EventWatcherMetrics {
   }
 
   public void updateFinishingTime(long duration) {
-    completionTime.add(duration);
+    MetricUtil.executeMetricsUpdateAction(() -> completionTime.add(duration));
   }
 
   @VisibleForTesting

@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * Metrics for the usage of ContainerDB.
@@ -85,11 +86,11 @@ public final class ContainerCacheMetrics {
   }
 
   public void incDbCloseLatency(long millis) {
-    dbCloseLatency.add(millis);
+    MetricUtil.executeMetricsUpdateAction(() -> dbCloseLatency.add(millis));
   }
 
   public void incDbOpenLatency(long millis) {
-    dbOpenLatency.add(millis);
+    MetricUtil.executeMetricsUpdateAction(() -> dbOpenLatency.add(millis));
   }
 
   public long getNumDbGetOps() {

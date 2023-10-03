@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.util.MetricUtil;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -50,7 +51,7 @@ public final class ContainerDataScannerMetrics
   }
 
   public void incNumBytesScanned(long bytes) {
-    numBytesScanned.add(bytes);
+    MetricUtil.executeMetricsUpdateAction(() -> numBytesScanned.add(bytes));
   }
 
   private ContainerDataScannerMetrics(String name, MetricsSystem ms) {

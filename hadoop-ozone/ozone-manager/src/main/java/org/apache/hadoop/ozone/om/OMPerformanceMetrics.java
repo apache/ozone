@@ -20,6 +20,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * Including OM performance related metrics.
@@ -115,7 +116,8 @@ public class OMPerformanceMetrics {
 
 
   public void addLookupLatency(long latencyInNs) {
-    lookupLatencyNs.add(latencyInNs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            lookupLatencyNs.add(latencyInNs));
   }
 
   public MutableRate getLookupRefreshLocationLatencyNs() {
@@ -136,7 +138,8 @@ public class OMPerformanceMetrics {
   }
 
   public void addS3VolumeContextLatencyNs(long latencyInNs) {
-    s3VolumeContextLatencyNs.add(latencyInNs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            s3VolumeContextLatencyNs.add(latencyInNs));
   }
 
   public MutableRate getLookupResolveBucketLatencyNs() {
@@ -144,7 +147,8 @@ public class OMPerformanceMetrics {
   }
 
   public void addGetKeyInfoLatencyNs(long value) {
-    getKeyInfoLatencyNs.add(value);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            getKeyInfoLatencyNs.add(value));
   }
 
   public MutableRate getGetKeyInfoAclCheckLatencyNs() {
@@ -172,15 +176,18 @@ public class OMPerformanceMetrics {
   }
 
   public void setForceContainerCacheRefresh(boolean value) {
-    forceContainerCacheRefresh.add(value ? 1L : 0L);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            forceContainerCacheRefresh.add(value ? 1L : 0L));
   }
 
   public void setCheckAccessLatencyNs(long latencyInNs) {
-    checkAccessLatencyNs.add(latencyInNs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            checkAccessLatencyNs.add(latencyInNs));
   }
 
   public void addListKeysLatencyNs(long latencyInNs) {
-    listKeysLatencyNs.add(latencyInNs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            listKeysLatencyNs.add(latencyInNs));
   }
 
   public MutableRate getValidateRequestLatencyNs() {

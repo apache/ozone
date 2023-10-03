@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.MutableStat;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
@@ -107,7 +108,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void updateFlushTime(long time) {
-    flushTime.add(time);
+    MetricUtil.executeMetricsUpdateAction(() -> flushTime.add(time));
   }
 
   @VisibleForTesting
@@ -124,7 +125,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void updateQueueSize(long size) {
-    queueSize.add(size);
+    MetricUtil.executeMetricsUpdateAction(() -> queueSize.add(size));
   }
 
   @VisibleForTesting

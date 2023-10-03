@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * This class is for maintaining the various Ozone Manager Lock Metrics.
@@ -84,7 +85,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param readLockWaitingTimeMs read lock waiting time (ms)
    */
   public void setReadLockWaitingTimeMsStat(long readLockWaitingTimeMs) {
-    this.readLockWaitingTimeMsStat.add(readLockWaitingTimeMs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            this.readLockWaitingTimeMsStat.add(readLockWaitingTimeMs));
   }
 
   /**
@@ -93,7 +95,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param readLockHeldTimeMs read lock held time (ms)
    */
   public void setReadLockHeldTimeMsStat(long readLockHeldTimeMs) {
-    this.readLockHeldTimeMsStat.add(readLockHeldTimeMs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            this.readLockHeldTimeMsStat.add(readLockHeldTimeMs));
   }
 
   /**
@@ -102,7 +105,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param writeLockWaitingTimeMs write lock waiting time (ms)
    */
   public void setWriteLockWaitingTimeMsStat(long writeLockWaitingTimeMs) {
-    this.writeLockWaitingTimeMsStat.add(writeLockWaitingTimeMs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            this.writeLockWaitingTimeMsStat.add(writeLockWaitingTimeMs));
   }
 
   /**
@@ -111,7 +115,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param writeLockHeldTimeMs write lock held time (ms)
    */
   public void setWriteLockHeldTimeMsStat(long writeLockHeldTimeMs) {
-    this.writeLockHeldTimeMsStat.add(writeLockHeldTimeMs);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            this.writeLockHeldTimeMsStat.add(writeLockHeldTimeMs));
   }
 
   /**

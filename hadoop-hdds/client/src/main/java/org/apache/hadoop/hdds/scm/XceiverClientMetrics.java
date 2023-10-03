@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * The client metrics for the Storage Container protocol.
@@ -95,7 +96,8 @@ public class XceiverClientMetrics {
 
   public void addContainerOpsLatency(ContainerProtos.Type type,
       long latencyMillis) {
-    containerOpsLatency[type.ordinal()].add(latencyMillis);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            containerOpsLatency[type.ordinal()].add(latencyMillis));
   }
 
   public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {

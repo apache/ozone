@@ -33,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,25 +156,29 @@ public class GrpcMetrics implements MetricsSource {
   }
 
   public void addGrpcQueueTime(int queueTime) {
-    grpcQueueTime.add(queueTime);
-    if (grpcQuantileEnable) {
-      for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
-        if (q != null) {
-          q.add(queueTime);
+    MetricUtil.executeMetricsUpdateAction(() -> {
+      grpcQueueTime.add(queueTime);
+      if (grpcQuantileEnable) {
+        for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
+          if (q != null) {
+            q.add(queueTime);
+          }
         }
       }
-    }
+    });
   }
 
   public void addGrpcProcessingTime(int processingTime) {
-    grpcProcessingTime.add(processingTime);
-    if (grpcQuantileEnable) {
-      for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
-        if (q != null) {
-          q.add(processingTime);
+    MetricUtil.executeMetricsUpdateAction(() -> {
+      grpcProcessingTime.add(processingTime);
+      if (grpcQuantileEnable) {
+        for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
+          if (q != null) {
+            q.add(processingTime);
+          }
         }
       }
-    }
+    });
   }
 
   public void inrcNumOpenClientConnections() {

@@ -1721,7 +1721,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         LOG.error("Closing certificate client failed", ioe);
       }
     }
-
     try {
       LOG.info("Stopping SCM MetadataStore.");
       scmMetadataStore.stop();

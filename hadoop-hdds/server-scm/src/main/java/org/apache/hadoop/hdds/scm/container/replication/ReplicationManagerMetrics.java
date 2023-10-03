@@ -39,6 +39,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
+import org.apache.hadoop.util.MetricUtil;
 
 /**
  * Class contains metrics related to ReplicationManager.
@@ -359,11 +360,12 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public void addReplicationTime(long millis) {
-    this.replicationTime.add(millis);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            this.replicationTime.add(millis));
   }
 
   public void addDeletionTime(long millis) {
-    this.deletionTime.add(millis);
+    MetricUtil.executeMetricsUpdateAction(() -> this.deletionTime.add(millis));
   }
 
   public void incrInflightSkipped(InflightType type) {

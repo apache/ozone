@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.util.MetricUtil;
 import org.apache.ratis.protocol.RaftGroupId;
 
 /**
@@ -198,8 +199,10 @@ public class CSMMetrics {
 
   public void incPipelineLatencyMs(ContainerProtos.Type type,
       long latencyMillis) {
-    opsLatencyMs[type.ordinal()].add(latencyMillis);
-    transactionLatencyMs.add(latencyMillis);
+    MetricUtil.executeMetricsUpdateAction(() -> {
+      opsLatencyMs[type.ordinal()].add(latencyMillis);
+      transactionLatencyMs.add(latencyMillis);
+    });
   }
 
   public void incNumStartTransactionVerifyFailures() {
@@ -211,11 +214,13 @@ public class CSMMetrics {
   }
 
   public void recordApplyTransactionCompletionNs(long latencyNanos) {
-    applyTransactionNs.add(latencyNanos);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            applyTransactionNs.add(latencyNanos));
   }
 
   public void recordWriteStateMachineCompletionNs(long latencyNanos) {
-    writeStateMachineDataNs.add(latencyNanos);
+    MetricUtil.executeMetricsUpdateAction(() ->
+            writeStateMachineDataNs.add(latencyNanos));
   }
 
   public void incNumDataCacheMiss() {
