@@ -164,6 +164,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
 
+  private static final int LONG_MAX_STR_LEN =
+      String.valueOf(Long.MAX_VALUE).length();
+
   /**
    * Used during DAG reconstruction.
    */
@@ -547,11 +550,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   @VisibleForTesting
   void addToCompactionLogTable(CompactionLogEntry compactionLogEntry) {
+    String dbSequenceIdStr =
+        String.valueOf(compactionLogEntry.getDbSequenceNumber());
+
+    if (dbSequenceIdStr.length() < LONG_MAX_STR_LEN) {
+      // Pad zeroes to the left to make sure it is lexicographic ordering.
+      dbSequenceIdStr = org.apache.commons.lang3.StringUtils.leftPad(
+          dbSequenceIdStr, LONG_MAX_STR_LEN, "0");
+    }
+
     // Key in the transactionId-currentTime
     // Just trxId can't be used because multiple compaction might be
     // running, and it is possible no new entry was added to DB.
     // Adding current time to transactionId eliminates key collision.
-    String keyString = compactionLogEntry.getDbSequenceNumber() + "-" +
+    String keyString = dbSequenceIdStr + "-" +
         compactionLogEntry.getCompactionTime();
 
     byte[] key = keyString.getBytes(UTF_8);
@@ -699,7 +711,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             line.substring(COMPACTION_LOG_COMMENT_LINE_PREFIX.length());
       } else if (line.startsWith(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX)) {
         reconstructionSnapshotCreationTime =
-            getSnapshotCreationTimeFromLogLing(line);
+            getSnapshotCreationTimeFromLogLine(line);
       } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
         // Compaction log entry is like following:
         // C sequence_number input_files:output_files
@@ -1179,9 +1191,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     if (!shouldRun()) {
       return;
     }
-    Pair<List<String>, List<byte[]>> fileNodeToKeyPair =
+    Pair<Set<String>, List<byte[]>> fileNodeToKeyPair =
         getOlderFileNodes();
-    List<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
+    Set<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
     List<byte[]> keysToRemove = fileNodeToKeyPair.getRight();
 
     Set<String> sstFileNodesRemoved =
@@ -1205,9 +1217,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Returns the list of input files from the compaction entries which are
    * older than the maximum allowed in the compaction DAG.
    */
-  private synchronized Pair<List<String>, List<byte[]>> getOlderFileNodes() {
+  private synchronized Pair<Set<String>, List<byte[]>> getOlderFileNodes() {
     long compactionLogPruneStartTime = System.currentTimeMillis();
-    List<String> compactionNodes = new ArrayList<>();
+    Set<String> compactionNodes = new HashSet<>();
     List<byte[]> keysToRemove = new ArrayList<>();
 
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
@@ -1268,7 +1280,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Prunes forward and backward DAGs when oldest snapshot with compaction
    * history gets deleted.
    */
-  public Set<String> pruneSstFileNodesFromDag(List<String> sstFileNodes) {
+  public Set<String> pruneSstFileNodesFromDag(Set<String> sstFileNodes) {
     Set<CompactionNode> startNodes = new HashSet<>();
     for (String sstFileNode : sstFileNodes) {
       CompactionNode infileNode = compactionNodeMap.get(sstFileNode);
@@ -1349,7 +1361,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return removedFiles;
   }
 
-  private long getSnapshotCreationTimeFromLogLing(String logLine) {
+  private long getSnapshotCreationTimeFromLogLine(String logLine) {
     // Remove `S ` from the line.
     String line =
         logLine.substring(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX.length());
