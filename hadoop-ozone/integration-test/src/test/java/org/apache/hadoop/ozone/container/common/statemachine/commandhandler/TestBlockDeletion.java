@@ -244,12 +244,14 @@ public class TestBlockDeletion {
     omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
       locationInfo.forEach(
-          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-              .getContainer().getContainerSet()
-              .getContainer(info.getContainerID()).getContainerData()
-              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
+          (info) -> {
+            cluster.getHddsDatanodes().forEach(dn -> {
+              dn.getDatanodeStateMachine().getContainer().getContainerSet()
+                  .getContainer(info.getContainerID()).getContainerData()
+                  .setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+            });
+          });
     });
-
 
     writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
