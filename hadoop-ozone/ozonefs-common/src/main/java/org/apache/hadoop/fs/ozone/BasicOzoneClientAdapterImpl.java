@@ -707,14 +707,23 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
         OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
         if (takeTemporaryToSnapshot) {
-          objectStore.deleteSnapshot(snapPath.getVolumeName(),
-              snapPath.getBucketName(), toSnapshot);
+          deleteSnapshot(toSnapshot, snapPath);
         }
         if (takeTemporaryFromSnapshot) {
-          objectStore.deleteSnapshot(snapPath.getVolumeName(),
-              snapPath.getBucketName(), fromSnapshot);
+          deleteSnapshot(fromSnapshot, snapPath);
         }
       }
+    }
+  }
+
+  private void deleteSnapshot(String snapshot, OFSPath snapPath) {
+    try {
+      objectStore.deleteSnapshot(snapPath.getVolumeName(),
+          snapPath.getBucketName(), snapshot);
+    } catch (IOException exception) {
+      LOG.warn("Failed to delete the temp snapshot with name {} in bucket"
+              + " {} and volume {} after snapDiff op.", snapshot,
+          snapPath.getBucketName(), snapPath.getVolumeName());
     }
   }
 
