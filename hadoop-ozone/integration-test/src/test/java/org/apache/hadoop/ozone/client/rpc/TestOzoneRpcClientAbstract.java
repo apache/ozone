@@ -898,6 +898,48 @@ public abstract class TestOzoneRpcClientAbstract {
     );
   }
 
+  @Test
+  public void testDeleteLinkedBucket()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String linkedBucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    assertNotNull(bucket);
+
+    volume.createBucket(linkedBucketName,
+        BucketArgs.newBuilder()
+            .setSourceBucket(bucketName)
+            .setSourceVolume(volumeName)
+            .build());
+    OzoneBucket linkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(linkedBucket);
+
+    volume.deleteBucket(bucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(bucketName)
+    );
+    //now linkedBucketName has become a dangling one
+    //should still be possible to get its info
+    OzoneBucket danglingLinkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(danglingLinkedBucket);
+
+    //now delete the dangling linked bucket
+    volume.deleteBucket(linkedBucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(linkedBucketName)
+    );
+
+    store.deleteVolume(volumeName);
+  }
+
   private void verifyReplication(String volumeName, String bucketName,
       String keyName, ReplicationConfig replication)
       throws IOException {
