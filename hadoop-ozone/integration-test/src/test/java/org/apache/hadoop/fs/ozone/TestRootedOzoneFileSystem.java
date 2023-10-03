@@ -2244,8 +2244,8 @@ public class TestRootedOzoneFileSystem {
     OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test", conf);
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
-    Assert.assertEquals(key.getReplicationConfig().getReplicationType().name(),
-        ReplicationType.RATIS.name());
+    Assert.assertEquals(key.getReplicationConfig(bucket.getReplicationConfig())
+        .getReplicationType().name(), ReplicationType.RATIS.name());
   }
 
   @Test
@@ -2275,7 +2275,8 @@ public class TestRootedOzoneFileSystem {
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
     Assert.assertEquals(ReplicationType.EC.name(),
-        key.getReplicationConfig().getReplicationType().name());
+        key.getReplicationConfig(bucket.getReplicationConfig())
+            .getReplicationType().name());
   }
 
   @Test

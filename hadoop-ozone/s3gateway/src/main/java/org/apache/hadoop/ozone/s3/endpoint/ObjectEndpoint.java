@@ -535,7 +535,8 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
-        .header("ETag", "" + key.getModificationTime())
+        .header("ETag", "" + key.getModificationTime(
+            getBucket(key.getBucketName()).getModificationTime()))
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
@@ -854,8 +855,9 @@ public class ObjectEndpoint extends EndpointBase {
 
           OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
               volume.getName(), sourceBucket, sourceKey);
-          Long sourceKeyModificationTime = sourceKeyDetails
-              .getModificationTime().toEpochMilli();
+          Long sourceKeyModificationTime = sourceKeyDetails.getModificationTime(
+                  getBucket(sourceKeyDetails.getBucketName()).
+                      getModificationTime()).toEpochMilli();
           String copySourceIfModifiedSince =
               headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
           String copySourceIfUnmodifiedSince =
@@ -1083,7 +1085,8 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().updateCopyObjectSuccessStats(startNanos);
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
-      copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
+      copyObjectResponse.setLastModified(destKeyDetails.getModificationTime(
+          getBucket(destKeyDetails.getBucketName()).getModificationTime()));
       return copyObjectResponse;
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {

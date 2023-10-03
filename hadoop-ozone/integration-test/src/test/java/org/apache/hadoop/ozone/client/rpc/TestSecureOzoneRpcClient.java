@@ -227,8 +227,10 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
           keyName, ReplicationType.RATIS,
           ReplicationFactor.ONE));
       assertEquals(value, new String(fileContent, UTF_8));
-      assertFalse(key.getCreationTime().isBefore(testStartTime));
-      assertFalse(key.getModificationTime().isBefore(testStartTime));
+      assertFalse(key.getCreationTime(bucket.getCreationTime())
+          .isBefore(testStartTime));
+      assertFalse(key.getModificationTime(bucket.getModificationTime())
+          .isBefore(testStartTime));
     }
   }
 

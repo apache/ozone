@@ -168,8 +168,10 @@ public class TestOzoneClient {
       Assert.assertEquals(value.length(), is.read(fileContent));
       is.close();
       Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getCreationTime(bucket.getCreationTime())
+          .isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime(bucket.getModificationTime())
+          .isBefore(testStartTime));
     }
   }
 

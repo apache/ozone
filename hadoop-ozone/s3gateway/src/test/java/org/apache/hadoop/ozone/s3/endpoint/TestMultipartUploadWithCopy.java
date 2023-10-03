@@ -100,7 +100,9 @@ public class TestMultipartUploadWithCopy {
     sourceKeyLastModificationTime = CLIENT.getObjectStore()
         .getS3Bucket(OzoneConsts.S3_BUCKET)
         .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
+        .getModificationTime(
+            CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+                .getModificationTime()).toEpochMilli();
     beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     afterSourceKeyModificationTimeStr =

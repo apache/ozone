@@ -231,8 +231,9 @@ public class TestOzoneManagerRestart {
     // Get newKey1.
     OzoneKey ozoneKey = ozoneBucket.getKey(newKey1);
     Assert.assertTrue(ozoneKey.getName().equals(newKey1));
-    Assert.assertTrue(ozoneKey.getReplicationType().equals(
-        ReplicationType.RATIS));
+    Assert.assertTrue(
+        ozoneKey.getReplicationType(ozoneBucket.getReplicationConfig())
+            .equals(ReplicationType.RATIS));
 
     // Get newKey2, it should not exist
     try {

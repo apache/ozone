@@ -981,8 +981,10 @@ public abstract class TestOzoneRpcClientAbstract {
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE));
         assertEquals(value, new String(fileContent, UTF_8));
-        assertFalse(key.getCreationTime().isBefore(testStartTime));
-        assertFalse(key.getModificationTime().isBefore(testStartTime));
+        assertFalse(key.getCreationTime(bucket.getCreationTime())
+            .isBefore(testStartTime));
+        assertFalse(key.getModificationTime(bucket.getModificationTime())
+            .isBefore(testStartTime));
       }
     }
   }
@@ -1542,8 +1544,10 @@ public abstract class TestOzoneRpcClientAbstract {
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE));
         assertEquals(value, new String(fileContent, UTF_8));
-        assertFalse(key.getCreationTime().isBefore(testStartTime));
-        assertFalse(key.getModificationTime().isBefore(testStartTime));
+        assertFalse(key.getCreationTime(bucket.getCreationTime())
+            .isBefore(testStartTime));
+        assertFalse(key.getModificationTime(bucket.getModificationTime())
+            .isBefore(testStartTime));
       }
     }
   }
@@ -1577,8 +1581,10 @@ public abstract class TestOzoneRpcClientAbstract {
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE));
         assertEquals(value, new String(fileContent, UTF_8));
-        assertFalse(key.getCreationTime().isBefore(testStartTime));
-        assertFalse(key.getModificationTime().isBefore(testStartTime));
+        assertFalse(key.getCreationTime(bucket.getCreationTime())
+            .isBefore(testStartTime));
+        assertFalse(key.getModificationTime(bucket.getModificationTime())
+            .isBefore(testStartTime));
       }
     }
   }
@@ -1619,8 +1625,10 @@ public abstract class TestOzoneRpcClientAbstract {
                     HddsProtos.ReplicationFactor.THREE));
             assertEquals(data, new String(fileContent, UTF_8));
           }
-          assertFalse(key.getCreationTime().isBefore(testStartTime));
-          assertFalse(key.getModificationTime().isBefore(testStartTime));
+          assertFalse(key.getCreationTime(bucket.getCreationTime())
+              .isBefore(testStartTime));
+          assertFalse(key.getModificationTime(bucket.getModificationTime())
+              .isBefore(testStartTime));
         }
         latch.countDown();
       } catch (IOException ex) {
@@ -4024,9 +4032,11 @@ public abstract class TestOzoneRpcClientAbstract {
     assertEquals(bucketName, key.getBucketName());
     assertEquals(keyName, key.getName());
     assertEquals(replicationConfig.getReplicationType(),
-        key.getReplicationConfig().getReplicationType());
+        key.getReplicationConfig(bucket.getReplicationConfig())
+            .getReplicationType());
     assertEquals(replicationConfig.getRequiredNodes(),
-        key.getReplicationConfig().getRequiredNodes());
+        key.getReplicationConfig(bucket.getReplicationConfig())
+            .getRequiredNodes());
     assertEquals(value.getBytes(UTF_8).length, key.getDataSize());
 
     try {

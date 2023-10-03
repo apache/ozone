@@ -507,7 +507,8 @@ public class TestListKeysWithFSO {
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
-      Assert.assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
+      Assert.assertEquals(expectedReplication,
+          ozoneKey.getReplicationConfig(fsoBucket.getReplicationConfig()));
       keyLists.add(ozoneKey.getName());
     }
     LinkedList outputKeysList = new LinkedList(keyLists);

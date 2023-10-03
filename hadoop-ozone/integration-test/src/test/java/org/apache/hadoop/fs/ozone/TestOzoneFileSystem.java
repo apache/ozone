@@ -1576,7 +1576,8 @@ public class TestOzoneFileSystem {
       throws IOException {
     o3FS.createFile(keyPath).build().close();
     Assert.assertEquals(expectedType.name(),
-        bucket.getKey(o3FS.pathToKey(keyPath)).getReplicationConfig()
+        bucket.getKey(o3FS.pathToKey(keyPath))
+            .getReplicationConfig(bucket.getReplicationConfig())
             .getReplicationType().name());
   }
 

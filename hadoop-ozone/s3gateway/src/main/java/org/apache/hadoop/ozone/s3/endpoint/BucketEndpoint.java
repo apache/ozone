@@ -694,19 +694,23 @@ public class BucketEndpoint extends EndpointBase {
     return ozoneAclList;
   }
 
-  private void addKey(ListObjectResponse response, OzoneKey next) {
+  private void addKey(ListObjectResponse response, OzoneKey next)
+      throws OS3Exception, IOException {
     KeyMetadata keyMetadata = new KeyMetadata();
     keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
         response.getEncodingType()));
     keyMetadata.setSize(next.getDataSize());
-    keyMetadata.setETag("" + next.getModificationTime());
-    if (next.getReplicationType().toString().equals(ReplicationType
-        .STAND_ALONE.toString())) {
+    keyMetadata.setETag("" + next.getModificationTime(
+        getBucket(next.getBucketName()).getModificationTime()));
+    if (next.getReplicationType(
+            getBucket(next.getBucketName()).getReplicationConfig()).toString()
+        .equals(ReplicationType.STAND_ALONE.toString())) {
       keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
     } else {
       keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
     }
-    keyMetadata.setLastModified(next.getModificationTime());
+    keyMetadata.setLastModified(next.getModificationTime(
+        getBucket(next.getBucketName()).getModificationTime()));
     response.addKey(keyMetadata);
   }
 

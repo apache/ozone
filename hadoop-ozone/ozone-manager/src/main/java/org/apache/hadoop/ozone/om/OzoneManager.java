@@ -299,6 +299,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo.fromOmKeyInfoWithBucketConfig;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.S3_SECRET_STORAGE_TYPE;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
@@ -2848,12 +2849,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String bucketName,
                                            String startKey, String keyPrefix,
                                            int maxKeys) throws IOException {
+    OmBucketInfo omBucketInfo =
+        bucketManager.getBucketInfo(volumeName, bucketName);
+
     ListKeysResult listKeysResult =
         listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
     List<OmKeyInfo> keys = listKeysResult.getKeys();
-    List<BasicOmKeyInfo> basicKeysList =
-        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
-            .collect(Collectors.toList());
+    List<BasicOmKeyInfo> basicKeysList = keys.stream().map(
+            key -> fromOmKeyInfoWithBucketConfig(key,
+                omBucketInfo.getDefaultReplicationConfig(),
+                omBucketInfo.getCreationTime(),
+                omBucketInfo.getModificationTime()))
+        .collect(Collectors.toList());
 
     return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }

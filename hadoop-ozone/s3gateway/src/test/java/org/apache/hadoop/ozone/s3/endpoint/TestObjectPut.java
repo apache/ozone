@@ -129,7 +129,9 @@ public class TestObjectPut {
 
     Assert.assertEquals(ecReplicationConfig,
         clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName)
-            .getReplicationConfig());
+            .getReplicationConfig(
+                clientStub.getObjectStore().getS3Bucket(bucketName)
+                    .getReplicationConfig()));
     OzoneInputStream ozoneInputStream =
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
@@ -297,7 +299,9 @@ public class TestObjectPut {
 
 
     //default type is set
-    Assert.assertEquals(ReplicationType.RATIS, key.getReplicationType());
+    Assert.assertEquals(ReplicationType.RATIS, key.getReplicationType(
+        clientStub.getObjectStore().getS3Bucket(bucketName)
+            .getReplicationConfig()));
   }
 
   @Test

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
@@ -29,6 +30,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
  * Lightweight OmKeyInfo class.
  */
 public class BasicOmKeyInfo {
+
+  public static final long DEFAULT_CREATION_TIME_VALUE = Long.MIN_VALUE;
+  public static final long DEFAULT_MODIFICATION_TIME_VALUE = Long.MIN_VALUE;
 
   private String volumeName;
   private String bucketName;
@@ -147,15 +151,21 @@ public class BasicOmKeyInfo {
   public BasicKeyInfo getProtobuf() {
     BasicKeyInfo.Builder builder = BasicKeyInfo.newBuilder()
         .setKeyName(keyName)
-        .setDataSize(dataSize)
-        .setCreationTime(creationTime)
-        .setModificationTime(modificationTime)
-        .setType(replicationConfig.getReplicationType());
-    if (replicationConfig instanceof ECReplicationConfig) {
-      builder.setEcReplicationConfig(
-          ((ECReplicationConfig) replicationConfig).toProto());
-    } else {
-      builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+        .setDataSize(dataSize);
+    if (creationTime != DEFAULT_CREATION_TIME_VALUE) {
+      builder.setCreationTime(creationTime);
+    }
+    if (modificationTime != DEFAULT_MODIFICATION_TIME_VALUE) {
+      builder.setModificationTime(modificationTime);
+    }
+    if (replicationConfig != null) {
+      builder.setType(replicationConfig.getReplicationType());
+      if (replicationConfig instanceof ECReplicationConfig) {
+        builder.setEcReplicationConfig(
+            ((ECReplicationConfig) replicationConfig).toProto());
+      } else {
+        builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+      }
     }
 
     return builder.build();
@@ -175,13 +185,29 @@ public class BasicOmKeyInfo {
         .setBucketName(request.getBucketName())
         .setKeyName(keyName)
         .setDataSize(basicKeyInfo.getDataSize())
-        .setCreationTime(basicKeyInfo.getCreationTime())
-        .setModificationTime(basicKeyInfo.getModificationTime())
-        .setReplicationConfig(ReplicationConfig.fromProto(
-            basicKeyInfo.getType(),
-            basicKeyInfo.getFactor(),
-            basicKeyInfo.getEcReplicationConfig()))
         .setIsFile(!keyName.endsWith("/"));
+
+    if (basicKeyInfo.hasCreationTime()) {
+      builder.setCreationTime(basicKeyInfo.getCreationTime());
+    } else {
+      builder.setCreationTime(DEFAULT_CREATION_TIME_VALUE);
+    }
+
+    if (basicKeyInfo.hasModificationTime()) {
+      builder.setModificationTime(basicKeyInfo.getModificationTime());
+    } else {
+      builder.setCreationTime(DEFAULT_MODIFICATION_TIME_VALUE);
+    }
+
+    if (basicKeyInfo.hasType() && basicKeyInfo.hasFactor() &&
+        basicKeyInfo.hasEcReplicationConfig()) {
+      builder.setReplicationConfig(ReplicationConfig.fromProto(
+          basicKeyInfo.getType(),
+          basicKeyInfo.getFactor(),
+          basicKeyInfo.getEcReplicationConfig()));
+    } else {
+      builder.setReplicationConfig(null);
+    }
 
     return builder.build();
   }
@@ -217,6 +243,42 @@ public class BasicOmKeyInfo {
         omKeyInfo.getCreationTime(),
         omKeyInfo.getModificationTime(),
         omKeyInfo.getReplicationConfig(),
+        omKeyInfo.isFile());
+  }
+
+  public static BasicOmKeyInfo fromOmKeyInfoWithBucketConfig(
+      OmKeyInfo omKeyInfo,
+      DefaultReplicationConfig bucketDefaultReplicationConfig,
+      long bucketCreationTime, long bucketModificationTime) {
+
+    ReplicationConfig keyReplicationConfig = omKeyInfo.getReplicationConfig();
+    long keyCreationTime = omKeyInfo.getCreationTime();
+    long keyModificationTime = omKeyInfo.getModificationTime();
+
+    ReplicationConfig bucketReplicationConfig =
+        bucketDefaultReplicationConfig != null ?
+            bucketDefaultReplicationConfig.getReplicationConfig() : null;
+
+    if (keyReplicationConfig.equals(bucketReplicationConfig)) {
+      keyReplicationConfig = null;
+    }
+
+    if (keyCreationTime == bucketCreationTime) {
+      keyCreationTime = DEFAULT_CREATION_TIME_VALUE;
+    }
+
+    if (keyModificationTime == bucketModificationTime) {
+      keyModificationTime = DEFAULT_MODIFICATION_TIME_VALUE;
+    }
+
+    return new BasicOmKeyInfo(
+        omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(),
+        omKeyInfo.getDataSize(),
+        keyCreationTime,
+        keyModificationTime,
+        keyReplicationConfig,
         omKeyInfo.isFile());
   }
 }

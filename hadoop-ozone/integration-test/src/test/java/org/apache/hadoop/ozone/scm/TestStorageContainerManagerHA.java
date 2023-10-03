@@ -193,8 +193,11 @@ public class TestStorageContainerManagerHA {
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
       is.read(fileContent);
       Assertions.assertEquals(value, new String(fileContent, UTF_8));
-      Assertions.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assertions.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assertions.assertFalse(key.getCreationTime(bucket.getCreationTime())
+          .isBefore(testStartTime));
+      Assertions.assertFalse(
+          key.getModificationTime(bucket.getModificationTime())
+              .isBefore(testStartTime));
       is.close();
       final OmKeyArgs keyArgs = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)

@@ -239,7 +239,8 @@ public class TestECKeyOutputStream {
       }
     }
     OzoneKeyDetails key = bucket.getKey(keyName);
-    Assert.assertEquals(replicationConfig, key.getReplicationConfig());
+    Assert.assertEquals(replicationConfig,
+        key.getReplicationConfig(bucket.getReplicationConfig()));
   }
 
   @Test

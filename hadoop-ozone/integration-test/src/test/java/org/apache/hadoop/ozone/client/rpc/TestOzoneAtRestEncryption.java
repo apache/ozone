@@ -275,8 +275,10 @@ class TestOzoneAtRestEncryption {
         bucket.getName(), keyName, RATIS,
         ONE));
     assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
-    assertFalse(key.getCreationTime().isBefore(testStartTime));
-    assertFalse(key.getModificationTime().isBefore(testStartTime));
+    assertFalse(
+        key.getCreationTime(bucket.getCreationTime()).isBefore(testStartTime));
+    assertFalse(key.getModificationTime(bucket.getModificationTime())
+        .isBefore(testStartTime));
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
@@ -357,8 +359,10 @@ class TestOzoneAtRestEncryption {
         keyName, RATIS,
         ONE));
     assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
-    assertFalse(key.getCreationTime().isBefore(testStartTime));
-    assertFalse(key.getModificationTime().isBefore(testStartTime));
+    assertFalse(
+        key.getCreationTime(bucket.getCreationTime()).isBefore(testStartTime));
+    assertFalse(key.getModificationTime(bucket.getModificationTime())
+        .isBefore(testStartTime));
     assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     //As TDE is enabled, the TDE encryption details should not be null.
     assertNotNull(key.getFileEncryptionInfo());
