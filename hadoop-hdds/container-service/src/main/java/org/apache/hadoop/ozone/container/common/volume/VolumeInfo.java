@@ -32,6 +32,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.container.common.volume.VolumeUsage.PrecomputedVolumeSpace;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
@@ -237,6 +238,15 @@ public final class VolumeInfo {
   public long getAvailable() {
     long avail = getCapacity() - usage.getUsedSpace();
     return Math.max(Math.min(avail, usage.getAvailable()), 0);
+  }
+
+  public long getAvailable(PrecomputedVolumeSpace precomputedValues) {
+    long avail = precomputedValues.getCapacity() - usage.getUsedSpace();
+    return Math.max(Math.min(avail, usage.getAvailable(precomputedValues)), 0);
+  }
+
+  public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
+    return usage.getPrecomputedVolumeSpace();
   }
 
   public void incrementUsedSpace(long usedSpace) {
