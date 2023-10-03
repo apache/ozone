@@ -37,11 +37,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
@@ -51,17 +49,14 @@ import static org.apache.hadoop.ozone.container.common.interfaces.Container.Scan
 public class ContainerController {
 
   private final ContainerSet containerSet;
-  private OzoneContainer ozoneContainer;
   private final Map<ContainerType, Handler> handlers;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerController.class);
 
   public ContainerController(final ContainerSet containerSet,
-                             final Map<ContainerType, Handler> handlers,
-                             OzoneContainer ozoneContainer) {
+      final Map<ContainerType, Handler> handlers) {
     this.containerSet = containerSet;
     this.handlers = handlers;
-    this.ozoneContainer = ozoneContainer;
   }
 
   /**
@@ -87,14 +82,12 @@ public class ContainerController {
    * Marks the container for closing. Moves the container to CLOSING state.
    *
    * @param containerId Id of the container to update
-   * @param uuid
    * @throws IOException in case of exception
    */
-  public void markContainerForClose(final long containerId, UUID uuid)
+  public void markContainerForClose(final long containerId)
       throws IOException {
     Container container = containerSet.getContainer(containerId);
     if (container == null) {
-      LOG.error("Container #{} is null on DN: {}", containerId, uuid);
       String warning;
       Set<Long> missingContainerSet = containerSet.getMissingContainerSet();
       if (missingContainerSet.contains(containerId)) {
@@ -103,16 +96,10 @@ public class ContainerController {
       } else {
         warning = "The Container is not found. ContainerID: " + containerId;
       }
-      LOG.error(warning);
+      LOG.warn(warning);
       throw new ContainerNotFoundException(warning);
     } else {
-      LOG.info(
-          "container.getContainerState(): {} for container #{} for DN: {}",
-          container.getContainerState(), containerId, uuid);
-
       if (container.getContainerState() == State.OPEN) {
-        LOG.error("About to mark container #{} as closing for DN: {}",
-            containerId, uuid);
         getHandler(container).markContainerForClose(container);
       }
     }
@@ -169,10 +156,6 @@ public class ContainerController {
    */
   public void closeContainer(final long containerId) throws IOException {
     final Container container = containerSet.getContainer(containerId);
-    LOG.info("closeContainer method call hierarchy: {} for container #{} " +
-            "on DN: {}", Arrays.toString(
-            Thread.currentThread().getStackTrace()), containerId,
-        ozoneContainer.getDatanodeDetails().getUuid());
     getHandler(container).closeContainer(container);
   }
 

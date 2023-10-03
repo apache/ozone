@@ -121,8 +121,6 @@ public class BlockDeletingTask implements BackgroundTask {
     ContainerBackgroundTaskResult result =
         new ContainerBackgroundTaskResult();
     while (blocksToDelete > 0) {
-      LOG.error("Start handleDeleteTask at DN: {}",
-          ozoneContainer.getDatanodeDetails().getUuid());
       ContainerBackgroundTaskResult crr = handleDeleteTask();
       if (blocksToDelete > 0 && crr.getSize() == 0) {
         LOG.warn("Block deletion failed, remaining Blocks to be deleted {}," +
@@ -351,9 +349,8 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      LOG.info("Container : {}, To-Delete blocks : {} at DN: {} ",
-          containerData.getContainerID(), delBlocks.size(),
-          ozoneContainer.getDatanodeDetails().getUuid());
+      LOG.debug("Container : {}, To-Delete blocks : {}",
+          containerData.getContainerID(), delBlocks.size());
 
       Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
           .getHandler(container.getContainerType()));
@@ -406,7 +403,7 @@ public class BlockDeletingTask implements BackgroundTask {
         metrics.incrSuccessBytes(releasedBytes);
       }
 
-      LOG.info("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
+      LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
               "task elapsed time: {}ms", containerData.getContainerID(),
           deletedBlocksCount, releasedBytes, Time.monotonicNow() - startTime);
 
@@ -437,8 +434,7 @@ public class BlockDeletingTask implements BackgroundTask {
       for (Long blkLong : entry.getLocalIDList()) {
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
-        LOG.info("Deleting block {} at DN: {}", blkLong,
-            ozoneContainer.getDatanodeDetails().getUuid());
+        LOG.debug("Deleting block {}", blkLong);
         if (blkInfo == null) {
           try {
             handler.deleteUnreferenced(container, blkLong);
@@ -457,8 +453,6 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, blkInfo);
           blocksDeleted++;
           deleted = true;
-          LOG.info("Block Deleted at DN: {}",
-              ozoneContainer.getDatanodeDetails().getUuid());
         } catch (IOException e) {
           // TODO: if deletion of certain block retries exceed the certain
           //  number of times, service should skip deleting it,

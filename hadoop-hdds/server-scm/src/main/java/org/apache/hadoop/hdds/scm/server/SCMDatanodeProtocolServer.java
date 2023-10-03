@@ -305,9 +305,6 @@ public class SCMDatanodeProtocolServer implements
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.SEND_HEARTBEAT, auditMap)
         );
-        LOG.info("Sending command {} to DN: {}",
-            flatten(cmdResponses.toString()),
-            heartbeat.getDatanodeDetails().getUuid());
       }
     }
   }

@@ -123,8 +123,7 @@ public class BlockDeletingService extends BackgroundService {
       List<ContainerBlockInfo> containers =
           chooseContainerForBlockDeletion(blockLimitPerInterval,
               containerDeletionPolicy);
-      LOG.info("Containers chosen by policy: {} at DN: {}", containers.size(),
-          ozoneContainer.getDatanodeDetails().getUuid());
+
       BackgroundTask
           containerBlockInfos = null;
       long totalBlocks = 0;
@@ -136,18 +135,13 @@ public class BlockDeletingService extends BackgroundService {
             .setPriority(TASK_PRIORITY_DEFAULT);
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
-        LOG.error(
-            "Background task gets added in queue for deletion, Datanode: {}",
-            ozoneContainer.getDatanodeDetails().getUuid());
         totalBlocks += containerBlockInfo.getNumBlocksToDelete();
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
-        LOG.info(
-            "Queued {} blocks from {} containers for deletion, Datanode: {}",
-            totalBlocks, containers.size(),
-            ozoneContainer.getDatanodeDetails().getUuid());
+        LOG.debug("Queued {} blocks from {} containers for deletion",
+            totalBlocks, containers.size());
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
@@ -163,13 +157,10 @@ public class BlockDeletingService extends BackgroundService {
   public List<ContainerBlockInfo> chooseContainerForBlockDeletion(
       int blockLimit, ContainerDeletionChoosingPolicy deletionPolicy)
       throws StorageContainerException {
-    ContainerSet containerSet = ozoneContainer.getContainerSet();
-    LOG.info("ozoneContainer.getContainerSet() : {} for DN:{}",
-        containerSet.containerCount(),
-        ozoneContainer.getDatanodeDetails().getUuid());
+
     AtomicLong totalPendingBlockCount = new AtomicLong(0L);
     Map<Long, ContainerData> containerDataMap =
-        containerSet.getContainerMap().entrySet().stream()
+        ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
             .filter(e -> (checkPendingDeletionBlocks(
                 e.getValue().getContainerData())))
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
@@ -184,20 +175,8 @@ public class BlockDeletingService extends BackgroundService {
             }));
 
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
-    LOG.info("Total pending block count: {}, blocklimit: {} at DN: {}",
-        totalPendingBlockCount.get(), blockLimit,
-        ozoneContainer.getDatanodeDetails().getUuid());
-    StringBuilder sb = new StringBuilder();
-    containerDataMap.entrySet().forEach(entry -> {
-      sb.append(entry.getKey() + ":" + entry.getValue());
-      sb.append(" , ");
-    });
-    LOG.info(
-        "ContainerDataMap: {} in chooseContainerForBlockDeletion for DN: {}",
-        sb.toString(), ozoneContainer.getDatanodeDetails().getUuid());
     return deletionPolicy
-        .chooseContainerForBlockDeletion(blockLimit, containerDataMap,
-            ozoneContainer);
+        .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
 
   private boolean checkPendingDeletionBlocks(ContainerData containerData) {
@@ -210,9 +189,6 @@ public class BlockDeletingService extends BackgroundService {
         .isValidContainerType(containerData.getContainerType())) {
       return false;
     } else if (!containerData.isClosed()) {
-      LOG.info(
-          "isDeletionAllowed: false because containerData not closed for DN: {}",
-          ozoneContainer.getDatanodeDetails().getUuid());
       return false;
     } else {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
@@ -222,9 +198,6 @@ public class BlockDeletingService extends BackgroundService {
         if (originPipelineId == null || originPipelineId.isEmpty()) {
           // In case the pipelineID is empty, just mark it for deletion.
           // TODO: currently EC container goes through this path.
-          LOG.info("isDeletionAllowed: true because origin pipelineId " +
-                  "is empty or null for DN: {}",
-              ozoneContainer.getDatanodeDetails().getUuid());
           return true;
         }
         UUID pipelineUUID;
@@ -238,9 +211,6 @@ public class BlockDeletingService extends BackgroundService {
         PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
         // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
-          LOG.info(
-              "isDeletionAllowed: true because ratis group not exist for DN: {}",
-              ozoneContainer.getDatanodeDetails().getUuid());
           return true;
         }
         try {
@@ -248,19 +218,13 @@ public class BlockDeletingService extends BackgroundService {
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex < containerBCSID) {
-            LOG.info("Close Container log Index {} is not replicated across all"
+            LOG.warn("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
-                    + "yet for DN: {}", containerBCSID,
-                containerData.getOriginPipelineId(), minReplicatedIndex,
-                ozoneContainer.getDatanodeDetails().getUuid());
-            LOG.info(
-                "isDeletionAllowed: false because Close Container log Index " +
-                    "is not replicated across all the servers in the pipeline ");
+                    + "yet.", containerBCSID,
+                containerData.getOriginPipelineId(), minReplicatedIndex);
             return false;
           } else {
-            LOG.info("isDeletionAllowed: true for DN: {}",
-                ozoneContainer.getDatanodeDetails().getUuid());
             return true;
           }
         } catch (IOException ioe) {
@@ -274,8 +238,6 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
       }
-      LOG.info("isDeletionAllowed: true at the end of method for DN: {}",
-          ozoneContainer.getDatanodeDetails().getUuid());
       return true;
     }
   }

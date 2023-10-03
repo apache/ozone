@@ -32,7 +32,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -489,8 +488,7 @@ public class KeyValueHandler extends Handler {
    */
   ContainerCommandResponseProto handleCloseContainer(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
-    LOG.info("handleCloseContainer start for container: #{} on DN: {}",
-        kvContainer.getContainerData().getContainerID(), datanodeId);
+
     if (!request.hasCloseContainer()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Update Container request. trace ID: {}",
@@ -1065,16 +1063,10 @@ public class KeyValueHandler extends Handler {
           containerSet.removeRecoveringContainer(
               container.getContainerData().getContainerID());
           ContainerLogger.logRecovered(container.getContainerData());
-          LOG.error("Container #{} is in recovering state at DN:{}",
-              container.getContainerData().getContainerID(), datanodeId);
         }
-        LOG.error("Marking container #{} for close at DN: {} ",
-            container.getContainerData().getContainerID(), datanodeId);
-        container.markContainerForClose(datanodeId);
+        container.markContainerForClose();
         ContainerLogger.logClosing(container.getContainerData());
         sendICR(container);
-        LOG.error("ICR sent by DN: {} for container #{}", datanodeId,
-            container.getContainerData().getContainerID());
       }
     } finally {
       container.writeUnlock();
@@ -1152,9 +1144,6 @@ public class KeyValueHandler extends Handler {
     container.writeLock();
     try {
       final State state = container.getContainerState();
-      LOG.info("closeContainer start for container: #{} having state: {} on " +
-          "DN: {}", container.getContainerData().getContainerID(), state,
-          datanodeId);
       // Close call is idempotent.
       if (state == State.CLOSED) {
         return;
@@ -1196,13 +1185,12 @@ public class KeyValueHandler extends Handler {
   public void deleteBlock(Container container, BlockData blockData)
       throws IOException {
     chunkManager.deleteChunks(container, blockData);
-    //if (LOG.isDebugEnabled()) {
+    if (LOG.isDebugEnabled()) {
       for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
         ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
-        LOG.info("block {} chunk {} deleted at DN: {}", blockData.getBlockID(),
-            info, datanodeId);
+        LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
-    //}
+    }
   }
 
   @Override

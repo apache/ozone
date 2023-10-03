@@ -135,8 +135,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
           container, context, connectionManager);
       deleteCommandQueues.add(cmd);
-      LOG.info("Added deleteBlocksCommand in queue at DN: {}",
-          container.getDatanodeDetails().getUuid());
     } catch (IllegalStateException e) {
       LOG.warn("Command is discarded because of the command queue is full");
     }
@@ -278,8 +276,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               String schemaVersion = containerData
                   .getSupportedSchemaVersionOrDefault();
               if (getSchemaHandlers().containsKey(schemaVersion)) {
-                LOG.info("Start processing transaction task at DN: {} ",
-                    ozoneContainer.getDatanodeDetails().getUuid());
                 schemaHandlers.get(schemaVersion).handle(containerData, tx);
               } else {
                 throw new UnsupportedOperationException(
@@ -317,8 +313,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   private void processCmd(DeleteCmdInfo cmd) {
-    LOG.info("Processing block deletion command at DN: {}.",
-        ozoneContainer.getDatanodeDetails().getUuid());
+    LOG.debug("Processing block deletion command.");
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
@@ -355,13 +350,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        //if (LOG.isDebugEnabled()) {
-          LOG.info("Sending following block deletion ACK to SCM");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Sending following block deletion ACK to SCM");
           for (DeleteBlockTransactionResult result : blockDeletionACK
               .getResultsList()) {
-            LOG.info("{} : {}", result.getTxID(), result.getSuccess());
+            LOG.debug("{} : {}", result.getTxID(), result.getSuccess());
           }
-        //}
+        }
       }
       cmdExecuted = true;
     } finally {
@@ -500,34 +495,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }
-    LOG.info("Committed block count:  {} for transaction Id: {} at DN: {}",
-        newDeletionBlocks, txnID,
-        ozoneContainer.getDatanodeDetails().getUuid());
     blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
-  }
-
-  private void logDeleteTransaction(long containerId,
-                                    KeyValueContainerData containerData,
-                                    DeletedBlocksTransaction delTX) {
-    //if (LOG.isDebugEnabled()) {
-      LOG.info("Processing Container : {}, DB path : {}, transaction {}",
-          containerId, containerData.getMetadataPath(), delTX.getTxID());
-    //}
-
-    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
-      LOG.info(String.format("Delete blocks for containerId: %d"
-              + " is either received out of order or retried,"
-              + " %d <= %d", containerId, delTX.getTxID(),
-          containerData.getDeleteTransactionId()));
-    }
   }
 
   private void markBlocksForDeletionSchemaV1(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    //logDeleteTransaction(containerId, containerData, delTX);
+    logDeleteTransaction(containerId, containerData, delTX);
     int newDeletionBlocks = 0;
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
@@ -598,15 +573,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // greater.
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
-        String latestDeleteTxnKey = containerData.getLatestDeleteTxnKey();
         metadataTable
             .putWithBatch(batchOperation,
-                latestDeleteTxnKey, delTX.getTxID());
-        LOG.info(
-            "Updated metadata table for container {} and transaction Id: {}, " +
-                "latestDeleteTrxKey: {}",
-            containerData.getContainerID(), delTX.getTxID(),
-            latestDeleteTxnKey);
+                containerData.getLatestDeleteTxnKey(), delTX.getTxID());
       }
 
       long pendingDeleteBlocks =
@@ -615,13 +584,27 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           .putWithBatch(batchOperation,
               containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
-      LOG.info("pending delete blocks: {}", pendingDeleteBlocks);
 
       // update pending deletion blocks count and delete transaction ID in
       // in-memory container status
       containerData.updateDeleteTransactionId(delTX.getTxID());
       containerData.incrPendingDeletionBlocks(newDeletionBlocks);
-      LOG.info("New pending deletion blocks: {}", newDeletionBlocks);
+    }
+  }
+
+  private void logDeleteTransaction(long containerId,
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
+          containerId, containerData.getMetadataPath(), delTX.getTxID());
+    }
+
+    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
+      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
+      LOG.info(String.format("Delete blocks for containerId: %d"
+              + " is either received out of order or retried,"
+              + " %d <= %d", containerId, delTX.getTxID(),
+          containerData.getDeleteTransactionId()));
     }
   }
 

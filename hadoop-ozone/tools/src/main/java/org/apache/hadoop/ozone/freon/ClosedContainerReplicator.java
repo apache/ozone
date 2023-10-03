@@ -199,7 +199,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     }
 
     ContainerController controller =
-        new ContainerController(containerSet, handlers, null);
+        new ContainerController(containerSet, handlers);
 
     ContainerImporter importer = new ContainerImporter(conf, containerSet,
         controller, null);

@@ -95,34 +95,25 @@ public class CloseContainerCommandHandler implements CommandHandler {
           ((CloseContainerCommand) command).getProto();
       final ContainerController controller = ozoneContainer.getController();
       final long containerId = closeCommand.getContainerID();
-      LOG.info("Processing Close Container command for container #{} at DN: {}",
-          containerId, ozoneContainer.getDatanodeDetails().getUuid());
+      LOG.debug("Processing Close Container command container #{}",
+          containerId);
       try {
         final Container container = controller.getContainer(containerId);
 
         if (container == null) {
-          LOG.info("Container #{} does not exist in datanode: {} "
-                  + "Container close failed.", containerId,
-              ozoneContainer.getDatanodeDetails().getUuid());
+          LOG.error("Container #{} does not exist in datanode. "
+              + "Container close failed.", containerId);
           return;
         }
-        LOG.info(
-            "Before marking container #{}: having state: {} for close on DN: {}",
-            containerId, container.getContainerState(),
-            ozoneContainer.getDatanodeDetails().getUuid());
+
         // move the container to CLOSING if in OPEN state
-        controller.markContainerForClose(containerId,
-            ozoneContainer.getDatanodeDetails().getUuid());
+        controller.markContainerForClose(containerId);
 
         switch (container.getContainerState()) {
         case OPEN:
         case CLOSING:
           // If the container is part of open pipeline, close it via
           // write channel
-          LOG.info("In CLOSING case for container #{}: having state: {} " +
-                  "for close on DN: {}",
-              containerId, container.getContainerState(),
-              ozoneContainer.getDatanodeDetails().getUuid());
           if (ozoneContainer.getWriteChannel()
               .isExist(closeCommand.getPipelineID())) {
             ContainerCommandRequestProto request =
@@ -131,16 +122,10 @@ public class CloseContainerCommandHandler implements CommandHandler {
                     command.getEncodedToken());
             ozoneContainer.getWriteChannel()
                 .submitRequest(request, closeCommand.getPipelineID());
-            LOG.info("Ratis request submitted for closing container #{} on " +
-                "DN: {}", containerId, datanodeDetails.getUuid());
           } else if (closeCommand.getForce()) {
             // Non-RATIS containers should have the force close flag set, so
             // they are moved to CLOSED immediately rather than going to
             // quasi-closed
-            LOG.info("Forcely closing container #{}: having state: {} " +
-                    "for close on DN: {}",
-                containerId, container.getContainerState(),
-                ozoneContainer.getDatanodeDetails().getUuid());
             controller.closeContainer(containerId);
           } else {
             controller.quasiCloseContainer(containerId,

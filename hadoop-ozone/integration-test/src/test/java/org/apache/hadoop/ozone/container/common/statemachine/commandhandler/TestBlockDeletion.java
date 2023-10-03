@@ -332,7 +332,6 @@ public class TestBlockDeletion {
   }
 
   @Test
-  @Flaky("HDDS-8353")
   public void testContainerStatisticsAfterDelete() throws Exception {
     ReplicationManager replicationManager = scm.getReplicationManager();
     boolean legacyEnabled = replicationManager.getConfig().isLegacyEnabled();

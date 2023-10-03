@@ -156,7 +156,7 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
       handlers.put(containerType, handler);
     }
 
-    controller = new ContainerController(containerSet, handlers, null);
+    controller = new ContainerController(containerSet, handlers);
 
     List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
         volumeSet.getVolumesList());

@@ -153,7 +153,7 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   /**
    * Marks the container for closing. Moves the container to CLOSING state.
    */
-  void markContainerForClose(String datanodeId) throws StorageContainerException;
+  void markContainerForClose() throws StorageContainerException;
 
   /**
    * Marks the container replica as unhealthy.
