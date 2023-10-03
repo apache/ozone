@@ -15,24 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Get the version number and break it into major and minor parts
-bash_version=$(bash --version | grep -oE 'version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+')
-major_version=$(echo $bash_version | cut -d. -f1)
-minor_version=$(echo $bash_version | cut -d. -f2)
-
-# If bash version is below a certain minimum (4.2 in this case), exit the script
-if [[ "$major_version" -lt 4 ]] || [[ "$major_version" -eq 4 && "$minor_version" -lt 2 ]]; then
-    echo "Your bash version (${bash_version}) is incompatible with this script. Please update your Bash to a more recent version."
-    exit 1
-fi
-
 declare -i OZONE_DATANODES OZONE_REPLICATION_FACTOR OZONE_SAFEMODE_MIN_DATANODES
 
 ORIG_DATANODES="${OZONE_DATANODES:-}"
 ORIG_REPLICATION_FACTOR="${OZONE_REPLICATION_FACTOR:-}"
 
 # only support replication factor of 1 or 3
-if [[ -v OZONE_REPLICATION_FACTOR ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 1 ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 3 ]]; then
+if [[ -n OZONE_REPLICATION_FACTOR ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 1 ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 3 ]]; then
   # assume invalid replication factor was intended as "number of datanodes"
   if [[ -z ${ORIG_DATANODES} ]]; then
     OZONE_DATANODES=${OZONE_REPLICATION_FACTOR}
@@ -41,22 +30,22 @@ if [[ -v OZONE_REPLICATION_FACTOR ]] && [[ ${OZONE_REPLICATION_FACTOR} -ne 1 ]] 
 fi
 
 # at least 1 datanode
-if [[ -v OZONE_DATANODES ]] && [[ ${OZONE_DATANODES} -lt 1 ]]; then
+if [[ -n OZONE_DATANODES ]] && [[ ${OZONE_DATANODES} -lt 1 ]]; then
   unset OZONE_DATANODES
 fi
 
-if [[ -v OZONE_DATANODES ]] && [[ -v OZONE_REPLICATION_FACTOR ]]; then
+if [[ -n OZONE_DATANODES ]] && [[ -n OZONE_REPLICATION_FACTOR ]]; then
   # ensure enough datanodes for replication factor
   if [[ ${OZONE_DATANODES} -lt ${OZONE_REPLICATION_FACTOR} ]]; then
     OZONE_DATANODES=${OZONE_REPLICATION_FACTOR}
   fi
-elif [[ -v OZONE_DATANODES ]]; then
+elif [[ -n OZONE_DATANODES ]]; then
   if [[ ${OZONE_DATANODES} -ge 3 ]]; then
     OZONE_REPLICATION_FACTOR=3
   else
     OZONE_REPLICATION_FACTOR=1
   fi
-elif [[ -v OZONE_REPLICATION_FACTOR ]]; then
+elif [[ -n OZONE_REPLICATION_FACTOR ]]; then
   OZONE_DATANODES=${OZONE_REPLICATION_FACTOR}
 else
   OZONE_DATANODES=1
