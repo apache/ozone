@@ -321,6 +321,8 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
     case UnknownCommand:
       return false;
     case EchoRPC:

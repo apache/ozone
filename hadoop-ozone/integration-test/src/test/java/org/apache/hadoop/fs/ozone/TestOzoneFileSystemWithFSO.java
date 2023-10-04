@@ -578,15 +578,19 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
     FSDataOutputStream stream = getFs().create(source);
-    // file not visible yet
-    assertThrows(OMException.class, () -> fs.isFileClosed(source));
-    stream.write(1);
-    stream.hsync();
-    // file is visible and open
-    assertFalse(fs.isFileClosed(source));
-    assertTrue(fs.recoverLease(source));
-    // file is closed after lease recovery
-    assertTrue(fs.isFileClosed(source));
+    try {
+      // file not visible yet
+      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      stream.write(1);
+      stream.hsync();
+      // file is visible and open
+      assertFalse(fs.isFileClosed(source));
+      assertTrue(fs.recoverLease(source));
+      // file is closed after lease recovery
+      assertTrue(fs.isFileClosed(source));
+    } finally {
+      TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
+    }
   }
 
   @Test

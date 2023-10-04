@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import javax.annotation.Nonnull;
 import java.nio.ByteBuffer;
-import java.util.function.IntFunction;
 
 /**
  * Codec to serialize/deserialize {@link Long}.
@@ -41,7 +40,7 @@ public final class LongCodec implements Codec<Long> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull Long object,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
     return allocator.apply(Long.BYTES).putLong(object);
   }
 

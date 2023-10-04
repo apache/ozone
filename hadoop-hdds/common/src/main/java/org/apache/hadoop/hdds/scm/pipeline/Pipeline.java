@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -191,6 +192,7 @@ public final class Pipeline {
    *
    * @return Set of DatanodeDetails
    */
+  @JsonIgnore
   public Set<DatanodeDetails> getNodeSet() {
     return Collections.unmodifiableSet(nodeStatus.keySet());
   }
@@ -282,10 +284,12 @@ public final class Pipeline {
         "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
+  @JsonIgnore
   public boolean isClosed() {
     return state == PipelineState.CLOSED;
   }
 
+  @JsonIgnore
   public boolean isOpen() {
     return state == PipelineState.OPEN;
   }
@@ -317,7 +321,7 @@ public final class Pipeline {
 
   public boolean isHealthy() {
     // EC pipelines are not reported by the DN and do not have a leader. If a
-    // node goes stale or dead, EC pipelines will by closed like RATIS pipelines
+    // node goes stale or dead, EC pipelines will be closed like RATIS pipelines
     // but at the current time there are not other health metrics for EC.
     if (replicationConfig.getReplicationType() == ReplicationType.EC) {
       return true;

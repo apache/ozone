@@ -142,6 +142,8 @@ enum Type {
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
   ListKeysLight = 126;
+  AbortExpiredMultiPartUploads = 127;
+  SetSnapshotProperty = 128;
 }
 
 enum SafeMode {
@@ -273,6 +275,9 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+
+  optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
+  optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
 }
 
 message OMResponse {
@@ -390,6 +395,8 @@ message OMResponse {
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
+  optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
+  optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
 }
 
 enum Status {
@@ -1578,6 +1585,24 @@ message MultipartUploadAbortRequest {
 message MultipartUploadAbortResponse {
 
 }
+
+message MultipartUploadsExpiredAbortRequest {
+  repeated ExpiredMultipartUploadsBucket expiredMultipartUploadsPerBucket = 1;
+}
+
+message ExpiredMultipartUploadsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated ExpiredMultipartUploadInfo multipartUploads = 3;
+}
+
+message ExpiredMultipartUploadInfo {
+  required string name = 1;
+}
+
+message MultipartUploadsExpiredAbortResponse {
+}
+
 message MultipartUploadListPartsRequest {
     required string volume = 1;
     required string bucket = 2;
@@ -1838,6 +1863,16 @@ message SnapshotPurgeRequest {
   repeated string updatedSnapshotDBKey = 2;
 }
 
+message SetSnapshotPropertyRequest {
+  optional SnapshotProperty snapshotProperty = 1;
+}
+
+message SnapshotProperty {
+  optional string snapshotKey = 1;
+  optional uint64 exclusiveSize = 2;
+  optional uint64 exclusiveReplicatedSize = 3;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1920,6 +1955,10 @@ message SnapshotMoveDeletedKeysResponse {
 }
 
 message SnapshotPurgeResponse {
+
+}
+
+message SetSnapshotPropertyResponse {
 
 }
 
