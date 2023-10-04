@@ -357,8 +357,6 @@ public class TestBlockDeletion {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .build();
-    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
-        om.lookupKey(keyArgs).getKeyLocationVersions();
     Thread.sleep(5000);
     List<ContainerInfo> containerInfos =
         scm.getContainerManager().getContainers();
