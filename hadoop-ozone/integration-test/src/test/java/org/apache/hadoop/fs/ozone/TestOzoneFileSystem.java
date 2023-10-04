@@ -61,7 +61,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -1635,7 +1634,6 @@ public class TestOzoneFileSystem {
    * 2.Verify that the key gets deleted by the trash emptier.
    */
   @Test
-  @Flaky("HDDS-6645")
   public void testTrash() throws Exception {
     String testKeyName = "testKey2";
     Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
