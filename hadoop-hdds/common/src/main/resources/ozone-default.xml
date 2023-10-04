@@ -3601,6 +3601,23 @@
       is send to DN.</description>
   </property>
   <property>
+    <name>ozone.scm.network.topology.schema.file.refresh.duration</name>
+    <value>3h</value>
+    <tag>SCM, OZONE</tag>
+    <description>The duration at which we periodically fetch the updated network topology schema file from SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.network.topology.schema.file.check.duration</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, RECON</tag>
+    <description>The duration at which we periodically check if it is the time for fetching the updated network
+      topology schema file from SCM. Example: If ozone.scm.network.topology.schema.file.refresh.duration=3d and
+      ozone.scm.network.topology.schema.file.check.duration=10m, the actual refresh duration will occur for each
+      3h +/- 5m.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
     <value>1024</value>
     <tag>SCM, OZONE</tag>

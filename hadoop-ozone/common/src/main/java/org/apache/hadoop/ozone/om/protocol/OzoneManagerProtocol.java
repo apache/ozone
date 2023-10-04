@@ -1072,6 +1072,14 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   UUID refetchSecretKey() throws IOException;
+
+  /**
+   * Refetches the updated network topology schema file from SCM.
+   *
+   * @return true if the topology information is either not null and is not
+   * empty.
+   */
+  boolean refetchTopologyInformation() throws IOException;
   /**
    * Enter, leave, or get safe mode.
    *

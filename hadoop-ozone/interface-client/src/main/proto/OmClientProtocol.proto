@@ -142,6 +142,7 @@ enum Type {
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
   ListKeysLight = 126;
+  RefetchTopologyInformation = 127;
 }
 
 enum SafeMode {
@@ -273,6 +274,7 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional RefetchTopologyInformationRequest RefetchTopologyInformationRequest = 126;
 }
 
 message OMResponse {
@@ -390,6 +392,7 @@ message OMResponse {
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
+  optional RefetchTopologyInformationResponse RefetchTopologyInformationResponse = 127;
 }
 
 enum Status {
@@ -627,6 +630,14 @@ message RefetchSecretKeyRequest {
 
 message RefetchSecretKeyResponse {
     optional hdds.UUID id = 1;
+}
+
+message RefetchTopologyInformationRequest {
+
+}
+
+message RefetchTopologyInformationResponse {
+    optional bool status = 1;
 }
 
 /**

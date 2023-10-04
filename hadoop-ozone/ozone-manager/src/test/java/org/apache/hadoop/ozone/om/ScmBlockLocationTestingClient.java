@@ -199,6 +199,11 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
     return null;
   }
 
+  @Override
+  public String getTopologyInformation() throws IOException {
+    return null;
+  }
+
   /**
    * Return the number of blocks puesdo deleted by this testing client.
    */

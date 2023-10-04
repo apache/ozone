@@ -114,4 +114,6 @@ public interface ScmBlockLocationProtocol extends Closeable {
    */
   List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException;
+
+  String getTopologyInformation() throws IOException;
 }

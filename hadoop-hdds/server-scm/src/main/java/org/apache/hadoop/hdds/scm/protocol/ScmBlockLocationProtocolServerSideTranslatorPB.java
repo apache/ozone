@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteKeyBlocksResultProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetTopologyInformationResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
@@ -159,6 +160,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             request.getSortDatanodesRequest(), request.getVersion()
         ));
         break;
+      case GetTopologyInformation:
+        response.setGetTopologyInformationResponse(getTopologyInformation());
       default:
         // Should never happen
         throw new IOException("Unknown Operation " + request.getCmdType() +
@@ -274,5 +277,14 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     } catch (IOException ex) {
       throw new ServiceException(ex);
     }
+  }
+
+  public GetTopologyInformationResponseProto getTopologyInformation()
+      throws IOException {
+    GetTopologyInformationResponseProto.Builder resp =
+        GetTopologyInformationResponseProto.newBuilder();
+    String schemaFile = impl.getTopologyInformation();
+    resp.setSchemaFile(schemaFile);
+    return resp.build();
   }
 }

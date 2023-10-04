@@ -81,6 +81,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.client.ScmBlockLocationClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -353,6 +354,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private SecretKeySignerClient secretKeyClient;
+
+  private ScmBlockLocationClient scmBlockLocationClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
@@ -600,6 +603,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
+    scmBlockLocationClient = new ScmBlockLocationClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
@@ -1083,6 +1087,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public UUID refetchSecretKey() {
     secretKeyClient.refetchSecretKey();
     return secretKeyClient.getCurrentSecretKey().getId();
+  }
+
+  public boolean refetchTopologyInformation() {
+    scmBlockLocationClient.refetchTopologyInformation();
+    String topologyInfo = scmBlockLocationClient.getTopologyInformation();
+    return topologyInfo != null && !topologyInfo.isEmpty();
   }
 
   @VisibleForTesting
@@ -1682,6 +1692,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager.start(configuration);
 
     try {
+      scmBlockLocationClient.start(configuration);
+    } catch (IOException ex) {
+      LOG.error("Unable to initialize network topology schema file. ", ex);
+      throw new UncheckedIOException(ex);
+    }
+
+    try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
     } catch (Exception ex) {
@@ -2234,6 +2251,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       keyManager.stop();
       stopSecretManager();
+
+      if (scmBlockLocationClient != null) {
+        scmBlockLocationClient.stop();
+      }
+
       if (httpServer != null) {
         httpServer.stop();
       }

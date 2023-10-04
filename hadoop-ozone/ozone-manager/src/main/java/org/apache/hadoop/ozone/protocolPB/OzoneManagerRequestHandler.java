@@ -91,6 +91,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchTopologyInformationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -354,6 +355,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             printCompactionLogDag(request.getPrintCompactionLogDagRequest());
         responseBuilder
             .setPrintCompactionLogDagResponse(printCompactionLogDagResponse);
+        break;
+      case RefetchTopologyInformation:
+        responseBuilder.setRefetchTopologyInformationResponse(
+            refetchTopologyInformation());
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1013,6 +1018,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     RefetchSecretKeyResponse response =
         RefetchSecretKeyResponse.newBuilder()
             .setId(ProtobufUtils.toProtobuf(uuid)).build();
+    return response;
+  }
+
+  private RefetchTopologyInformationResponse refetchTopologyInformation() {
+    RefetchTopologyInformationResponse response =
+        RefetchTopologyInformationResponse.newBuilder()
+            .setStatus(impl.refetchTopologyInformation())
+            .build();
     return response;
   }
 

@@ -166,6 +166,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchTopologyInformationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchTopologyInformationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
@@ -1526,6 +1528,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final RefetchSecretKeyResponse resp =
         handleError(omResponse).getRefetchSecretKeyResponse();
     return ProtobufUtils.fromProtobuf(resp.getId());
+  }
+
+  @Override
+  public boolean refetchTopologyInformation() throws IOException {
+    final RefetchTopologyInformationRequest.Builder requestBuilder =
+        RefetchTopologyInformationRequest.newBuilder();
+    final OMRequest omRequest = createOMRequest(Type.RefetchTopologyInformation)
+        .setRefetchTopologyInformationRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final RefetchTopologyInformationResponse resp =
+        handleError(omResponse).getRefetchTopologyInformationResponse();
+    return resp.getStatus();
   }
 
   /**
