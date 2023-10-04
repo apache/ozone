@@ -49,6 +49,7 @@ public final class SCMContext {
    * term equals INVALID_TERM indicates current SCM is running without Ratis.
    */
   public static final long INVALID_TERM = -1;
+  private final String threadNamePrefix;
 
   /**
    * Used by non-HA mode SCM, Recon and Unit Tests.
@@ -87,6 +88,9 @@ public final class SCMContext {
     this.finalizationCheckpoint = finalizationCheckpoint;
     this.scm = scm;
     this.isLeaderReady = false;
+    threadNamePrefix = scm != null
+        ? scm.getScmNodeDetails().threadNamePrefix()
+        : "";
   }
 
   /**
@@ -264,6 +268,10 @@ public final class SCMContext {
    */
   public OzoneStorageContainerManager getScm() {
     return scm;
+  }
+
+  public String threadNamePrefix() {
+    return threadNamePrefix;
   }
 
   /**

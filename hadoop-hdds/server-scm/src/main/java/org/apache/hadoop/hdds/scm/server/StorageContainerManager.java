@@ -306,6 +306,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SecurityConfig securityConfig;
 
   private final SCMHANodeDetails scmHANodeDetails;
+  private final String threadNamePrefix;
 
   private final ContainerBalancer containerBalancer;
   // MoveManager is used by ContainerBalancer to schedule container moves
@@ -371,6 +372,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
+    threadNamePrefix = HddsUtils.threadNamePrefix(getScmId());
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
 
     jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
@@ -390,7 +392,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
 
-    eventQueue = new EventQueue();
+    eventQueue = new EventQueue(threadNamePrefix);
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
@@ -514,7 +516,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
-        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+            threadNamePrefix, queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
@@ -654,7 +657,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
           OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
               .getDuration(), TimeUnit.MILLISECONDS);
-      leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
+      leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
@@ -1461,6 +1464,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public SCMHANodeDetails getSCMHANodeDetails() {
     return scmHANodeDetails;
+  }
+
+  public String threadNamePrefix() {
+    return threadNamePrefix;
   }
 
   @Override
