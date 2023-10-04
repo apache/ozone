@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -746,7 +747,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-
   /**
    * Helper to read compaction log file to the internal DAG and compaction log
    * table.
@@ -860,6 +860,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param dest destination snapshot
    * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
    *                                 for snapDiff job.
+   * @param columnFamilyToPrefixMap map containing tableName to prefix for
+   *                               the keys in the table.
    * @return A list of SST files without extension.
    *         e.g. ["/path/to/sstBackupDir/000050.sst",
    *               "/path/to/sstBackupDir/000060.sst"]
@@ -867,10 +869,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public synchronized List<String> getSSTDiffListWithFullPath(
       DifferSnapshotInfo src,
       DifferSnapshotInfo dest,
-      String sstFilesDirForSnapDiffJob
+      String sstFilesDirForSnapDiffJob,
+      Map<String, String> columnFamilyToPrefixMap
   ) throws IOException {
 
-    List<String> sstDiffList = getSSTDiffList(src, dest);
+    List<String> sstDiffList = getSSTDiffList(src, dest,
+        columnFamilyToPrefixMap);
 
     return sstDiffList.stream()
         .map(
@@ -894,24 +898,28 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param columnFamilyToPrefixMap map containing tableName to prefix for
+   *                               the keys in the table.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
-  public synchronized List<String> getSSTDiffList(DifferSnapshotInfo src,
-                                                  DifferSnapshotInfo dest)
-      throws IOException {
+  public synchronized List<String> getSSTDiffList(
+      DifferSnapshotInfo src,
+      DifferSnapshotInfo dest,
+      Map<String, String> columnFamilyToPrefixMap
+  ) throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
-    HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB());
-    HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB());
+    Set<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB());
+    Set<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB());
 
-    HashSet<String> fwdDAGSameFiles = new HashSet<>();
-    HashSet<String> fwdDAGDifferentFiles = new HashSet<>();
+    Set<String> fwdDAGSameFiles = new HashSet<>();
+    Set<String> fwdDAGDifferentFiles = new HashSet<>();
 
     LOG.debug("Doing forward diff from src '{}' to dest '{}'",
         src.getDbPath(), dest.getDbPath());
     internalGetSSTDiffList(src, dest, srcSnapFiles, destSnapFiles,
-        forwardCompactionDAG, fwdDAGSameFiles, fwdDAGDifferentFiles);
+        fwdDAGSameFiles, fwdDAGDifferentFiles, columnFamilyToPrefixMap);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Result of diff from src '" + src.getDbPath() + "' to dest '" +
@@ -967,10 +975,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * need further diffing.
    */
   synchronized void internalGetSSTDiffList(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest,
-      Set<String> srcSnapFiles, Set<String> destSnapFiles,
-      MutableGraph<CompactionNode> mutableGraph,
-      Set<String> sameFiles, Set<String> differentFiles) {
+      DifferSnapshotInfo src,
+      DifferSnapshotInfo dest,
+      Set<String> srcSnapFiles,
+      Set<String> destSnapFiles,
+      Set<String> sameFiles,
+      Set<String> differentFiles,
+      Map<String, String> columnFamilyToPrefixMap) {
 
     // Sanity check
     Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
@@ -1017,7 +1028,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
         final Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
-          LOG.debug("Processing node: {}", current.getFileName());
+          LOG.debug("Processing node: '{}'", current.getFileName());
           if (current.getSnapshotGeneration() < dest.getSnapshotGeneration()) {
             LOG.debug("Current node's snapshot generation '{}' "
                     + "reached destination snapshot's '{}'. "
@@ -1028,7 +1039,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             continue;
           }
 
-          Set<CompactionNode> successors = mutableGraph.successors(current);
+          Set<CompactionNode> successors =
+              forwardCompactionDAG.successors(current);
           if (successors.isEmpty()) {
             LOG.debug("No further compaction happened to the current file. " +
                 "Src '{}' and dest '{}' have different file: {}",
@@ -1037,24 +1049,34 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             continue;
           }
 
-          for (CompactionNode node : successors) {
-            if (sameFiles.contains(node.getFileName()) ||
-                differentFiles.contains(node.getFileName())) {
-              LOG.debug("Skipping known processed SST: {}", node.getFileName());
+          for (CompactionNode nextNodes : successors) {
+            if (shouldSkipNode(nextNodes, columnFamilyToPrefixMap)) {
+              LOG.debug("Skipping next node: '{}' with startKey: '{}' and " +
+                      "endKey: '{}' because it doesn't have keys related to " +
+                      "columnFamilyToPrefixMap: '{}'.",
+                  nextNodes.getFileName(), nextNodes.getStartKey(),
+                  nextNodes.getEndKey(), columnFamilyToPrefixMap);
               continue;
             }
 
-            if (destSnapFiles.contains(node.getFileName())) {
+            if (sameFiles.contains(nextNodes.getFileName()) ||
+                differentFiles.contains(nextNodes.getFileName())) {
+              LOG.debug("Skipping known processed SST: {}",
+                  nextNodes.getFileName());
+              continue;
+            }
+
+            if (destSnapFiles.contains(nextNodes.getFileName())) {
               LOG.debug("Src '{}' and dest '{}' have the same SST: {}",
-                  src.getDbPath(), dest.getDbPath(), node.getFileName());
-              sameFiles.add(node.getFileName());
+                  src.getDbPath(), dest.getDbPath(), nextNodes.getFileName());
+              sameFiles.add(nextNodes.getFileName());
               continue;
             }
 
             // Queue different SST to the next level
             LOG.debug("Src '{}' and dest '{}' have a different SST: {}",
-                src.getDbPath(), dest.getDbPath(), node.getFileName());
-            nextLevel.add(node);
+                src.getDbPath(), dest.getDbPath(), nextNodes.getFileName());
+            nextLevel.add(nextNodes);
           }
         }
         currentLevel = nextLevel;
@@ -1105,7 +1127,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @return CompactionNode
    */
   private CompactionNode addNodeToDAG(String file, String snapshotID,
-      long seqNum) {
+                                      long seqNum, String startKey,
+                                      String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
       numKeys = getSSTFileSummary(file);
@@ -1114,8 +1137,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (FileNotFoundException e) {
       LOG.info("Can't find SST '{}'", file);
     }
-    CompactionNode fileNode = new CompactionNode(
-        file, snapshotID, numKeys, seqNum);
+    CompactionNode fileNode = new CompactionNode(file, snapshotID, numKeys,
+        seqNum, startKey, endKey, columnFamily);
     forwardCompactionDAG.addNode(fileNode);
     backwardCompactionDAG.addNode(fileNode);
 
@@ -1142,12 +1165,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     for (CompactionFileInfo outfile : outputFiles) {
       final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
           outfile.getFileName(),
-          file -> addNodeToDAG(file, snapshotId, seqNum));
+          file -> addNodeToDAG(file, snapshotId, seqNum, outfile.getStartKey(),
+              outfile.getEndKey(), outfile.getColumnFamily()));
 
       for (CompactionFileInfo infile : inputFiles) {
         final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
             infile.getFileName(),
-            file -> addNodeToDAG(file, snapshotId, seqNum));
+            file -> addNodeToDAG(file, snapshotId, seqNum, infile.getStartKey(),
+                infile.getEndKey(), infile.getColumnFamily()));
         // Draw the edges
         if (!outfileNode.getFileName().equals(infileNode.getFileName())) {
           forwardCompactionDAG.putEdge(outfileNode, infileNode);
@@ -1549,5 +1574,34 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       }
     }
     return response;
+  }
+
+  private boolean shouldSkipNode(CompactionNode node,
+                                 Map<String, String> columnFamilyToPrefixMap) {
+    // This is for backward compatibility. Before the compaction log table
+    // migration, startKey, endKey and columnFamily information is not persisted
+    // in compaction log files.
+    if (node.getStartKey() == null || node.getEndKey() == null ||
+        node.getColumnFamily() == null) {
+      LOG.debug("Compaction node with fileName: {} doesn't have startKey, " +
+          "endKey and columnFamily details.", node.getFileName());
+      return false;
+    }
+
+    if (MapUtils.isEmpty(columnFamilyToPrefixMap)) {
+      LOG.debug("Provided columnFamilyToPrefixMap is null or empty.");
+      return false;
+    }
+
+    if (!columnFamilyToPrefixMap.containsKey(node.getColumnFamily())) {
+      LOG.debug("SstFile: {} is for columnFamily: {} while filter map " +
+              "contains columnFamilies: {}.", node.getFileName(),
+          node.getColumnFamily(), columnFamilyToPrefixMap.keySet());
+      return false;
+    }
+
+    String keyPrefix = columnFamilyToPrefixMap.get(node.getColumnFamily());
+    return RocksDiffUtils.isKeyWithPrefixPresent(keyPrefix, node.getStartKey(),
+        node.getEndKey());
   }
 }

@@ -471,9 +471,9 @@ public class TestRocksDBCheckpointDiffer {
           destSnapshot,
           srcSnapshotSstFiles,
           destSnapshotSstFiles,
-          rocksDBCheckpointDiffer.getForwardCompactionDAG(),
           actualSameSstFiles,
-          actualDiffSstFiles);
+          actualDiffSstFiles,
+          Collections.emptyMap());
     } catch (RuntimeException rtEx) {
       if (!expectingException) {
         fail("Unexpected exception thrown in test.");
@@ -569,7 +569,8 @@ public class TestRocksDBCheckpointDiffer {
     int index = 0;
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksDiff
-      List<String> sstDiffList = differ.getSSTDiffList(src, snap);
+      List<String> sstDiffList = differ.getSSTDiffList(src, snap,
+          Collections.emptyMap());
       LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
@@ -850,7 +851,8 @@ public class TestRocksDBCheckpointDiffer {
                       sstFile -> new CompactionNode(sstFile,
                           UUID.randomUUID().toString(),
                           1000L,
-                          Long.parseLong(sstFile.substring(0, 6))
+                          Long.parseLong(sstFile.substring(0, 6)),
+                          null, null, null
                       ))
                   .collect(Collectors.toList()))
           .collect(Collectors.toList());

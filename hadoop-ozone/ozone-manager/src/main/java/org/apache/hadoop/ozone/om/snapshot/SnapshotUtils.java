@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -32,8 +33,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
@@ -154,5 +161,31 @@ public final class SnapshotUtils {
       snapInfo = nextSnapshotInfo;
     }
     return null;
+  }
+
+  /**
+   * Return a map column family to prefix for the keys in the table for
+   * the given volume and bucket.
+   * Column families, map is returned for, are keyTable, dirTable and fileTable.
+   */
+  public static Map<String, String> getColumnFamilyToPrefixMap(
+      OMMetadataManager omMetadataManager,
+      String volumeName,
+      String bucketName
+  ) throws IOException {
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+
+    String keyPrefix = OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
+        + OM_KEY_PREFIX;
+
+    String keyPrefixFso = OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
+        bucketId + OM_KEY_PREFIX;
+
+    Map<String, String> comlumnFamilyToPrefixMap = new HashMap<>();
+    comlumnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
+    comlumnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
+    comlumnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
+    return comlumnFamilyToPrefixMap;
   }
 }

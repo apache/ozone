@@ -60,6 +60,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -252,7 +253,8 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap2 = new File(snap2.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap2::exists, 2000, 20000);
 
-    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1);
+    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1,
+        Collections.emptyMap());
     LOG.debug("Got diff list: {}", sstDiffList21);
 
     // Delete 1000 keys, take a 3rd snapshot, and do another diff
@@ -273,13 +275,16 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
-    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2);
+    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2,
+        Collections.emptyMap());
 
     // snap3-snap1 diff result is a combination of snap3-snap2 and snap2-snap1
-    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1);
+    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1,
+        Collections.emptyMap());
 
     // Same snapshot. Result should be empty list
-    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
+    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2,
+        Collections.emptyMap());
     Assertions.assertTrue(sstDiffList22.isEmpty());
     snapDB1.close();
     snapDB2.close();
@@ -308,13 +313,16 @@ public class TestOMSnapshotDAG {
         volumeName, bucketName, "snap3",
         ((RDBStore)((OmSnapshot)snapDB3.get())
             .getMetadataManager().getStore()).getDb().getManagedRocksDb());
-    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
+    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1,
+        Collections.emptyMap());
     Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
 
-    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
+    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2,
+        Collections.emptyMap());
     Assertions.assertEquals(sstDiffList32, sstDiffList32Run2);
 
-    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
+    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1,
+        Collections.emptyMap());
     Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
     snapDB1.close();
     snapDB2.close();

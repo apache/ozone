@@ -436,7 +436,8 @@ public class TestSnapshotDiffManager {
     when(differ.getSSTDiffListWithFullPath(
         any(DifferSnapshotInfo.class),
         any(DifferSnapshotInfo.class),
-        eq(diffDir))
+        eq(diffDir),
+        anyMap())
     ).thenReturn(Lists.newArrayList(randomStrings));
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
@@ -501,7 +502,8 @@ public class TestSnapshotDiffManager {
         when(differ.getSSTDiffListWithFullPath(
             any(DifferSnapshotInfo.class),
             any(DifferSnapshotInfo.class),
-            anyString()))
+            anyString(),
+            anyMap()))
             .thenReturn(Collections.emptyList());
       }
 
@@ -568,7 +570,8 @@ public class TestSnapshotDiffManager {
           .getSSTDiffListWithFullPath(
               any(DifferSnapshotInfo.class),
               any(DifferSnapshotInfo.class),
-              anyString());
+              anyString(),
+              anyMap());
 
       ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
           snapshotCache.get(snap1.toString());
