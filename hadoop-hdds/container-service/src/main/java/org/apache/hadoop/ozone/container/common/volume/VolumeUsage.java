@@ -66,7 +66,7 @@ public class VolumeUsage implements SpaceUsageSource {
   }
 
   public long getAvailable(PrecomputedVolumeSpace precomputedVolumeSpace) {
-    long available = source.getAvailable();
+    long available = precomputedVolumeSpace.getAvailable();
     return available - getRemainingReserved(precomputedVolumeSpace);
   }
 
@@ -187,6 +187,7 @@ public class VolumeUsage implements SpaceUsageSource {
   }
 
   public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
-    return new PrecomputedVolumeSpace(getCapacity(), getAvailable());
+    return new PrecomputedVolumeSpace(source.getCapacity(),
+        source.getAvailable());
   }
 }
