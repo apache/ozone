@@ -28,7 +28,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.IntFunction;
 
 /**
  * Codecs to serialize/deserialize Protobuf v2 messages.
@@ -70,7 +69,7 @@ public final class Proto2Codec<M extends MessageLite>
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull M message,
-      IntFunction<CodecBuffer> allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws IOException {
     final int size = message.getSerializedSize();
     return allocator.apply(size).put(writeTo(message, size));
   }

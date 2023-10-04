@@ -462,28 +462,6 @@ public final class OmSnapshotManager implements AutoCloseable {
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
     }
 
-    final RocksDBCheckpointDiffer dbCpDiffer =
-        store.getRocksDBCheckpointDiffer();
-
-    if (dbCpDiffer != null) {
-      final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
-
-      Objects.requireNonNull(snapshotInfo.getSnapshotId(),
-          "SnapshotId is null for snapshot: " + snapshotInfo.getName());
-      // Write snapshot generation (latest sequence number) to compaction log.
-      // This will be used for DAG reconstruction as snapshotGeneration.
-      dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-          snapshotInfo.getSnapshotId().toString(),
-          snapshotInfo.getCreationTime());
-
-      // Set compaction log filename to the latest DB sequence number
-      // right after taking the RocksDB checkpoint for Ozone snapshot.
-      //
-      // Note it doesn't matter if sequence number hasn't increased (even though
-      // it shouldn't happen), since the writer always appends the file.
-      dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
-    }
-
     return dbCheckpoint;
   }
 

@@ -835,6 +835,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     LOG.info("Started snap diff report generation for volume: '{}', " +
             "bucket: '{}', fromSnapshot: '{}', toSnapshot: '{}'",
         volumeName, bucketName, fromSnapshotName, toSnapshotName);
+    ozoneManager.getMetrics().incNumSnapshotDiffJobs();
 
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
@@ -1601,6 +1602,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       // TODO: [Snapshot] Revisit this when we have proper exception handling.
       snapshotDiffJob.setReason("Job failed due to unknown reason.");
     }
+    ozoneManager.getMetrics().incNumSnapshotDiffJobFails();
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
