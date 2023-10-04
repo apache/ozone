@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.fasterxml.uuid.Generators;
 import io.grpc.Status;
 import com.google.protobuf.RpcController;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
@@ -35,6 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.security.SecureRandom;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -74,7 +77,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         null,
         null,
         RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-        ClientId.getClientId()));
+        getClientId()));
     // TODO: currently require setting the Server class for each request
     // with thread context (Server.Call()) that includes retries
     // and importantly random ClientId.  This is currently necessary for
@@ -96,4 +99,23 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
     }
     responseObserver.onCompleted();
   }
+
+  private static byte[] getClientId() {
+    UUID uuid = UUIDs.randomUUID();
+    ByteBuffer buf = ByteBuffer.wrap(new byte[16]);
+    buf.putLong(uuid.getMostSignificantBits());
+    buf.putLong(uuid.getLeastSignificantBits());
+    return buf.array();
+  }
+
+  private static class UUIDs {
+    private static final ThreadLocal<SecureRandom> GENERATOR =
+        ThreadLocal.withInitial(SecureRandom::new);
+
+    public static UUID randomUUID() {
+      return Generators.randomBasedGenerator(GENERATOR.get()).generate();
+    }
+
+  }
+
 }

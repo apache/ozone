@@ -262,6 +262,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.mockito</groupId>
       <artifactId>mockito-junit-jupiter</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.fasterxml.uuid</groupId>
+      <artifactId>java-uuid-generator</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
