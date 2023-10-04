@@ -91,7 +91,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final KeyManager manager;
-  private static ClientId clientId = ClientId.randomId();
   private final int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
@@ -512,6 +511,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       Iterator<String> completedSnapshotIterator =
           completedExclusiveSizeSet.iterator();
       while (completedSnapshotIterator.hasNext()) {
+        ClientId clientId = ClientId.randomId();
         String dbKey = completedSnapshotIterator.next();
         SnapshotProperty snapshotProperty = SnapshotProperty.newBuilder()
                 .setSnapshotKey(dbKey)
@@ -529,7 +529,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
             .setClientId(clientId.toString())
             .build();
-        submitRequest(omRequest);
+        submitRequest(omRequest, clientId);
         exclusiveSizeMap.remove(dbKey);
         exclusiveReplicatedSizeMap.remove(dbKey);
         completedSnapshotIterator.remove();
@@ -538,6 +538,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     private void updateDeepCleanedSnapshots(List<String> deepCleanedSnapshots) {
       if (!deepCleanedSnapshots.isEmpty()) {
+        ClientId clientId = ClientId.randomId();
         SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
             .newBuilder()
             .addAllUpdatedSnapshotDBKey(deepCleanedSnapshots)
@@ -549,11 +550,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             .setClientId(clientId.toString())
             .build();
 
-        submitRequest(omRequest);
+        submitRequest(omRequest, clientId);
       }
     }
 
-    public void submitRequest(OMRequest omRequest) {
+    public void submitRequest(OMRequest omRequest, ClientId clientId) {
       try {
         if (isRatisEnabled()) {
           OzoneManagerRatisServer server = getOzoneManager().getOmRatisServer();
