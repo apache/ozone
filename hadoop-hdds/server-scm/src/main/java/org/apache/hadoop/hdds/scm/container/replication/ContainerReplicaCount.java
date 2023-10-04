@@ -38,6 +38,14 @@ public interface ContainerReplicaCount {
 
   boolean isSufficientlyReplicated();
 
+  /**
+   * Checks if a container has enough replicas to allow the specified
+   * datanode to be taken offline. This method is the interface between the
+   * decommissioning flow and Replication Manager.
+   * @param datanode the datanode being taken offline
+   * @param nodeManager an instance of {@link NodeManager}
+   * @return true if the datanode can be taken offline, otherwise false
+   */
   boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
       NodeManager nodeManager);
 
