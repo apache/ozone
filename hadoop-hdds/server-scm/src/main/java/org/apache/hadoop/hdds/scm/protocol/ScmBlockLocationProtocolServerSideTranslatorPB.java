@@ -162,6 +162,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         break;
       case GetTopologyInformation:
         response.setGetTopologyInformationResponse(getTopologyInformation());
+        break;
       default:
         // Should never happen
         throw new IOException("Unknown Operation " + request.getCmdType() +
