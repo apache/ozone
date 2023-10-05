@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -55,7 +56,9 @@ public class TestRatisPipelineCreateAndDestroy {
 
   public void init(int numDatanodes) throws Exception {
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
-
+    conf.setTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, 500,
+        TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
             .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
