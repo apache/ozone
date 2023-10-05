@@ -76,7 +76,11 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.LoggerFactory;
@@ -117,6 +121,9 @@ import static org.mockito.Mockito.when;
  */
 @RunWith(Parameterized.class)
 public class TestBlockDeletingService {
+
+  @Rule
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   private File testRoot;
   private String scmId;
@@ -901,7 +908,7 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @Test(timeout = 30000)
+  @Test
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
@@ -967,7 +974,7 @@ public class TestBlockDeletingService {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testContainerMaxLockHoldingTime() throws Exception {
     GenericTestUtils.LogCapturer log =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -1025,7 +1032,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testBlockThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 5

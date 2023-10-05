@@ -54,7 +54,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test OzoneManager list volume operation under combinations of configs.
@@ -64,7 +66,7 @@ public class TestOzoneManagerListVolumes {
   private static MiniOzoneCluster cluster;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(120);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   private static UserGroupInformation adminUser =
       UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
