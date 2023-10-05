@@ -50,11 +50,39 @@ public class NodeManagerInsight extends BaseInsightPoint {
     MetricGroupDisplay nodes =
         new MetricGroupDisplay(Type.SCM, "Node counters");
 
-    nodes.addMetrics(
-        new MetricDisplay("Healthy Nodes", "scm_node_manager_healthy_nodes"));
-    nodes.addMetrics(
-        new MetricDisplay("Dead Nodes", "scm_node_manager_dead_nodes"));
-
+    nodes.addMetrics(new MetricDisplay("In-Service Healthy Nodes",
+        "scm_node_manager_in_service_healthy_nodes"));
+    nodes.addMetrics(new MetricDisplay("In-Service Dead Nodes",
+        "scm_node_manager_in_service_dead_nodes"));
+    nodes.addMetrics(new MetricDisplay("In-Service Stale Nodes",
+        "scm_node_manager_in_service_stale_nodes"));
+    nodes.addMetrics(new MetricDisplay("Decommissioning Healthy Nodes",
+        "scm_node_manager_decommissioning_healthy_nodes"));
+    nodes.addMetrics(new MetricDisplay("Decommissioning Dead Nodes",
+        "scm_node_manager_decommissioning_dead_nodes"));
+    nodes.addMetrics(new MetricDisplay("Decommissioning Stale Nodes",
+        "scm_node_manager_decommissioning_stale_nodes"));
+    nodes.addMetrics(new MetricDisplay("Decommissioned Healthy Nodes",
+        "scm_node_manager_decommissioned_healthy_nodes"));
+    nodes.addMetrics(new MetricDisplay("Decommissioned Dead Nodes",
+        "scm_node_manager_decommissioned_dead_nodes"));
+    nodes.addMetrics(new MetricDisplay("Decommissioned Stale Nodes",
+        "scm_node_manager_decommissioned_stale_nodes"));
+    nodes.addMetrics(new MetricDisplay("In-maintenance Healthy Nodes",
+        "scm_node_manager_in_maintenance_healthy_nodes"));
+    nodes.addMetrics(new MetricDisplay("In-maintenance Dead Nodes",
+        "scm_node_manager_in_maintenance_dead_nodes"));
+    nodes.addMetrics(new MetricDisplay("In-maintenance Stale Nodes",
+        "scm_node_manager_in_maintenance_stale_nodes"));
+    nodes.addMetrics(new MetricDisplay(
+        "Entering-maintenance Healthy Nodes",
+        "scm_node_manager_entering_maintenance_healthy_nodes"));
+    nodes.addMetrics(new MetricDisplay(
+        "Entering-maintenance Dead Nodes",
+        "scm_node_manager_entering_maintenance_dead_nodes"));
+    nodes.addMetrics(new MetricDisplay(
+        "Entering-maintenance Stale Nodes",
+        "scm_node_manager_entering_maintenance_dead_nodes"));
     display.add(nodes);
 
     MetricGroupDisplay hb =
