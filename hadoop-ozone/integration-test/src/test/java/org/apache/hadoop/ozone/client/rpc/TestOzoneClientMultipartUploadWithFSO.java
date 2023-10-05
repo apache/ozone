@@ -361,6 +361,36 @@ public class TestOzoneClientMultipartUploadWithFSO {
   }
 
   @Test
+  public void testMultipartUploadWithDiscardedUnusedPartSize()
+      throws Exception {
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS, ONE);
+    byte[] data = generateData(10000000, (byte) 97);
+
+    // Upload Parts
+    Map<Integer, String> partsMap = new TreeMap<>();
+
+    // Upload part 1 and add it to the partsMap for completing the upload.
+    String partName1 = uploadPart(bucket, keyName, uploadID, 1, data);
+    partsMap.put(1, partName1);
+
+    // Upload part 2 and add it to the partsMap for completing the upload.
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2, data);
+    partsMap.put(2, partName2);
+
+    // Upload part 3 but do not add it to the partsMap.
+    uploadPart(bucket, keyName, uploadID, 3, data);
+
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
+
+    // Check the bucket size. Since part number 3 was not added to the partsMap,
+    // the unused part size should be discarded from the bucket size,
+    // 30000000 - 10000000 = 20000000
+    long bucketSize = volume.getBucket(bucketName).getUsedBytes();
+    Assert.assertEquals(bucketSize, data.length * 2);
+  }
+
+  @Test
   public void testMultipartUploadWithPartsMisMatchWithListSizeDifferent()
           throws Exception {
     String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,

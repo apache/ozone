@@ -187,7 +187,7 @@ public class TestRootedOzoneFileSystem {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
+    IOUtils.closeQuietly(fs, userOfs);
   }
 
   @Before

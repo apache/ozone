@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -351,7 +352,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     private final Path path;
     private final FileStatus status;
     private String pathKey;
-    private Iterator<OmKeyInfo> keyIterator;
+    private Iterator<String> keyIterator;
 
     OzoneListingIterator(Path path)
           throws IOException {
@@ -368,23 +369,18 @@ public class TrashOzoneFileSystem extends FileSystem {
               fsPath.getKeyName());
     }
 
-    private Iterator<OmKeyInfo> getKeyIterator(String volumeName,
+    private Iterator<String> getKeyIterator(String volumeName,
         String bucketName, String keyName) throws IOException {
-      OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-      List<OmKeyInfo> keys = new ArrayList<>(
-          metadataManager.listKeys(volumeName, bucketName, "", keyName,
-              OZONE_MAX_LIST_KEYS_SIZE));
-      String lastKey = keys.get(keys.size() - 1).getKeyName();
-      List<OmKeyInfo> nextBatchKeys =
-          metadataManager.listKeys(volumeName, bucketName, lastKey, keyName,
-              OZONE_MAX_LIST_KEYS_SIZE);
+      List<String> keys = new ArrayList<>(
+          listKeys(volumeName, bucketName, "", keyName));
+      String lastKey = keys.get(keys.size() - 1);
+      List<String> nextBatchKeys =
+          listKeys(volumeName, bucketName, lastKey, keyName);
 
       while (!nextBatchKeys.isEmpty()) {
         keys.addAll(nextBatchKeys);
-        lastKey = nextBatchKeys.get(nextBatchKeys.size() - 1).getKeyName();
-        nextBatchKeys =
-            metadataManager.listKeys(volumeName, bucketName, lastKey, keyName,
-                OZONE_MAX_LIST_KEYS_SIZE);
+        lastKey = nextBatchKeys.get(nextBatchKeys.size() - 1);
+        nextBatchKeys = listKeys(volumeName, bucketName, lastKey, keyName);
       }
       return keys.iterator();
     }
@@ -419,8 +415,8 @@ public class TrashOzoneFileSystem extends FileSystem {
         String ofsPathprefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         while (keyIterator.hasNext()) {
-          OmKeyInfo  kv = keyIterator.next();
-          String keyPath = ofsPathprefix + kv.getKeyName();
+          String keyName = keyIterator.next();
+          String keyPath = ofsPathprefix + keyName;
           LOG.trace("iterating key path: {}", keyPath);
           keyPathList.add(keyPath);
           if (keyPathList.size() >= OZONE_FS_ITERATE_BATCH_SIZE) {
@@ -446,6 +442,18 @@ public class TrashOzoneFileSystem extends FileSystem {
 
     FileStatus getStatus() {
       return status;
+    }
+
+    /**
+     * Return a listKeys output with only a list of keyNames.
+     */
+    List<String> listKeys(String volumeName, String bucketName, String startKey,
+        String keyPrefix) throws IOException {
+      OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+      return metadataManager.listKeys(volumeName, bucketName, startKey,
+              keyPrefix, OZONE_MAX_LIST_KEYS_SIZE).getKeys().stream()
+          .map(OmKeyInfo::getKeyName)
+          .collect(Collectors.toList());
     }
   }
 

@@ -348,7 +348,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       }
     }
 
-    public Runnable getEmptierTask(Path trashRootPath, TrashPolicyOzone trash,
+    private Runnable getEmptierTask(Path trashRootPath, TrashPolicyOzone trash,
         boolean deleteImmediately) {
       Runnable task = () -> {
         try {

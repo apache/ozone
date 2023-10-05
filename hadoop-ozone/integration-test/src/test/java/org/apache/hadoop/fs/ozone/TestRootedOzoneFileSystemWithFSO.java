@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -270,7 +271,7 @@ public class TestRootedOzoneFileSystemWithFSO
 
     FileStatus[] fileStatuses = getFs().listStatus(
         new Path(getBucketPath() + "/testListStatusFSO"));
-    Assert.assertEquals(valueGreaterBatchSize, fileStatuses.length);
+    assertEquals(valueGreaterBatchSize, fileStatuses.length);
   }
 
   @Test
@@ -282,11 +283,16 @@ public class TestRootedOzoneFileSystemWithFSO
 
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
     FSDataOutputStream stream = getFs().create(source);
-    assertThrows(OMException.class, () -> fs.isFileClosed(source));
-    stream.write(1);
-    stream.hsync();
-    assertFalse(fs.isFileClosed(source));
-    assertTrue(fs.recoverLease(source));
-    assertTrue(fs.isFileClosed(source));
+    try {
+      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      stream.write(1);
+      stream.hsync();
+      assertFalse(fs.isFileClosed(source));
+      assertTrue(fs.recoverLease(source));
+      assertTrue(fs.isFileClosed(source));
+    } finally {
+      TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
+    }
   }
+
 }
