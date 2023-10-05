@@ -215,8 +215,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       if (fileName != null) {
         printWriter = new PrintWriter(
             new BufferedWriter(new PrintWriter(fileName, UTF_8.name())));
-      } else {
-        printWriter = out();
       }
       return displayTable(iterator, dbColumnFamilyDef, printWriter,
           schemaV3);
@@ -230,6 +228,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private boolean displayTable(ManagedRocksIterator iterator,
                                DBColumnFamilyDefinition dbColumnFamilyDef,
                                PrintWriter printWriter, boolean schemaV3) {
+    if (printWriter == null) {
+      printWriter = out();
+    }
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setNameFormat("DBScanner-%d")
         .build();
@@ -624,7 +625,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           LOG.error("Exception while output", e);
         } finally {
           stop = true;
-          drainRemainingMessages();
+          synchronized (lock) {
+            drainRemainingMessages();
+          }
         }
       }
     }
