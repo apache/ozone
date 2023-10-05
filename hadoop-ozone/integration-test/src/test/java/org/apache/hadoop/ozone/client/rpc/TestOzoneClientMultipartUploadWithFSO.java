@@ -67,7 +67,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -103,7 +105,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300000));
   private String volumeName;
   private String bucketName;
   private String keyName;

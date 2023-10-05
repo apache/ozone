@@ -61,7 +61,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +77,7 @@ public class TestOzoneManagerListVolumesSecure {
       .getLogger(TestOzoneManagerListVolumesSecure.class);
 
   @Rule
-  public Timeout timeout = Timeout.seconds(1200);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(1200));
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 

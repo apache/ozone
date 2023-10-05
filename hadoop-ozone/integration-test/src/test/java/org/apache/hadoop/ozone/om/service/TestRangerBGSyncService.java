@@ -82,7 +82,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,7 +104,7 @@ public class TestRangerBGSyncService {
    * Timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(180));
 
   private static final long TEST_SYNC_INTERVAL_SEC = 1L;
   private static final long TEST_SYNC_TIMEOUT_SEC = 3L;
