@@ -67,7 +67,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -165,7 +164,6 @@ public class TestFailureHandlingByClient {
   }
 
   @Test
-  @Flaky("HDDS-7877")
   public void testBlockWritesWithDnFailures() throws Exception {
     startCluster();
     String keyName = UUID.randomUUID().toString();
@@ -355,7 +353,6 @@ public class TestFailureHandlingByClient {
 
 
   @Test
-  @Flaky("HDDS-7878")
   public void testContainerExclusionWithClosedContainerException()
       throws Exception {
     startCluster();
@@ -416,7 +413,6 @@ public class TestFailureHandlingByClient {
   }
 
   @Test
-  @Flaky("HDDS-3298")
   public void testDatanodeExclusionWithMajorityCommit() throws Exception {
     startCluster();
     String keyName = UUID.randomUUID().toString();
