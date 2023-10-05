@@ -1371,8 +1371,9 @@ public class BasicRootedOzoneClientAdapterImpl
           ofsPath.getBucketName(), snapshot);
     } catch (IOException exception) {
       LOG.warn("Failed to delete the temp snapshot with name {} in bucket"
-              + " {} and volume {} after snapDiff op.", snapshot,
-          ofsPath.getBucketName(), ofsPath.getVolumeName());
+              + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
+          ofsPath.getBucketName(), ofsPath.getVolumeName(),
+          exception.getMessage());
     }
   }
 

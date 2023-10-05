@@ -722,8 +722,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           snapPath.getBucketName(), snapshot);
     } catch (IOException exception) {
       LOG.warn("Failed to delete the temp snapshot with name {} in bucket"
-              + " {} and volume {} after snapDiff op.", snapshot,
-          snapPath.getBucketName(), snapPath.getVolumeName());
+              + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
+          snapPath.getBucketName(), snapPath.getVolumeName(),
+          exception.getMessage());
     }
   }
 
