@@ -144,6 +144,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -316,7 +318,7 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
       Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
       // Wait for container report
-      Thread.sleep(1000);
+      Thread.sleep(500);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
@@ -374,7 +376,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 1000, 20000);
+      }, 500, 10000);
     } finally {
       cluster.shutdown();
     }
@@ -474,7 +476,10 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-
+    conf.setTimeDuration(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        1000,
+        TimeUnit.MILLISECONDS);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
@@ -500,12 +505,11 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
       Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
       // Wait for container report
-      Thread.sleep(5000);
+      Thread.sleep(3000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
       }
-
       createDeleteTXLog(cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
       // Verify a few TX gets created in the TX log.
