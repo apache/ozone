@@ -76,7 +76,6 @@ public class TestRatisPipelineCreateAndDestroy {
   }
 
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
-  @Flaky("HDDS-7886")
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
