@@ -81,16 +81,14 @@ public final class SCMContext {
   private SCMContext(boolean isLeader, long term,
       final SafeModeStatus safeModeStatus,
       final FinalizationCheckpoint finalizationCheckpoint,
-      final OzoneStorageContainerManager scm) {
+      final OzoneStorageContainerManager scm, String threadNamePrefix) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;
     this.finalizationCheckpoint = finalizationCheckpoint;
     this.scm = scm;
     this.isLeaderReady = false;
-    threadNamePrefix = scm != null
-        ? scm.getScmNodeDetails().threadNamePrefix()
-        : "";
+    this.threadNamePrefix = threadNamePrefix;
   }
 
   /**
@@ -288,6 +286,7 @@ public final class SCMContext {
     private boolean isPreCheckComplete = true;
     private OzoneStorageContainerManager scm = null;
     private FinalizationCheckpoint finalizationCheckpoint;
+    private String threadNamePrefix = "";
 
     public Builder setLeader(boolean leader) {
       this.isLeader = leader;
@@ -321,6 +320,11 @@ public final class SCMContext {
       return this;
     }
 
+    public SCMContext.Builder setThreadNamePrefix(String prefix) {
+      this.threadNamePrefix = prefix;
+      return this;
+    }
+
     public SCMContext build() {
       Preconditions.checkNotNull(scm, "scm == null");
       return buildMaybeInvalid();
@@ -337,7 +341,7 @@ public final class SCMContext {
           new SafeModeStatus(isInSafeMode, isPreCheckComplete),
           Optional.ofNullable(finalizationCheckpoint).orElse(
               FinalizationCheckpoint.FINALIZATION_COMPLETE),
-          scm);
+          scm, threadNamePrefix);
     }
   }
 }
