@@ -65,12 +65,13 @@ public class BlockDeletingService extends BackgroundService {
 
   private final Duration blockDeletingMaxLockHoldingTime;
 
-  public BlockDeletingService(OzoneContainer ozoneContainer,
-                              long serviceInterval, long serviceTimeout,
-                              TimeUnit timeUnit, int workerSize,
-                              ConfigurationSource conf) {
+  public BlockDeletingService(
+      OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
+      TimeUnit timeUnit, int workerSize, ConfigurationSource conf,
+      String threadNamePrefix
+  ) {
     super("BlockDeletingService", serviceInterval, timeUnit,
-        workerSize, serviceTimeout);
+        workerSize, serviceTimeout, threadNamePrefix);
     this.ozoneContainer = ozoneContainer;
     try {
       containerDeletionPolicy = conf.getClass(

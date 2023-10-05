@@ -66,7 +66,7 @@ public class OMCertificateClient extends CommonCertificateClient {
       Runnable shutdownCallback
   ) {
     super(secConfig, scmSecurityClient, LOG, omStorage.getOmCertSerialId(),
-        COMPONENT_NAME, HddsUtils.threadNamePrefix(omStorage.getOmId()),
+        COMPONENT_NAME, HddsUtils.threadNamePrefix(omStorage.getOmNodeId()),
         saveCertIdCallback, shutdownCallback);
     this.serviceId = serviceId;
     this.scmID = scmID;
