@@ -1018,8 +1018,8 @@ public class TestStorageContainerManager {
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
             reportExecutorMap);
-    containerReportExecutors.setQueueWaitThreshold(1000);
-    containerReportExecutors.setExecWaitThreshold(1000);
+    containerReportExecutors.setQueueWaitThreshold(500);
+    containerReportExecutors.setExecWaitThreshold(500);
     
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
