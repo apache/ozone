@@ -63,6 +63,12 @@ public class HadoopFsGenerator extends BaseFreonGenerator
       defaultValue = "4096")
   private int copyBufferSize;
 
+  @Option(names = {"--sync"},
+      description = "Type of operation to execute after a write. Supported " +
+      "options include NONE (default), HFLUSH and HSYNC",
+      defaultValue = "NONE")
+  private static ContentGenerator.SyncOptions flushOrSync;
+
   private ContentGenerator contentGenerator;
 
   private Timer timer;
@@ -89,7 +95,7 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     }
 
     contentGenerator =
-        new ContentGenerator(fileSize, bufferSize, copyBufferSize);
+        new ContentGenerator(fileSize, bufferSize, copyBufferSize, flushOrSync);
 
     timer = getMetrics().timer("file-create");
 
