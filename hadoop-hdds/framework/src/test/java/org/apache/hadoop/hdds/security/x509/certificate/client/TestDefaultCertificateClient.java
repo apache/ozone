@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -321,7 +322,8 @@ public class TestDefaultCertificateClient {
     if (dnCertClient != null) {
       dnCertClient.close();
     }
-    dnCertClient = new DNCertificateClient(dnSecurityConfig, null, null,
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    dnCertClient = new DNCertificateClient(dnSecurityConfig, null, dn,
         certSerialId, null, null);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
