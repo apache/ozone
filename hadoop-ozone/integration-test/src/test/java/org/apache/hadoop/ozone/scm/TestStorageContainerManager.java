@@ -344,7 +344,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 1000, 20000);
+      }, 500, 10000);
       Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
