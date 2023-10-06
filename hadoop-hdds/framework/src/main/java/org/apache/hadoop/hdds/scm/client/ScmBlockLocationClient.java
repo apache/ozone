@@ -92,14 +92,14 @@ public class ScmBlockLocationClient {
   private void scheduleTopologyPoller(ConfigurationSource conf,
                                        Instant initialInvocation) {
     Duration refreshDuration = parseRefreshDuration(conf);
-    Instant nextRotate = initialInvocation.plus(refreshDuration);
+    Instant nextRefresh = initialInvocation.plus(refreshDuration);
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("NetworkTopologyPoller")
         .setDaemon(true)
         .build();
     executorService = Executors.newScheduledThreadPool(1, threadFactory);
     Duration interval = parseRefreshCheckDuration(conf);
-    Duration initialDelay = Duration.between(Instant.now(), nextRotate);
+    Duration initialDelay = Duration.between(Instant.now(), nextRefresh);
 
     LOG.info("Scheduling NetworkTopologyPoller with initial delay of {} " +
         "and interval of {}", initialDelay, interval);

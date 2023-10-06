@@ -1531,7 +1531,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean refetchTopologyInformation() throws IOException {
+  public String refetchTopologyInformation() throws IOException {
     final RefetchTopologyInformationRequest.Builder requestBuilder =
         RefetchTopologyInformationRequest.newBuilder();
     final OMRequest omRequest = createOMRequest(Type.RefetchTopologyInformation)
@@ -1540,7 +1540,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMResponse omResponse = submitRequest(omRequest);
     final RefetchTopologyInformationResponse resp =
         handleError(omResponse).getRefetchTopologyInformationResponse();
-    return resp.getStatus();
+    return resp.getUpdatedSchema();
   }
 
   /**

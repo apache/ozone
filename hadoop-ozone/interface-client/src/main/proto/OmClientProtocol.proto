@@ -644,7 +644,7 @@ message RefetchTopologyInformationRequest {
 }
 
 message RefetchTopologyInformationResponse {
-    optional bool status = 1;
+    optional string updatedSchema = 1;
 }
 
 /**

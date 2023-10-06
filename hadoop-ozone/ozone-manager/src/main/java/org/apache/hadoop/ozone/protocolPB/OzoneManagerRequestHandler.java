@@ -1024,7 +1024,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private RefetchTopologyInformationResponse refetchTopologyInformation() {
     RefetchTopologyInformationResponse response =
         RefetchTopologyInformationResponse.newBuilder()
-            .setStatus(impl.refetchTopologyInformation())
+            .setUpdatedSchema(impl.refetchTopologyInformation())
             .build();
     return response;
   }

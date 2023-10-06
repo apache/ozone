@@ -1089,10 +1089,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return secretKeyClient.getCurrentSecretKey().getId();
   }
 
-  public boolean refetchTopologyInformation() {
+  public String refetchTopologyInformation() {
     scmBlockLocationClient.refetchTopologyInformation();
-    String topologyInfo = scmBlockLocationClient.getTopologyInformation();
-    return topologyInfo != null && !topologyInfo.isEmpty();
+    return scmBlockLocationClient.getTopologyInformation();
   }
 
   @VisibleForTesting
