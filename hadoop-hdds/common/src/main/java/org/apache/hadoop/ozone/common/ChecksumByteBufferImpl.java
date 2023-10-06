@@ -26,20 +26,24 @@ import java.util.zip.Checksum;
  */
 public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
-  private Checksum checksum;
+  private final Checksum checksum;
 
-  private Field isReadyOnlyField = null;
+  private static final Field isReadyOnlyField;
 
-  public ChecksumByteBufferImpl(Checksum impl) {
-    this.checksum = impl;
-
+  static {
+    Field f = null;
     try {
-      isReadyOnlyField = ByteBuffer.class
+      f = ByteBuffer.class
           .getDeclaredField("isReadOnly");
-      isReadyOnlyField.setAccessible(true);
+      f.setAccessible(true);
     } catch (NoSuchFieldException e) {
       e.printStackTrace();
     }
+    isReadyOnlyField = f;
+  }
+
+  public ChecksumByteBufferImpl(Checksum impl) {
+    this.checksum = impl;
   }
 
   @Override
@@ -48,11 +52,14 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
     // this is a hack to not do memory copy.
-    try {
-      isReadyOnlyField.setBoolean(buffer, false);
-    } catch (IllegalAccessException e) {
-      e.printStackTrace();
+    if (isReadyOnlyField != null) {
+      try {
+        isReadyOnlyField.setBoolean(buffer, false);
+      } catch (IllegalAccessException e) {
+        e.printStackTrace();
+      }
     }
+
     if (buffer.hasArray()) {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
           buffer.remaining());
