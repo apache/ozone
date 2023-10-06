@@ -24,11 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -37,7 +33,8 @@ import static java.lang.String.format;
 
 public class PipelineMapV2 implements PipelineMap {
 
-  private final Map<PipelineID, PipelineWithContainers> pipelines = new ConcurrentHashMap<>();
+  private final Map<PipelineID, PipelineWithContainers> pipelines =
+      new ConcurrentHashMap<>();
 
   public PipelineMapV2() {
   }
@@ -45,114 +42,209 @@ public class PipelineMapV2 implements PipelineMap {
   @Override
   public void addPipeline(Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(pipeline, "Pipeline cannot be null");
-    Preconditions.checkArgument(
-        pipeline.getNodes().size() == pipeline.getReplicationConfig()
-            .getRequiredNodes(),
+    Preconditions.checkArgument(pipeline.getNodes().size() ==
+            pipeline.getReplicationConfig().getRequiredNodes(),
         "Nodes size=%s, replication factor=%s do not match ",
-        pipeline.getNodes().size(), pipeline.getReplicationConfig()
-            .getRequiredNodes());
+        pipeline.getNodes().size(),
+        pipeline.getReplicationConfig().getRequiredNodes());
 
-    if (pipelines.putIfAbsent(pipeline.getId(), new PipelineWithContainers(pipeline)) != null) {
+    if (pipelines.putIfAbsent(pipeline.getId(),
+        new PipelineWithContainers(pipeline)) != null) {
       throw new DuplicatedPipelineIdException(
           format("Duplicate pipeline ID %s detected.", pipeline.getId()));
     }
   }
 
   @Override
-  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
-      throws InvalidPipelineStateException {
+  public void addContainerToPipeline(PipelineID pipelineID,
+                                     ContainerID containerID)
+      throws InvalidPipelineStateException, PipelineNotFoundException {
     addContainerToPipeline(pipelineID, containerID, true);
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
-      throws InvalidPipelineStateException {
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID,
+                                             ContainerID containerID)
+      throws InvalidPipelineStateException, PipelineNotFoundException {
     addContainerToPipeline(pipelineID, containerID, false);
   }
 
-  private void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID, boolean declineClosed) {
-    pipelines.computeIfPresent(pipelineID, (pipelineID1, pipelineWithContainers) -> {
-      if (pipelineWithContainers.pipeline.isClosed() && declineClosed) {
-        throw new InvalidPipelineStateException(format(
-            "Cannot add container to pipeline=%s in closed state", pipelineID));
-      }
-      pipelineWithContainers.addContainer(containerID);
-      return pipelineWithContainers;
-    });
+  private void addContainerToPipeline(PipelineID pipelineID,
+                                      ContainerID containerID,
+                                      boolean declineClosed)
+      throws InvalidPipelineStateException, PipelineNotFoundException {
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+    Preconditions.checkNotNull(containerID, "Container Id cannot be null");
+
+    // attempt to add container
+    PipelineWithContainers newPipelineWithContainers =
+        pipelines.compute(pipelineID, (pipelineID1, pipelineWithContainers) -> {
+          if (pipelineWithContainers != null) {
+            // if updating is not allowed - do nothing
+            if (!(pipelineWithContainers.getPipeline().isClosed() &&
+                declineClosed)) {
+              pipelineWithContainers.addContainer(containerID);
+            }
+            return pipelineWithContainers;
+          }
+          return null;
+        });
+
+    if (newPipelineWithContainers == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    // check again if updating was allowed and throw exception if not
+    if (newPipelineWithContainers.getPipeline().isClosed() && declineClosed) {
+      throw new InvalidPipelineStateException(
+          format("Cannot add container to pipeline=%s in closed state",
+              pipelineID));
+    }
   }
 
   @Override
-  public Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
-    return pipelines.get(pipelineID).getPipeline();
+  public Pipeline getPipeline(PipelineID pipelineID)
+      throws PipelineNotFoundException {
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+
+    PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
+    if (pipelineWithContainers == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    return pipelineWithContainers.getPipeline();
   }
 
   @Override
   public List<Pipeline> getPipelines() {
-//    List<Pipeline> result = new ArrayList<>();
-    return pipelines.values().stream()
-        .map(PipelineWithContainers::getPipeline)
-        .collect(Collectors.toList());
-//    return result;
-  }
-
-  @Override
-  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig, Pipeline.PipelineState state) {
-    return pipelines.values().stream()
-        .filter(pipelineWithContainers -> pipelineWithContainers.getPipeline().getReplicationConfig().equals(replicationConfig)
-            && pipelineWithContainers.getPipeline().getPipelineState() == state)
-        .map(PipelineWithContainers::getPipeline)
+    return pipelines.values().stream().map(PipelineWithContainers::getPipeline)
         .collect(Collectors.toList());
   }
 
   @Override
-  public int getPipelineCount(ReplicationConfig replicationConfig, Pipeline.PipelineState state) {
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
+    Preconditions.checkNotNull(replicationConfig,
+        "ReplicationConfig cannot be null");
+    return getPipelines(
+        pipeline -> pipeline.getReplicationConfig().equals(replicationConfig));
+  }
+
+  @Override
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+                                     Pipeline.PipelineState state) {
+    Preconditions.checkNotNull(replicationConfig,
+        "ReplicationConfig cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
+
+    return pipelines.values().stream().filter(pipelineWithContainers ->
+            pipelineWithContainers.getPipeline().getReplicationConfig()
+                .equals(replicationConfig) &&
+                pipelineWithContainers.getPipeline().getPipelineState() == state)
+        .map(PipelineWithContainers::getPipeline).collect(Collectors.toList());
+  }
+
+  @Override
+  public int getPipelineCount(ReplicationConfig replicationConfig,
+                              Pipeline.PipelineState state) {
+    Preconditions.checkNotNull(replicationConfig,
+        "ReplicationConfig cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
     return getPipelines(replicationConfig, state).size();
   }
 
   @Override
-  public List<Pipeline> getPipelines(
-      ReplicationConfig replicationConfig,
-      Pipeline.PipelineState state,
-      Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines
-  ) {
-    return getPipelines(pipeline -> pipeline.getPipelineState() == state
-        && pipeline.getReplicationConfig().equals(replicationConfig)
-        && pipeline.getNodes().stream().filter(excludeDns::contains).distinct().isEmpty()
-        && excludePipelines.contains(pipeline.getId())
-    );
-  }
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+                                     Pipeline.PipelineState state,
+                                     Collection<DatanodeDetails> excludeDns,
+                                     Collection<PipelineID> excludePipelines) {
+    Preconditions.checkNotNull(replicationConfig,
+        "ReplicationConfig cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
+    Preconditions.checkNotNull(excludeDns,
+        "Datanode exclude list cannot be null");
+    Preconditions.checkNotNull(excludePipelines,
+        "Pipeline exclude list cannot be null");
 
-  private List<Pipeline> getPipelines(Predicate<Pipeline> filter) {
-    return pipelines.values().stream()
-        .map(PipelineWithContainers::getPipeline)
-        .filter(filter)
-        .collect(Collectors.toList());
-  }
-
-  @Override
-  public NavigableSet<ContainerID> getContainers(PipelineID pipelineID) throws PipelineNotFoundException {
-    return null;
+    return getPipelines(pipeline -> pipeline.getPipelineState() == state &&
+        pipeline.getReplicationConfig().equals(replicationConfig) &&
+        pipeline.getNodes().stream().noneMatch(excludeDns::contains) &&
+        !excludePipelines.contains(pipeline.getId()));
   }
 
   @Override
-  public int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException {
-    return 0;
+  public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
+      throws PipelineNotFoundException {
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+
+    PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
+    if (pipelineWithContainers == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    return new TreeSet<>(pipelineWithContainers.getContainers());
+  }
+
+  @Override
+  public int getNumberOfContainers(PipelineID pipelineID)
+      throws PipelineNotFoundException {
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+
+    PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
+    if (pipelineWithContainers == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    return pipelineWithContainers.getContainers().size();
   }
 
   @Override
   public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
-    return null;
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+    Pipeline pipeline = getPipeline(pipelineID);
+    if (!pipeline.isClosed()) {
+      throw new InvalidPipelineStateException(
+          format("Pipeline with %s is not yet closed", pipelineID));
+    }
+    pipelines.remove(pipelineID);
+    return pipeline;
   }
 
   @Override
-  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID,
+                                          ContainerID containerID)
+      throws IOException {
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+    Preconditions.checkNotNull(containerID, "container Id cannot be null");
 
+    PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
+    if (pipelineWithContainers == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    Set<ContainerID> containerIDs = pipelineWithContainers.getContainers();
+    containerIDs.remove(containerID);
   }
 
   @Override
-  public Pipeline updatePipelineState(PipelineID pipelineID, Pipeline.PipelineState state) throws PipelineNotFoundException {
-    return null;
+  public Pipeline updatePipelineState(PipelineID pipelineID,
+                                      Pipeline.PipelineState state)
+      throws PipelineNotFoundException {
+    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline LifeCycleState cannot be null");
+
+    PipelineWithContainers updatedPipelineWithContainers =
+        pipelines.compute(pipelineID, (id, oldPwC) -> {
+          if (oldPwC != null) {
+            return new PipelineWithContainers(
+                Pipeline.newBuilder(oldPwC.getPipeline()).setState(state)
+                    .build(), oldPwC.getContainers());
+          }
+          return null;
+        });
+    if (updatedPipelineWithContainers == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    return updatedPipelineWithContainers.getPipeline();
+  }
+
+  private List<Pipeline> getPipelines(Predicate<Pipeline> filter) {
+    return pipelines.values().stream().map(PipelineWithContainers::getPipeline)
+        .filter(filter).collect(Collectors.toList());
   }
 
   private static class PipelineWithContainers {
@@ -164,8 +256,18 @@ public class PipelineMapV2 implements PipelineMap {
       this.pipeline = pipeline;
     }
 
+    PipelineWithContainers(Pipeline pipeline,
+                           NavigableSet<ContainerID> containers) {
+      this.pipeline = pipeline;
+      this.containers.addAll(containers);
+    }
+
     public Pipeline getPipeline() {
       return pipeline;
+    }
+
+    public NavigableSet<ContainerID> getContainers() {
+      return containers;
     }
 
     public void addContainer(ContainerID containerID) {
@@ -178,7 +280,6 @@ public class PipelineMapV2 implements PipelineMap {
 
     public void removeContainer(ContainerID containerID) {
       containers.remove(containerID);
-
     }
   }
 }

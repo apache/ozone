@@ -17,22 +17,16 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
-
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * Provides {@link Pipeline} factory methods for testing.
@@ -53,12 +47,11 @@ public final class MockPipeline {
    * @return Pipeline with single node in it.
    */
   public static Pipeline createPipeline(int numNodes) throws IOException {
-    Preconditions.checkArgument(numNodes >= 1);
-    final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
-    for (int i = 0; i < numNodes; i++) {
-      ids.add(MockDatanodeDetails.randomLocalDatanodeDetails());
-    }
-    return createPipeline(ids);
+    return createPipeline(getDatanodeDetails(numNodes));
+  }
+
+  public static Pipeline createPipeline() throws IOException {
+    return getDefaultPipelineBuilder().build();
   }
 
   public static Pipeline createPipeline(Iterable<DatanodeDetails> ids) {
@@ -66,12 +59,58 @@ public final class MockPipeline {
     Preconditions.checkArgument(ids.iterator().hasNext());
     List<DatanodeDetails> dns = new ArrayList<>();
     ids.forEach(dns::add);
-    return Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
-        .setReplicationConfig(
-            StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE))
+    return getDefaultPipelineBuilder()
         .setNodes(dns)
+        .build();
+  }
+
+  public static Pipeline createPipeline(Pipeline.PipelineState pipelineState)
+      throws IOException {
+    Objects.requireNonNull(pipelineState, "pipelineState == null");
+    return getDefaultPipelineBuilder()
+        .setState(pipelineState)
+        .build();
+  }
+
+  public static Pipeline createPipeline(
+      ReplicatedReplicationConfig replicationConfig) throws IOException {
+    Objects.requireNonNull(replicationConfig, "replicationConfig == null");
+    return getDefaultPipelineBuilder()
+        .setReplicationConfig(replicationConfig)
+        .build();
+  }
+
+  public static Pipeline createPipeline(
+      ReplicatedReplicationConfig replicationConfig,
+      Pipeline.PipelineState pipelineState) throws IOException {
+    Objects.requireNonNull(replicationConfig, "replicationConfig == null");
+    Objects.requireNonNull(pipelineState, "pipelineState == null");
+    return getDefaultPipelineBuilder()
+        .setState(pipelineState)
+        .setReplicationConfig(replicationConfig)
+        .build();
+  }
+
+  public static Pipeline createPipeline(
+      ReplicatedReplicationConfig replicationConfig,
+      Pipeline.PipelineState pipelineState,
+      List<DatanodeDetails> datanodeDetails) throws IOException {
+    Objects.requireNonNull(replicationConfig, "replicationConfig == null");
+    Objects.requireNonNull(pipelineState, "pipelineState == null");
+    return getDefaultPipelineBuilder()
+        .setState(pipelineState)
+        .setNodes(datanodeDetails)
+        .setReplicationConfig(replicationConfig)
+        .build();
+  }
+
+  public static Pipeline createPipeline(
+      ReplicatedReplicationConfig replicationConfig, int numNodes)
+      throws IOException {
+    Objects.requireNonNull(replicationConfig, "replicationConfig == null");
+    return getDefaultPipelineBuilder()
+        .setReplicationConfig(replicationConfig)
+        .setNodes(getDatanodeDetails(numNodes))
         .build();
   }
 
@@ -82,9 +121,7 @@ public final class MockPipeline {
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    return Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
+    return getDefaultPipelineBuilder()
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes)
@@ -121,5 +158,23 @@ public final class MockPipeline {
 
   private MockPipeline() {
     throw new UnsupportedOperationException("no instances");
+  }
+
+  private static List<DatanodeDetails> getDatanodeDetails(int numNodes) {
+    Preconditions.checkArgument(numNodes >= 1);
+    final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
+    for (int i = 0; i < numNodes; i++) {
+      ids.add(MockDatanodeDetails.randomLocalDatanodeDetails());
+    }
+    return ids;
+  }
+
+  private static Pipeline.Builder getDefaultPipelineBuilder() {
+    return Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
+        .setNodes(getDatanodeDetails(1));
   }
 }

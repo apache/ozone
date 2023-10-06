@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Provides {@link DatanodeDetails} factory methods for testing.
@@ -112,13 +113,14 @@ public final class MockDatanodeDetails {
    *
    * @return DatanodeDetails
    */
-  public static DatanodeDetails randomLocalDatanodeDetails()
-      throws IOException {
+  public static DatanodeDetails randomLocalDatanodeDetails() {
     try (ServerSocket socket = new ServerSocket(0)) {
       return createDatanodeDetails(UUID.randomUUID().toString(),
           socket.getInetAddress().getHostName(),
           socket.getInetAddress().getHostAddress(), null,
           socket.getLocalPort());
+    } catch (IOException e) {
+      return fail("Could not initialize DatanodeDetails");
     }
   }
 

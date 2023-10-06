@@ -26,8 +26,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 public interface PipelineMap {
   /**
@@ -41,7 +39,7 @@ public interface PipelineMap {
   /**
    * Add container to an existing pipeline.
    *
-   * @param pipelineID - PipelineID of the pipeline to which container is added
+   * @param pipelineID  - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
    * @throws IOException if pipeline is not in open state or does not exist
    */
@@ -51,11 +49,12 @@ public interface PipelineMap {
   /**
    * Add container to an existing pipeline during SCM Start.
    *
-   * @param pipelineID - PipelineID of the pipeline to which container is added
+   * @param pipelineID  - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
    */
   void addContainerToPipelineSCMStart(PipelineID pipelineID,
-                                      ContainerID containerID) throws IOException;
+                                      ContainerID containerID)
+      throws IOException;
 
   /**
    * Get pipeline corresponding to specified pipelineID.
@@ -68,13 +67,10 @@ public interface PipelineMap {
 
   /**
    * Get list of pipelines in SCM.
+   *
    * @return List of pipelines
    */
   List<Pipeline> getPipelines();
-
-  default List<Pipeline> getPipelines(Predicate<Pipeline> filter) {
-    return getPipelines().stream().filter(filter).collect(Collectors.toList());
-  }
 
   /**
    * Get pipeline corresponding to specified replication type.
@@ -82,9 +78,7 @@ public interface PipelineMap {
    * @param replicationConfig - ReplicationConfig
    * @return List of pipelines which have the specified replication type
    */
-  default List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
-    return getPipelines(pipeline -> pipeline.getReplicationConfig().equals(replicationConfig));
-  }
+  List<Pipeline> getPipelines(ReplicationConfig replicationConfig);
 
   /**
    * Get list of pipeline corresponding to specified replication type,
@@ -107,7 +101,8 @@ public interface PipelineMap {
    * @param state             - Required PipelineState
    * @return Count of pipelines with the specified replication config and state
    */
-  int getPipelineCount(ReplicationConfig replicationConfig, Pipeline.PipelineState state);
+  int getPipelineCount(ReplicationConfig replicationConfig,
+                       Pipeline.PipelineState state);
 
   /**
    * Get list of pipeline corresponding to specified replication type,
@@ -121,7 +116,8 @@ public interface PipelineMap {
    * replication factor and pipeline state
    */
   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
-                              Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
+                              Pipeline.PipelineState state,
+                              Collection<DatanodeDetails> excludeDns,
                               Collection<PipelineID> excludePipelines);
 
   /**
@@ -131,7 +127,8 @@ public interface PipelineMap {
    * @return Set of containerIDs belonging to the pipeline
    * @throws PipelineNotFoundException if pipeline is not found
    */
-  NavigableSet<ContainerID> getContainers(PipelineID pipelineID) throws PipelineNotFoundException;
+  NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
+      throws PipelineNotFoundException;
 
   /**
    * Get number of containers corresponding to a pipeline.
@@ -140,7 +137,8 @@ public interface PipelineMap {
    * @return Number of containers belonging to the pipeline
    * @throws PipelineNotFoundException if pipeline is not found
    */
-  int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException;
+  int getNumberOfContainers(PipelineID pipelineID)
+      throws PipelineNotFoundException;
 
   /**
    * Remove pipeline from the data structures.
@@ -153,21 +151,24 @@ public interface PipelineMap {
   /**
    * Remove container from a pipeline.
    *
-   * @param pipelineID - PipelineID of the pipeline from which container needs
-   *                   to be removed
+   * @param pipelineID  - PipelineID of the pipeline from which container needs
+   *                    to be removed
    * @param containerID - ContainerID of the container to remove
    * @throws IOException if pipeline does not exist
    */
-  void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) throws IOException;
+  void removeContainerFromPipeline(PipelineID pipelineID,
+                                   ContainerID containerID) throws IOException;
 
   /**
    * Updates the state of pipeline.
    *
    * @param pipelineID - PipelineID of the pipeline whose state needs
    *                   to be updated
-   * @param state - new state of the pipeline
+   * @param state      - new state of the pipeline
    * @return Pipeline with the updated state
    * @throws PipelineNotFoundException if pipeline does not exist
    */
-  Pipeline updatePipelineState(PipelineID pipelineID, Pipeline.PipelineState state) throws PipelineNotFoundException;
+  Pipeline updatePipelineState(PipelineID pipelineID,
+                               Pipeline.PipelineState state)
+      throws PipelineNotFoundException;
 }
