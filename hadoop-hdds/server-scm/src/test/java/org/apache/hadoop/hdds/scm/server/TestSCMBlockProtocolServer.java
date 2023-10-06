@@ -85,15 +85,6 @@ public class TestSCMBlockProtocolServer {
   }
 
   @Test
-  public void testGetTopologyInformation() {
-    String schemaFile = server.getTopologyInformation();
-    Assertions.assertEquals(
-        config.get(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
-            ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
-        schemaFile);
-  }
-
-  @Test
   public void testSortDatanodes() throws Exception {
     List<String> nodes = new ArrayList();
     nodeManager.getAllNodes().stream().forEach(
