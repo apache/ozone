@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -172,20 +174,11 @@ public interface MiniOzoneCluster {
 
   /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
+   * The caller is responsible for closing the client after use.
    *
    * @return {@link OzoneClient}
-   * @throws IOException
    */
-  OzoneClient getClient() throws IOException;
-
-  /**
-   * Returns an RPC based {@link OzoneClient} to access the
-   * {@link MiniOzoneCluster}.
-   *
-   * @return {@link OzoneClient}
-   * @throws IOException
-   */
-  OzoneClient getRpcClient() throws IOException;
+  OzoneClient newClient() throws IOException;
 
   /**
    * Returns StorageContainerLocationClient to communicate with
@@ -287,6 +280,16 @@ public interface MiniOzoneCluster {
    */
   void shutdownHddsDatanodes();
 
+  String getClusterId();
+
+  default String getName() {
+    return getClass().getSimpleName() + "-" + getClusterId();
+  }
+
+  default String getBaseDir() {
+    return GenericTestUtils.getTempPath(getName());
+  }
+
   /**
    * Builder class for MiniOzoneCluster.
    */
@@ -319,12 +322,15 @@ public interface MiniOzoneCluster {
     protected Optional<String> scmId = Optional.empty();
     protected Optional<String> omId = Optional.empty();
     
-    protected Boolean randomContainerPort = true;
+    protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
+    protected Optional<Long> dataStreamBufferFlushSize = Optional.empty();
+    protected Optional<Long> datastreamWindowSize = Optional.empty();
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
+    protected OptionalInt dataStreamMinPacketSize = OptionalInt.empty();
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
@@ -341,6 +347,7 @@ public interface MiniOzoneCluster {
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
+    protected SecretKeyClient secretKeyClient;
     protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
@@ -403,6 +410,11 @@ public interface MiniOzoneCluster {
       return this;
     }
 
+    public Builder setSecretKeyClient(SecretKeyClient client) {
+      this.secretKeyClient = client;
+      return this;
+    }
+
     /**
      * Sets the SCM id.
      *
@@ -424,18 +436,6 @@ public interface MiniOzoneCluster {
      */
     public Builder setOmId(String id) {
       omId = Optional.of(id);
-      return this;
-    }
-
-    /**
-     * If set to true container service will be started in a random port.
-     *
-     * @param randomPort enable random port
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setRandomContainerPort(boolean randomPort) {
-      randomContainerPort = randomPort;
       return this;
     }
 
@@ -565,6 +565,21 @@ public interface MiniOzoneCluster {
       return this;
     }
 
+    public Builder setDataStreamBufferFlushize(long size) {
+      dataStreamBufferFlushSize = Optional.of(size);
+      return this;
+    }
+
+    public Builder setDataStreamMinPacketSize(int size) {
+      dataStreamMinPacketSize = OptionalInt.of(size);
+      return this;
+    }
+
+    public Builder setDataStreamStreamWindowSize(long size) {
+      datastreamWindowSize = Optional.of(size);
+      return this;
+    }
+
     /**
      * Sets the block size for stream buffer.
      *
@@ -638,5 +653,36 @@ public interface MiniOzoneCluster {
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
+  }
+
+  /**
+   * Helper class to get free port avoiding randomness.
+   */
+  class PortAllocator {
+
+    private static final int MIN_PORT = 15000;
+    private static final int MAX_PORT = 32000;
+    private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    private PortAllocator() {
+      // no instances
+    }
+
+    static synchronized int getFreePort() {
+      int port = NEXT_PORT.getAndIncrement();
+      if (port > MAX_PORT) {
+        NEXT_PORT.set(MIN_PORT);
+        port = NEXT_PORT.getAndIncrement();
+      }
+      return port;
+    }
+
+    static String localhostWithFreePort() {
+      return "127.0.0.1:" + getFreePort();
+    }
+
+    static String anyHostWithFreePort() {
+      return "0.0.0.0:" + getFreePort();
+    }
   }
 }

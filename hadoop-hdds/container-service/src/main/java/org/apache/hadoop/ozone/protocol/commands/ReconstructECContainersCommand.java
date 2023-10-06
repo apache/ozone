@@ -134,6 +134,21 @@ public class ReconstructECContainersCommand
     return ecReplicationConfig;
   }
 
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": containerID: ").append(containerID)
+        .append(", replicationConfig: ").append(ecReplicationConfig)
+        .append(", sources: [").append(getSources().stream()
+            .map(a -> a.dnDetails
+                + " replicaIndex: " + a.getReplicaIndex())
+            .collect(Collectors.joining(", "))).append("]")
+        .append(", targets: ").append(getTargetDatanodes())
+        .append(", missingIndexes: ").append(
+            Arrays.toString(missingContainerIndexes));
+    return sb.toString();
+  }
   /**
    * To store the datanode details with replica index.
    */

@@ -47,10 +47,10 @@ import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COU
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
 /**
  * Unit test for File Size Count Task.
  */
@@ -74,44 +74,59 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testReprocess() throws IOException {
-    OmKeyInfo omKeyInfo1 = mock(OmKeyInfo.class);
-    given(omKeyInfo1.getKeyName()).willReturn("key1");
-    given(omKeyInfo1.getVolumeName()).willReturn("vol1");
-    given(omKeyInfo1.getBucketName()).willReturn("bucket1");
-    given(omKeyInfo1.getDataSize()).willReturn(1000L);
+    OmKeyInfo[] omKeyInfos = new OmKeyInfo[3];
+    String[] keyNames = {"key1", "key2", "key3"};
+    String[] volumeNames = {"vol1", "vol1", "vol1"};
+    String[] bucketNames = {"bucket1", "bucket1", "bucket1"};
+    Long[] dataSizes = {1000L, 100000L, 1125899906842624L * 4};
 
-    OmKeyInfo omKeyInfo2 = mock(OmKeyInfo.class);
-    given(omKeyInfo2.getKeyName()).willReturn("key2");
-    given(omKeyInfo2.getVolumeName()).willReturn("vol1");
-    given(omKeyInfo2.getBucketName()).willReturn("bucket1");
-    given(omKeyInfo2.getDataSize()).willReturn(100000L);
+    // Loop to initialize each instance of OmKeyInfo
+    for (int i = 0; i < 3; i++) {
+      omKeyInfos[i] = mock(OmKeyInfo.class);
+      given(omKeyInfos[i].getKeyName()).willReturn(keyNames[i]);
+      given(omKeyInfos[i].getVolumeName()).willReturn(volumeNames[i]);
+      given(omKeyInfos[i].getBucketName()).willReturn(bucketNames[i]);
+      given(omKeyInfos[i].getDataSize()).willReturn(dataSizes[i]);
+    }
 
-    OmKeyInfo omKeyInfo3 = mock(OmKeyInfo.class);
-    given(omKeyInfo3.getKeyName()).willReturn("key3");
-    given(omKeyInfo3.getVolumeName()).willReturn("vol1");
-    given(omKeyInfo3.getBucketName()).willReturn("bucket1");
-    given(omKeyInfo3.getDataSize()).willReturn(1125899906842624L * 4); // 4PB
-
+    // Create two mock instances of TypedTable, one for FILE_SYSTEM_OPTIMIZED
+    // layout and one for LEGACY layout
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
-        .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue = mock(
-        TypedTable.TypedKeyValue.class);
+    // Set return values for getKeyTable() for FILE_SYSTEM_OPTIMIZED
+    // and LEGACY layout
+    when(omMetadataManager.getKeyTable(eq(BucketLayout.LEGACY)))
+        .thenReturn(keyTableLegacy);
+    when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
+        .thenReturn(keyTableFso);
 
-    when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
-    when(mockKeyIter.hasNext())
-        .thenReturn(true)
-        .thenReturn(true)
-        .thenReturn(true)
-        .thenReturn(false);
-    when(mockKeyIter.next()).thenReturn(mockKeyValue);
-    when(mockKeyValue.getValue())
-        .thenReturn(omKeyInfo1)
-        .thenReturn(omKeyInfo2)
-        .thenReturn(omKeyInfo3);
+    // Create two mock instances of TypedTableIterator, one for each
+    // instance of TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy =
+        mock(TypedTable.TypedTableIterator.class);
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    // Set return values for hasNext() and next() of the mock instance of
+    // TypedTableIterator for keyTableLegacy
+    when(mockKeyIterLegacy.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueLegacy =
+        mock(TypedTable.TypedKeyValue.class);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyValueLegacy.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
+        omKeyInfos[2]);
+
+
+    // Same as above, but for keyTableFso
+    TypedTable.TypedTableIterator mockKeyIterFso =
+        mock(TypedTable.TypedTableIterator.class);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
+    when(mockKeyIterFso.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueFso =
+        mock(TypedTable.TypedKeyValue.class);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
+    when(mockKeyValueFso.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
+        omKeyInfos[2]);
 
     // Reprocess could be called from table having existing entries. Adding
     // an entry to simulate that.
@@ -120,25 +135,31 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     Pair<String, Boolean> result =
         fileSizeCountTask.reprocess(omMetadataManager);
+
+    // Verify that the result of reprocess is true
     assertTrue(result.getRight());
 
+    // Verify that the number of entries in fileCountBySizeDao is 3
     assertEquals(3, fileCountBySizeDao.count());
+
+    // Create a record to find the count of files in a specific volume,
+    // bucket and file size
     Record3<String, String, Long> recordToFind = dslContext
         .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
-        FILE_COUNT_BY_SIZE.BUCKET,
-        FILE_COUNT_BY_SIZE.FILE_SIZE)
+            FILE_COUNT_BY_SIZE.BUCKET,
+            FILE_COUNT_BY_SIZE.FILE_SIZE)
         .value1("vol1")
         .value2("bucket1")
         .value3(1024L);
-    assertEquals(1L,
+    assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
     // file size upper bound for 100000L is 131072L (next highest power of 2)
     recordToFind.value3(131072L);
-    assertEquals(1L,
+    assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
     // file size upper bound for 4PB is Long.MAX_VALUE
     recordToFind.value3(Long.MAX_VALUE);
-    assertEquals(1L,
+    assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
   }
 
@@ -166,7 +187,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setAction(PUT)
         .setKey("updatedKey")
         .setValue(toBeUpdatedKey)
-        .setTable(OmMetadataManagerImpl.KEY_TABLE)
+        .setTable(OmMetadataManagerImpl.FILE_TABLE)
         .build();
 
     OMUpdateEventBatch omUpdateEventBatch =
@@ -221,7 +242,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .setAction(DELETE)
         .setKey("deletedKey")
         .setValue(toBeDeletedKey)
-        .setTable(OmMetadataManagerImpl.KEY_TABLE)
+        .setTable(OmMetadataManagerImpl.FILE_TABLE)
         .build();
 
     omUpdateEventBatch = new OMUpdateEventBatch(
@@ -267,19 +288,36 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     hasNextAnswer.add(false);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue = mock(
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
+        .TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
+        TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
-    when(mockKeyIter.hasNext())
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
+
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY))
+        .thenReturn(keyTableLegacy);
+    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
+        .thenReturn(keyTableFso);
+
+    when(mockKeyIterLegacy.hasNext())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
-    when(mockKeyIter.next()).thenReturn(mockKeyValue);
-    when(mockKeyValue.getValue())
+    when(mockKeyIterFso.hasNext())
+        .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
+
+    when(mockKeyValueLegacy.getValue())
+        .thenAnswer(AdditionalAnswers.returnsElementsOf(omKeyInfoList));
+    when(mockKeyValueFso.getValue())
         .thenAnswer(AdditionalAnswers.returnsElementsOf(omKeyInfoList));
 
     Pair<String, Boolean> result =
@@ -295,16 +333,16 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .value1("vol1")
         .value2("bucket1")
         .value3(1024L);
-    assertEquals(1L,
+    assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
     // file size upper bound for 100000L is 131072L (next highest power of 2)
     recordToFind.value1("vol1");
     recordToFind.value3(131072L);
-    assertEquals(1L,
+    assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
     recordToFind.value2("bucket500");
     recordToFind.value3(Long.MAX_VALUE);
-    assertEquals(1L,
+    assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
   }
 
@@ -324,12 +362,23 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
           long fileSize = (long)Math.pow(2, keyIndex + 9) - 1L;
           given(omKeyInfo.getDataSize()).willReturn(fileSize);
           omKeyInfoList.add(omKeyInfo);
-          omDbEventList.add(new OMUpdateEventBuilder()
-              .setAction(PUT)
-              .setKey("key" + keyIndex)
-              .setValue(omKeyInfo)
-              .setTable(OmMetadataManagerImpl.KEY_TABLE)
-              .build());
+          // All the keys ending with even will be stored in KEY-TABLE
+          if (keyIndex % 2 == 0) {
+            omDbEventList.add(new OMUpdateEventBuilder()
+                .setAction(PUT)
+                .setKey("key" + keyIndex)
+                .setValue(omKeyInfo)
+                .setTable(OmMetadataManagerImpl.KEY_TABLE)
+                .build());
+          } else {
+            // All the keys ending with odd will be stored in FILE-TABLE
+            omDbEventList.add(new OMUpdateEventBuilder()
+                .setAction(PUT)
+                .setKey("key" + keyIndex)
+                .setValue(omKeyInfo)
+                .setTable(OmMetadataManagerImpl.FILE_TABLE)
+                .build());
+          }
         }
       }
     }
@@ -368,24 +417,44 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
           if (keyIndex <= 5) {
             long fileSize = (long)Math.pow(2, keyIndex + 9) - 1L;
             given(omKeyInfo.getDataSize()).willReturn(fileSize);
-            omDbEventList.add(new OMUpdateEventBuilder()
-                .setAction(DELETE)
-                .setKey("key" + keyIndex)
-                .setValue(omKeyInfo)
-                .setTable(OmMetadataManagerImpl.KEY_TABLE)
-                .build());
+            if (keyIndex % 2 == 0) {
+              omDbEventList.add(new OMUpdateEventBuilder()
+                  .setAction(DELETE)
+                  .setKey("key" + keyIndex)
+                  .setValue(omKeyInfo)
+                  .setTable(OmMetadataManagerImpl.KEY_TABLE)
+                  .build());
+            } else {
+              omDbEventList.add(new OMUpdateEventBuilder()
+                  .setAction(DELETE)
+                  .setKey("key" + keyIndex)
+                  .setValue(omKeyInfo)
+                  .setTable(OmMetadataManagerImpl.FILE_TABLE)
+                  .build());
+            }
           } else {
             // update all the files with keyIndex > 5 to filesize 1023L
             // so that they get into first bin
             given(omKeyInfo.getDataSize()).willReturn(1023L);
-            omDbEventList.add(new OMUpdateEventBuilder()
-                .setAction(UPDATE)
-                .setKey("key" + keyIndex)
-                .setValue(omKeyInfo)
-                .setTable(OmMetadataManagerImpl.KEY_TABLE)
-                .setOldValue(
-                    omKeyInfoList.get((volIndex * bktIndex) + keyIndex))
-                .build());
+            if (keyIndex % 2 == 0) {
+              omDbEventList.add(new OMUpdateEventBuilder()
+                  .setAction(UPDATE)
+                  .setKey("key" + keyIndex)
+                  .setValue(omKeyInfo)
+                  .setTable(OmMetadataManagerImpl.KEY_TABLE)
+                  .setOldValue(
+                      omKeyInfoList.get((volIndex * bktIndex) + keyIndex))
+                  .build());
+            } else {
+              omDbEventList.add(new OMUpdateEventBuilder()
+                  .setAction(UPDATE)
+                  .setKey("key" + keyIndex)
+                  .setValue(omKeyInfo)
+                  .setTable(OmMetadataManagerImpl.FILE_TABLE)
+                  .setOldValue(
+                      omKeyInfoList.get((volIndex * bktIndex) + keyIndex))
+                  .build());
+            }
           }
         }
       }
@@ -417,7 +486,4 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .getCount().longValue());
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
 }

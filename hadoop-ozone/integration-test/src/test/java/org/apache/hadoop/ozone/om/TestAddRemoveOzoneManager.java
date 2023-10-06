@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
@@ -44,7 +46,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.server.leader.FollowerInfo;
 import org.junit.Assert;
@@ -82,6 +83,8 @@ public class TestAddRemoveOzoneManager {
     BUCKET_NAME = "bucket" + RandomStringUtils.randomNumeric(5);
   }
 
+  private OzoneClient client;
+
   private void setupCluster(int numInitialOMs) throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
@@ -93,8 +96,8 @@ public class TestAddRemoveOzoneManager {
         .setNumOfOzoneManagers(numInitialOMs)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
+    objectStore = client.getObjectStore();
 
     // Perform some transactions
     objectStore.createVolume(VOLUME_NAME);
@@ -109,6 +112,7 @@ public class TestAddRemoveOzoneManager {
 
   @AfterEach
   public void shutdown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -192,8 +196,9 @@ public class TestAddRemoveOzoneManager {
         "other OMs are down", newOMNodeIds.contains(omLeader.getOMNodeId()));
 
     // Perform some read and write operations with new OM leader
-    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID,
-        cluster.getConf()).getObjectStore();
+    IOUtils.closeQuietly(client);
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf());
+    objectStore = client.getObjectStore();
 
     OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
     OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
@@ -208,7 +213,6 @@ public class TestAddRemoveOzoneManager {
    * 2. Force bootstrap without upating config on any OM -> fail
    */
   @Test
-  @Flaky("HDDS-6077")
   public void testBootstrapWithoutConfigUpdate() throws Exception {
     // Setup 1 node cluster
     setupCluster(1);
@@ -257,7 +261,6 @@ public class TestAddRemoveOzoneManager {
     newNodeId = "omNode-bootstrap-2";
     try {
       cluster.bootstrapOzoneManager(newNodeId, false, true);
-      Assert.fail();
     } catch (IOException e) {
       Assert.assertTrue(omLog.getOutput().contains("Couldn't add OM " +
           newNodeId + " to peer list."));

@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -31,14 +33,14 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.Assert;
-import org.junit.experimental.runners.Enclosed;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -50,20 +52,20 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 
 /**
  * Test for NSSummaryTaskWithFSO.
  */
-@RunWith(Enclosed.class)
+@SuppressFBWarnings
 public final class TestNSSummaryTaskWithFSO {
-
-  @ClassRule
-  public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+
+  private static OzoneConfiguration ozoneConfiguration;
 
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
@@ -115,17 +117,19 @@ public final class TestNSSummaryTaskWithFSO {
   private TestNSSummaryTaskWithFSO() {
   }
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    omMetadataManager = initializeNewOmMetadataManager(
-            TEMPORARY_FOLDER.newFolder());
+  @BeforeAll
+  public static void setUp(@TempDir File tmpDir) throws Exception {
+    ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        10);
+    omMetadataManager = initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProvider ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProviderWithFSO();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-            TEMPORARY_FOLDER.newFolder());
+            new File(tmpDir, "recon"));
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(TEMPORARY_FOLDER)
+        new ReconTestInjector.Builder(tmpDir)
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
@@ -134,7 +138,6 @@ public final class TestNSSummaryTaskWithFSO {
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
-
     NSSummary nonExistentSummary =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
     Assert.assertNull(nonExistentSummary);
@@ -142,19 +145,21 @@ public final class TestNSSummaryTaskWithFSO {
     populateOMDB();
 
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration);
   }
 
   /**
    * Nested class for testing NSSummaryTaskWithFSO reprocess.
    */
-  public static class TestReprocess {
+  @Nested
+  public class TestReprocess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws IOException {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
       NSSummary staleNSSummary = new NSSummary();
@@ -165,7 +170,11 @@ public final class TestNSSummaryTaskWithFSO {
 
       // Verify commit
       Assert.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
+
+      // reinit Recon RocksDB's namespace CF.
+      reconNamespaceSummaryManager.clearNSSummaryTable();
+
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
       Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
@@ -195,16 +204,18 @@ public final class TestNSSummaryTaskWithFSO {
     public void testReprocessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket1.length);
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket2.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket1.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket2.length);
 
       Assert.assertEquals(1, fileDistBucket1[0]);
-      for (int i = 1; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 1; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         Assert.assertEquals(0, fileDistBucket1[i]);
       }
       Assert.assertEquals(1, fileDistBucket2[1]);
       Assert.assertEquals(1, fileDistBucket2[2]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 1 || i == 2) {
           continue;
         }
@@ -244,9 +255,10 @@ public final class TestNSSummaryTaskWithFSO {
       Assert.assertEquals(KEY_THREE_SIZE, nsSummaryInDir2.getSizeOfFiles());
 
       int[] fileDistForDir2 = nsSummaryInDir2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistForDir2.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistForDir2.length);
       Assert.assertEquals(1, fileDistForDir2[fileDistForDir2.length - 1]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS - 1; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS - 1; ++i) {
         Assert.assertEquals(0, fileDistForDir2[i]);
       }
       Assert.assertEquals(0, nsSummaryInDir2.getChildDir().size());
@@ -263,21 +275,23 @@ public final class TestNSSummaryTaskWithFSO {
   /**
    * Nested class for testing NSSummaryTaskWithFSO process.
    */
-  public static class TestProcess {
-    private static OMDBUpdateEvent keyEvent1;
-    private static OMDBUpdateEvent keyEvent2;
-    private static OMDBUpdateEvent keyEvent3;
-    private static OMDBUpdateEvent keyEvent4;
-    private static OMDBUpdateEvent keyEvent5;
-    private static OMDBUpdateEvent keyEvent6;
-    private static OMDBUpdateEvent keyEvent7;
-    @BeforeClass
-    public static void setUp() throws IOException {
-      nSSummaryTaskWithFso.reprocess(reconOMMetadataManager);
-      nSSummaryTaskWithFso.process(processEventBatch());
+  @Nested
+  public class TestProcess {
+    private OMDBUpdateEvent keyEvent1;
+    private OMDBUpdateEvent keyEvent2;
+    private OMDBUpdateEvent keyEvent3;
+    private OMDBUpdateEvent keyEvent4;
+    private OMDBUpdateEvent keyEvent5;
+    private OMDBUpdateEvent keyEvent6;
+    private OMDBUpdateEvent keyEvent7;
+
+    @BeforeEach
+    public void setUp() throws IOException {
+      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+      nSSummaryTaskWithFso.processWithFSO(processEventBatch());
     }
 
-    private static OMUpdateEventBatch processEventBatch() throws IOException {
+    private OMUpdateEventBatch processEventBatch() throws IOException {
       // Events for keyTable change:
       // put file5 under bucket 2
       String omPutKey = BUCKET_TWO_OBJECT_ID + OM_KEY_PREFIX + FILE_FIVE;
@@ -417,16 +431,17 @@ public final class TestNSSummaryTaskWithFSO {
       Assert.assertNotNull(nsSummaryForBucket2);
       Assert.assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
       // key 4 + key 5 + updated key 2
-      Assert.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_TWO_UPDATE_SIZE,
-          nsSummaryForBucket2.getSizeOfFiles());
+      Assert.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE
+          + KEY_TWO_UPDATE_SIZE, nsSummaryForBucket2.getSizeOfFiles());
 
       int[] fileSizeDist = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileSizeDist.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileSizeDist.length);
       // 1023L and 100L
       Assert.assertEquals(2, fileSizeDist[0]);
       // 2050L
       Assert.assertEquals(1, fileSizeDist[2]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 0 || i == 2) {
           continue;
         }

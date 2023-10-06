@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -37,9 +38,12 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -61,6 +65,8 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
 
@@ -133,6 +139,27 @@ public interface ClientProtocol {
    * @throws IOException
    */
   S3VolumeContext getS3VolumeContext() throws IOException;
+
+  /**
+   * Returns OzoneKey that contains the application generated/visible
+   * metadata for an Ozone Object in S3 context.
+   *
+   * If Key exists, return returns OzoneKey.
+   * If Key does not exist, throws an exception with error code KEY_NOT_FOUND
+   *
+   * @return OzoneKey which gives basic information about the key.
+   */
+  OzoneKey headS3Object(String bucketName, String keyName) throws IOException;
+
+  /**
+   * Get OzoneKey in S3 context.
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @return {@link OzoneKey}
+   * @throws IOException
+   */
+  OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
+      throws IOException;
 
   OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
@@ -267,15 +294,18 @@ public interface ClientProtocol {
    * Returns the List of Buckets in the Volume that matches the bucketPrefix,
    * size of the returned list depends on maxListResult. The caller has to make
    * multiple calls to read all volumes.
-   * @param volumeName Name of the Volume
-   * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Starting point of the list, this bucket is excluded
+   *
+   * @param volumeName    Name of the Volume
+   * @param bucketPrefix  Bucket prefix to match
+   * @param prevBucket    Starting point of the list, this bucket is excluded
    * @param maxListResult Max number of buckets to return.
+   * @param hasSnapshot   flag to list the buckets which have snapshot.
    * @return {@code List<OzoneBucket>}
    * @throws IOException
    */
   List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                String prevBucket, int maxListResult)
+                                String prevBucket, int maxListResult,
+                                boolean hasSnapshot)
       throws IOException;
 
   /**
@@ -310,6 +340,20 @@ public interface ClientProtocol {
       Map<String, String> metadata)
       throws IOException;
 
+  /**
+   * Writes a key in an existing bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param metadata custom key value metadata
+   * @return {@link OzoneDataStreamOutput}
+   *
+   */
+  OzoneDataStreamOutput createStreamKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata)
+      throws IOException;
 
   /**
    * Reads a key from an existing bucket.
@@ -480,6 +524,24 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Create a part key for a multipart upload key.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param size
+   * @param partNumber
+   * @param uploadID
+   * @return OzoneDataStreamOutput
+   * @throws IOException
+   */
+  OzoneDataStreamOutput createMultipartStreamKey(String volumeName,
+                                                 String bucketName,
+                                                 String keyName, long size,
+                                                 int partNumber,
+                                                 String uploadID)
+      throws IOException;
+
+  /**
    * Complete Multipart upload. This will combine all the parts and make the
    * key visible in ozone.
    * @param volumeName
@@ -563,7 +625,7 @@ public interface ClientProtocol {
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  @Nonnull S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
    * Returns S3 Secret given kerberos user.
@@ -796,6 +858,11 @@ public interface ClientProtocol {
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException;
 
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneDataStreamOutput createStreamFile(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      boolean overWrite, boolean recursive) throws IOException;
+
 
   /**
    * List the status for a file or a directory and its contents.
@@ -933,6 +1000,10 @@ public interface ClientProtocol {
    */
   void clearThreadLocalS3Auth();
 
+  default ThreadLocal<S3Auth> getS3CredentialsProvider() {
+    return null;
+  }
+
   /**
    * Sets the owner of bucket.
    * @param volumeName Name of the Volume
@@ -956,5 +1027,113 @@ public interface ClientProtocol {
   Map<OmKeyLocationInfo,
       Map<DatanodeDetails, OzoneInputStream>> getKeysEveryReplicas(
           String volumeName, String bucketName, String keyName)
+      throws IOException;
+
+  /**
+   * Create snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
+   * @return name used
+   * @throws IOException
+   */
+  String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException;
+
+  /**
+   * Delete snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException;
+
+  /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
+   */
+  String printCompactionLogDag(String fileNamePrefix, String graphType)
+      throws IOException;
+
+  /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   start of the list, this snapshot is excluded
+   * @param maxListResult  max numbet of snapshots to return
+   * @return list of snapshots for volume/bucket snapshotpath.
+   * @throws IOException
+   */
+  List<OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException;
+
+  /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  @SuppressWarnings("parameternumber")
+  SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
+                                    String fromSnapshot, String toSnapshot,
+                                    String token, int pageSize,
+                                    boolean forceFullDiff,
+                                    boolean disableNativeDiff)
+      throws IOException;
+
+  /**
+   * Cancel snapshot diff job.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @return the success if cancel succeeds.
+   * @throws IOException in case of any exception while cancelling snap diff job
+   */
+  CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                String bucketName,
+                                                String fromSnapshot,
+                                                String toSnapshot)
+      throws IOException;
+
+  /**
+   * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAll Option to specify whether to list all jobs or not
+   * @return a list of SnapshotDiffJob objects
+   * @throws IOException in case there is a failure while getting a response.
+   */
+  List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
+                                               String bucketName,
+                                               String jobStatus,
+                                               boolean listAll)
+      throws IOException;
+
+  /**
+   * Time to be set for given Ozone object. This operations updates modification
+   * time and access time for the given key.
+   * @param obj Ozone object.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   *
+   * @throws IOException if there is error.
+   * */
+  void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException;
 }

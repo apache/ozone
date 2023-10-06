@@ -17,10 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.common.utils;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -37,6 +43,7 @@ public final class DatanodeStoreCache {
   private final Map<String, RawDB> datanodeStoreMap;
 
   private static DatanodeStoreCache cache;
+  private boolean miniClusterMode;
 
   private DatanodeStoreCache() {
     datanodeStoreMap = new ConcurrentHashMap<>();
@@ -49,12 +56,37 @@ public final class DatanodeStoreCache {
     return cache;
   }
 
-  public void addDB(String containerDBPath, RawDB db) {
-    datanodeStoreMap.putIfAbsent(containerDBPath, db);
+  @VisibleForTesting
+  public static synchronized void setMiniClusterMode() {
+    getInstance().miniClusterMode = true;
   }
 
-  public RawDB getDB(String containerDBPath) {
-    return datanodeStoreMap.get(containerDBPath);
+  public void addDB(String containerDBPath, RawDB db) {
+    datanodeStoreMap.putIfAbsent(containerDBPath, db);
+    LOG.info("Added db {} to cache", containerDBPath);
+  }
+
+  public RawDB getDB(String containerDBPath, ConfigurationSource conf)
+      throws IOException {
+    RawDB db = datanodeStoreMap.get(containerDBPath);
+    if (db == null) {
+      synchronized (this) {
+        db = datanodeStoreMap.get(containerDBPath);
+        if (db == null) {
+          try {
+            DatanodeStore store = new DatanodeStoreSchemaThreeImpl(
+                conf, containerDBPath, false);
+            db = new RawDB(store, containerDBPath);
+            datanodeStoreMap.put(containerDBPath, db);
+          } catch (IOException e) {
+            LOG.error("Failed to get DB store {}", containerDBPath, e);
+            throw new IOException("Failed to get DB store " +
+                containerDBPath, e);
+          }
+        }
+      }
+    }
+    return db;
   }
 
   public void removeDB(String containerDBPath) {
@@ -69,9 +101,18 @@ public final class DatanodeStoreCache {
     } catch (Exception e) {
       LOG.error("Stop DatanodeStore: {} failed", containerDBPath, e);
     }
+    LOG.info("Removed db {} from cache", containerDBPath);
   }
 
   public void shutdownCache() {
+    if (miniClusterMode) {
+      if (!datanodeStoreMap.isEmpty()) {
+        LOG.info("Skip clearing cache in mini cluster mode. Entries left: {}",
+            new TreeSet<>(datanodeStoreMap.keySet()));
+      }
+      return;
+    }
+
     for (Map.Entry<String, RawDB> entry : datanodeStoreMap.entrySet()) {
       try {
         entry.getValue().getStore().stop();

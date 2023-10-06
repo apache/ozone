@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -55,6 +56,8 @@ import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
@@ -156,6 +159,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return snapshotInfo;
   }
 
+  @Override
+  public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
+                                  RaftPeerId newLeaderId) {
+    // Initialize OMHAMetrics
+    ozoneManager.omHAMetricsInit(newLeaderId.toString());
+  }
+
   /**
    * Called to notify state machine about indexes which are processed
    * internally by Raft Server, this currently happens when conf entries are
@@ -201,6 +211,31 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   /**
+   * Called to notify state machine about the snapshot install result.
+   * Trigger the cleanup of candidate DB dir.
+   * @param result InstallSnapshotResult
+   * @param snapshotIndex the index of installed snapshot
+   * @param peer the peer which fini
+   */
+  @Override
+  public void notifySnapshotInstalled(RaftProtos.InstallSnapshotResult result,
+                                      long snapshotIndex, RaftPeer peer) {
+    LOG.info("Receive notifySnapshotInstalled event {} for the peer: {}" +
+        " snapshotIndex: {}.", result, peer.getId(), snapshotIndex);
+    switch (result) {
+    case SUCCESS:
+    case SNAPSHOT_UNAVAILABLE:
+      // Currently, only trigger for the one who installed snapshot
+      if (ozoneManager.getOmRatisServer().getServer().getPeer().equals(peer)) {
+        ozoneManager.getOmSnapshotProvider().init();
+      }
+      break;
+    default:
+      break;
+    }
+  }
+
+  /**
    * Validate/pre-process the incoming update request in the state machine.
    * @return the content to be written to the log entry. Null means the request
    * should be rejected.
@@ -232,8 +267,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext preAppendTransaction(TransactionContext trx)
       throws IOException {
-    OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
-        trx.getStateMachineLogEntry().getLogData());
+    final OMRequest request = (OMRequest) trx.getStateMachineContext();
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
 
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
@@ -279,7 +313,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     try {
-      OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
+      // For the Leader, the OMRequest is set in trx in startTransaction.
+      // For Followers, the OMRequest hast to be converted from the log entry.
+      final Object context = trx.getStateMachineContext();
+      final OMRequest request = context != null ? (OMRequest) context
+          : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       long trxLogIndex = trx.getLogEntry().getIndex();
       // In the current approach we have one single global thread executor.
@@ -391,8 +429,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (getLifeCycleState() == LifeCycle.State.PAUSED) {
       return;
     }
-    getLifeCycle().transition(LifeCycle.State.PAUSING);
-    getLifeCycle().transition(LifeCycle.State.PAUSED);
+    final LifeCycle lc = getLifeCycle();
+    if (lc.getCurrentState() != LifeCycle.State.NEW) {
+      getLifeCycle().transition(LifeCycle.State.PAUSING);
+      getLifeCycle().transition(LifeCycle.State.PAUSED);
+    }
+
     ozoneManagerDoubleBuffer.stop();
   }
 
@@ -515,6 +557,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setStateMachine(this)
         .setServerRole(RaftProtos.RaftPeerRole.LEADER)
         .setLogData(raftClientRequest.getMessage().getContent())
+        .setStateMachineContext(omRequest)
         .build();
   }
 
@@ -528,12 +571,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     try {
       return handler.handleWriteRequest(request,
           trxLogIndex).getOMResponse();
+    } catch (IOException e) {
+      LOG.warn("Failed to write, Exception occurred ", e);
+      return createErrorResponse(request, e);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
-      String errorMessage = "Request " + request + "failed with exception";
+      String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     }
     return null;
+  }
+
+  private OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 
   /**
@@ -680,4 +739,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return applyTransactionMap.get(transactionIndex);
   }
 
+  /**
+   * Wait until both buffers are flushed.  This is used in cases like
+   * "follower bootstrap tarball creation" where the rocksDb for the active
+   * fs needs to synchronized with the rocksdb's for the snapshots.
+   */
+  public void awaitDoubleBufferFlush() throws InterruptedException {
+    ozoneManagerDoubleBuffer.awaitFlush();
+  }
 }

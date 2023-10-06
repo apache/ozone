@@ -20,9 +20,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>ozone-fault-injection-test</artifactId>
     <groupId>org.apache.ozone</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <description>Apache Ozone Mini Ozone Chaos Tests</description>
   <name>Apache Ozone Mini Ozone Chaos Tests</name>
 

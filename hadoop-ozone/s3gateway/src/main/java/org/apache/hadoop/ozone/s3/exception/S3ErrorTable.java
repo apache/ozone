@@ -29,6 +29,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
 /**
@@ -58,8 +59,9 @@ public final class S3ErrorTable {
           " this request is not supported.", HTTP_BAD_REQUEST);
 
   public static final OS3Exception S3_AUTHINFO_CREATION_ERROR =
-      new OS3Exception("InvalidRequest", "Error creating s3 auth info.",
-          HTTP_BAD_REQUEST);
+      new OS3Exception("InvalidRequest", "Error creating s3 auth info. " +
+          "The request may not be signed using AWS V4 signing algorithm," +
+          " or might be invalid", HTTP_FORBIDDEN);
 
   public static final OS3Exception BUCKET_NOT_EMPTY = new OS3Exception(
       "BucketNotEmpty", "The bucket you tried to delete is not empty.",
@@ -121,6 +123,18 @@ public final class S3ErrorTable {
   public static final OS3Exception NOT_IMPLEMENTED = new OS3Exception(
       "NotImplemented", "This part of feature is not implemented yet.",
       HTTP_NOT_IMPLEMENTED);
+
+  public static final OS3Exception NO_OVERWRITE = new OS3Exception(
+      "Conflict", "Cannot overwrite file with directory", HTTP_CONFLICT);
+
+  public static final OS3Exception METADATA_TOO_LARGE = new OS3Exception(
+      "MetadataTooLarge", "Illegal user defined metadata. Combined size " +
+      "exceeds the maximum allowed metadata size of " +
+      S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB + "KB", HTTP_BAD_REQUEST);
+
+  public static final OS3Exception BUCKET_ALREADY_EXISTS = new OS3Exception(
+      "BucketAlreadyExists", "The requested bucket name is not available" +
+      " as it already exists.", HTTP_CONFLICT);
 
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);

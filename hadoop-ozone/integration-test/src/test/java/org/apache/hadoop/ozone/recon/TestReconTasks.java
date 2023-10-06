@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -41,7 +42,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
@@ -57,7 +60,7 @@ public class TestReconTasks {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
@@ -90,6 +93,41 @@ public class TestReconTasks {
   }
 
   @Test
+  public void testSyncSCMContainerInfo() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            cluster.getReconServer().getReconStorageContainerManager();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
+    final ContainerInfo container1 = scmContainerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), "admin");
+    final ContainerInfo container2 = scmContainerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), "admin");
+    reconContainerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), "admin");
+    scmContainerManager.updateContainerState(container1.containerID(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scmContainerManager.updateContainerState(container2.containerID(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scmContainerManager.updateContainerState(container1.containerID(),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    scmContainerManager.updateContainerState(container2.containerID(),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    int scmContainersCount = scmContainerManager.getContainers().size();
+    int reconContainersCount = reconContainerManager
+        .getContainers().size();
+    Assert.assertNotEquals(scmContainersCount, reconContainersCount);
+    reconScm.syncWithSCMContainerInfo();
+    reconContainersCount = reconContainerManager
+        .getContainers().size();
+    Assert.assertEquals(scmContainersCount, reconContainersCount);
+  }
+
+  @Test
   public void testMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -115,8 +153,8 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-    Assert.assertEquals(scmContainerManager.getContainerIDs(),
-        reconContainerManager.getContainerIDs());
+    Assert.assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
 
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());

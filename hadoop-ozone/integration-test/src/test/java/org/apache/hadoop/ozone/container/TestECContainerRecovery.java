@@ -20,7 +20,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -34,6 +33,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -44,22 +45,33 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -78,12 +90,14 @@ public class TestECContainerRecovery {
   private static int dataBlocks = 3;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
+  private static final Logger LOG =
+          LoggerFactory.getLogger(TestECContainerRecovery.class);
   /**
    * Create a MiniDFSCluster for testing.
    */
   @BeforeAll
   public static void init() throws Exception {
-    chunkSize = 1024;
+    chunkSize = 1024 * 1024;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
@@ -92,8 +106,22 @@ public class TestECContainerRecovery {
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
-
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
+    DatanodeConfiguration datanodeConfiguration =
+            conf.getObject(DatanodeConfiguration.class);
+    datanodeConfiguration.setRecoveringContainerScrubInterval(
+            Duration.of(10, ChronoUnit.SECONDS));
+    conf.setFromObject(datanodeConfiguration);
+    ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
+            .getObject(
+                    ReplicationManager.ReplicationManagerConfiguration.class);
+    //Setting all the intervals to 10 seconds current tests have timeout
+    // of 100s.
+    rmConfig.setUnderReplicatedInterval(Duration.of(10,
+            ChronoUnit.SECONDS));
+    rmConfig.setOverReplicatedInterval(Duration.of(10,
+            ChronoUnit.SECONDS));
+    rmConfig.setInterval(Duration.of(10, ChronoUnit.SECONDS));
+    conf.setFromObject(rmConfig);
     conf.set(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, "1s");
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
     conf.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");
@@ -130,6 +158,7 @@ public class TestECContainerRecovery {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -140,7 +169,7 @@ public class TestECContainerRecovery {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -191,7 +220,7 @@ public class TestECContainerRecovery {
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
-    // Shutting sown DN triggers close pipeline and close container.
+    // Shutting down DN triggers close pipeline and close container.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
     // Make sure container closed.
@@ -199,6 +228,7 @@ public class TestECContainerRecovery {
         .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -211,19 +241,117 @@ public class TestECContainerRecovery {
     // Let's verify for Over replications now.
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Restart the DN to make the over replication and expect replication to be
     // increased.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     // Check container is over replicated.
     waitForContainerCount(6, container.containerID(), scm);
+
+    // Resume RM and wait the over replicated replica deleted.
+    // ReplicationManager fix container replica state if different
+    scm.getReplicationManager().start();
+
     // Wait for all the replicas to be closed.
     container = scm.getContainerInfo(container.getContainerID());
     waitForDNContainerState(container, scm);
 
-    // Resume RM and wait the over replicated replica deleted.
-    scm.getReplicationManager().start();
     waitForContainerCount(5, container.containerID(), scm);
+  }
+
+  @Test
+  public void testECContainerRecoveryWithTimedOutRecovery() throws Exception {
+    byte[] inputData = getInputBytes(3);
+    final OzoneBucket bucket = getOzoneBucket();
+    String keyName = UUID.randomUUID().toString();
+    final Pipeline pipeline;
+    ECReplicationConfig repConfig =
+            new ECReplicationConfig(3, 2,
+                    ECReplicationConfig.EcCodec.RS, chunkSize);
+    try (OzoneOutputStream out = bucket
+            .createKey(keyName, 1024, repConfig, new HashMap<>())) {
+      out.write(inputData);
+      pipeline = ((ECKeyOutputStream) out.getOutputStream())
+              .getStreamEntries().get(0).getPipeline();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    List<ContainerInfo> containers =
+            cluster.getStorageContainerManager().getContainerManager()
+                    .getContainers();
+    ContainerInfo container = null;
+    for (ContainerInfo info : containers) {
+      if (info.getPipelineID().getId().equals(pipeline.getId().getId())) {
+        container = info;
+      }
+    }
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    AtomicReference<HddsDatanodeService> reconstructedDN =
+            new AtomicReference<>();
+    ContainerInfo finalContainer = container;
+    Map<HddsDatanodeService, Long> recoveryTimeoutMap = new HashMap<>();
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      recoveryTimeoutMap.put(dn, dn.getDatanodeStateMachine().getConf()
+              .getTimeDuration(OZONE_RECOVERING_CONTAINER_TIMEOUT,
+              OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT,
+              TimeUnit.MILLISECONDS));
+      dn.getDatanodeStateMachine().getContainer()
+              .getContainerSet().setRecoveringTimeout(100);
+
+      ReconstructECContainersCommandHandler handler = GenericTestUtils
+          .getFieldReflection(dn.getDatanodeStateMachine(),
+              "reconstructECContainersCommandHandler");
+
+      ECReconstructionCoordinator coordinator = GenericTestUtils
+              .mockFieldReflection(handler,
+                      "coordinator");
+
+      Mockito.doAnswer(invocation -> {
+        GenericTestUtils.waitFor(() ->
+            dn.getDatanodeStateMachine()
+                .getContainer()
+                .getContainerSet()
+                .getContainer(finalContainer.getContainerID())
+                .getContainerState() ==
+                    ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+            1000, 100000);
+        reconstructedDN.set(dn);
+        invocation.callRealMethod();
+        return null;
+      }).when(coordinator).reconstructECBlockGroup(Mockito.any(), Mockito.any(),
+              Mockito.any(), Mockito.any());
+    }
+
+    // Shutting down DN triggers close pipeline and close container.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+
+
+    // Make sure container closed.
+    waitForSCMContainerState(StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED, container.containerID());
+    //Temporarily stop the RM process.
+    scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
+
+    // Wait for the lower replication.
+    waitForContainerCount(4, container.containerID(), scm);
+
+    // Start the RM to resume the replication process and wait for the
+    // reconstruction.
+    scm.getReplicationManager().start();
+    GenericTestUtils.waitFor(() -> reconstructedDN.get() != null, 10000,
+            100000);
+    GenericTestUtils.waitFor(() -> reconstructedDN.get()
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(finalContainer.getContainerID()) == null,
+            10000, 100000);
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      dn.getDatanodeStateMachine().getContainer().getContainerSet()
+              .setRecoveringTimeout(recoveryTimeoutMap.get(dn));
+    }
   }
 
   private void waitForDNContainerState(ContainerInfo container,
@@ -281,6 +409,11 @@ public class TestECContainerRecovery {
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;
+  }
+
+  private void waitForReplicationManagerStopped(ReplicationManager rm)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> !rm.isRunning(), 100, 10000);
   }
 
 }

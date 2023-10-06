@@ -42,18 +42,20 @@ import org.slf4j.LoggerFactory;
  * Cache implementation for the table. Partial Table cache, where the DB state
  * and cache state will not be same. Partial table cache holds entries until
  * flush to DB happens.
+ * @param <KEY>
+ * @param <VALUE>
  */
 @Private
 @Evolving
-public class PartialTableCache<CACHEKEY extends CacheKey,
-    CACHEVALUE extends CacheValue> implements TableCache<CACHEKEY, CACHEVALUE> {
+public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(PartialTableCache.class);
 
-  private final Map<CACHEKEY, CACHEVALUE> cache;
-  private final NavigableMap<Long, Set<CACHEKEY>> epochEntries;
-  private ExecutorService executorService;
+  private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
+  private final NavigableMap<Long, Set<CacheKey<KEY>>> epochEntries;
+  private final ExecutorService executorService;
+  private final CacheStatsRecorder statsRecorder;
 
 
   public PartialTableCache() {
@@ -78,20 +80,24 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("PartialTableCache Cleanup Thread - %d").build();
     executorService = Executors.newSingleThreadExecutor(build);
+
+    statsRecorder = new CacheStatsRecorder();
   }
 
   @Override
-  public CACHEVALUE get(CACHEKEY cachekey) {
-    return cache.get(cachekey);
+  public CacheValue<VALUE> get(CacheKey<KEY> cachekey) {
+    CacheValue<VALUE> value = cache.get(cachekey);
+    statsRecorder.recordValue(value);
+    return value;
   }
 
   @Override
-  public void loadInitial(CACHEKEY cacheKey, CACHEVALUE cacheValue) {
+  public void loadInitial(CacheKey<KEY> key, CacheValue<VALUE> value) {
     // Do nothing for partial table cache.
   }
 
   @Override
-  public void put(CACHEKEY cacheKey, CACHEVALUE value) {
+  public void put(CacheKey<KEY> cacheKey, CacheValue<VALUE> value) {
     cache.put(cacheKey, value);
     epochEntries.computeIfAbsent(value.getEpoch(), v -> new HashSet<>())
             .add(cacheKey);
@@ -108,15 +114,16 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   }
 
   @Override
-  public Iterator<Map.Entry<CACHEKEY, CACHEVALUE>> iterator() {
+  public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> iterator() {
+    statsRecorder.recordIteration();
     return cache.entrySet().iterator();
   }
 
   @VisibleForTesting
   @Override
   public void evictCache(List<Long> epochs) {
-    Set<CACHEKEY> currentCacheKeys;
-    CACHEKEY cachekey;
+    Set<CacheKey<KEY>> currentCacheKeys;
+    CacheKey<KEY> cachekey;
     long lastEpoch = epochs.get(epochs.size() - 1);
     for (long currentEpoch : epochEntries.keySet()) {
       currentCacheKeys = epochEntries.get(currentEpoch);
@@ -129,7 +136,7 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
       // As ConcurrentHashMap computeIfPresent is atomic, there is no race
       // condition between cache cleanup and requests updating same cache entry.
       if (epochs.contains(currentEpoch)) {
-        for (Iterator<CACHEKEY> iterator = currentCacheKeys.iterator();
+        for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
              iterator.hasNext();) {
           cachekey = iterator.next();
           cache.computeIfPresent(cachekey, ((k, v) -> {
@@ -152,9 +159,10 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
   }
 
   @Override
-  public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
+  public CacheResult<VALUE> lookup(CacheKey<KEY> cachekey) {
 
-    CACHEVALUE cachevalue = cache.get(cachekey);
+    CacheValue<VALUE> cachevalue = cache.get(cachekey);
+    statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
       return new CacheResult<>(CacheResult.CacheStatus.MAY_EXIST,
             null);
@@ -170,8 +178,12 @@ public class PartialTableCache<CACHEKEY extends CacheKey,
 
   @VisibleForTesting
   @Override
-  public NavigableMap<Long, Set<CACHEKEY>> getEpochEntries() {
+  public NavigableMap<Long, Set<CacheKey<KEY>>> getEpochEntries() {
     return epochEntries;
   }
 
+  @Override
+  public CacheStats getStats() {
+    return statsRecorder.snapshot();
+  }
 }

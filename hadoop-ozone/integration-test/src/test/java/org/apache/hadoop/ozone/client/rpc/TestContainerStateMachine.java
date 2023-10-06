@@ -31,12 +31,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
@@ -50,16 +52,18 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests the containerStateMachine failure handling.
@@ -70,7 +74,7 @@ public class TestContainerStateMachine {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -99,7 +103,6 @@ public class TestContainerStateMachine {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     OzoneManager.setTestSecureOmFlag(true);
@@ -114,6 +117,7 @@ public class TestContainerStateMachine {
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
+            .setSecretKeyClient(new SecretKeyTestClient())
             .build();
     cluster.setWaitForClusterToBeReadyTimeout(300000);
     cluster.waitForClusterToBeReady();
@@ -132,6 +136,7 @@ public class TestContainerStateMachine {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -181,7 +186,7 @@ public class TestContainerStateMachine {
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Assert.assertNull(storage.findLatestSnapshot());
+    Assert.assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
@@ -202,7 +207,7 @@ public class TestContainerStateMachine {
     stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    Path parentPath = getSnapshotPath(storage);
     int numSnapshots = parentPath.getParent().toFile().listFiles().length;
     Assert.assertTrue(Math.abs(ratisServerConfiguration
         .getNumSnapshotsRetained() - numSnapshots) <= 1);
@@ -222,10 +227,15 @@ public class TestContainerStateMachine {
     stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    parentPath = storage.findLatestSnapshot().getFile().getPath();
+    parentPath = getSnapshotPath(storage);
     numSnapshots = parentPath.getParent().toFile().listFiles().length;
     Assert.assertTrue(Math.abs(ratisServerConfiguration
         .getNumSnapshotsRetained() - numSnapshots) <= 1);
   }
 
+  static Path getSnapshotPath(SimpleStateMachineStorage storage)
+      throws IOException {
+    return StatemachineImplTestUtil.findLatestSnapshot(storage)
+        .getFile().getPath();
+  }
 }

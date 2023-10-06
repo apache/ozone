@@ -25,13 +25,13 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -66,9 +67,10 @@ public class KeyValueContainerCheck {
 
   private String metadataPath;
   private HddsVolume volume;
+  private KeyValueContainer container;
 
   public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
-      long containerID, HddsVolume volume) {
+      long containerID, HddsVolume volume, KeyValueContainer container) {
     Preconditions.checkArgument(metadataPath != null);
 
     this.checkConfig = conf;
@@ -76,6 +78,7 @@ public class KeyValueContainerCheck {
     this.onDiskContainerData = null;
     this.metadataPath = metadataPath;
     this.volume = volume;
+    this.container = container;
   }
 
   /**
@@ -85,22 +88,55 @@ public class KeyValueContainerCheck {
    *
    * @return true : integrity checks pass, false : otherwise.
    */
-  public boolean fastCheck() {
+  public ScanResult fastCheck() throws InterruptedException {
     LOG.debug("Running basic checks for container {};", containerID);
-    boolean valid = false;
+
     try {
-      loadContainerData();
-      checkLayout();
-      checkContainerFile();
-      valid = true;
+      // Container directory should exist.
+      File containerDir = new File(metadataPath).getParentFile();
+      if (!containerDir.exists()) {
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.MISSING_CONTAINER_DIR,
+            containerDir, new FileNotFoundException("Container directory " +
+                containerDir + " not found."));
+      }
 
-    } catch (IOException e) {
-      LOG.info("Marking Container {} UNHEALTHY as it failed metadata check",
-              containerID);
-      handleCorruption(e);
+      // Metadata directory should exist.
+      File metadataDir = new File(metadataPath);
+      if (!metadataDir.exists()) {
+        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_METADATA_DIR,
+            metadataDir, new FileNotFoundException("Metadata directory " +
+                metadataDir + " not found."));
+      }
+
+      // Container file should be valid.
+      File containerFile = KeyValueContainer
+          .getContainerFile(metadataPath, containerID);
+      try {
+        loadContainerData(containerFile);
+      } catch (FileNotFoundException ex) {
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.MISSING_CONTAINER_FILE, containerFile, ex);
+      } catch (IOException ex) {
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.CORRUPT_CONTAINER_FILE, containerFile, ex);
+      }
+
+      // Chunks directory should exist.
+      File chunksDir = new File(onDiskContainerData.getChunksPath());
+      if (!chunksDir.exists()) {
+        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CHUNKS_DIR,
+            chunksDir, new FileNotFoundException("Chunks directory " +
+                chunksDir + " not found."));
+      }
+
+      return checkContainerFile(containerFile);
+    } finally {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Metadata scan of container " +
+            containerID + " interrupted.");
+      }
     }
-
-    return valid;
   }
 
   /**
@@ -114,59 +150,22 @@ public class KeyValueContainerCheck {
    *
    * @return true : integrity checks pass, false : otherwise.
    */
-  public boolean fullCheck(DataTransferThrottler throttler, Canceler canceler) {
-    boolean valid;
-
-    try {
-      valid = fastCheck();
-      if (valid) {
-        scanData(throttler, canceler);
-      }
-    } catch (IOException e) {
-      handleCorruption(e);
-      valid = false;
+  public ScanResult fullCheck(DataTransferThrottler throttler,
+      Canceler canceler) throws InterruptedException {
+    ScanResult result = fastCheck();
+    if (result.isHealthy()) {
+      result = scanData(throttler, canceler);
     }
 
-    return valid;
-  }
-
-  /**
-   * Check the integrity of the directory structure of the container.
-   */
-  private void checkLayout() throws IOException {
-
-    // is metadataPath accessible as a directory?
-    checkDirPath(metadataPath);
-
-    // is chunksPath accessible as a directory?
-    String chunksPath = onDiskContainerData.getChunksPath();
-    checkDirPath(chunksPath);
-  }
-
-  private void checkDirPath(String path) throws IOException {
-
-    File dirPath = new File(path);
-    String errStr;
-
-    try {
-      if (!dirPath.isDirectory()) {
-        errStr = "Not a directory [" + path + "]";
-        throw new IOException(errStr);
-      }
-    } catch (SecurityException se) {
-      throw new IOException("Security exception checking dir ["
-          + path + "]", se);
+    if (!result.isHealthy() && Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException("Data scan of container " + containerID +
+          " interrupted.");
     }
 
-    String[] ls = dirPath.list();
-    if (ls == null) {
-      // null result implies operation failed
-      errStr = "null listing for directory [" + path + "]";
-      throw new IOException(errStr);
-    }
+    return result;
   }
 
-  private void checkContainerFile() throws IOException {
+  private ScanResult checkContainerFile(File containerFile) {
     /*
      * compare the values in the container file loaded from disk,
      * with the values we are expecting
@@ -175,25 +174,33 @@ public class KeyValueContainerCheck {
     Preconditions
         .checkState(onDiskContainerData != null, "Container File not loaded");
 
-    ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
+    try {
+      ContainerUtils.verifyChecksum(onDiskContainerData, checkConfig);
+    } catch (IOException ex) {
+      return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
+          containerFile, ex);
+    }
 
     if (onDiskContainerData.getContainerType()
         != ContainerProtos.ContainerType.KeyValueContainer) {
       String errStr = "Bad Container type in Containerdata for " + containerID;
-      throw new IOException(errStr);
+      return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
+          containerFile, new IOException(errStr));
     }
 
     if (onDiskContainerData.getContainerID() != containerID) {
       String errStr =
           "Bad ContainerID field in Containerdata for " + containerID;
-      throw new IOException(errStr);
+      return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
+          containerFile, new IOException(errStr));
     }
 
     dbType = onDiskContainerData.getContainerDBType();
     if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB)) {
       String errStr = "Unknown DBType [" + dbType
           + "] in Container File for  [" + containerID + "]";
-      throw new IOException(errStr);
+      return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
+          containerFile, new IOException(errStr));
     }
 
     KeyValueContainerData kvData = onDiskContainerData;
@@ -202,12 +209,15 @@ public class KeyValueContainerCheck {
           "Bad metadata path in Containerdata for " + containerID + "Expected ["
               + metadataPath + "] Got [" + kvData.getMetadataPath()
               + "]";
-      throw new IOException(errStr);
+      return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
+          containerFile, new IOException(errStr));
     }
+
+    return ScanResult.healthy();
   }
 
-  private void scanData(DataTransferThrottler throttler, Canceler canceler)
-      throws IOException {
+  private ScanResult scanData(DataTransferThrottler throttler,
+      Canceler canceler) {
     /*
      * Check the integrity of the DB inside each container.
      * 1. iterate over each key (Block) and locate the chunks for the block
@@ -225,53 +235,133 @@ public class KeyValueContainerCheck {
       String dbFileErrorMsg = "Unable to access DB File [" + dbFile.toString()
           + "] for Container [" + containerID + "] metadata path ["
           + metadataPath + "]";
-      throw new IOException(dbFileErrorMsg);
+      return ScanResult.unhealthy(ScanResult.FailureType.INACCESSIBLE_DB,
+          dbFile, new IOException(dbFileErrorMsg));
     }
 
     onDiskContainerData.setDbFile(dbFile);
 
-    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
+    try {
+      try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
+          BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
+              onDiskContainerData.getContainerID(),
+              onDiskContainerData.getUnprefixedKeyFilter())) {
 
-    try (DBHandle db = BlockUtils.getDB(onDiskContainerData, checkConfig);
-        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator(
-            onDiskContainerData.getContainerID(),
-            onDiskContainerData.getUnprefixedKeyFilter())) {
+        while (kvIter.hasNext()) {
+          BlockData block = kvIter.nextBlock();
 
-      while (kvIter.hasNext()) {
-        BlockData block = kvIter.nextBlock();
-        for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
-          File chunkFile = layout.getChunkFile(onDiskContainerData,
-              block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
-
-          if (!chunkFile.exists()) {
-            // concurrent mutation in Block DB? lookup the block again.
-            String blockKey =
-                onDiskContainerData.blockKey(block.getBlockID().getLocalID());
-            BlockData bdata = db.getStore()
-                    .getBlockDataTable()
-                    .get(blockKey);
-            // In EC, client may write empty putBlock in padding block nodes.
-            // So, we need to make sure, chunk length > 0, before declaring
-            // the missing chunk file.
-            if (bdata != null && bdata.getChunks().size() > 0 && bdata
-                .getChunks().get(0).getLen() > 0) {
-              throw new IOException(
-                  "Missing chunk file " + chunkFile.getAbsolutePath());
+          // If holding read lock for the entire duration, including wait()
+          // calls in DataTransferThrottler, would effectively make other
+          // threads throttled.
+          // Here try optimistically and retry with the container lock to
+          // make sure reading the latest record. If the record is just removed,
+          // the block should be skipped to scan.
+          ScanResult result = scanBlock(block, throttler, canceler);
+          if (!result.isHealthy()) {
+            if (result.getFailureType() ==
+                ScanResult.FailureType.MISSING_CHUNK_FILE) {
+              if (getBlockDataFromDBWithLock(db, block) != null) {
+                // Block was not deleted, the failure is legitimate.
+                return result;
+              } else if (LOG.isDebugEnabled()) {
+                // Block may have been deleted during the scan.
+                LOG.debug("Scanned outdated blockData {} in container {}.",
+                    block, containerID);
+              }
+            } else {
+              // All other failures should be treated as errors.
+              return result;
             }
-          } else if (chunk.getChecksumData().getType()
-              != ContainerProtos.ChecksumType.NONE) {
-            verifyChecksum(block, chunk, chunkFile, layout, throttler,
-                canceler);
           }
         }
       }
+    } catch (IOException ex) {
+      return ScanResult.unhealthy(ScanResult.FailureType.INACCESSIBLE_DB,
+          dbFile, ex);
+    }
+
+    return ScanResult.healthy();
+  }
+
+  /**
+   *  Attempt to read the block data without the container lock.
+   *  The block onDisk might be in modification by other thread and not yet
+   *  flushed to DB, so the content might be outdated.
+   *
+   * @param db DB of container
+   * @param block last queried blockData
+   * @return blockData in DB
+   * @throws IOException
+   */
+  private BlockData getBlockDataFromDB(DBHandle db, BlockData block)
+      throws IOException {
+    String blockKey =
+        onDiskContainerData.getBlockKey(block.getBlockID().getLocalID());
+    return db.getStore().getBlockDataTable().get(blockKey);
+  }
+
+  /**
+   *  Attempt to read the block data with the container lock.
+   *  The container lock ensure the latest DB record could be retrieved, since
+   *  other block related write operation will acquire the container write lock.
+   *
+   * @param db DB of container
+   * @param block last queried blockData
+   * @return blockData in DB
+   * @throws IOException
+   */
+  private BlockData getBlockDataFromDBWithLock(DBHandle db, BlockData block)
+      throws IOException {
+    container.readLock();
+    try {
+      return getBlockDataFromDB(db, block);
+    } finally {
+      container.readUnlock();
     }
   }
 
-  private static void verifyChecksum(BlockData block,
+  private ScanResult scanBlock(BlockData block, DataTransferThrottler throttler,
+      Canceler canceler) {
+    ContainerLayoutVersion layout = onDiskContainerData.getLayoutVersion();
+
+    for (ContainerProtos.ChunkInfo chunk : block.getChunks()) {
+      File chunkFile;
+      try {
+        chunkFile = layout.getChunkFile(onDiskContainerData,
+            block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
+      } catch (IOException ex) {
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.MISSING_CHUNK_FILE,
+            new File(onDiskContainerData.getChunksPath()), ex);
+      }
+
+      if (!chunkFile.exists()) {
+        // In EC, client may write empty putBlock in padding block nodes.
+        // So, we need to make sure, chunk length > 0, before declaring
+        // the missing chunk file.
+        if (block.getChunks().size() > 0 && block
+            .getChunks().get(0).getLen() > 0) {
+          return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CHUNK_FILE,
+              chunkFile, new IOException("Missing chunk file " +
+                  chunkFile.getAbsolutePath()));
+        }
+      } else if (chunk.getChecksumData().getType()
+          != ContainerProtos.ChecksumType.NONE) {
+        ScanResult result = verifyChecksum(block, chunk, chunkFile, layout,
+            throttler, canceler);
+        if (!result.isHealthy()) {
+          return result;
+        }
+      }
+    }
+
+    return ScanResult.healthy();
+  }
+
+  private static ScanResult verifyChecksum(BlockData block,
       ContainerProtos.ChunkInfo chunk, File chunkFile,
       ContainerLayoutVersion layout,
-      DataTransferThrottler throttler, Canceler canceler) throws IOException {
+      DataTransferThrottler throttler, Canceler canceler) {
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
     int checksumCount = checksumData.getChecksums().size();
@@ -306,7 +396,7 @@ public class KeyValueContainerCheck {
         ByteString actual = cal.computeChecksum(buffer)
             .getChecksums().get(0);
         if (!expected.equals(actual)) {
-          throw new OzoneChecksumException(String
+          String message = String
               .format("Inconsistent read for chunk=%s" +
                   " checksum item %d" +
                   " expected checksum %s" +
@@ -316,33 +406,33 @@ public class KeyValueContainerCheck {
                   i,
                   Arrays.toString(expected.toByteArray()),
                   Arrays.toString(actual.toByteArray()),
-                  block.getBlockID()));
+                  block.getBlockID());
+          return ScanResult.unhealthy(
+              ScanResult.FailureType.CORRUPT_CHUNK, chunkFile,
+              new IOException(message));
         }
-
       }
       if (bytesRead != chunk.getLen()) {
-        throw new OzoneChecksumException(String
+        String message = String
             .format("Inconsistent read for chunk=%s expected length=%d"
                     + " actual length=%d for block %s",
                 chunk.getChunkName(),
-                chunk.getLen(), bytesRead, block.getBlockID()));
+                chunk.getLen(), bytesRead, block.getBlockID());
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.INCONSISTENT_CHUNK_LENGTH, chunkFile,
+            new IOException(message));
       }
+    } catch (IOException ex) {
+      return ScanResult.unhealthy(
+          ScanResult.FailureType.MISSING_CHUNK_FILE, chunkFile, ex);
     }
+
+    return ScanResult.healthy();
   }
 
-  private void loadContainerData() throws IOException {
-    File containerFile = KeyValueContainer
-        .getContainerFile(metadataPath, containerID);
-
+  private void loadContainerData(File containerFile) throws IOException {
     onDiskContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     onDiskContainerData.setVolume(volume);
-  }
-
-  private void handleCorruption(IOException e) {
-    String errStr =
-        "Corruption detected in container: [" + containerID + "] ";
-    String logMessage = errStr + "Exception: [" + e.getMessage() + "]";
-    LOG.error(logMessage);
   }
 }

@@ -28,12 +28,10 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -46,6 +44,15 @@ import com.google.common.base.Preconditions;
  * A class that encapsulates Bucket Info.
  */
 public final class OmBucketInfo extends WithObjectID implements Auditable {
+  private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(BucketInfo.class),
+      OmBucketInfo::getFromProtobuf,
+      OmBucketInfo::getProtobuf);
+
+  public static Codec<OmBucketInfo> getCodec() {
+    return CODEC;
+  }
+
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -55,18 +62,18 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    */
   private final String bucketName;
   /**
-   * ACL Information.
+   * ACL Information (mutable).
    */
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
-  private Boolean isVersionEnabled;
+  private final boolean isVersionEnabled;
   /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
    */
-  private StorageType storageType;
+  private final StorageType storageType;
   /**
    * Creation time of bucket.
    */
@@ -79,23 +86,21 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * Bucket encryption key info if encryption is enabled.
    */
-  private BucketEncryptionKeyInfo bekInfo;
+  private final BucketEncryptionKeyInfo bekInfo;
 
   /**
    * Optional default replication for bucket.
    */
-  private DefaultReplicationConfig defaultReplicationConfig;
+  private final DefaultReplicationConfig defaultReplicationConfig;
 
   private final String sourceVolume;
 
   private final String sourceBucket;
 
   private long usedBytes;
-
   private long usedNamespace;
-
-  private long quotaInBytes;
-  private long quotaInNamespace;
+  private final long quotaInBytes;
+  private final long quotaInNamespace;
 
   /**
    * Bucket Layout.
@@ -414,19 +419,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setDefaultReplicationConfig(defaultReplicationConfig);
   }
 
-  public void setDefaultReplicationConfig(ReplicationConfig replicationConfig) {
-    this.defaultReplicationConfig = new DefaultReplicationConfig(
-        ReplicationType.fromProto(replicationConfig.getReplicationType()),
-        replicationConfig
-            .getReplicationType() == HddsProtos.ReplicationType.EC ?
-            null :
-            ReplicationFactor.valueOf(replicationConfig.getRequiredNodes()),
-        replicationConfig
-            .getReplicationType() == HddsProtos.ReplicationType.EC ?
-            ((ECReplicationConfig) replicationConfig) :
-            null);
-  }
-
   /**
    * Builder for OmBucketInfo.
    */
@@ -681,7 +673,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     if (bucketInfo.hasDefaultReplicationConfig()) {
       obib.setDefaultReplicationConfig(
-          OMPBHelper.convert(bucketInfo.getDefaultReplicationConfig()));
+          DefaultReplicationConfig.fromProto(
+              bucketInfo.getDefaultReplicationConfig()));
     }
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
@@ -755,7 +748,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(metadata, that.metadata) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
-        Objects.equals(defaultReplicationConfig, this.defaultReplicationConfig);
+        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
   }
 
   @Override

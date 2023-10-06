@@ -56,7 +56,6 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyPrefix)
-        .setRefreshPipeline(false)
         .setHeadOp(true)
         .build();
     try {
@@ -158,7 +157,6 @@ public class OzonePrefixPathImpl implements OzonePrefixPath {
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(keyPrefix)
-          .setRefreshPipeline(false)
           .setHeadOp(true)
           .build();
 

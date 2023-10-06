@@ -58,7 +58,7 @@ import static org.junit.Assert.assertNotNull;
  */
 public class TestKeyValueContainerIntegrityChecks {
 
-  private static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
   private final ContainerLayoutTestInfo containerLayoutTestInfo;
@@ -75,6 +75,7 @@ public class TestKeyValueContainerIntegrityChecks {
 
   public TestKeyValueContainerIntegrityChecks(
       ContainerTestVersionInfo versionInfo) {
+    LOG.info("new {} for {}", getClass().getSimpleName(), versionInfo);
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(
         versionInfo.getSchemaVersion(), conf);
@@ -172,10 +173,10 @@ public class TestKeyValueContainerIntegrityChecks {
         blockData.setChunks(chunkList);
 
         // normal key
-        String key = containerData.blockKey(blockID.getLocalID());
+        String key = containerData.getBlockKey(blockID.getLocalID());
         if (i >= normalBlocks) {
           // deleted key
-          key = containerData.deletingBlockKey(blockID.getLocalID());
+          key = containerData.getDeletingBlockKey(blockID.getLocalID());
         }
         metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }

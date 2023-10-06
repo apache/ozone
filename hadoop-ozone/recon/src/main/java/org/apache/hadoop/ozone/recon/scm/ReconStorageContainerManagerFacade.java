@@ -21,25 +21,38 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
@@ -61,14 +74,13 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.server.events.EventExecutor;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -76,23 +88,33 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
+
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
 import org.apache.ratis.util.ExitUtils;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +122,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Recon's 'lite' version of SCM.
  */
+@Singleton
 public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
@@ -107,6 +130,7 @@ public class ReconStorageContainerManagerFacade
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
+  public static final long CONTAINER_METADATA_SIZE = 1 * 1024 * 1024L;
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
@@ -127,14 +151,26 @@ public class ReconStorageContainerManagerFacade
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private ReconSafeModeManager safeModeManager;
+  private ReconSafeModeMgrTask reconSafeModeMgrTask;
+  private ContainerSizeCountTask containerSizeCountTask;
+  private ContainerCountBySizeDao containerCountBySizeDao;
+  private ScheduledExecutorService scheduler;
 
+  private AtomicBoolean isSyncDataFromSCMRunning;
+
+  // To Do :- Refactor the constructor in a separate JIRA
   @Inject
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
+      ContainerCountBySizeDao containerCountBySizeDao,
+      UtilizationSchemaDefinition utilizationSchemaDefinition,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      ReconUtils reconUtils) throws IOException {
+      ReconUtils reconUtils,
+      ReconSafeModeManager safeModeManager) throws IOException {
     reconNodeDetails = getReconNodeDetails(conf);
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -165,14 +201,13 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
-        conf,
-        nodeManager,
+        conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
         eventQueue,
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
-        conf, new MonotonicClock(ZoneId.systemDefault()));
+        Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
@@ -180,11 +215,12 @@ public class ReconStorageContainerManagerFacade
         containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
-
+    this.isSyncDataFromSCMRunning = new AtomicBoolean();
+    this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
 
-    SafeModeManager safeModeManager = new ReconSafeModeManager();
+    this.safeModeManager = safeModeManager;
     ReconPipelineReportHandler pipelineReportHandler =
         new ReconPipelineReportHandler(safeModeManager,
             pipelineManager, scmContext, conf, scmServiceProvider);
@@ -192,45 +228,84 @@ public class ReconStorageContainerManagerFacade
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, conf);
 
+    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
+    PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
+        pipelineManager,
+        nodeManager,
+        scmServiceProvider,
+        reconTaskStatusDao,
+        reconTaskConfig);
+    ContainerHealthTask containerHealthTask = new ContainerHealthTask(
+        containerManager, scmServiceProvider,
+        reconTaskStatusDao, containerHealthSchemaManager,
+        containerPlacementPolicy, reconTaskConfig);
+
+    this.containerSizeCountTask = new ContainerSizeCountTask(
+        containerManager,
+        scmServiceProvider,
+        reconTaskStatusDao,
+        reconTaskConfig,
+        containerCountBySizeDao,
+        utilizationSchemaDefinition);
+
     StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(nodeManager, pipelineManager, conf);
+        new ReconStaleNodeHandler(nodeManager, pipelineManager, conf,
+            pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
-        pipelineManager, containerManager, scmServiceProvider);
+        pipelineManager, containerManager, scmServiceProvider,
+        containerHealthTask, pipelineSyncTask, containerSizeCountTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
-
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            null, 0);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
-
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
     // Dispatcher should always dispatch FCR first followed by ICR
-    List<ThreadPoolExecutor> executors =
-        FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
-            SCMEvents.CONTAINER_REPORT.getName()
-                + "_OR_"
-                + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName());
-
-    EventExecutor<ContainerReportFromDatanode>
-        containerReportExecutors =
+    // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
+    // .queue.wait.threshold
+    long waitQueueThreshold = ozoneConfiguration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".queue.wait.threshold",
+        OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT);
+    // conf: ozone.scm.event.CONTAINER_REPORT_OR_INCREMENTAL_CONTAINER_REPORT
+    // .execute.wait.threshold
+    long execWaitThreshold = ozoneConfiguration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
+        OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT);
+    List<BlockingQueue<ContainerReport>> queues
+        = ScmUtils.initContainerReportQueue(ozoneConfiguration);
+    List<ThreadPoolExecutor> executors
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
+    FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
+        ContainerReport> containerReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(SCMEvents.CONTAINER_REPORT,
                 containerReportHandler),
-            executors);
-    EventExecutor<IncrementalContainerReportFromDatanode>
-        incrementalReportExecutors =
+            containerReportHandler, queues, eventQueue,
+            ContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
+    containerReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
+    containerReportExecutors.setExecWaitThreshold(execWaitThreshold);
+    FixedThreadPoolWithAffinityExecutor<IncrementalContainerReportFromDatanode,
+        ContainerReport> incrementalReportExecutors =
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(
                 SCMEvents.INCREMENTAL_CONTAINER_REPORT,
                 icrHandler),
-            executors);
+            icrHandler, queues, eventQueue,
+            IncrementalContainerReportFromDatanode.class, executors,
+            reportExecutorMap);
+    incrementalReportExecutors.setQueueWaitThreshold(waitQueueThreshold);
+    incrementalReportExecutors.setExecWaitThreshold(execWaitThreshold);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
@@ -244,20 +319,12 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
-
-    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
-    reconScmTasks.add(new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig));
-    reconScmTasks.add(new ContainerHealthTask(
-        containerManager,
-        scmServiceProvider,
-        reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy,
-        reconTaskConfig));
+    reconScmTasks.add(pipelineSyncTask);
+    reconScmTasks.add(containerHealthTask);
+    reconScmTasks.add(containerSizeCountTask);
+    reconSafeModeMgrTask = new ReconSafeModeMgrTask(
+        containerManager, nodeManager, safeModeManager,
+        reconTaskConfig, ozoneConfiguration);
   }
 
   /**
@@ -298,6 +365,7 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
+    scheduler = Executors.newScheduledThreadPool(1);
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);
@@ -307,8 +375,40 @@ public class ReconStorageContainerManagerFacade
     } else {
       initializePipelinesFromScm();
     }
+    LOG.debug("Started the SCM Container Info sync scheduler.");
+    long interval = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+    long initialDelay = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
+        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    // This periodic sync with SCM container cache is needed because during
+    // the window when recon will be down and any container being added
+    // newly and went missing, that container will not be reported as missing by
+    // recon till there is a difference of container count equivalent to
+    // threshold value defined in "ozone.recon.scm.container.threshold"
+    // between SCM container cache and recon container cache.
+    scheduler.scheduleWithFixedDelay(() -> {
+      try {
+        boolean isSuccess = syncWithSCMContainerInfo();
+        if (!isSuccess) {
+          LOG.debug("SCM container info sync is already running.");
+        }
+      } catch (Throwable t) {
+        LOG.error("Unexpected exception while syncing data from SCM.", t);
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
+      }
+    },
+        initialDelay,
+        interval,
+        TimeUnit.MILLISECONDS);
     getDatanodeProtocolServer().start();
-    this.reconScmTasks.forEach(ReconScmTask::start);
+    reconSafeModeMgrTask.start();
+    if (!this.safeModeManager.getInSafeMode()) {
+      this.reconScmTasks.forEach(ReconScmTask::start);
+    }
   }
 
   /**
@@ -342,17 +442,13 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
-    try {
-      dbStore.close();
-    } catch (Exception e) {
-      LOG.error("Can't close dbStore ", e);
-    }
+    IOUtils.close(LOG, dbStore);
   }
 
   @Override
   public void shutDown(String message) {
     stop();
-    ExitUtils.terminate(1, message, LOG);
+    ExitUtils.terminate(0, message, LOG);
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {
@@ -364,7 +460,7 @@ public class ReconStorageContainerManagerFacade
       List<Pipeline> pipelinesFromScm = scmServiceProvider.getPipelines();
       LOG.info("Obtained {} pipelines from SCM.", pipelinesFromScm.size());
       pipelineManager.initializePipelines(pipelinesFromScm);
-    } catch (IOException | TimeoutException ioEx) {
+    } catch (IOException ioEx) {
       LOG.error("Exception encountered while getting pipelines from SCM.",
           ioEx);
     }
@@ -388,22 +484,99 @@ public class ReconStorageContainerManagerFacade
       }
     } catch (IOException e) {
       LOG.error("Exception encountered while getting SCM DB.");
+    } finally {
+      isSyncDataFromSCMRunning.compareAndSet(true, false);
     }
   }
 
   public void updateReconSCMDBWithNewSnapshot() throws IOException {
-    DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
-    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-      LOG.info("Got new checkpoint from SCM : " +
-          dbSnapshot.getCheckpointLocation());
-      try {
-        initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
-      } catch (IOException e) {
-        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+      if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+        LOG.info("Got new checkpoint from SCM : " +
+            dbSnapshot.getCheckpointLocation());
+        try {
+          initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
+        } catch (IOException e) {
+          LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+        }
+      } else {
+        LOG.error("Null snapshot location got from SCM.");
       }
     } else {
-      LOG.error("Null snapshot location got from SCM.");
+      LOG.warn("SCM DB sync is already running.");
     }
+  }
+
+  public boolean syncWithSCMContainerInfo()
+      throws IOException {
+    if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+      try {
+        List<ContainerInfo> containers = containerManager.getContainers();
+
+        long totalContainerCount = scmServiceProvider.getContainerCount(
+            HddsProtos.LifeCycleState.CLOSED);
+        long containerCountPerCall =
+            getContainerCountPerCall(totalContainerCount);
+        long startContainerId = 1;
+        long retrievedContainerCount = 0;
+        if (totalContainerCount > 0) {
+          while (retrievedContainerCount < totalContainerCount) {
+            List<ContainerInfo> listOfContainers = scmServiceProvider.
+                getListOfContainers(startContainerId,
+                    Long.valueOf(containerCountPerCall).intValue(),
+                    HddsProtos.LifeCycleState.CLOSED);
+            if (null != listOfContainers && listOfContainers.size() > 0) {
+              LOG.info("Got list of containers from SCM : " +
+                  listOfContainers.size());
+              listOfContainers.forEach(containerInfo -> {
+                long containerID = containerInfo.getContainerID();
+                boolean isContainerPresentAtRecon =
+                    containers.contains(containerInfo);
+                if (!isContainerPresentAtRecon) {
+                  try {
+                    ContainerWithPipeline containerWithPipeline =
+                        scmServiceProvider.getContainerWithPipeline(
+                            containerID);
+                    containerManager.addNewContainer(containerWithPipeline);
+                  } catch (IOException e) {
+                    LOG.error("Could not get container with pipeline " +
+                        "for container : {}", containerID);
+                  }
+                }
+              });
+              startContainerId = listOfContainers.get(
+                  listOfContainers.size() - 1).getContainerID() + 1;
+            } else {
+              LOG.info("No containers found at SCM in CLOSED state");
+              return false;
+            }
+            retrievedContainerCount += containerCountPerCall;
+          }
+        }
+      } catch (IOException e) {
+        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+        return false;
+      }
+    } else {
+      LOG.debug("SCM DB sync is already running.");
+      return false;
+    }
+    return true;
+  }
+
+  private long getContainerCountPerCall(long totalContainerCount) {
+    // Assumption of size of 1 container info object here is 1 MB
+    long containersMetaDataTotalRpcRespSizeMB =
+        CONTAINER_METADATA_SIZE * totalContainerCount;
+    long hadoopRPCSize = ozoneConfiguration.getInt(
+        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
+        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+    long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
+        hadoopRPCSize ? totalContainerCount :
+        Math.round(Math.floor(
+            hadoopRPCSize / (double) CONTAINER_METADATA_SIZE));
+    return containerCountPerCall;
   }
 
   private void deleteOldSCMDB() throws IOException {
@@ -440,8 +613,9 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
       nodeManager.reinitialize(
           ReconSCMDBDefinition.NODES.getTable(newStore));
+      IOUtils.close(LOG, dbStore);
       deleteOldSCMDB();
-      setDbStore(newStore);
+      dbStore = newStore;
       File newDb = new File(dbFile.getParent() +
           OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
       boolean success = dbFile.renameTo(newDb);
@@ -470,10 +644,6 @@ public class ReconStorageContainerManagerFacade
           columnFamily.getValueCodec());
     }
     return dbStoreBuilder.build();
-  }
-
-  public void setDbStore(DBStore dbStore) {
-    this.dbStore = dbStore;
   }
 
   @Override
@@ -516,11 +686,24 @@ public class ReconStorageContainerManagerFacade
     return reconNodeDetails;
   }
 
+  public DBStore getScmDBStore() {
+    return dbStore;
+  }
+
   public EventQueue getEventQueue() {
     return eventQueue;
   }
 
   public StorageContainerServiceProvider getScmServiceProvider() {
     return scmServiceProvider;
+  }
+
+  @VisibleForTesting
+  public ContainerSizeCountTask getContainerSizeCountTask() {
+    return containerSizeCountTask;
+  }
+  @VisibleForTesting
+  public ContainerCountBySizeDao getContainerCountBySizeDao() {
+    return containerCountBySizeDao;
   }
 }

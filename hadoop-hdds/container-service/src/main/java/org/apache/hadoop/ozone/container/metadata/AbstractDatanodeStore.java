@@ -67,7 +67,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
-  private static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private volatile DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
@@ -123,15 +123,16 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         options.setStatistics(statistics);
       }
 
+      DatanodeConfiguration dc =
+          config.getObject(DatanodeConfiguration.class);
+      // Config user log files
+      InfoLogLevel level = InfoLogLevel.valueOf(
+          dc.getRocksdbLogLevel() + "_LEVEL");
+      options.setInfoLogLevel(level);
+      options.setMaxLogFileSize(dc.getRocksdbLogMaxFileSize());
+      options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
+      
       if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
-        DatanodeConfiguration dc =
-            config.getObject(DatanodeConfiguration.class);
-        // Config user log files
-        InfoLogLevel level = InfoLogLevel.valueOf(
-            dc.getRocksdbLogLevel() + "_LEVEL");
-        options.setInfoLogLevel(level);
-        options.setMaxLogFileSize(dc.getRocksdbMaxFileSize());
-        options.setKeepLogFileNum(dc.getRocksdbMaxFileNum());
         options.setDeleteObsoleteFilesPeriodMicros(
             dc.getRocksdbDeleteObsoleteFilesPeriod());
 

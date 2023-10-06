@@ -40,8 +40,16 @@ public class DatanodeConfiguration {
 
   static final String CONTAINER_DELETE_THREADS_MAX_KEY =
       "hdds.datanode.container.delete.threads.max";
+  static final String CONTAINER_CLOSE_THREADS_MAX_KEY =
+      "hdds.datanode.container.close.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
+  public static final String DISK_CHECK_FILE_SIZE_KEY =
+      "hdds.datanode.disk.check.io.file.size";
+  public static final String DISK_CHECK_IO_TEST_COUNT_KEY =
+      "hdds.datanode.disk.check.io.test.count";
+  public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY =
+      "hdds.datanode.disk.check.io.failures.tolerated";
   public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.data.volumes.tolerated";
   public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
@@ -64,19 +72,27 @@ public class DatanodeConfiguration {
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
+  public static final int DISK_CHECK_IO_TEST_COUNT_DEFAULT = 3;
+
+  public static final int DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT = 1;
+
+  public static final int DISK_CHECK_FILE_SIZE_DEFAULT = 100;
+
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
   static final long DISK_CHECK_MIN_GAP_DEFAULT =
-      Duration.ofMinutes(15).toMillis();
+      Duration.ofMinutes(10).toMillis();
 
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
 
-  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = false;
+  static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
   static final int ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT = 64;
+  // one hour
   static final long ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT =
-      6 * 60 * 60 * 1000 * 1000;
+      1L * 60 * 60 * 1000 * 1000;
+  static final int ROCKSDB_MAX_OPEN_FILES_DEFAULT = 1024;
   public static final String ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY =
       "hdds.datanode.rocksdb.log.max-file-size";
   public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY =
@@ -84,6 +100,9 @@ public class DatanodeConfiguration {
   public static final String
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
+  public static final Boolean
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT =
+      false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -98,6 +117,7 @@ public class DatanodeConfiguration {
   private int numReadThreadPerVolume = 10;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
   /**
@@ -112,6 +132,19 @@ public class DatanodeConfiguration {
           "on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of threads used to close containers on a datanode
+   * simultaneously.
+   */
+  @Config(key = "container.close.threads.max",
+      type = ConfigType.INT,
+      defaultValue = "3",
+      tags = {DATANODE},
+      description = "The maximum number of threads used to close containers " +
+          "on a datanode"
+  )
+  private int containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
 
   /**
    * The maximum number of threads used to handle delete block commands.
@@ -137,12 +170,25 @@ public class DatanodeConfiguration {
    */
   @Config(key = "block.delete.queue.limit",
       type = ConfigType.INT,
-      defaultValue = "1440",
+      defaultValue = "5",
       tags = {DATANODE},
       description = "The maximum number of block delete commands queued on " +
           " a datanode"
   )
-  private int blockDeleteQueueLimit = 60 * 24;
+  private int blockDeleteQueueLimit = 5;
+
+  /**
+   * The maximum number of commands in queued list.
+   * if the commands limit crosses limit, then command will be ignored.
+   */
+  @Config(key = "command.queue.limit",
+      type = ConfigType.INT,
+      defaultValue = "5000",
+      tags = {DATANODE},
+      description = "The default maximum number of commands in the queue " +
+          "and command type's sub-queue on a datanode"
+  )
+  private int cmdQueueLimit = 5000;
 
   @Config(key = "block.deleting.service.interval",
           defaultValue = "60s",
@@ -170,8 +216,31 @@ public class DatanodeConfiguration {
   private long recoveringContainerScrubInterval =
       Duration.ofMinutes(10).toMillis();
 
+  /**
+   * The maximum time to wait for acquiring the container lock when processing
+   * a delete block transaction.
+   * If a timeout occurs while attempting to get the lock, the delete block
+   * transaction won't be immediately discarded. Instead, it will be retried
+   * after all the current delete block transactions have been processed.
+   */
+  @Config(key = "block.delete.max.lock.wait.timeout",
+      defaultValue = "100ms",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION},
+      description = "Timeout for the thread used to process the delete" +
+          " block command to wait for the container lock."
+  )
+  private long blockDeleteMaxLockWaitTimeoutMs =
+      Duration.ofMillis(100).toMillis();
+
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
+  }
+
+  public void setRecoveringContainerScrubInterval(
+          Duration recoveringContainerScrubInterval) {
+    this.recoveringContainerScrubInterval =
+            recoveringContainerScrubInterval.toMillis();
   }
 
   public Duration getRecoveringContainerScrubInterval() {
@@ -193,6 +262,30 @@ public class DatanodeConfiguration {
 
   public int getBlockDeletionLimit() {
     return blockLimitPerInterval;
+  }
+
+  @Config(key = "block.deleting.max.lock.holding.time",
+      defaultValue = "1s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION },
+      description =
+          "This configuration controls the maximum time that the block "
+          + "deleting service can hold the lock during the deletion of blocks. "
+          + "Once this configured time period is reached, the service will "
+          + "release and re-acquire the lock. This is not a hard limit as the "
+          + "time check only occurs after the completion of each transaction, "
+          + "which means the actual execution time may exceed this limit. "
+          + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long blockDeletingMaxLockHoldingTime =
+      Duration.ofSeconds(1).toMillis();
+
+  public Duration getBlockDeletingMaxLockHoldingTime() {
+    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
+  }
+
+  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
+    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
   }
 
   public void setBlockDeletionLimit(int limit) {
@@ -241,8 +334,44 @@ public class DatanodeConfiguration {
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
+  @Config(key = "disk.check.io.test.count",
+      defaultValue = "3",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of IO tests required to determine if a disk " +
+          " has failed. Each disk check does one IO test. The volume will be " +
+          "failed if more than " +
+          "hdds.datanode.disk.check.io.failures.tolerated out of the last " +
+          "hdds.datanode.disk.check.io.test.count runs failed. Set to 0 " +
+          "to disable disk IO checks."
+  )
+  private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+
+  @Config(key = "disk.check.io.failures.tolerated",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of IO tests out of the last hdds.datanode" +
+          ".disk.check.io.test.count test run that are allowed to fail before" +
+          " the volume is marked as failed."
+  )
+  private int volumeIOFailureTolerance =
+      DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+
+  @Config(key = "disk.check.io.file.size",
+      defaultValue = "100B",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "The size of the temporary file that will be synced to " +
+          "the disk and " +
+          "read back to assess its health. The contents of the " +
+          "file will be stored in memory during the duration of the check."
+  )
+  private int volumeHealthCheckFileSize =
+      DISK_CHECK_FILE_SIZE_DEFAULT;
+
   @Config(key = "disk.check.min.gap",
-      defaultValue = "15m",
+      defaultValue = "10m",
       type = ConfigType.TIME,
       tags = { DATANODE },
       description = "The minimum gap between two successive checks of the same"
@@ -292,7 +421,7 @@ public class DatanodeConfiguration {
   }
 
   @Config(key = "container.schema.v3.enabled",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = { DATANODE },
       description = "Enable use of container schema v3(one rocksdb per disk)."
@@ -309,9 +438,6 @@ public class DatanodeConfiguration {
   )
   private String containerSchemaV3KeySeparator = "|";
 
-  /**
-   * Following RocksDB related configuration applies to Schema V3 only.
-   */
   @Config(key = "rocksdb.log.level",
       defaultValue = "INFO",
       type = ConfigType.STRING,
@@ -328,7 +454,7 @@ public class DatanodeConfiguration {
       description = "The max size of each user log file of RocksDB. " +
           "O means no size limit."
   )
-  private long rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+  private long rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
 
   @Config(key = "rocksdb.log.max-file-num",
       defaultValue = "64",
@@ -336,17 +462,70 @@ public class DatanodeConfiguration {
       tags = { DATANODE },
       description = "The max user log file number to keep for each RocksDB"
   )
-  private int rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+  private int rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
 
-  @Config(key = "rocksdb.delete_obsolete_files_period",
-      defaultValue = "6h", timeUnit = MICROSECONDS,
+  /**
+   * Following RocksDB related configuration applies to Schema V3 only.
+   */
+  @Config(key = "rocksdb.delete-obsolete-files-period",
+      defaultValue = "1h", timeUnit = MICROSECONDS,
       type = ConfigType.TIME,
       tags = { DATANODE },
       description = "Periodicity when obsolete files get deleted. " +
-          "Default is 6h."
+          "Default is 1h."
   )
   private long rocksdbDeleteObsoleteFilesPeriod =
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
+
+  @Config(key = "rocksdb.max-open-files",
+      defaultValue = "1024",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The total number of files that a RocksDB can open. "
+  )
+  private int rocksdbMaxOpenFiles = ROCKSDB_MAX_OPEN_FILES_DEFAULT;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Auto compact small SST files " +
+          "(rocksdb.auto-compaction-small-sst-file-size-threshold) when " +
+          "count exceeds (rocksdb.auto-compaction-small-sst-file-num-threshold)"
+  )
+  private boolean autoCompactionSmallSstFile = true;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file-size-threshold",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "SST files smaller than this configuration will be " +
+          "auto compacted."
+  )
+  private long autoCompactionSmallSstFileSize = 1024 * 1024;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file-num-threshold",
+      defaultValue = "512",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "Auto compaction will happen if the number of small SST " +
+          " files exceeds this threshold."
+  )
+  private int autoCompactionSmallSstFileNum = 512;
+
+  /**
+   * Whether to check container directory or not to determine
+   * container is empty.
+   */
+  @Config(key = "hdds.datanode.check.empty.container.dir.on.delete",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = { DATANODE },
+      description = "Boolean Flag to decide whether to check container " +
+          "directory or not to determine container is empty"
+  )
+  private boolean bCheckEmptyContainerDir =
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
 
   @PostConstruct
   public void validate() {
@@ -355,6 +534,13 @@ public class DatanodeConfiguration {
               " and was set to {}. Defaulting to {}",
           containerDeleteThreads, CONTAINER_DELETE_THREADS_DEFAULT);
       containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+    }
+
+    if (containerCloseThreads < 1) {
+      LOG.warn(CONTAINER_CLOSE_THREADS_MAX_KEY + " must be greater than zero" +
+              " and was set to {}. Defaulting to {}",
+          containerCloseThreads, CONTAINER_CLOSE_THREADS_DEFAULT);
+      containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
     }
 
     if (periodicDiskCheckIntervalMinutes < 1) {
@@ -387,6 +573,48 @@ public class DatanodeConfiguration {
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
+    if (volumeIOTestCount == 0) {
+      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
+          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
+    } else {
+      if (volumeIOTestCount < 0) {
+        LOG.warn("{} must be greater than 0 but was set to {}." +
+                "Defaulting to {}",
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
+            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+      }
+
+      if (volumeIOFailureTolerance < 0) {
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
+                "Defaulting to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+      }
+
+      if (volumeIOFailureTolerance >= volumeIOTestCount) {
+        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
+                "set to {}. Defaulting {} to {} and {} to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
+            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+      }
+
+      if (volumeHealthCheckFileSize < 1) {
+        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
+                "must be at least 1 byte and was set to {}. Defaulting to {}",
+            volumeHealthCheckFileSize,
+            DISK_CHECK_FILE_SIZE_DEFAULT);
+        volumeHealthCheckFileSize =
+            DISK_CHECK_FILE_SIZE_DEFAULT;
+      }
+    }
+
     if (diskCheckMinGap < 0) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -401,18 +629,18 @@ public class DatanodeConfiguration {
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
-    if (rocksdbMaxFileSize < 0) {
+    if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
-          rocksdbMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
-      rocksdbMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
+          rocksdbLogMaxFileSize, ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT);
+      rocksdbLogMaxFileSize = ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT;
     }
 
-    if (rocksdbMaxFileNum <= 0) {
+    if (rocksdbLogMaxFileNum <= 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_NUM_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
-          rocksdbMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
-      rocksdbMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
+          rocksdbLogMaxFileNum, ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT);
+      rocksdbLogMaxFileNum = ROCKSDB_LOG_MAX_FILE_NUM_DEFAULT;
     }
 
     if (rocksdbDeleteObsoleteFilesPeriod <= 0) {
@@ -423,7 +651,6 @@ public class DatanodeConfiguration {
       rocksdbDeleteObsoleteFilesPeriod =
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
-
   }
 
   public void setContainerDeleteThreads(int containerDeleteThreads) {
@@ -432,6 +659,14 @@ public class DatanodeConfiguration {
 
   public int getContainerDeleteThreads() {
     return containerDeleteThreads;
+  }
+
+  public void setContainerCloseThreads(int containerCloseThreads) {
+    this.containerCloseThreads = containerCloseThreads;
+  }
+
+  public int getContainerCloseThreads() {
+    return containerCloseThreads;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {
@@ -467,6 +702,34 @@ public class DatanodeConfiguration {
     this.failedDbVolumesTolerated = failedVolumesTolerated;
   }
 
+  public int getVolumeIOTestCount() {
+    return volumeIOTestCount;
+  }
+
+  public void setVolumeIOTestCount(int testCount) {
+    this.volumeIOTestCount = testCount;
+  }
+
+  public int getVolumeIOFailureTolerance() {
+    return volumeIOFailureTolerance;
+  }
+
+  public void setVolumeIOFailureTolerance(int failureTolerance) {
+    volumeIOFailureTolerance = failureTolerance;
+  }
+
+  public int getVolumeHealthCheckFileSize() {
+    return volumeHealthCheckFileSize;
+  }
+
+  public void getVolumeHealthCheckFileSize(int fileSizeBytes) {
+    this.volumeHealthCheckFileSize = fileSizeBytes;
+  }
+
+  public boolean getCheckEmptyContainerDir() {
+    return bCheckEmptyContainerDir;
+  }
+
   public Duration getDiskCheckMinGap() {
     return Duration.ofMillis(diskCheckMinGap);
   }
@@ -495,8 +758,20 @@ public class DatanodeConfiguration {
     return blockDeleteQueueLimit;
   }
 
+  public long getBlockDeleteMaxLockWaitTimeoutMs() {
+    return blockDeleteMaxLockWaitTimeoutMs;
+  }
+
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public int getCommandQueueLimit() {
+    return cmdQueueLimit;
+  }
+
+  public void setCommandQueueLimit(int queueLimit) {
+    this.cmdQueueLimit = queueLimit;
   }
 
   public boolean isChunkDataValidationCheck() {
@@ -539,20 +814,20 @@ public class DatanodeConfiguration {
     this.rocksdbLogLevel = level;
   }
 
-  public void setRocksdbMaxFileNum(int count) {
-    this.rocksdbMaxFileNum = count;
+  public void setRocksdbLogMaxFileNum(int count) {
+    this.rocksdbLogMaxFileNum = count;
   }
 
-  public int getRocksdbMaxFileNum() {
-    return rocksdbMaxFileNum;
+  public int getRocksdbLogMaxFileNum() {
+    return rocksdbLogMaxFileNum;
   }
 
-  public void setRocksdbMaxFileSize(long size) {
-    this.rocksdbMaxFileSize = size;
+  public void setRocksdbLogMaxFileSize(long size) {
+    this.rocksdbLogMaxFileSize = size;
   }
 
-  public long getRocksdbMaxFileSize() {
-    return rocksdbMaxFileSize;
+  public long getRocksdbLogMaxFileSize() {
+    return rocksdbLogMaxFileSize;
   }
 
   public long getRocksdbDeleteObsoleteFilesPeriod() {
@@ -561,5 +836,37 @@ public class DatanodeConfiguration {
 
   public void setRocksdbDeleteObsoleteFilesPeriod(long period) {
     this.rocksdbDeleteObsoleteFilesPeriod = period;
+  }
+
+  public void setRocksdbMaxOpenFiles(int count) {
+    this.rocksdbMaxOpenFiles = count;
+  }
+
+  public int getRocksdbMaxOpenFiles() {
+    return this.rocksdbMaxOpenFiles;
+  }
+
+  public boolean autoCompactionSmallSstFile() {
+    return autoCompactionSmallSstFile;
+  }
+
+  public void setAutoCompactionSmallSstFile(boolean auto) {
+    this.autoCompactionSmallSstFile = auto;
+  }
+
+  public long getAutoCompactionSmallSstFileSize() {
+    return autoCompactionSmallSstFileSize;
+  }
+
+  public void setAutoCompactionSmallSstFileSize(long size) {
+    this.autoCompactionSmallSstFileSize = size;
+  }
+
+  public int getAutoCompactionSmallSstFileNum() {
+    return autoCompactionSmallSstFileNum;
+  }
+
+  public void setAutoCompactionSmallSstFileNum(int num) {
+    this.autoCompactionSmallSstFileNum = num;
   }
 }

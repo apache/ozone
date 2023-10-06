@@ -34,7 +34,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.util.HashMap;
 import java.util.concurrent.TimeoutException;
@@ -54,7 +56,7 @@ public class TestRefreshVolumeUsageHandler {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -93,45 +95,46 @@ public class TestRefreshVolumeUsageHandler {
         .getScmNodeStat().getScmUsed().get();
 
     //creating a key to take some storage space
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume("test");
-    objectStore.getVolume("test").createBucket("test");
-    OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("test", 4096, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes(UTF_8));
-    key.close();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume("test");
+      objectStore.getVolume("test").createBucket("test");
+      OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
+          .createKey("test", 4096, ReplicationType.RATIS,
+              ReplicationFactor.ONE, new HashMap<>());
+      key.write("test".getBytes(UTF_8));
+      key.close();
 
-    //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
-    //still the cache is updated, so the scm will eventually get the new
-    //used space from the datanode through node report.
-    Assert.assertTrue(cluster.getStorageContainerManager()
-            .getScmNodeManager().getUsageInfo(datanodeDetails)
-            .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
+      //a new key is created, but the datanode default REFRESH_PERIOD is 1 hour,
+      //still the cache is updated, so the scm will eventually get the new
+      //used space from the datanode through node report.
+      Assert.assertTrue(cluster.getStorageContainerManager()
+          .getScmNodeManager().getUsageInfo(datanodeDetails)
+          .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
 
-    try {
+      try {
+        GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
+            datanodeDetails, currentScmUsed), 500, 5 * 1000);
+      } catch (TimeoutException te) {
+        //no op
+      } catch (InterruptedException ie) {
+        //no op
+      }
+
+      //after waiting for several node report , this usage info
+      //in SCM should be updated as we have updated the DN's cached usage info.
+      Assert.assertTrue(cluster.getStorageContainerManager()
+          .getScmNodeManager().getUsageInfo(datanodeDetails)
+          .getScmNodeStat().getScmUsed().isGreater(currentScmUsed));
+
+      //send refresh volume usage command to datanode
+      cluster.getStorageContainerManager()
+          .getScmNodeManager().refreshAllHealthyDnUsageInfo();
+
+      //waiting for the new usage info is refreshed
       GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
           datanodeDetails, currentScmUsed), 500, 5 * 1000);
-    } catch (TimeoutException te) {
-      //no op
-    } catch (InterruptedException ie) {
-      //no op
     }
-
-    //after waiting for several node report , this usage info
-    //in SCM should be updated as we have updated the DN's cached usage info.
-    Assert.assertTrue(cluster.getStorageContainerManager()
-        .getScmNodeManager().getUsageInfo(datanodeDetails)
-        .getScmNodeStat().getScmUsed().isGreater(currentScmUsed));
-
-    //send refresh volume usage command to datanode
-    cluster.getStorageContainerManager()
-        .getScmNodeManager().refreshAllHealthyDnUsageInfo();
-
-    //waiting for the new usage info is refreshed
-    GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
-        datanodeDetails, currentScmUsed), 500, 5 * 1000);
   }
 
   private static Boolean isUsageInfoRefreshed(MiniOzoneCluster cluster,

@@ -22,8 +22,8 @@ import java.io.OutputStream;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
@@ -37,8 +37,6 @@ public class OnDemandContainerReplicationSource
 
   private final ContainerController controller;
 
-  private final TarContainerPacker packer = new TarContainerPacker();
-
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
     this.controller = controller;
@@ -50,7 +48,8 @@ public class OnDemandContainerReplicationSource
   }
 
   @Override
-  public void copyData(long containerId, OutputStream destination)
+  public void copyData(long containerId, OutputStream destination,
+                       CopyContainerCompression compression)
       throws IOException {
 
     Container container = controller.getContainer(containerId);
@@ -61,7 +60,7 @@ public class OnDemandContainerReplicationSource
     }
 
     controller.exportContainer(
-        container.getContainerType(), containerId, destination, packer);
-
+        container.getContainerType(), containerId, destination,
+        new TarContainerPacker(compression));
   }
 }

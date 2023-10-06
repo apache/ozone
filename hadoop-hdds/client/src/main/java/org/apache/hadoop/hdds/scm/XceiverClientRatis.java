@@ -33,7 +33,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -47,12 +46,13 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
@@ -135,7 +135,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         .orElse(0L);
   }
 
-  private long updateCommitInfosMap(
+  public long updateCommitInfosMap(
       Collection<RaftProtos.CommitInfoProto> commitInfoProtos) {
     // if the commitInfo map is empty, just update the commit indexes for each
     // of the servers
@@ -226,7 +226,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       ContainerCommandRequestProto request) {
     return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name(),
-        (Supplier<CompletableFuture<RaftClientReply>>) () -> {
+        () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
               request, TracingUtil.exportCurrentSpan());
@@ -381,5 +381,9 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       sendCommandOnAllNodes(ContainerCommandRequestProto request) {
     throw new UnsupportedOperationException(
             "Operation Not supported for ratis client");
+  }
+
+  public DataStreamApi getDataStreamApi() {
+    return this.getClient().getDataStreamApi();
   }
 }

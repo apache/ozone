@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.TimeUnit;
 
@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for {@link DatanodeConfiguration}.

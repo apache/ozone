@@ -19,7 +19,7 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ozone-shell-lib.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-Test Timeout        5 minute
+Test Timeout        10 minutes
 Suite Setup         Generate prefix
 
 *** Test Cases ***
@@ -38,8 +38,15 @@ RpcClient bucket acls
 RpcClient key acls
     Test Key Acls         o3://            om:9862     ${prefix}-acls
 
+# depends on being run between key and prefix tests
+Test native authorizer
+    Test native authorizer    o3://    om:9862    ${prefix}-acls
+
 RpcClient prefix acls
     Test Prefix Acls      o3://            om:9862     ${prefix}-acls
 
 RpcClient without host
     Test ozone shell      o3://            ${EMPTY}    ${prefix}-without-host
+
+RpcClient Delete key
+   Test Delete key with Trash       o3://            om:9862      ${prefix}-with-del

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.s3.tenant;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -50,6 +51,7 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
   private String principal, accessId;
   private OmDBAccessIdInfo omDBAccessIdInfo;
   private OmDBUserPrincipalInfo omDBUserPrincipalInfo;
+  private S3SecretManager s3SecretManager;
 
   @SuppressWarnings("checkstyle:parameternumber")
   public OMTenantAssignUserAccessIdResponse(@Nonnull OMResponse omResponse,
@@ -57,7 +59,8 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
       @Nonnull String principal,
       @Nonnull String accessId,
       @Nonnull OmDBAccessIdInfo omDBAccessIdInfo,
-      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo
+      @Nonnull OmDBUserPrincipalInfo omDBUserPrincipalInfo,
+      @Nonnull S3SecretManager s3SecretManager
   ) {
     super(omResponse);
     this.s3SecretValue = s3SecretValue;
@@ -65,6 +68,7 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
     this.accessId = accessId;
     this.omDBAccessIdInfo = omDBAccessIdInfo;
     this.omDBUserPrincipalInfo = omDBUserPrincipalInfo;
+    this.s3SecretManager = s3SecretManager;
   }
 
   /**
@@ -80,11 +84,16 @@ public class OMTenantAssignUserAccessIdResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (s3SecretValue != null &&
-        getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      // Add S3SecretTable entry
-      omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
-          accessId, s3SecretValue);
+    boolean isOk =
+        getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK;
+    if (s3SecretValue != null && isOk) {
+      if (s3SecretManager.isBatchSupported()) {
+        // Add S3SecretTable entry
+        s3SecretManager.batcher().addWithBatch(batchOperation,
+            accessId, s3SecretValue);
+      } else {
+        s3SecretManager.storeSecret(accessId, s3SecretValue);
+      }
     }
 
     omMetadataManager.getTenantAccessIdTable().putWithBatch(

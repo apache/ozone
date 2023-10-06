@@ -196,6 +196,7 @@ Test abort Multipart upload with invalid uploadId
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id "random"    255
 
 Upload part with Incorrect uploadID
+        SKIP    TODO: HDDS-7811
                         Execute                 echo "Multipart upload" > /tmp/testfile
         ${result} =     Execute AWSS3APICli and checkrc     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey --part-number 1 --body /tmp/testfile --upload-id "random"  255
                         Should contain          ${result}    NoSuchUpload

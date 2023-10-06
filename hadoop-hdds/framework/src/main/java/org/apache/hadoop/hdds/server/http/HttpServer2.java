@@ -110,6 +110,8 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterHolder;
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterMapping;
 import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
 
 /**
@@ -194,6 +196,7 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
   private XFrameOption xFrameOption;
+  private HttpServer2Metrics metrics;
   private boolean xFrameOptionIsEnabled;
   public static final String HTTP_HEADER_PREFIX = "ozone.http.header.";
   private static final String HTTP_HEADER_REGEX =
@@ -604,6 +607,7 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
+    metrics = HttpServer2Metrics.create(threadPool, name);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
@@ -705,7 +709,7 @@ public final class HttpServer2 implements FilterContainer {
 
   private static void addNoCacheFilter(ServletContextHandler ctxt) {
     defineFilter(ctxt, NO_CACHE_FILTER, NoCacheFilter.class.getName(),
-        Collections.<String, String>emptyMap(), new String[] {"/*"});
+        Collections.emptyMap(), new String[] {"/*"});
   }
 
   /**
@@ -756,7 +760,6 @@ public final class HttpServer2 implements FilterContainer {
       if (conf.getBoolean(
           CommonConfigurationKeys.HADOOP_JETTY_LOGS_SERVE_ALIASES,
           CommonConfigurationKeys.DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
-        @SuppressWarnings("unchecked")
         Map<String, String> params = logContext.getInitParams();
         params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
       }
@@ -775,7 +778,6 @@ public final class HttpServer2 implements FilterContainer {
     staticContext.setResourceBase(appDir + "/static");
     staticContext.addServlet(DefaultServlet.class, "/*");
     staticContext.setDisplayName("static");
-    @SuppressWarnings("unchecked")
     Map<String, String> params = staticContext.getInitParams();
     params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
     params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
@@ -998,13 +1000,13 @@ public final class HttpServer2 implements FilterContainer {
   public void addFilter(String name, String classname,
       Map<String, String> parameters) {
 
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
     FilterMapping fmap =
-        getFilterMapping(name, new String[] {"*.html", "*.jsp"});
+        createFilterMapping(name, new String[] {"*.html", "*.jsp"});
     defineFilter(webAppContext, filterHolder, fmap);
     LOG.info("Added filter {} (class={}) to context {}", name, classname,
             webAppContext.getDisplayName());
-    fmap = getFilterMapping(name, new String[] {"/*"});
+    fmap = createFilterMapping(name, new String[] {"/*"});
     for (Map.Entry<ServletContextHandler, Boolean> e
         : defaultContexts.entrySet()) {
       if (e.getValue()) {
@@ -1020,8 +1022,8 @@ public final class HttpServer2 implements FilterContainer {
   @Override
   public void addGlobalFilter(String name, String classname,
       Map<String, String> parameters) {
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
-    FilterMapping fmap = getFilterMapping(name, new String[] {"/*"});
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
+    FilterMapping fmap = createFilterMapping(name, new String[] {"/*"});
     defineFilter(webAppContext, filterHolder, fmap);
     for (ServletContextHandler ctx : defaultContexts.keySet()) {
       defineFilter(ctx, filterHolder, fmap);
@@ -1034,8 +1036,8 @@ public final class HttpServer2 implements FilterContainer {
    */
   private static void defineFilter(ServletContextHandler ctx, String name,
       String classname, Map<String, String> parameters, String[] urls) {
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
-    FilterMapping fmap = getFilterMapping(name, urls);
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
+    FilterMapping fmap = createFilterMapping(name, urls);
     defineFilter(ctx, filterHolder, fmap);
   }
 
@@ -1046,25 +1048,6 @@ public final class HttpServer2 implements FilterContainer {
       FilterHolder holder, FilterMapping fmap) {
     ServletHandler handler = ctx.getServletHandler();
     handler.addFilter(holder, fmap);
-  }
-
-  private static FilterMapping getFilterMapping(String name, String[] urls) {
-    FilterMapping fmap = new FilterMapping();
-    fmap.setPathSpecs(urls);
-    fmap.setDispatches(FilterMapping.ALL);
-    fmap.setFilterName(name);
-    return fmap;
-  }
-
-  private static FilterHolder getFilterHolder(String name, String classname,
-      Map<String, String> parameters) {
-    FilterHolder holder = new FilterHolder();
-    holder.setName(name);
-    holder.setClassName(classname);
-    if (parameters != null) {
-      holder.setInitParameters(parameters);
-    }
-    return holder;
   }
 
   /**
@@ -1365,6 +1348,7 @@ public final class HttpServer2 implements FilterContainer {
       // clear & stop webAppContext attributes to avoid memory leaks.
       webAppContext.clearAttributes();
       webAppContext.stop();
+      metrics.unRegister();
     } catch (Exception e) {
       LOG.error("Error while stopping web app context for webapp "
           + webAppContext.getDisplayName(), e);
@@ -1566,7 +1550,6 @@ public final class HttpServer2 implements FilterContainer {
       /**
        * Return the set of parameter names, quoting each name.
        */
-      @SuppressWarnings("unchecked")
       @Override
       public Enumeration<String> getParameterNames() {
         return new Enumeration<String>() {
@@ -1607,7 +1590,6 @@ public final class HttpServer2 implements FilterContainer {
         return result;
       }
 
-      @SuppressWarnings("unchecked")
       @Override
       public Map<String, String[]> getParameterMap() {
         Map<String, String[]> result = new HashMap<>();

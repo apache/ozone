@@ -25,6 +25,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
+
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,8 +48,8 @@ public class LeaseManager<T> {
 
   private final String name;
   private final long defaultTimeout;
-  private final Object monitor = new Object();
   private Map<T, Lease<T>> activeLeases;
+  private Semaphore semaphore = new Semaphore(0);
   private LeaseMonitor leaseMonitor;
   private Thread leaseMonitorThread;
   private boolean isRunning;
@@ -120,10 +123,52 @@ public class LeaseManager<T> {
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    semaphore.release();
     return lease;
+  }
+
+  /**
+   * Returns a lease for the specified resource with the timeout provided.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param timeout
+   *        The timeout in milliseconds which has to be set on the lease
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, long timeout, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    checkStatus();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Acquiring lease on {} for {} milliseconds", resource, timeout);
+    }
+    if (activeLeases.containsKey(resource)) {
+      throw new LeaseAlreadyExistException(messageForResource(resource));
+    }
+    Lease<T> lease = new Lease<>(resource, timeout, callback);
+    activeLeases.put(resource, lease);
+    semaphore.release();
+    return lease;
+  }
+
+  /**
+   * Returns a lease for the specified resource with the default timeout.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    return acquire(resource, defaultTimeout, callback);
   }
 
   /**
@@ -173,9 +218,11 @@ public class LeaseManager<T> {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    // added extra release for case when interrupt is called
+    // before going to semaphore's tryAcquire. This will ensure release
+    //  of wait and exit of while loop as leaseMonitor.disable() is done.
+    semaphore.release();
+    leaseMonitorThread.interrupt();
     for (T resource : activeLeases.keySet()) {
       try {
         release(resource);
@@ -234,11 +281,9 @@ public class LeaseManager<T> {
         }
 
         try {
-          synchronized (monitor) {
-            monitor.wait(sleepTime);
-          }
+          // ignore return value, just used for wait
+          boolean b = semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-          // This means a new lease is added to activeLeases.
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
         }

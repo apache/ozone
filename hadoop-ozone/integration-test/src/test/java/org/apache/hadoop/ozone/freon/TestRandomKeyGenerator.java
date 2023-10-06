@@ -24,13 +24,17 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.tag.Flaky;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
+
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -40,14 +44,8 @@ public class TestRandomKeyGenerator {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
-  public static void init() throws Exception {
+  static void init() throws Exception {
     conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
@@ -65,14 +63,28 @@ public class TestRandomKeyGenerator {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  @Timeout(5)
+  void singleFailedAttempt() {
+    BaseFreonGenerator subject = new BaseFreonGenerator();
+    subject.setThreadNo(2);
+    subject.setTestNo(1);
+    subject.init();
+
+    assertThrows(RuntimeException.class, () -> subject.runTests(
+        n -> {
+          waitFor(subject::isCompleted, 100, 3000);
+          throw new RuntimeException("fail");
+        }
+    ));
+    assertEquals(1, subject.getFailureCount());
   }
 
   @Test
@@ -87,6 +99,7 @@ public class TestRandomKeyGenerator {
     Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
     Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    randomKeyGenerator.printStats(System.out);
   }
 
   @Test
@@ -204,7 +217,6 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  @Flaky("HDDS-5993")
   void cleanObjectsTest() {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());

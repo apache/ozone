@@ -18,26 +18,68 @@
 package org.apache.hadoop.ozone.client.io;
 
 import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
- * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
-public class OzoneOutputStream extends OutputStream {
+public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   private final OutputStream outputStream;
+  private final Syncable syncable;
+  private boolean enableHsync;
 
   /**
-   * Constructs OzoneOutputStream with KeyOutputStream.
+   * Constructs an instance with a {@link Syncable} {@link OutputStream}.
    *
-   * @param outputStream
+   * @param outputStream an {@link OutputStream} which is {@link Syncable}.
+   * @param enableHsync if false, hsync() executes flush() instead.
    */
-  public OzoneOutputStream(OutputStream outputStream) {
-    this.outputStream = outputStream;
+  public OzoneOutputStream(Syncable outputStream, boolean enableHsync) {
+    this(Optional.of(Objects.requireNonNull(outputStream,
+                "outputStream == null"))
+        .filter(s -> s instanceof OutputStream)
+        .map(s -> (OutputStream)s)
+        .orElseThrow(() -> new IllegalArgumentException(
+            "The parameter syncable is not an OutputStream")),
+        outputStream, enableHsync);
+  }
+
+  /**
+   * Constructs an instance with a (non-{@link Syncable}) {@link OutputStream}
+   * with an optional {@link Syncable} object.
+   *
+   * @param outputStream for writing data.
+   * @param syncable an optional parameter
+   *                 for accessing the {@link Syncable} feature.
+   */
+  public OzoneOutputStream(OutputStream outputStream, Syncable syncable) {
+    this(outputStream, syncable, false);
+  }
+
+  /**
+   * Constructs an instance with a (non-{@link Syncable}) {@link OutputStream}
+   * with an optional {@link Syncable} object.
+   *
+   * @param outputStream for writing data.
+   * @param syncable an optional parameter
+   *                 for accessing the {@link Syncable} feature.
+   * @param enableHsync if false, hsync() executes flush() instead.
+   */
+  public OzoneOutputStream(OutputStream outputStream, Syncable syncable,
+      boolean enableHsync) {
+    this.outputStream = Objects.requireNonNull(outputStream,
+        "outputStream == null");
+    this.syncable = syncable != null ? syncable
+        : outputStream instanceof Syncable ? (Syncable) outputStream
+        : null;
+    this.enableHsync = enableHsync;
   }
 
   @Override
@@ -59,6 +101,23 @@ public class OzoneOutputStream extends OutputStream {
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
     outputStream.close();
+  }
+
+  public void hsync() throws IOException {
+    // Disable the feature flag restores the prior behavior.
+    if (!enableHsync) {
+      outputStream.flush();
+      return;
+    }
+    if (syncable != null) {
+      if (outputStream != syncable) {
+        outputStream.flush();
+      }
+      syncable.hsync();
+    } else {
+      throw new UnsupportedOperationException(outputStream.getClass()
+          + " is not " + Syncable.class.getSimpleName());
+    }
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {

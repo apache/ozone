@@ -18,30 +18,41 @@
 
 package org.apache.hadoop.hdds.security.x509.crl;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CRLInfoProto;
 import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.security.cert.CRLException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509CRLEntry;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Class that wraps Certificate Revocation List Info.
  */
-public class CRLInfo implements Comparator<CRLInfo>,
+public final class CRLInfo implements Comparator<CRLInfo>,
     Comparable<CRLInfo> {
 
-  private X509CRL x509CRL;
-  private long creationTimestamp;
-  private long crlSequenceID;
-  private Instant revocationTime;
+  private static final Codec<CRLInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(CRLInfoProto.class),
+      proto -> fromProtobuf(proto, CRLCodec::toIOException),
+      CRLInfo::getProtobuf);
+
+  public static Codec<CRLInfo> getCodec() {
+    return CODEC;
+  }
+
+  private final X509CRL x509CRL;
+  private final long creationTimestamp;
+  private final long crlSequenceID;
+  private final Instant revocationTime;
 
   private CRLInfo(X509CRL x509CRL, long creationTimestamp, long crlSequenceID) {
     assert ((x509CRL != null) &&
@@ -54,27 +65,23 @@ public class CRLInfo implements Comparator<CRLInfo>,
         entry.getRevocationDate().getTime());
   }
 
-  /**
-   * Constructor for CRLInfo. Needed for serialization findbugs.
-   */
-  public CRLInfo() {
+  public static CRLInfo fromProtobuf(CRLInfoProto info)
+      throws CRLException {
+    return fromProtobuf(info, Function.identity());
   }
 
-  public static CRLInfo fromProtobuf(HddsProtos.CRLInfoProto info)
-      throws IOException, CRLException, CertificateException {
-    CRLInfo.Builder builder = new CRLInfo.Builder();
-    return builder
-        .setX509CRL(CRLCodec.getX509CRL(info.getX509CRL()))
+  private static <E extends Exception> CRLInfo fromProtobuf(
+      CRLInfoProto info, Function<CRLException, E> convertor) throws E {
+    return new CRLInfo.Builder()
+        .setX509CRL(CRLCodec.getX509CRL(info.getX509CRL(), convertor))
         .setCreationTimestamp(info.getCreationTimestamp())
         .setCrlSequenceID(info.getCrlSequenceID())
         .build();
   }
 
-  public HddsProtos.CRLInfoProto getProtobuf() throws SCMSecurityException {
-    HddsProtos.CRLInfoProto.Builder builder =
-        HddsProtos.CRLInfoProto.newBuilder();
-
-    return builder.setX509CRL(CRLCodec.getPEMEncodedString(getX509CRL()))
+  public CRLInfoProto getProtobuf() throws SCMSecurityException {
+    return CRLInfoProto.newBuilder()
+        .setX509CRL(CRLCodec.getPEMEncodedString(getX509CRL()))
         .setCreationTimestamp(getCreationTimestamp())
         .setCrlSequenceID(getCrlSequenceID())
         .build();
@@ -82,9 +89,8 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
   public static CRLInfo fromCRLProto3(
       SCMUpdateServiceProtos.CRLInfoProto info)
-      throws IOException, CRLException, CertificateException {
-    CRLInfo.Builder builder = new CRLInfo.Builder();
-    return builder
+      throws CRLException {
+    return new CRLInfo.Builder()
         .setX509CRL(CRLCodec.getX509CRL(info.getX509CRL()))
         .setCreationTimestamp(info.getCreationTimestamp())
         .setCrlSequenceID(info.getCrlSequenceID())
@@ -93,10 +99,8 @@ public class CRLInfo implements Comparator<CRLInfo>,
 
   public SCMUpdateServiceProtos.CRLInfoProto getCRLProto3()
       throws SCMSecurityException {
-    SCMUpdateServiceProtos.CRLInfoProto.Builder builder =
-        SCMUpdateServiceProtos.CRLInfoProto.newBuilder();
-
-    return builder.setX509CRL(CRLCodec.getPEMEncodedString(getX509CRL()))
+    return SCMUpdateServiceProtos.CRLInfoProto.newBuilder()
+        .setX509CRL(CRLCodec.getPEMEncodedString(getX509CRL()))
         .setCreationTimestamp(getCreationTimestamp())
         .setCrlSequenceID(getCrlSequenceID())
         .build();

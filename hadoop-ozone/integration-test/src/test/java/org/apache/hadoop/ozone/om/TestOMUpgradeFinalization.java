@@ -35,9 +35,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -51,7 +53,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -65,11 +69,12 @@ public class TestOMUpgradeFinalization {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300000));
   private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;
   private int fromLayoutVersion;
+  private OzoneClient client;
 
   /**
    * Defines a "from" layout version to finalize from.
@@ -110,8 +115,8 @@ public class TestOMUpgradeFinalization {
 
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    ObjectStore objectStore = client.getObjectStore();
     clientProtocol = objectStore.getClientProxy();
   }
 
@@ -120,6 +125,7 @@ public class TestOMUpgradeFinalization {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

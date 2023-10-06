@@ -19,8 +19,11 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -42,19 +45,34 @@ public class ListBucketHandler extends VolumeHandler {
   @CommandLine.Mixin
   private ListOptions listOptions;
 
+  @CommandLine.Option(names = {"--has-snapshot"},
+      description = "Only show buckets that have at least one active snapshot.")
+  private boolean filterByHasSnapshot;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
     String volumeName = address.getVolumeName();
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume vol = objectStore.getVolume(volumeName);
     Iterator<? extends OzoneBucket> bucketIterator =
-        vol.listBuckets(listOptions.getPrefix(), listOptions.getStartItem());
-
-    int counter = printAsJsonArray(bucketIterator, listOptions.getLimit());
-
+        vol.listBuckets(listOptions.getPrefix(),
+            listOptions.getStartItem(), filterByHasSnapshot);
+    List<Object> bucketList = new ArrayList<>();
+    int counter = 0;
+    while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
+      OzoneBucket bucket = bucketIterator.next();
+      if (bucket.isLink()) {
+        bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
+      } else {
+        bucketList.add(bucket);
+      }
+      counter++;
+    }
+    printAsJsonArray(bucketList.iterator(), listOptions.getLimit());
     if (isVerbose()) {
-      out().printf("Found : %d buckets for volume : %s ", counter, volumeName);
+      err().printf("Found : %d buckets for volume : %s ", counter, volumeName);
     }
   }
 

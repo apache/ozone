@@ -25,6 +25,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.apache.ratis.util.MemoizedSupplier;
+
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
@@ -55,6 +59,7 @@ public abstract class DatanodeDBProfile {
     case SSD:
       return new SSD();
     case DISK:
+    case TEST:
       return new Disk();
     default:
       throw new IllegalArgumentException(
@@ -104,6 +109,8 @@ public abstract class DatanodeDBProfile {
    * Base profile for datanode storage disks.
    */
   private static final class StorageBasedProfile {
+    private final AtomicReference<Supplier<ManagedColumnFamilyOptions>> cfOpts =
+        new AtomicReference<>();
     private final DBProfile baseProfile;
 
     private StorageBasedProfile(DBProfile profile) {
@@ -116,9 +123,18 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      ManagedColumnFamilyOptions cfOptions =
+      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier =
+          MemoizedSupplier.valueOf(() -> createColumnFamilyOptions(config));
+      cfOpts.compareAndSet(null, supplier);
+      return cfOpts.get().get();
+    }
+
+    private ManagedColumnFamilyOptions createColumnFamilyOptions(
+        ConfigurationSource config) {
+      ManagedColumnFamilyOptions options =
           baseProfile.getColumnFamilyOptions();
-      return cfOptions.closeAndSetTableFormatConfig(
+      options.setReused(true);
+      return options.closeAndSetTableFormatConfig(
           getBlockBasedTableConfig(config));
     }
 

@@ -18,8 +18,11 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.ObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -30,6 +33,8 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -53,13 +58,24 @@ public class DirectoryEntityHandler extends EntityHandler {
           throws IOException {
     // path should exist so we don't need any extra verification/null check
     long dirObjectId = getBucketHandler().getDirObjectId(getNames());
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.DIRECTORY);
-    namespaceSummaryResponse
-        .setNumTotalDir(getTotalDirCount(dirObjectId));
-    namespaceSummaryResponse.setNumTotalKey(getTotalKeyCount(dirObjectId));
+    CountStats countStats = new CountStats(
+        -1, -1,
+        getTotalDirCount(dirObjectId), getTotalKeyCount(dirObjectId));
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.DIRECTORY)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getDirectoryObjDbInfo(getNames()))
+        .setStatus(ResponseStatus.OK)
+        .build();
+  }
 
-    return namespaceSummaryResponse;
+  private ObjectDBInfo getDirectoryObjDbInfo(String[] names)
+      throws IOException {
+    OmDirectoryInfo omDirectoryInfo = getBucketHandler().getDirInfo(names);
+    if (null == omDirectoryInfo) {
+      return new ObjectDBInfo();
+    }
+    return new ObjectDBInfo(omDirectoryInfo);
   }
 
   @Override
@@ -89,7 +105,23 @@ public class DirectoryEntityHandler extends EntityHandler {
     for (long subdirObjectId: subdirs) {
       NSSummary subdirNSSummary =
               getReconNamespaceSummaryManager().getNSSummary(subdirObjectId);
-      String subdirName = subdirNSSummary.getDirName();
+      // for the subdirName we need the subdir filename, not the key name
+      // Eg. /vol/bucket1/dir1/dir2,
+      // key name is /dir1/dir2
+      // we need to get dir2
+      Path subdirPath = Paths.get(subdirNSSummary.getDirName());
+      Path subdirFileName = subdirPath.getFileName();
+      String subdirName;
+      // Checking for null to get rid of a findbugs error and
+      // then throwing the NPException to avoid swallowing it.
+      // Error: Possible null pointer dereference in
+      // ...DirectoryEntityHandler.getDuResponse(boolean, boolean) due to
+      // return value of called method Dereferenced at DirectoryEntityHandler
+      if (subdirFileName != null) {
+        subdirName = subdirFileName.toString();
+      } else {
+        throw new NullPointerException("Subdirectory file name is null.");
+      }
       // build the path for subdirectory
       String subpath = BucketHandler
               .buildSubpath(getNormalizedPath(), subdirName);

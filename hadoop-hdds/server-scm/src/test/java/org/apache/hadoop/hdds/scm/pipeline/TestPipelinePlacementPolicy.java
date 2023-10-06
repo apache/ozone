@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -107,7 +106,7 @@ public class TestPipelinePlacementPolicy {
         10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestPipelinePlacementPolicy.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -517,6 +516,12 @@ public class TestPipelinePlacementPolicy {
     subSet.add(dns.get(0));
     status = placementPolicy.validateContainerPlacement(subSet, 1);
     Assertions.assertTrue(status.isPolicySatisfied());
+
+    // three nodes, one dead, one rack
+    cluster.remove(dns.get(2));
+    status = placementPolicy.validateContainerPlacement(dns, 3);
+    Assertions.assertFalse(status.isPolicySatisfied());
+    Assertions.assertEquals(1, status.misReplicationCount());
   }
 
   @Test
@@ -692,7 +697,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(0));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(0));
     Assertions.assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE pipeline
@@ -701,7 +707,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(ratisOneDn, RATIS, ONE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(1));
     Assertions.assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/THREE pipeline
@@ -712,7 +719,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(2));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(2));
     Assertions.assertEquals(pipelineCount, 1);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline
@@ -721,7 +729,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(standaloneOneDn, STAND_ALONE, ONE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(1));
     Assertions.assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline and
@@ -734,7 +743,8 @@ public class TestPipelinePlacementPolicy {
     createPipelineWithReplicationConfig(ratisThreeDn, RATIS, THREE);
 
     pipelineCount
-        = placementPolicy.currentRatisThreePipelineCount(healthyNodes.get(1));
+        = placementPolicy.currentRatisThreePipelineCount(nodeManager,
+        stateManager, healthyNodes.get(1));
     Assertions.assertEquals(pipelineCount, 2);
   }
 

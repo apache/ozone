@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -54,7 +55,8 @@ import java.util.concurrent.ExecutionException;
  * This class encapsulates all state management for buffering and writing
  * through to the container.
  */
-public class RatisBlockOutputStream extends BlockOutputStream {
+public class RatisBlockOutputStream extends BlockOutputStream
+    implements Syncable {
   public static final Logger LOG = LoggerFactory.getLogger(
       RatisBlockOutputStream.class);
 
@@ -90,7 +92,7 @@ public class RatisBlockOutputStream extends BlockOutputStream {
 
   @VisibleForTesting
   public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitWatcher.getCommitIndex2flushedDataMap();
+    return commitWatcher.getCommitIndexMap();
   }
 
   @Override
@@ -125,5 +127,20 @@ public class RatisBlockOutputStream extends BlockOutputStream {
   @Override
   void cleanup() {
     commitWatcher.cleanup();
+  }
+
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    if (!isClosed()) {
+      if (getBufferPool() != null && getBufferPool().getSize() > 0) {
+        handleFlush(false);
+      }
+      waitForFlushAndCommit(false);
+    }
   }
 }

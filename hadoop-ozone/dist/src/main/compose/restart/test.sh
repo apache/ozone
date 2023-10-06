@@ -47,6 +47,3 @@ execute_robot_test scm -v PREFIX:post freon/generate.robot
 execute_robot_test scm -v PREFIX:post freon/validate.robot
 execute_robot_test scm -v PREFIX:post freon/generate-chunk.robot
 execute_robot_test scm -v PREFIX:post freon/validate-chunk.robot
-stop_docker_env
-
-generate_report

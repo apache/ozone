@@ -25,11 +25,15 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -45,6 +49,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
@@ -286,7 +292,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException {
+      Iterable<? extends Long> containerIDs) throws IOException {
     for (Long containerID: containerIDs) {
       Preconditions.checkState(containerID >= 0,
           "Container ID cannot be negative");
@@ -703,6 +709,31 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  public void transferLeadership(String nodeId)
+      throws IOException {
+    TransferLeadershipRequestProto.Builder reqBuilder =
+        TransferLeadershipRequestProto.newBuilder();
+    reqBuilder.setNewLeaderId(nodeId);
+    submitRequest(Type.TransferLeadership,
+        builder -> builder.setTransferScmLeadershipRequest(reqBuilder.build()));
+  }
+
+  @Override
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException {
+    GetFailedDeletedBlocksTxnRequestProto request =
+        GetFailedDeletedBlocksTxnRequestProto.newBuilder()
+            .setCount(count)
+            .setStartTxId(startTxId)
+            .build();
+    GetFailedDeletedBlocksTxnResponseProto resp = submitRequest(
+        Type.GetFailedDeletedBlocksTransaction,
+        builder -> builder.setGetFailedDeletedBlocksTxnRequest(request)).
+        getGetFailedDeletedBlocksTxnResponse();
+    return resp.getDeletedBlocksTransactionsList();
+  }
+
+  @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs)
       throws IOException {
     ResetDeletedBlockRetryCountRequestProto request =
@@ -1019,6 +1050,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    GetContainerCountRequestProto request =
+        GetContainerCountRequestProto.newBuilder().build();
+
+    GetContainerCountResponseProto response =
+        submitRequest(Type.GetClosedContainerCount,
+            builder -> builder.setGetContainerCountRequest(request))
+            .getGetContainerCountResponse();
+    return response.getContainerCount();
+  }
+
+  @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
   }
@@ -1026,5 +1070,27 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public void close() {
     RPC.stopProxy(rpcProxy);
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return listContainer(startContainerID, count, state);
+  }
+
+  @Override
+  public DecommissionScmResponseProto decommissionScm(
+      String scmId) throws IOException {
+
+    DecommissionScmRequestProto request = DecommissionScmRequestProto
+        .newBuilder()
+        .setScmId(scmId)
+        .build();
+    DecommissionScmResponseProto response =
+        submitRequest(Type.DecommissionScm,
+            builder -> builder.setDecommissionScmRequest(request))
+                .getDecommissionScmResponse();
+    return response;
   }
 }

@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -82,10 +83,11 @@ public class TestOMDBUpdatesHandler {
   @Before
   public void setUp() throws Exception {
     OzoneConfiguration configuration = createNewTestPath();
-    omMetadataManager = new OmMetadataManagerImpl(configuration);
+    omMetadataManager = new OmMetadataManagerImpl(configuration, null);
 
     OzoneConfiguration reconConfiguration = createNewTestPath();
-    reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration);
+    reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration,
+        null);
   }
 
   @Test
@@ -112,11 +114,20 @@ public class TestOMDBUpdatesHandler {
     reconOmMetadataManager.getKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_two", secondKey);
 
+
+    Text tester = new Text("tester");
+    OzoneTokenIdentifier identifier =
+        new OzoneTokenIdentifier(tester, tester, tester);
+    identifier.setOmCertSerialId("certID");
+    identifier.setOmServiceId("");
+
+    omMetadataManager.getDelegationTokenTable().put(identifier, 12345L);
+
     List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(3, events.size());
+    assertEquals(4, events.size());
 
     OMDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());
@@ -292,20 +303,31 @@ public class TestOMDBUpdatesHandler {
 
   @Test
   public void testGetKeyType() throws IOException {
-    assertEquals(String.class, omdbDefinition.getKeyType(
-        omMetadataManager.getKeyTable(getBucketLayout()).getName()).get());
-    assertEquals(OzoneTokenIdentifier.class, omdbDefinition.getKeyType(
-        omMetadataManager.getDelegationTokenTable().getName()).get());
+    final String keyTable = omMetadataManager
+        .getKeyTable(getBucketLayout()).getName();
+    assertEquals(String.class,
+        omdbDefinition.getColumnFamily(keyTable).getKeyType());
+
+    final String delegationTokenTable = omMetadataManager
+        .getDelegationTokenTable().getName();
+    assertEquals(OzoneTokenIdentifier.class,
+        omdbDefinition.getColumnFamily(delegationTokenTable).getKeyType());
   }
 
   @Test
   public void testGetValueType() throws IOException {
-    assertEquals(OmKeyInfo.class, omdbDefinition.getValueType(
-        omMetadataManager.getKeyTable(getBucketLayout()).getName()).get());
-    assertEquals(OmVolumeArgs.class, omdbDefinition.getValueType(
-        omMetadataManager.getVolumeTable().getName()).get());
-    assertEquals(OmBucketInfo.class, omdbDefinition.getValueType(
-        omMetadataManager.getBucketTable().getName()).get());
+    final String keyTable = omMetadataManager
+        .getKeyTable(getBucketLayout()).getName();
+    assertEquals(OmKeyInfo.class,
+        omdbDefinition.getColumnFamily(keyTable).getValueType());
+
+    final String volumeTable = omMetadataManager.getVolumeTable().getName();
+    assertEquals(OmVolumeArgs.class,
+        omdbDefinition.getColumnFamily(volumeTable).getValueType());
+
+    final String bucketTable = omMetadataManager.getBucketTable().getName();
+    assertEquals(OmBucketInfo.class,
+        omdbDefinition.getColumnFamily(bucketTable).getValueType());
   }
 
   @NotNull

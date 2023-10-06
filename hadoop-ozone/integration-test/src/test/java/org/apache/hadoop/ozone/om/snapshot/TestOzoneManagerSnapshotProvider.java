@@ -22,10 +22,12 @@ import java.util.UUID;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -40,7 +42,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test OM's snapshot provider service.
@@ -56,7 +60,8 @@ public class TestOzoneManagerSnapshotProvider {
   private int numOfOMs = 3;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+  private OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -76,8 +81,8 @@ public class TestOzoneManagerSnapshotProvider {
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    objectStore = client.getObjectStore();
   }
 
   /**
@@ -85,6 +90,7 @@ public class TestOzoneManagerSnapshotProvider {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -119,7 +125,7 @@ public class TestOzoneManagerSnapshotProvider {
 
     // Download latest checkpoint from leader OM to follower OM
     DBCheckpoint omSnapshot = followerOM.getOmSnapshotProvider()
-        .getOzoneManagerDBSnapshot(leaderOMNodeId);
+        .downloadDBSnapshotFromLeader(leaderOMNodeId);
 
     long leaderSnapshotIndex = leaderOM.getRatisSnapshotIndex();
     long downloadedSnapshotIndex = getDownloadedSnapshotIndex(omSnapshot);

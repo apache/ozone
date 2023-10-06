@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
@@ -31,6 +34,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
@@ -43,6 +47,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.Before;
@@ -79,6 +84,31 @@ public class TestHddsVolume {
   }
 
   @Test
+  public void testReadPropertiesFromVersionFile() throws Exception {
+    StorageVolume volume = volumeBuilder.build();
+
+    volume.format(CLUSTER_ID);
+
+    Properties properties = DatanodeVersionFile.readFrom(versionFile);
+
+    String storageID = StorageVolumeUtil.getStorageID(properties, versionFile);
+    String clusterID = StorageVolumeUtil.getClusterID(
+        properties, versionFile, CLUSTER_ID);
+    String datanodeUuid = StorageVolumeUtil.getDatanodeUUID(
+        properties, versionFile, DATANODE_UUID);
+    long cTime = StorageVolumeUtil.getCreationTime(
+        properties, versionFile);
+    int layoutVersion = StorageVolumeUtil.getLayOutVersion(
+        properties, versionFile);
+
+    assertEquals(volume.getStorageID(), storageID);
+    assertEquals(volume.getClusterID(), clusterID);
+    assertEquals(volume.getDatanodeUuid(), datanodeUuid);
+    assertEquals(volume.getCTime(), cTime);
+    assertEquals(volume.getLayoutVersion(), layoutVersion);
+  }
+
+  @Test
   public void testHddsVolumeInitialization() throws Exception {
     HddsVolume volume = volumeBuilder.build();
 
@@ -102,6 +132,102 @@ public class TestHddsVolume {
         versionFile.exists());
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
+
+    // Shutdown the volume.
+    volume.shutdown();
+  }
+
+  @Test
+  public void testCreateVolumeTmpDirs() throws Exception {
+    // Set up volume.
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    // All temp directories should have been created.
+    assertTrue(volume.getTmpDir().exists());
+    assertTrue(volume.getDeletedContainerDir().exists());
+    assertTrue(volume.getDiskCheckDir().exists());
+
+    volume.shutdown();
+    // tmp directories should still exist after shutdown. This is not
+    // checking their contents.
+    assertTrue(volume.getTmpDir().exists());
+    assertTrue(volume.getDeletedContainerDir().exists());
+    assertTrue(volume.getDiskCheckDir().exists());
+  }
+
+  @Test
+  public void testClearDeletedContainersDir() throws Exception {
+    // Set up volume.
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    File tmpDir = volume.getHddsRootDir().toPath()
+        .resolve(Paths.get(CLUSTER_ID, StorageVolume.TMP_DIR_NAME)).toFile();
+
+    // Simulate a container that failed to delete fully from the deleted
+    // containers directory.
+    File tmpDeleteDir = new File(tmpDir,
+        HddsVolume.TMP_CONTAINER_DELETE_DIR_NAME);
+    File leftoverContainer = new File(tmpDeleteDir, "1");
+    assertTrue(leftoverContainer.mkdirs());
+
+    // Check that tmp dirs are created with expected names.
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
+    assertEquals(tmpDir, volume.getTmpDir());
+    assertEquals(tmpDeleteDir, volume.getDeletedContainerDir());
+
+    // Cleanup should have removed the partial container without removing the
+    // delete directory itself.
+    assertFalse(leftoverContainer.exists());
+    assertTrue(tmpDeleteDir.exists());
+
+    // Re-create the partial container.
+    assertTrue(leftoverContainer.mkdir());
+
+    volume.shutdown();
+    // It should be cleared again on shutdown.
+    assertFalse(leftoverContainer.exists());
+    assertTrue(tmpDeleteDir.exists());
+  }
+
+  @Test
+  public void testClearVolumeHealthCheckDir() throws Exception {
+    // Set up volume.
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    File tmpDir = volume.getHddsRootDir().toPath()
+        .resolve(Paths.get(CLUSTER_ID, StorageVolume.TMP_DIR_NAME)).toFile();
+
+    // Simulate a leftover disk check file that failed to delete.
+    File tmpDiskCheckDir = new File(tmpDir,
+        StorageVolume.TMP_DISK_CHECK_DIR_NAME);
+    assertTrue(tmpDiskCheckDir.mkdirs());
+    File leftoverDiskCheckFile = new File(tmpDiskCheckDir, "diskcheck");
+    assertTrue(leftoverDiskCheckFile.createNewFile());
+
+    // Check that tmp dirs are created with expected names.
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
+    assertEquals(tmpDir, volume.getTmpDir());
+    assertEquals(tmpDiskCheckDir, volume.getDiskCheckDir());
+
+    // Cleanup should have removed the leftover disk check file without
+    // removing the directory itself.
+    assertFalse(leftoverDiskCheckFile.exists());
+    assertTrue(tmpDiskCheckDir.exists());
+
+    // Re-create the disk check file
+    assertTrue(leftoverDiskCheckFile.createNewFile());
+
+    volume.shutdown();
+    // It should be cleared again on shutdown.
+    assertFalse(leftoverDiskCheckFile.exists());
+    assertTrue(tmpDiskCheckDir.exists());
   }
 
   @Test
@@ -327,14 +453,13 @@ public class TestHddsVolume {
         CONTAINER_DB_NAME);
     assertTrue(containerDBFile.exists());
     assertNotNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+        containerDBFile.getAbsolutePath(), CONF));
 
     // Make it a bad volume
     volume.failVolume();
 
     // The db should be removed from cache
-    assertNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+    assertEquals(0, DatanodeStoreCache.getInstance().size());
   }
 
   @Test
@@ -361,14 +486,51 @@ public class TestHddsVolume {
         CONTAINER_DB_NAME);
     assertTrue(containerDBFile.exists());
     assertNotNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+        containerDBFile.getAbsolutePath(), CONF));
 
     // Make it a bad volume
     volume.failVolume();
 
     // The db should be removed from cache
-    assertNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+    assertEquals(0, DatanodeStoreCache.getInstance().size());
+  }
+
+  @Test
+  public void testFailedVolumeSpace() throws IOException {
+    // Build failed volume
+    HddsVolume volume = volumeBuilder.failedVolume(true).build();
+    VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
+
+    try {
+      // In case of failed volume all stats should return 0.
+      assertEquals(0, volumeInfoMetrics.getUsed());
+      assertEquals(0, volumeInfoMetrics.getAvailable());
+      assertEquals(0, volumeInfoMetrics.getCapacity());
+      assertEquals(0, volumeInfoMetrics.getReserved());
+      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
+    } finally {
+      // Shutdown the volume.
+      volume.shutdown();
+    }
+  }
+
+  @Test
+  public void testDBDirFailureDetected() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    VolumeCheckResult result = volume.check(false);
+    assertEquals(VolumeCheckResult.HEALTHY, result);
+
+    File dbFile = new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
+    FileUtils.deleteDirectory(dbFile);
+
+    result = volume.check(false);
+    assertEquals(VolumeCheckResult.FAILED, result);
+
+    volume.shutdown();
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {

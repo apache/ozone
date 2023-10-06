@@ -17,24 +17,25 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyRatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,16 +44,14 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.mockito.Mockito.reset;
 
 /**
  * Tests to ensure the DatanodeAdminMonitor is working correctly. This class
@@ -64,7 +63,8 @@ public class TestDatanodeAdminMonitor {
   private SimpleMockNodeManager nodeManager;
   private OzoneConfiguration conf;
   private DatanodeAdminMonitorImpl monitor;
-  private DatanodeAdminHandler startAdminHandler;
+  private DatanodeAdminMonitorTestUtil
+          .DatanodeAdminHandler startAdminHandler;
   private ReplicationManager repManager;
   private EventQueue eventQueue;
 
@@ -73,7 +73,8 @@ public class TestDatanodeAdminMonitor {
     conf = new OzoneConfiguration();
 
     eventQueue = new EventQueue();
-    startAdminHandler = new DatanodeAdminHandler();
+    startAdminHandler = new DatanodeAdminMonitorTestUtil
+            .DatanodeAdminHandler();
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE, startAdminHandler);
 
     nodeManager = new SimpleMockNodeManager();
@@ -82,6 +83,7 @@ public class TestDatanodeAdminMonitor {
 
     monitor =
         new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager, repManager);
+    monitor.setMetrics(NodeDecommissionMetrics.create());
   }
 
   @Test
@@ -173,11 +175,13 @@ public class TestDatanodeAdminMonitor {
     nodeManager.setContainers(dn1, generateContainers(3));
     // Mock Replication Manager to return ContainerReplicaCount's which
     // always have a DECOMMISSIONED replica.
-    mockGetContainerReplicaCount(
-        HddsProtos.LifeCycleState.CLOSED,
-        DECOMMISSIONED,
-        IN_SERVICE,
-        IN_SERVICE);
+    DatanodeAdminMonitorTestUtil
+            .mockGetContainerReplicaCount(
+                    repManager,
+                    HddsProtos.LifeCycleState.CLOSED,
+                    DECOMMISSIONED,
+                    IN_SERVICE,
+                    IN_SERVICE);
 
     // Run the monitor for the first time and the node will transition to
     // REPLICATE_CONTAINERS as there are no pipelines to close.
@@ -197,11 +201,149 @@ public class TestDatanodeAdminMonitor {
     // Now change the replicationManager mock to return 3 CLOSED replicas
     // and the node should complete the REPLICATE_CONTAINERS step, moving to
     // complete which will end the decommission workflow
-    mockGetContainerReplicaCount(
-        HddsProtos.LifeCycleState.CLOSED,
-        IN_SERVICE,
-        IN_SERVICE,
-        IN_SERVICE);
+    DatanodeAdminMonitorTestUtil
+            .mockGetContainerReplicaCount(
+                    repManager,
+                    HddsProtos.LifeCycleState.CLOSED,
+                    IN_SERVICE,
+                    IN_SERVICE,
+                    IN_SERVICE);
+
+    monitor.run();
+
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  /**
+   * Situation: A QUASI_CLOSED container has an UNHEALTHY replica with the
+   * greatest BCSID, and three QUASI_CLOSED replicas with a smaller BCSID. The
+   * UNHEALTHY container is on a decommissioning node, and there are no other
+   * copies of this replica, that is, replicas with the same Origin ID as
+   * this replica.
+   *
+   * Expectation: Decommissioning should not complete until the UNHEALTHY
+   * replica has been replicated to another node.
+   *
+   * Note: This test currently uses the LegacyReplicationManager, as the new
+   * one doesn't support this behaviour yet.
+   * @throws NodeNotFoundException
+   * @throws ContainerNotFoundException
+   */
+  @Test
+  public void testDecommissionWaitsForUnhealthyReplicaToReplicate()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    // create 3 QUASI_CLOSED replicas with containerID 1 and same origin ID
+    ContainerID containerID = ContainerID.valueOf(1);
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithSameOrigin(containerID,
+            State.QUASI_CLOSED, 0, 0, 0);
+
+    // the container's sequence id is greater than the healthy replicas'
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE), containerID.getId(),
+        HddsProtos.LifeCycleState.QUASI_CLOSED,
+        replicas.iterator().next().getSequenceId() + 1);
+    // UNHEALTHY replica is on a unique origin and has same sequence id as
+    // the container
+    ContainerReplica unhealthy =
+        ReplicationTestUtil.createContainerReplica(containerID, 0,
+            dn1.getPersistedOpState(), State.UNHEALTHY,
+            container.getNumberOfKeys(), container.getUsedBytes(), dn1,
+            dn1.getUuid(), container.getSequenceId());
+    replicas.add(unhealthy);
+    nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
+
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+        .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
+            0, 0, 3, 2));
+
+    // start monitoring dn1
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Running the monitor again causes it to remain DECOMMISSIONING
+    // as nothing has changed.
+    monitor.run();
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // add a copy of the UNHEALTHY replica on a new node, dn1 should get
+    // decommissioned now
+    ContainerReplica copyOfUnhealthyOnNewNode = unhealthy.toBuilder()
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .build();
+    replicas.add(copyOfUnhealthyOnNewNode);
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+        .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
+            0, 0, 3, 2));
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  @Test
+  public void testDecommissionNodeWithUnrecoverableECContainer()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(1));
+    // Mock Replication Manager to return ContainerReplicaCount's which
+    // always have a DECOMMISSIONED replica.
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCountForEC(
+            repManager,
+            HddsProtos.LifeCycleState.CLOSED,
+            new ECReplicationConfig(3, 2),
+            Triple.of(DECOMMISSIONING, dn1, 1),
+            Triple.of(IN_SERVICE,
+                MockDatanodeDetails.randomDatanodeDetails(), 2));
+
+    // Run the monitor for the first time and the node will transition to
+    // REPLICATE_CONTAINERS as there are no pipelines to close.
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    DatanodeDetails node = getFirstTrackedNode();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Running the monitor again causes it to remain DECOMMISSIONING
+    // as nothing has changed.
+    monitor.run();
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Now change the replicationManager mock another copy of the
+    // decommissioning replica on an IN_SERVICE node and the node should
+    // complete the REPLICATE_CONTAINERS step, moving to complete which will end
+    // the decommission workflow
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCountForEC(
+            repManager,
+            HddsProtos.LifeCycleState.CLOSED,
+            new ECReplicationConfig(3, 2),
+            Triple.of(DECOMMISSIONING, dn1, 1),
+            Triple.of(IN_SERVICE,
+                MockDatanodeDetails.randomDatanodeDetails(), 2),
+            Triple.of(IN_SERVICE,
+                MockDatanodeDetails.randomDatanodeDetails(), 1));
 
     monitor.run();
 
@@ -219,11 +361,13 @@ public class TestDatanodeAdminMonitor {
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
-    mockGetContainerReplicaCount(
-        HddsProtos.LifeCycleState.CLOSED,
-        DECOMMISSIONED,
-        IN_SERVICE,
-        IN_SERVICE);
+    DatanodeAdminMonitorTestUtil
+            .mockGetContainerReplicaCount(
+                    repManager,
+                    HddsProtos.LifeCycleState.CLOSED,
+                    DECOMMISSIONED,
+                    IN_SERVICE,
+                    IN_SERVICE);
 
     // Add the node to the monitor, it should have 3 under-replicated containers
     // after the first run
@@ -254,9 +398,13 @@ public class TestDatanodeAdminMonitor {
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
-    mockGetContainerReplicaCount(
-        HddsProtos.LifeCycleState.CLOSED,
-        DECOMMISSIONED, IN_SERVICE, IN_SERVICE);
+    DatanodeAdminMonitorTestUtil
+            .mockGetContainerReplicaCount(
+                    repManager,
+                    HddsProtos.LifeCycleState.CLOSED,
+                    DECOMMISSIONED,
+                    IN_SERVICE,
+                    IN_SERVICE);
 
     // Add the node to the monitor, it should have 3 under-replicated containers
     // after the first run
@@ -344,11 +492,13 @@ public class TestDatanodeAdminMonitor {
             HddsProtos.NodeState.HEALTHY));
 
     nodeManager.setContainers(dn1, generateContainers(3));
-    mockGetContainerReplicaCount(
-        HddsProtos.LifeCycleState.CLOSED,
-        IN_MAINTENANCE,
-        ENTERING_MAINTENANCE,
-        IN_MAINTENANCE);
+    DatanodeAdminMonitorTestUtil
+            .mockGetContainerReplicaCount(
+                    repManager,
+                    HddsProtos.LifeCycleState.CLOSED,
+                    IN_MAINTENANCE,
+                    ENTERING_MAINTENANCE,
+                    IN_MAINTENANCE);
 
     // Add the node to the monitor, it should transiting to
     // REPLICATE_CONTAINERS as the containers are under-replicated for
@@ -433,51 +583,6 @@ public class TestDatanodeAdminMonitor {
   }
 
   /**
-   * Create a ContainerReplicaCount object, including a container with the
-   * requested ContainerID and state, along with a set of replicas of the given
-   * states.
-   * @param containerID The ID of the container to create an included
-   * @param containerState The state of the container
-   * @param states Create a replica for each of the given states.
-   * @return A ContainerReplicaCount containing the generated container and
-   *         replica set
-   */
-  private ContainerReplicaCount generateReplicaCount(ContainerID containerID,
-      HddsProtos.LifeCycleState containerState,
-      HddsProtos.NodeOperationalState...states) {
-    Set<ContainerReplica> replicas = new HashSet<>();
-    for (HddsProtos.NodeOperationalState s : states) {
-      replicas.add(generateReplica(containerID, s, CLOSED));
-    }
-    ContainerInfo container = new ContainerInfo.Builder()
-        .setContainerID(containerID.getId())
-        .setState(containerState)
-        .build();
-
-    return new RatisContainerReplicaCount(container, replicas, 0, 0, 3, 2);
-  }
-
-  /**
-   * Generate a new ContainerReplica with the given containerID and State.
-   * @param containerID The ID the replica is associated with
-   * @param nodeState The persistedOpState stored in datanodeDetails.
-   * @param replicaState The state of the generated replica.
-   * @return A containerReplica with the given ID and state
-   */
-  private ContainerReplica generateReplica(ContainerID containerID,
-      HddsProtos.NodeOperationalState nodeState,
-      ContainerReplicaProto.State replicaState) {
-    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-    dn.setPersistedOpState(nodeState);
-    return ContainerReplica.newBuilder()
-        .setContainerState(replicaState)
-        .setContainerID(containerID)
-        .setSequenceId(1)
-        .setDatanodeDetails(dn)
-        .build();
-  }
-
-  /**
    * Helper method to get the first node from the set of trackedNodes within
    * the monitor.
    * @return DatanodeAdminNodeDetails for the first tracked node found.
@@ -485,48 +590,5 @@ public class TestDatanodeAdminMonitor {
   private DatanodeDetails getFirstTrackedNode() {
     return
         monitor.getTrackedNodes().toArray(new DatanodeDetails[0])[0];
-  }
-
-  /**
-   * The only interaction the DatanodeAdminMonitor has with the
-   * ReplicationManager, is to request a ContainerReplicaCount object for each
-   * container on nodes being deocmmissioned or moved to maintenance. This
-   * method mocks that interface to return a ContainerReplicaCount with a
-   * container in the given containerState and a set of replias in the given
-   * replicaStates.
-   * @param containerState
-   * @param replicaStates
-   * @throws ContainerNotFoundException
-   */
-  private void mockGetContainerReplicaCount(
-      HddsProtos.LifeCycleState containerState,
-      HddsProtos.NodeOperationalState...replicaStates)
-      throws ContainerNotFoundException {
-    reset(repManager);
-    Mockito.when(repManager.getContainerReplicaCount(
-        Mockito.any(ContainerID.class)))
-        .thenAnswer(invocation ->
-            generateReplicaCount((ContainerID)invocation.getArguments()[0],
-                containerState, replicaStates));
-  }
-
-  /**
-   * This simple internal class is used to track and handle any DatanodeAdmin
-   * events fired by the DatanodeAdminMonitor during tests.
-   */
-  private static class DatanodeAdminHandler implements
-      EventHandler<DatanodeDetails> {
-
-    private AtomicInteger invocation = new AtomicInteger(0);
-
-    @Override
-    public void onMessage(final DatanodeDetails dn,
-                          final EventPublisher publisher) {
-      invocation.incrementAndGet();
-    }
-
-    public int getInvocation() {
-      return invocation.get();
-    }
   }
 }

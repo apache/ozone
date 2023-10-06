@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -51,6 +50,12 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
+  protected long getNamespaceCount() {
+    // parent directory count which is also created
+    return 5L;
+  }
+
+  @Override
   protected void addVolumeAndBucket(String volumeName, String bucketName)
       throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -66,14 +71,14 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
     // add parentDir to dirTable
     long parentID = getParentID(volumeName, bucketName, keyName);
-    long txnId = 50;
+    long txnId = 2;
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+                    Time.now(), true);
 
     // add key to openFileTable
     String fileName = OzoneFSUtils.getFileName(keyName);
@@ -81,22 +86,6 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, omKeyInfoFSO.getObjectID(),
             omMetadataManager);
-  }
-
-  @Override
-  protected String getMultipartKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) throws IOException {
-    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-            omMetadataManager, volumeName,
-            bucketName, keyName, 0);
-
-    Assert.assertNotNull("key not found in DB!", keyStatus);
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
-    return omMetadataManager.getMultipartKey(volumeId, bucketId,
-            keyStatus.getKeyInfo().getParentObjectID(),
-            keyStatus.getTrimmedName(), multipartUploadID);
   }
 
   private long getParentID(String volumeName, String bucketName,

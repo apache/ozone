@@ -54,7 +54,7 @@ Static list can be configured with the help of ```TableMapping```:
 </property>
 ```
 
-The second configuration option should point to a text file. The file format is a two column text file, with columns separated by whitespace. The first column is a DNS or IP address and the second column specifies the rack where the address maps. If no entry corresponding to a host in the cluster is found, then `/default-rack` is assumed. 
+The second configuration option should point to a text file. The file format is a two column text file, with columns separated by whitespace. The first column is IP address and the second column specifies the rack where the address maps. If no entry corresponding to a host in the cluster is found, then `/default-rack` is assumed. 
 
 ### Dynamic list 
 

@@ -61,7 +61,7 @@
 
     <!-- Checks whether files end with a new line.                        -->
     <!-- See http://checkstyle.sf.net/config_misc.html#NewlineAtEndOfFile -->
-    <!-- module name="NewlineAtEndOfFile"/-->
+    <module name="NewlineAtEndOfFile"/>
 
     <!-- Checks that property files contain the same keys.         -->
     <!-- See http://checkstyle.sf.net/config_misc.html#Translation -->
@@ -208,5 +208,11 @@
 
         <module name="ModifierOrder"/>
 
+        <module name="Regexp">
+            <property name="format" value="@Test\(.*timeout|=\s*Timeout\.|=\s*new Timeout\("/>
+            <property name="illegalPattern" value="true"/>
+            <property name="message" value="Please use JUnit5AwareTimeout, see HDDS-9361"/>
+        </module>
     </module>
+
 </module>

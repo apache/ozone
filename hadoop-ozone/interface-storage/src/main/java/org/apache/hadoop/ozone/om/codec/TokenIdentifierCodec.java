@@ -27,9 +27,20 @@ import java.io.IOException;
 import java.nio.BufferUnderflowException;
 
 /**
- * Codec to encode TokenIdentifierCodec as byte array.
+ * Codec to serialize/deserialize {@link OzoneTokenIdentifier}.
  */
-public class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
+public final class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
+
+  private static final Codec<OzoneTokenIdentifier> INSTANCE =
+      new TokenIdentifierCodec();
+
+  public static Codec<OzoneTokenIdentifier> get() {
+    return INSTANCE;
+  }
+
+  private TokenIdentifierCodec() {
+    // singleton
+  }
 
   @Override
   public byte[] toPersistedFormat(OzoneTokenIdentifier object) {

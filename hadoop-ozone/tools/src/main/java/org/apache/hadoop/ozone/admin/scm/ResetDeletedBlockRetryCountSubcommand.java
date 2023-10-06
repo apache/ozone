@@ -16,22 +16,32 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
 import picocli.CommandLine;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-
+import java.util.stream.Collectors;
 
 /**
- * Handler of the expired deleted blocks from SCM side.
+ * Handler of resetting expired deleted blocks from SCM side.
  */
 @CommandLine.Command(
-    name = "resetDeletedBlockRetryCount",
-    description = "Reset deleted block transactions whose retry count is -1",
+    name = "reset",
+    description = "Reset the retry count of failed DeletedBlocksTransaction",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
@@ -41,25 +51,52 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
 
   static class TransactionsOption {
     @CommandLine.Option(names = {"-a", "--all"},
-        description = "reset all expired deleted block transaction retry" +
+        description = "Reset all expired deleted block transaction retry" +
             " count from -1 to 0.")
     private boolean resetAll;
 
     @CommandLine.Option(names = {"-l", "--list"},
         split = ",",
-        description = "reset the only given deletedBlock transaction ID" +
-            " list, e.g 100,101,102.(Separated by ',')")
+        paramLabel = "txID",
+        description = "Reset the only given deletedBlock transaction ID" +
+            " list. Example: 100,101,102.(Separated by ',')")
     private List<Long> txList;
-  }
 
-  @CommandLine.ParentCommand
-  private ScmAdmin parent;
+    @CommandLine.Option(names = {"-i", "--in"},
+        description = "Use file as input, need to be JSON Array format and " +
+            "contains multi \"txID\" key. Example: [{\"txID\":1},{\"txID\":2}]")
+    private String fileName;
+  }
 
   @Override
   public void execute(ScmClient client) throws IOException {
     int count;
     if (group.resetAll) {
       count = client.resetDeletedBlockRetryCount(new ArrayList<>());
+    } else if (group.fileName != null) {
+      Gson gson = new Gson();
+      List<Long> txIDs;
+      try (InputStream in = new FileInputStream(group.fileName);
+           Reader fileReader = new InputStreamReader(in,
+               StandardCharsets.UTF_8)) {
+        DeletedBlocksTransactionInfoWrapper[] txns = gson.fromJson(fileReader,
+            DeletedBlocksTransactionInfoWrapper[].class);
+        txIDs = Arrays.stream(txns)
+            .map(DeletedBlocksTransactionInfoWrapper::getTxID)
+            .sorted()
+            .distinct()
+            .collect(Collectors.toList());
+        System.out.println("Num of loaded txIDs: " + txIDs.size());
+        if (!txIDs.isEmpty()) {
+          System.out.println("The first loaded txID: " + txIDs.get(0));
+          System.out.println("The last loaded txID: " +
+              txIDs.get(txIDs.size() - 1));
+        }
+      } catch (JsonIOException | JsonSyntaxException | IOException ex) {
+        System.out.println("Cannot parse the file " + group.fileName);
+        throw new IOException(ex);
+      }
+      count = client.resetDeletedBlockRetryCount(txIDs);
     } else {
       if (group.txList == null || group.txList.isEmpty()) {
         System.out.println("TransactionId list should not be empty");

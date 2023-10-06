@@ -53,11 +53,12 @@ public class DatanodeInfo extends DatanodeDetails {
 
   private volatile long lastHeartbeatTime;
   private long lastStatsUpdatedTime;
+  private int failedVolumeCount;
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
   private LayoutVersionProto lastKnownLayoutVersion;
-  private Map<SCMCommandProto.Type, Integer> commandCounts;
+  private final Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
 
@@ -155,9 +156,14 @@ public class DatanodeInfo extends DatanodeDetails {
    * @param reports list of storage report
    */
   public void updateStorageReports(List<StorageReportProto> reports) {
+    final int failedCount = (int) reports.stream()
+        .filter(e -> e.hasFailed() && e.getFailed())
+        .count();
+
     try {
       lock.writeLock().lock();
       lastStatsUpdatedTime = Time.monotonicNow();
+      failedVolumeCount = failedCount;
       storageReports = reports;
     } finally {
       lock.writeLock().unlock();
@@ -215,7 +221,7 @@ public class DatanodeInfo extends DatanodeDetails {
   public int getHealthyVolumeCount() {
     try {
       lock.readLock().lock();
-      return storageReports.size() - getFailedVolumeCount();
+      return storageReports.size() - failedVolumeCount;
     } finally {
       lock.readLock().unlock();
     }
@@ -232,15 +238,6 @@ public class DatanodeInfo extends DatanodeDetails {
     } finally {
       lock.readLock().unlock();
     }
-  }
-
-  /**
-   * Returns count of failed volumes reported from datanode.
-   * @return count of failed volumes
-   */
-  private int getFailedVolumeCount() {
-    return (int) storageReports.stream().
-            filter(e -> e.hasFailed() ? e.getFailed() : false).count();
   }
 
   /**
@@ -286,11 +283,20 @@ public class DatanodeInfo extends DatanodeDetails {
    * Set the current command counts for this datanode, as reported in the last
    * heartbeat.
    * @param cmds Proto message containing a list of command count pairs.
+   * @param commandsToBeSent Summary of commands which will be sent to the DN
+   *                         as the heartbeat is processed and should be added
+   *                         to the command count.
    */
-  public void setCommandCounts(CommandQueueReportProto cmds) {
+  public void setCommandCounts(CommandQueueReportProto cmds,
+      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
     try {
       int count = cmds.getCommandCount();
+      Map<SCMCommandProto.Type, Integer> mutableCmds
+          = new HashMap<>(commandsToBeSent);
       lock.writeLock().lock();
+      // Purge the existing counts, as each report should completely replace
+      // the existing counts.
+      commandCounts.clear();
       for (int i = 0; i < count; i++) {
         SCMCommandProto.Type command = cmds.getCommand(i);
         if (command == SCMCommandProto.Type.unknownScmCommand) {
@@ -305,8 +311,19 @@ public class DatanodeInfo extends DatanodeDetails {
               "Setting it to zero", cmdCount, this);
           cmdCount = 0;
         }
+        cmdCount += mutableCmds.getOrDefault(command, 0);
+        // Each CommandType will be in the report once only. So we remove any
+        // we have seen, so we can add anything the DN has not reported but
+        // there is a command queued for. The DNs should return a count for all
+        // command types even if they have a zero count, so this is really to
+        // handle something being wrong on the DN where it sends a spare report.
+        // It really should never happen.
+        mutableCmds.remove(command);
         commandCounts.put(command, cmdCount);
       }
+      // Add any counts which the DN did not report. See comment above. This
+      // should not happen.
+      commandCounts.putAll(mutableCmds);
     } finally {
       lock.writeLock().unlock();
     }
@@ -322,12 +339,7 @@ public class DatanodeInfo extends DatanodeDetails {
   public int getCommandCount(SCMCommandProto.Type cmd) {
     try {
       lock.readLock().lock();
-      Integer count = commandCounts.get(cmd);
-      if (count == null) {
-        return -1;
-      } else {
-        return count.intValue();
-      }
+      return commandCounts.getOrDefault(cmd, -1);
     } finally {
       lock.readLock().unlock();
     }

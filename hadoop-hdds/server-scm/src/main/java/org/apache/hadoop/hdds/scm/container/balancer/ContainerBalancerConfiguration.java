@@ -93,11 +93,19 @@ public final class ContainerBalancerConfiguration {
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
-  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
+  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "65m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
           "from source to target.")
-  private long moveTimeout = Duration.ofMinutes(30).toMillis();
+  private long moveTimeout = Duration.ofMinutes(65).toMillis();
+
+  @Config(key = "move.replication.timeout", type = ConfigType.TIME,
+      defaultValue = "50m", tags = {ConfigTag.BALANCER}, description = "The " +
+      "amount of time to allow a single container's replication from source " +
+      "to target as part of container move. For example, if \"hdds.container" +
+      ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
+      "50 minutes will be the deadline for replication to complete.")
+  private long moveReplicationTimeout = Duration.ofMinutes(50).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
       defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
@@ -326,6 +334,14 @@ public final class ContainerBalancerConfiguration {
     this.moveTimeout = millis;
   }
 
+  public Duration getMoveReplicationTimeout() {
+    return Duration.ofMillis(moveReplicationTimeout);
+  }
+
+  public void setMoveReplicationTimeout(long millis) {
+    this.moveReplicationTimeout = millis;
+  }
+
   public Duration getBalancingInterval() {
     return Duration.ofMillis(balancingInterval);
   }
@@ -395,7 +411,16 @@ public final class ContainerBalancerConfiguration {
             "%-50s %d%n" +
             "%-50s %dGB%n" +
             "%-50s %dGB%n" +
-            "%-50s %dGB%n", "Key", "Value", "Threshold",
+            "%-50s %dGB%n" +
+            "%-50s %d%n" +
+            "%-50s %dmin%n" +
+            "%-50s %dmin%n" +
+            "%-50s %dmin%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n" +
+            "%-50s %s%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(percent)",
         maxDatanodesPercentageToInvolvePerIteration,
         "Max Size to Move per Iteration",
@@ -403,7 +428,25 @@ public final class ContainerBalancerConfiguration {
         "Max Size Entering Target per Iteration",
         maxSizeEnteringTarget / OzoneConsts.GB,
         "Max Size Leaving Source per Iteration",
-        maxSizeLeavingSource / OzoneConsts.GB);
+        maxSizeLeavingSource / OzoneConsts.GB,
+        "Number of Iterations",
+        iterations,
+        "Time Limit for Single Container's Movement",
+        Duration.ofMillis(moveTimeout).toMinutes(),
+        "Time Limit for Single Container's Replication",
+        Duration.ofMillis(moveReplicationTimeout).toMinutes(),
+        "Interval between each Iteration",
+        Duration.ofMillis(balancingInterval).toMinutes(),
+        "Whether to Enable Network Topology",
+        networkTopologyEnable,
+        "Whether to Trigger Refresh Datanode Usage Info",
+        triggerDuEnable,
+        "Container IDs to Exclude from Balancing",
+        excludeContainers.equals("") ? "None" : excludeContainers,
+        "Datanodes Specified to be Balanced",
+        includeNodes.equals("") ? "None" : includeNodes,
+        "Datanodes Excluded from Balancing",
+        excludeNodes.equals("") ? "None" : excludeNodes);
   }
 
   ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -423,7 +466,8 @@ public final class ContainerBalancerConfiguration {
         .setIncludeDatanodes(includeNodes)
         .setExcludeDatanodes(excludeNodes)
         .setMoveNetworkTopologyEnable(networkTopologyEnable)
-        .setTriggerDuBeforeMoveEnable(triggerDuEnable);
+        .setTriggerDuBeforeMoveEnable(triggerDuEnable)
+        .setMoveReplicationTimeout(moveReplicationTimeout);
     return builder;
   }
 
@@ -471,6 +515,9 @@ public final class ContainerBalancerConfiguration {
     }
     if (proto.hasTriggerDuBeforeMoveEnable()) {
       config.setTriggerDuEnable(proto.getTriggerDuBeforeMoveEnable());
+    }
+    if (proto.hasMoveReplicationTimeout()) {
+      config.setMoveReplicationTimeout(proto.getMoveReplicationTimeout());
     }
     return config;
   }

@@ -1,7 +1,10 @@
 ---
 title: "安全化 Datanode"
 date: "2019-April-03"
-weight: 2
+weight: 3
+menu:
+  main:
+    parent: 安全
 summary:  解释安全化 datanode 的不同模式，包括 Kerberos、证书的手动颁发和自动颁发等。
 icon: th
 ---

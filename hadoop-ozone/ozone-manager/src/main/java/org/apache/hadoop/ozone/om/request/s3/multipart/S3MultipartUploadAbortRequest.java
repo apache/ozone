@@ -19,14 +19,13 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -170,11 +169,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
-      Iterator iter =
-          multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
-      while (iter.hasNext()) {
-        Map.Entry entry = (Map.Entry)iter.next();
-        PartKeyInfo iterPartKeyInfo = (PartKeyInfo)entry.getValue();
+      for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
         quotaReleased += QuotaUtil.getReplicatedSize(
             iterPartKeyInfo.getPartKeyInfo().getDataSize(),
             omKeyInfo.getReplicationConfig());
@@ -186,10 +181,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // in delete table are not used by any read/write operations.
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(multipartOpenKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
       omMetadataManager.getMultipartInfoTable()
           .addCacheEntry(new CacheKey<>(multipartKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);
@@ -256,10 +251,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   protected String getMultipartOpenKey(String multipartUploadID,
       String volumeName, String bucketName, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-
-    String multipartKey = omMetadataManager.getMultipartKey(
-        volumeName, bucketName, keyName, multipartUploadID);
-    return multipartKey;
+    return OMMultipartUploadUtils.getMultipartOpenKey(
+        volumeName, bucketName, keyName, multipartUploadID, omMetadataManager,
+        getBucketLayout());
   }
 
   @RequestFeatureValidator(

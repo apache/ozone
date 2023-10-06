@@ -24,6 +24,9 @@ ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
 ${KEY_NAME}                    key1
+${OZONE_S3_TESTS_SET_UP}       ${FALSE}
+${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
+${OZONE_S3_ADDRESS_STYLE}      path
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -34,6 +37,11 @@ Execute AWSS3APICli
 Execute AWSS3APICli and checkrc
     [Arguments]       ${command}                 ${expected_error_code}
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}
+    [return]          ${output}
+
+Execute AWSS3APICli and ignore error
+    [Arguments]       ${command}
+    ${output} =       Execute And Ignore Error   aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
 Execute AWSS3Cli
@@ -65,7 +73,9 @@ Setup v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
 
 Setup secure v4 headers
-    ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
+    ${result} =         Execute and Ignore error             ozone s3 getsecret ${OM_HA_PARAM}
+    ${output} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
+    Return From Keyword if      ${output}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
     ${accessKey} =      Get Variable Value         ${accessKey}  testuser
@@ -76,12 +86,21 @@ Setup secure v4 headers
                         Execute                    aws configure set aws_access_key_id ${accessKey}
                         Execute                    aws configure set aws_secret_access_key ${secret}
                         Execute                    aws configure set region us-west-1
+                        Execute                    aws configure set default.s3.addressing_style ${OZONE_S3_ADDRESS_STYLE}
+
 
 Setup dummy credentials for S3
                         Execute                    aws configure set default.s3.signature_version s3v4
                         Execute                    aws configure set aws_access_key_id dlfknslnfslf
                         Execute                    aws configure set aws_secret_access_key dlfknslnfslf
                         Execute                    aws configure set region us-west-1
+
+Save AWS access key
+    ${OZONE_AWS_ACCESS_KEY_ID} =      Execute     aws configure get aws_access_key_id
+    Set Test Variable     ${OZONE_AWS_ACCESS_KEY_ID}
+
+Restore AWS access key
+    Execute    aws configure set aws_access_key_id ${OZONE_AWS_ACCESS_KEY_ID}
 
 Generate Ozone String
     ${randStr} =         Generate Random String     10  [NUMBERS]
@@ -98,17 +117,28 @@ Create bucket with name
     ${result} =          Execute AWSS3APICli  create-bucket --bucket ${bucket}
                          Should contain              ${result}         Location
                          Should contain              ${result}         ${bucket}
+Create legacy bucket
+    ${postfix} =         Generate Ozone String
+    ${legacy_bucket} =   Set Variable               legacy-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l LEGACY s3v/${legacy_bucket}   0
+    [Return]             ${legacy_bucket}
+
+Create obs bucket
+    ${postfix} =         Generate Ozone String
+    ${bucket} =   Set Variable               obs-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l OBJECT_STORE s3v/${bucket}   0
+    [Return]             ${bucket}
 
 Setup s3 tests
+    Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}
     Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
-    ...                ELSE                                      Set Variable    ${BUCKET}
-                       Set Suite Variable                        ${BUCKET}
-                       Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
-                       Run Keyword if                            '${BUCKET}' == 'encrypted'            Create encrypted bucket
-                       Run Keyword if                            '${BUCKET}' == 'erasure'              Create EC bucket
+    Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket
+    Run Keyword if    '${BUCKET}' == 'link'                 Setup links for S3 tests
+    Run Keyword if    '${BUCKET}' == 'encrypted'            Create encrypted bucket
+    Run Keyword if    '${BUCKET}' == 'erasure'              Create EC bucket
+    Set Global Variable  ${OZONE_S3_TESTS_SET_UP}    ${TRUE}
 
 Setup links for S3 tests
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
@@ -116,6 +146,10 @@ Setup links for S3 tests
     Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
     Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
     Create link        link
+
+Create generated bucket
+    ${BUCKET} =          Create bucket
+    Set Global Variable   ${BUCKET}
 
 Create encrypted bucket
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
@@ -135,7 +169,7 @@ Create EC bucket
 
 Generate random prefix
     ${random} =          Generate Ozone String
-                         Set Suite Variable  ${PREFIX}  ${random}
+                         Set Global Variable  ${PREFIX}  ${random}
 
 Perform Multipart Upload
     [arguments]    ${bucket}    ${key}    @{files}

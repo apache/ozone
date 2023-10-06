@@ -22,14 +22,20 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -48,6 +54,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+
+import static org.junit.Assert.assertThrows;
 
 /**
  * Class tests OMKeyCommitRequest class.
@@ -78,11 +86,17 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, omKeyCommitRequest.getBucketLayout());
 
-    String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList);
+    String ozoneKey = getOzonePathKey();
+
+    OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(
+                    omKeyCommitRequest.getBucketLayout()).get(openKey);
+    Assert.assertNotNull(omKeyInfo);
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
-    OmKeyInfo omKeyInfo =
+    omKeyInfo =
         omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
             .get(ozoneKey);
 
@@ -98,7 +112,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // Entry should be deleted from openKey Table.
     omKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout())
-            .get(ozoneKey);
+            .get(openKey);
     Assert.assertNull(omKeyInfo);
 
     // Now entry should be created in key Table.
@@ -140,11 +154,17 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, omKeyCommitRequest.getBucketLayout());
 
-    String ozoneKey = addKeyToOpenKeyTable(allocatedLocationList);
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList);
+    String ozoneKey = getOzonePathKey();
+
+    OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(
+                    omKeyCommitRequest.getBucketLayout()).get(openKey);
+    Assert.assertNotNull(omKeyInfo);
 
     // Key should not be there in key table, as validateAndUpdateCache is
     // still not called.
-    OmKeyInfo omKeyInfo =
+    omKeyInfo =
         omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
             .get(ozoneKey);
 
@@ -160,14 +180,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // Entry should be deleted from openKey Table.
     omKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout())
-            .get(ozoneKey);
+            .get(openKey);
     Assert.assertNull(omKeyInfo);
 
     // Now entry should be created in key Table.
     omKeyInfo =
         omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
             .get(ozoneKey);
-
     Assert.assertNotNull(omKeyInfo);
     // DB keyInfo format
     verifyKeyName(omKeyInfo);
@@ -188,6 +207,196 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omKeyInfo.getLatestVersionLocations().getLocationList());
     Assert.assertEquals(allocatedLocationList,
         omKeyInfo.getLatestVersionLocations().getLocationList());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithUncommittedBlocks()
+      throws Exception {
+
+    // allocated block list
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(5);
+
+    List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    // committed block list, with three blocks different with the allocated
+    List<KeyLocation> committedKeyLocationList = getKeyLocation(3);
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
+        committedKeyLocationList, false));
+
+    OMKeyCommitRequest omKeyCommitRequest =
+        getOmKeyCommitRequest(modifiedOmRequest);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
+
+    String openKey = addKeyToOpenKeyTable(allocatedBlockList);
+    String ozoneKey = getOzonePathKey();
+
+    OmKeyInfo omKeyInfo =
+            omMetadataManager.getOpenKeyTable(
+                    omKeyCommitRequest.getBucketLayout()).get(openKey);
+    Assert.assertNotNull(omKeyInfo);
+
+    // Key should not be there in key table, as validateAndUpdateCache is
+    // still not called.
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
+
+    Assert.assertNull(omKeyInfo);
+
+    OMClientResponse omClientResponse =
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
+            100L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    Map<String, RepeatedOmKeyInfo> toDeleteKeyList
+        = ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
+
+    // This is the first time to commit key, only the allocated but uncommitted
+    // blocks should be deleted.
+    Assert.assertEquals(1, toDeleteKeyList.size());
+    Assert.assertEquals(2, toDeleteKeyList.values().stream().findFirst().get()
+        .cloneOmKeyInfoList().get(0).getKeyLocationVersions().get(0)
+        .getLocationList().size());
+
+    // Entry should be deleted from openKey Table.
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(openKey);
+    Assert.assertNull(omKeyInfo);
+
+    // Now entry should be created in key Table.
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
+
+    Assert.assertNotNull(omKeyInfo);
+
+    // DB keyInfo format
+    verifyKeyName(omKeyInfo);
+
+    // Check modification time
+    CommitKeyRequest commitKeyRequest = modifiedOmRequest.getCommitKeyRequest();
+    Assert.assertEquals(commitKeyRequest.getKeyArgs().getModificationTime(),
+        omKeyInfo.getModificationTime());
+
+    // Check block location.
+    List<OmKeyLocationInfo> locationInfoListFromCommitKeyRequest =
+        commitKeyRequest.getKeyArgs()
+            .getKeyLocationsList().stream()
+            .map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList());
+
+    List<OmKeyLocationInfo> intersection = new ArrayList<>(allocatedBlockList);
+    intersection.retainAll(locationInfoListFromCommitKeyRequest);
+
+    // Key table should have three blocks.
+    Assert.assertEquals(intersection,
+        omKeyInfo.getLatestVersionLocations().getLocationList());
+    Assert.assertEquals(3, intersection.size());
+
+  }
+
+  @Test
+  public void testRejectHsyncIfNotEnabled() throws Exception {
+    OzoneConfiguration conf = ozoneManager.getConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
+    BucketLayout bucketLayout = getBucketLayout();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+
+    // hsync should throw OMException
+    assertThrows(OMException.class, () ->
+        doKeyCommit(true, allocatedKeyLocationList.subList(0, 5)));
+
+    // Regular key commit should still work
+    doKeyCommit(false, allocatedKeyLocationList.subList(0, 5));
+
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+  }
+
+  @Test
+  public void testCommitWithHsyncIncrementalUsages() throws Exception {
+    BucketLayout bucketLayout = getBucketLayout();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .get(bucketKey);
+    long usedBytes = bucketInfo.getUsedBytes();
+
+    // 1st commit of 3 blocks, HSync = true
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap =
+        doKeyCommit(true, allocatedKeyLocationList.subList(0, 3));
+    Assert.assertNull(keyToDeleteMap);
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long firstCommitUsedBytes = bucketInfo.getUsedBytes();
+    Assert.assertEquals(300, firstCommitUsedBytes - usedBytes);
+
+    // 2nd commit of 6 blocks, HSync = true
+    keyToDeleteMap = doKeyCommit(true, allocatedKeyLocationList.subList(0, 6));
+    Assert.assertNull(keyToDeleteMap);
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long secondCommitUsedBytes = bucketInfo.getUsedBytes();
+    Assert.assertEquals(600, secondCommitUsedBytes - usedBytes);
+
+    // 3rd and final commit of all 10 blocks, HSync = false
+    keyToDeleteMap = doKeyCommit(false, allocatedKeyLocationList);
+    // keyToDeleteMap should be null / empty because none of the previous blocks
+    // should be deleted.
+    Assert.assertTrue(keyToDeleteMap == null || keyToDeleteMap.isEmpty());
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long thirdCommitUsedBytes = bucketInfo.getUsedBytes();
+    Assert.assertEquals(1000, thirdCommitUsedBytes - usedBytes);
+  }
+
+  private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
+      List<KeyLocation> keyLocations) throws Exception {
+    // allocated block list
+    dataSize = keyLocations.size() * 100;
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
+        keyLocations, isHSync));
+    OMKeyCommitRequest omKeyCommitRequest =
+        getOmKeyCommitRequest(modifiedOmRequest);
+
+    List<OmKeyLocationInfo> allocatedBlockList = keyLocations
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+    String openKey = addKeyToOpenKeyTable(allocatedBlockList);
+    String ozoneKey = getOzonePathKey();
+    
+    OMClientResponse omClientResponse =
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
+            100L, ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // Key should be present in both OpenKeyTable and KeyTable with HSync commit
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(
+            omKeyCommitRequest.getBucketLayout()).get(openKey);
+    if (isHSync) {
+      Assert.assertNotNull(omKeyInfo);
+    } else {
+      // Key should not exist in OpenKeyTable anymore with non-HSync commit
+      Assert.assertNull(omKeyInfo);
+    }
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
+    Assert.assertNotNull(omKeyInfo);
+
+    return ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
   }
 
   @Test
@@ -466,19 +675,28 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         modifiedKeyArgs.getFactor());
   }
 
+  private OMRequest createCommitKeyRequest() {
+    return createCommitKeyRequest(false);
+  }
+
+  private OMRequest createCommitKeyRequest(boolean isHsync) {
+    return createCommitKeyRequest(getKeyLocation(5), isHsync);
+  }
+
   /**
    * Create OMRequest which encapsulates CommitKeyRequest.
    */
-  private OMRequest createCommitKeyRequest() {
+  private OMRequest createCommitKeyRequest(
+      List<KeyLocation> keyLocations, boolean isHsync) {
     KeyArgs keyArgs =
         KeyArgs.newBuilder().setDataSize(dataSize).setVolumeName(volumeName)
             .setKeyName(keyName).setBucketName(bucketName)
             .setType(replicationType).setFactor(replicationFactor)
-            .addAllKeyLocations(getKeyLocation(5)).build();
+            .addAllKeyLocations(keyLocations).build();
 
     CommitKeyRequest commitKeyRequest =
         CommitKeyRequest.newBuilder().setKeyArgs(keyArgs)
-            .setClientID(clientID).build();
+            .setClientID(clientID).setHsync(isHsync).build();
 
     return OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
@@ -521,7 +739,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         clientID, replicationType, replicationFactor, omMetadataManager,
         locationList, version);
 
-    return getOzonePathKey();
+    return omMetadataManager.getOpenKey(volumeName, bucketName,
+              keyName, clientID);
   }
 
   @NotNull

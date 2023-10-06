@@ -87,12 +87,14 @@ public class TestXceiverClientGrpc {
   @Timeout(5)
   public void testRandomFirstNodeIsCommandTarget() throws IOException {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    conf.setBoolean(
+            OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
     // Using a new Xceiver Client, call it repeatedly until all DNs in the
     // pipeline have been the target of the command, indicating it is shuffling
     // the DNs on each call with a new client. This test will timeout if this
     // is not happening.
     while (allDNs.size() > 0) {
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
@@ -100,9 +102,52 @@ public class TestXceiverClientGrpc {
           allDNs.remove(dn);
           return buildValidResponse();
         }
-      };
-      invokeXceiverClientGetBlock(client);
+      }) {
+        invokeXceiverClientGetBlock(client);
+      }
     }
+  }
+
+  @Test
+  @Timeout(5)
+  public void testGetBlockRetryAlNodes() {
+    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    Assertions.assertTrue(allDNs.size() > 1);
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) throws IOException {
+        allDNs.remove(dn);
+        throw new IOException("Failed " + dn);
+      }
+    }) {
+      invokeXceiverClientGetBlock(client);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    Assertions.assertEquals(0, allDNs.size());
+  }
+
+  @Test
+  @Timeout(5)
+  public void testReadChunkRetryAllNodes() {
+    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    Assertions.assertTrue(allDNs.size() > 1);
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) throws IOException {
+        allDNs.remove(dn);
+        throw new IOException("Failed " + dn);
+      }
+    }) {
+      invokeXceiverClientReadChunk(client);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    Assertions.assertEquals(0, allDNs.size());
   }
 
   @Test
@@ -115,7 +160,7 @@ public class TestXceiverClientGrpc {
     // each time. The logic should always use the sorted node, so we can check
     // only a single DN is ever seen after 100 calls.
     for (int i = 0; i < 100; i++) {
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
@@ -123,8 +168,9 @@ public class TestXceiverClientGrpc {
           seenDNs.add(dn);
           return buildValidResponse();
         }
-      };
-      invokeXceiverClientGetBlock(client);
+      }) {
+        invokeXceiverClientGetBlock(client);
+      }
     }
     Assertions.assertEquals(1, seenDNs.size());
   }
@@ -135,7 +181,7 @@ public class TestXceiverClientGrpc {
     // DN is seen, indicating the same DN connection is reused.
     for (int i = 0; i < 100; i++) {
       final Set<DatanodeDetails> seenDNs = new HashSet<>();
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
@@ -143,11 +189,12 @@ public class TestXceiverClientGrpc {
           seenDNs.add(dn);
           return buildValidResponse();
         }
-      };
-      invokeXceiverClientGetBlock(client);
-      invokeXceiverClientGetBlock(client);
-      invokeXceiverClientReadChunk(client);
-      invokeXceiverClientReadSmallFile(client);
+      }) {
+        invokeXceiverClientGetBlock(client);
+        invokeXceiverClientGetBlock(client);
+        invokeXceiverClientReadChunk(client);
+        invokeXceiverClientReadSmallFile(client);
+      }
       Assertions.assertEquals(1, seenDNs.size());
     }
   }
@@ -173,8 +220,8 @@ public class TestXceiverClientGrpc {
                 .setBytesPerChecksum(512)
                 .setType(ContainerProtos.ChecksumType.CRC32)
                 .build())
-            .setLen(100)
-            .setOffset(100)
+            .setLen(-1)
+            .setOffset(0)
             .build(),
         bid,
         null, null);

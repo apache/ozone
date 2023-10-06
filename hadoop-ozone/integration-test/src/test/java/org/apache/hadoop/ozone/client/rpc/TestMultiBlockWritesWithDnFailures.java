@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -52,10 +53,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -68,7 +70,7 @@ public class TestMultiBlockWritesWithDnFailures {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -91,7 +93,6 @@ public class TestMultiBlockWritesWithDnFailures {
     conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
@@ -138,6 +139,7 @@ public class TestMultiBlockWritesWithDnFailures {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -181,7 +183,6 @@ public class TestMultiBlockWritesWithDnFailures {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     Assert.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
@@ -234,7 +235,6 @@ public class TestMultiBlockWritesWithDnFailures {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setKeyName(keyName)
-        .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     Assert.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());

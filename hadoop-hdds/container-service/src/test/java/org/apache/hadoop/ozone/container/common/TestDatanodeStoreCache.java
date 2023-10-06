@@ -58,7 +58,7 @@ public class TestDatanodeStoreCache {
     Assert.assertEquals(2, cache.size());
 
     // test get, test reference the same object using ==
-    Assert.assertTrue(store1 == cache.getDB(dbPath1).getStore());
+    Assert.assertTrue(store1 == cache.getDB(dbPath1, conf).getStore());
 
     // test remove
     cache.removeDB(dbPath1);

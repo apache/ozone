@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,7 +34,7 @@ import org.junit.jupiter.api.Test;
 public class TestDefaultUpgradeFinalizationExecutor {
 
   @Test
-  public void testPreFinalizeFailureThrowsException() throws Exception {
+  public void testPreFinalizeFailureThrowsException() {
     AbstractLayoutVersionManager mockLvm =
         mock(AbstractLayoutVersionManager.class);
     when(mockLvm.needsFinalization()).thenReturn(true);
@@ -60,8 +61,9 @@ public class TestDefaultUpgradeFinalizationExecutor {
 
     DefaultUpgradeFinalizationExecutor executor =
         new DefaultUpgradeFinalizationExecutor();
-    LambdaTestUtils.intercept(IOException.class,
-        "Failure!", () -> executor.execute(new Object(), uf));
+    IOException ioException = assertThrows(IOException.class,
+        () -> executor.execute(new Object(), uf));
+    assertEquals("Failure!", ioException.getMessage());
   }
 
   @Test

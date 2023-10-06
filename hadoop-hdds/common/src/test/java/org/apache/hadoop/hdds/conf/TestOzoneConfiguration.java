@@ -33,6 +33,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test class for OzoneConfiguration.
@@ -255,6 +257,20 @@ public class TestOzoneConfiguration {
 
     Assertions.assertThrows(NumberFormatException.class,
         () -> ozoneConfiguration.getObject(SimpleConfiguration.class));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void tagIsRecognized(ConfigTag tag) {
+    OzoneConfiguration subject = new OzoneConfiguration();
+    Assertions.assertTrue(subject.isPropertyTag(tag.name()),
+        () -> tag + " should be recognized as config tag");
+  }
+
+  @Test
+  void unknownTag() {
+    OzoneConfiguration subject = new OzoneConfiguration();
+    Assertions.assertFalse(subject.isPropertyTag("not-a-tag"));
   }
 
   private void appendProperty(BufferedWriter out, String name, String val)

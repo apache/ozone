@@ -32,7 +32,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +49,7 @@ public class TestGrpcOmTransport {
       LoggerFactory.getLogger(TestGrpcOmTransport.class);
   private static OzoneConfiguration conf;
   @Rule
-  public Timeout timeout = Timeout.seconds(3000);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(3000));
 
   @BeforeClass
   public static void setUp() {

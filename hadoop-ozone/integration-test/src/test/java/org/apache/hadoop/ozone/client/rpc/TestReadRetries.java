@@ -65,7 +65,9 @@ import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -82,7 +84,7 @@ public class TestReadRetries {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -178,7 +180,7 @@ public class TestReadRetries {
     // First, confirm the key info from the client matches the info in OM.
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
     builder.setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(keyName).setRefreshPipeline(true);
+        .setKeyName(keyName);
     OmKeyLocationInfo keyInfo = ozoneManager.lookupKey(builder.build()).
         getKeyLocationVersions().get(0).getBlocksLatestVersionOnly().get(0);
     long containerID = keyInfo.getContainerID();

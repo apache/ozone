@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -37,7 +39,9 @@ import org.junit.Test;
 import org.junit.Before;
 import org.junit.After;
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -71,7 +75,7 @@ public class TestOMBucketLayoutUpgrade {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300000));
   private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;
@@ -81,6 +85,7 @@ public class TestOMBucketLayoutUpgrade {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOMBucketLayoutUpgrade.class);
+  private OzoneClient client;
 
   /**
    * Defines a "from" layout version to finalize from.
@@ -120,8 +125,8 @@ public class TestOMBucketLayoutUpgrade {
 
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    ObjectStore objectStore = client.getObjectStore();
     clientProtocol = objectStore.getClientProxy();
     omClient = clientProtocol.getOzoneManagerClient();
 
@@ -139,6 +144,7 @@ public class TestOMBucketLayoutUpgrade {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

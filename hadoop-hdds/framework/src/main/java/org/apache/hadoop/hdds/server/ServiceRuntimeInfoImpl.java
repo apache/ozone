@@ -56,5 +56,4 @@ public class ServiceRuntimeInfoImpl implements ServiceRuntimeInfo {
   public void setStartTime() {
     startedTimeInMillis = System.currentTimeMillis();
   }
-
 }

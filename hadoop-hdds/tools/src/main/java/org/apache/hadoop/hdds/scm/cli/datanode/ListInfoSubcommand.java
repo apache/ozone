@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -65,6 +66,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String nodeState;
 
+  @CommandLine.Option(names = { "--json" },
+       description = "Show info in json format",
+       defaultValue = "false")
+  private boolean json;
+
   private List<Pipeline> pipelines;
 
 
@@ -88,7 +94,15 @@ public class ListInfoSubcommand extends ScmSubcommand {
       allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
     }
-    allNodes.forEach(this::printDatanodeInfo);
+
+    if (json) {
+      List<DatanodeWithAttributes> datanodeList = allNodes.collect(
+              Collectors.toList());
+      System.out.print(
+              JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
+    } else {
+      allNodes.forEach(this::printDatanodeInfo);
+    }
   }
 
   private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)

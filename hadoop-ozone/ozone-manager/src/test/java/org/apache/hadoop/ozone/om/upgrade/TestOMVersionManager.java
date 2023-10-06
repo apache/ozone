@@ -46,9 +46,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 /**
  * Test OM layout version management.
@@ -83,10 +85,10 @@ public class TestOMVersionManager {
   public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
       throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
-    int currVersion = Integer.MIN_VALUE;
+    int currVersion = -1;
     OMLayoutFeature lastFeature = null;
     for (OMLayoutFeature lf : values) {
-      assertTrue(currVersion < lf.layoutVersion());
+      assertEquals(currVersion + 1, lf.layoutVersion());
       currVersion = lf.layoutVersion();
       lastFeature = lf;
     }
@@ -103,10 +105,11 @@ public class TestOMVersionManager {
     verify(omMock, times(UpgradeActionType.values().length)).getVersion();
   }
 
-  @Ignore("Since there is no longer a need to enforce the getRequestType " +
+  @Test
+  @Category(UnhealthyTest.class)
+  @Unhealthy("Since there is no longer a need to enforce the getRequestType " +
       "method in OM request classes, disabling the " +
       "test. Potentially revisit later.")
-  @Test
   public void testAllOMRequestClassesHaveRequestType()
       throws InvocationTargetException, IllegalAccessException {
 

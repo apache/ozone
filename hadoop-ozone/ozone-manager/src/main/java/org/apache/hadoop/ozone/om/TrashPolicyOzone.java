@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.OFSPath;
@@ -123,12 +124,111 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   @Override
   public boolean moveToTrash(Path path) throws IOException {
-    this.fs.getFileStatus(path);
+    if (validatePath(path)) {
+      if (!isEnabled()) {
+        return false;
+      }
+
+      if (!path.isAbsolute()) {                  // make path absolute
+        path = new Path(fs.getWorkingDirectory(), path);
+      }
+
+      // check that path exists
+      fs.getFileStatus(path);
+      String qpath = fs.makeQualified(path).toString();
+
+      Path trashRoot = fs.getTrashRoot(path);
+      Path trashCurrent = new Path(trashRoot, CURRENT);
+      if (qpath.startsWith(trashRoot.toString())) {
+        return false;                               // already in trash
+      }
+
+      if (trashRoot.getParent().toString().startsWith(qpath)) {
+        throw new IOException("Cannot move \"" + path
+            + "\" to the trash, as it contains the trash");
+      }
+
+      Path trashPath;
+      Path baseTrashPath;
+      if (fs.getUri().getScheme().equals(OzoneConsts.OZONE_OFS_URI_SCHEME)) {
+        OFSPath ofsPath = new OFSPath(path,
+            OzoneConfiguration.of(configuration));
+        // trimming volume and bucket in order to be compatible with o3fs
+        // Also including volume and bucket name in the path is redundant as
+        // the key is already in a particular volume and bucket.
+        Path trimmedVolumeAndBucket =
+            new Path(OzoneConsts.OZONE_URI_DELIMITER
+                + ofsPath.getKeyName());
+        trashPath = makeTrashRelativePath(trashCurrent, trimmedVolumeAndBucket);
+        baseTrashPath = makeTrashRelativePath(trashCurrent,
+            trimmedVolumeAndBucket.getParent());
+      } else {
+        trashPath = makeTrashRelativePath(trashCurrent, path);
+        baseTrashPath = makeTrashRelativePath(trashCurrent, path.getParent());
+      }
+
+      IOException cause = null;
+
+      // try twice, in case checkpoint between the mkdirs() & rename()
+      for (int i = 0; i < 2; i++) {
+        try {
+          if (!fs.mkdirs(baseTrashPath, PERMISSION)) {      // create current
+            LOG.warn("Can't create(mkdir) trash directory: " + baseTrashPath);
+            return false;
+          }
+        } catch (FileAlreadyExistsException e) {
+          // find the path which is not a directory, and modify baseTrashPath
+          // & trashPath, then mkdirs
+          Path existsFilePath = baseTrashPath;
+          while (!fs.exists(existsFilePath)) {
+            existsFilePath = existsFilePath.getParent();
+          }
+          baseTrashPath = new Path(baseTrashPath.toString()
+              .replace(existsFilePath.toString(),
+                  existsFilePath.toString() + Time.now()));
+          trashPath = new Path(baseTrashPath, trashPath.getName());
+          // retry, ignore current failure
+          --i;
+          continue;
+        } catch (IOException e) {
+          LOG.warn("Can't create trash directory: " + baseTrashPath, e);
+          cause = e;
+          break;
+        }
+        try {
+          // if the target path in Trash already exists, then append with
+          // a current time in millisecs.
+          String orig = trashPath.toString();
+
+          while (fs.exists(trashPath)) {
+            trashPath = new Path(orig + Time.now());
+          }
+
+          // move to current trash
+          boolean renamed = fs.rename(path, trashPath);
+          if (!renamed) {
+            LOG.error("Failed to move to trash: {}", path);
+            throw new IOException("Failed to move to trash: " + path);
+          }
+          LOG.info("Moved: '" + path + "' to trash at: " + trashPath);
+          return true;
+        } catch (IOException e) {
+          cause = e;
+        }
+      }
+      throw (IOException) new IOException("Failed to move to trash: " + path)
+          .initCause(cause);
+    }
+    return false;
+  }
+
+  private boolean validatePath(Path path) throws IOException {
     String key = path.toUri().getPath();
     // Check to see if bucket is path item to be deleted.
     // Cannot moveToTrash if bucket is deleted,
     // return error for this condition
-    OFSPath ofsPath = new OFSPath(key.substring(1));
+    OFSPath ofsPath = new OFSPath(key.substring(1),
+        OzoneConfiguration.of(configuration));
     if (path.isRoot() || ofsPath.isBucket()) {
       throw new IOException("Recursive rm of bucket "
           + path.toString() + " not permitted");
@@ -146,11 +246,14 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     // first condition tests when length key is <= length trash
     // and second when length key > length trash
     if ((key.contains(this.fs.TRASH_PREFIX)) && (trashRootKey.startsWith(key))
-            || key.startsWith(trashRootKey)) {
+        || key.startsWith(trashRootKey)) {
       return false;
-    } else {
-      return super.moveToTrash(path);
     }
+    return true;
+  }
+
+  private Path makeTrashRelativePath(Path basePath, Path rmFilePath) {
+    return Path.mergePaths(basePath, rmFilePath);
   }
 
   protected class Emptier implements Runnable {
@@ -219,17 +322,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-              Runnable task = () -> {
-                try {
-                  om.getMetrics().incNumTrashRootsProcessed();
-                  trash.deleteCheckpoint(trashRoot.getPath(), false);
-                  trash.createCheckpoint(trashRoot.getPath(),
-                      new Date(Time.now()));
-                } catch (Exception e) {
-                  om.getMetrics().incNumTrashFails();
-                  LOG.error("Unable to checkpoint:" + trashRoot.getPath(), e);
-                }
-              };
+              Path trashRootPath = trashRoot.getPath();
+              Runnable task = getEmptierTask(trashRootPath, trash, false);
               om.getMetrics().incNumTrashRootsEnqueued();
               executor.submit(task);
             }
@@ -252,6 +346,21 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           Thread.currentThread().interrupt();
         }
       }
+    }
+
+    private Runnable getEmptierTask(Path trashRootPath, TrashPolicyOzone trash,
+        boolean deleteImmediately) {
+      Runnable task = () -> {
+        try {
+          om.getMetrics().incNumTrashRootsProcessed();
+          trash.deleteCheckpoint(trashRootPath, deleteImmediately);
+          trash.createCheckpoint(trashRootPath, new Date(Time.now()));
+        } catch (Exception e) {
+          om.getMetrics().incNumTrashFails();
+          LOG.error("Unable to checkpoint:" + trashRootPath, e);
+        }
+      };
+      return task;
     }
 
     private long ceiling(long time, long interval) {

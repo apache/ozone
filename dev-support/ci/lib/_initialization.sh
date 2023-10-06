@@ -129,7 +129,9 @@ function initialization::parameters_to_json() {
 
 # output parameter name and value - both to stdout and to be set by GitHub Actions
 function initialization::ga_output() {
-    echo "::set-output name=${1}::${2}"
+    if [[ -n "${GITHUB_OUTPUT=}" ]]; then
+        echo "${1}=${2}" >> "${GITHUB_OUTPUT}"
+    fi
     echo "${1}=${2}"
 }
 

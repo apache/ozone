@@ -16,6 +16,9 @@
 
 CORE-SITE.XML_fs.defaultFS=ofs://om
 CORE-SITE.XML_fs.trash.interval=1
+# For HttpFS service it is required to enable proxying users.
+CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts=*
+CORE-SITE.XML_hadoop.proxyuser.hadoop.groups=*
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
@@ -32,6 +35,7 @@ OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
@@ -39,12 +43,21 @@ OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
-OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.heartbeat.interval=5s
+OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
+OZONE-SITE.XML_hdds.scm.replication.thread.interval=15s
+OZONE-SITE.XML_hdds.scm.replication.under.replicated.interval=5s
+OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5s
+OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
+
+OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

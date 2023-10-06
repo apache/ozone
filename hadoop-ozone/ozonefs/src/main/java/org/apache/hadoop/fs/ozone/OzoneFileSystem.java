@@ -25,6 +25,10 @@ import java.net.URI;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LeaseRecoverable;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.SafeMode;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -42,7 +46,7 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class OzoneFileSystem extends BasicOzoneFileSystem
-    implements KeyProviderTokenIssuer {
+    implements KeyProviderTokenIssuer, LeaseRecoverable, SafeMode {
 
   private OzoneFSStorageStatistics storageStatistics;
 
@@ -99,5 +103,46 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   @Override
   protected InputStream createFSInputStream(InputStream inputStream) {
     return new CapableOzoneFSInputStream(inputStream, statistics);
+  }
+
+  @Override
+  protected OzoneFSOutputStream createFSOutputStream(
+          OzoneFSOutputStream outputStream) {
+    return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
+  }
+
+  @Override
+  public boolean hasPathCapability(final Path path, final String capability)
+      throws IOException {
+    // qualify the path to make sure that it refers to the current FS.
+    final Path p = makeQualified(path);
+    boolean cap =
+        OzonePathCapabilities.hasPathCapability(p, capability);
+    if (cap) {
+      return cap;
+    }
+    return super.hasPathCapability(p, capability);
+  }
+
+  @Override
+  public boolean recoverLease(Path f) throws IOException {
+    LOG.trace("isFileClosed() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().recoverLease(key);
+  }
+
+  @Override
+  public boolean isFileClosed(Path f) throws IOException {
+    LOG.trace("isFileClosed() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().isFileClosed(key);
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    return setSafeModeUtil(action, isChecked);
   }
 }

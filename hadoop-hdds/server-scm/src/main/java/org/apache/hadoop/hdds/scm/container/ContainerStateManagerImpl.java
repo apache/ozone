@@ -30,6 +30,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.base.Preconditions;
 
+import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,9 +39,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
-import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -54,6 +55,8 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 
+import org.apache.ratis.util.AutoCloseableLock;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +73,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT;
+
 
 /**
  * Default implementation of ContainerStateManager. This implementation
@@ -80,6 +86,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
  */
 public final class ContainerStateManagerImpl
     implements ContainerStateManager {
+
+  private final Striped<ReadWriteLock> stripedLock;
 
   /**
    * Logger instance of ContainerStateManagerImpl.
@@ -115,6 +123,13 @@ public final class ContainerStateManagerImpl
   private final StateMachine<LifeCycleState, LifeCycleEvent> stateMachine;
 
   /**
+   * Pending Ops table used by Replication Manager to track pending moves. As
+   * replicas are added or removed, we make a call to the pendingOps object to
+   * mark the pending operations as completed.
+   */
+  private final ContainerReplicaPendingOps containerReplicaPendingOps;
+
+  /**
    * We use the containers in round-robin fashion for operations like block
    * allocation. This map is used for remembering the last used container.
    */
@@ -125,7 +140,7 @@ public final class ContainerStateManagerImpl
 
   // Protect containers and containerStore against the potential
   // contentions between RaftServer and ContainerManager.
-  private final ReadWriteLock lock = new ReentrantReadWriteLock();
+  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   /**
    * constructs ContainerStateManagerImpl instance and loads the containers
@@ -139,8 +154,8 @@ public final class ContainerStateManagerImpl
   private ContainerStateManagerImpl(final Configuration conf,
       final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore,
-      final DBTransactionBuffer buffer)
-      throws IOException {
+      final DBTransactionBuffer buffer,
+      final ContainerReplicaPendingOps pendingOps) throws IOException {
     this.pipelineManager = pipelineManager;
     this.containerStore = containerStore;
     this.stateMachine = newStateMachine();
@@ -149,7 +164,10 @@ public final class ContainerStateManagerImpl
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerStateChangeActions = getContainerStateChangeActions();
     this.transactionBuffer = buffer;
-
+    this.stripedLock = Striped.readWriteLock(conf.getInt(
+        OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE,
+        OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT));
+    this.containerReplicaPendingOps = pendingOps;
     initialize();
   }
 
@@ -260,31 +278,22 @@ public final class ContainerStateManagerImpl
 
   @Override
   public Set<ContainerID> getContainerIDs() {
-    lock.readLock().lock();
-    try {
+    try (AutoCloseableLock ignored = readLock()) {
       return containers.getAllContainerIDs();
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
   @Override
   public Set<ContainerID> getContainerIDs(final LifeCycleState state) {
-    lock.readLock().lock();
-    try {
+    try (AutoCloseableLock ignored = readLock()) {
       return containers.getContainerIDsByState(state);
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
   @Override
   public ContainerInfo getContainer(final ContainerID id) {
-    lock.readLock().lock();
-    try {
+    try (AutoCloseableLock ignored = readLock(id)) {
       return containers.getContainerInfo(id);
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
@@ -301,16 +310,17 @@ public final class ContainerStateManagerImpl
     final ContainerID containerID = container.containerID();
     final PipelineID pipelineID = container.getPipelineID();
 
-    lock.writeLock().lock();
-    try {
+    try (AutoCloseableLock ignoredGlobal = writeLock();
+        AutoCloseableLock ignored = writeLock(containerID)) {
       if (!containers.contains(containerID)) {
         ExecutionUtil.create(() -> {
-          transactionBuffer.addToBuffer(containerStore, containerID, container);
+          transactionBuffer.addToBuffer(containerStore,
+              containerID, container);
           containers.addContainer(container);
           if (pipelineManager.containsPipeline(pipelineID)) {
             pipelineManager.addContainerToPipeline(pipelineID, containerID);
           } else if (containerInfo.getState().
-              equals(HddsProtos.LifeCycleState.OPEN)) {
+              equals(LifeCycleState.OPEN)) {
             // Pipeline should exist, but not
             throw new PipelineNotFoundException();
           }
@@ -322,18 +332,13 @@ public final class ContainerStateManagerImpl
           transactionBuffer.removeFromBuffer(containerStore, containerID);
         }).execute();
       }
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
   @Override
   public boolean contains(ContainerID id) {
-    lock.readLock().lock();
-    try {
+    try (AutoCloseableLock ignored = readLock(id)) {
       return containers.contains(id);
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
@@ -344,8 +349,7 @@ public final class ContainerStateManagerImpl
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
-    lock.writeLock().lock();
-    try {
+    try (AutoCloseableLock ignored = writeLock(id)) {
       if (containers.contains(id)) {
         final ContainerInfo oldInfo = containers.getContainerInfo(id);
         final LifeCycleState oldState = oldInfo.getState();
@@ -360,57 +364,53 @@ public final class ContainerStateManagerImpl
             transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
           }).execute();
-          containerStateChangeActions.getOrDefault(event, info -> {
-          }).execute(oldInfo);
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(oldInfo);
         }
       }
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
 
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
-    lock.readLock().lock();
-    try {
+    try (AutoCloseableLock ignored = readLock(id)) {
       return containers.getContainerReplicas(id);
-    } finally {
-      lock.readLock().unlock();
     }
   }
 
   @Override
   public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
-    lock.writeLock().lock();
-    try {
+    try (AutoCloseableLock ignored = writeLock(id)) {
       containers.updateContainerReplica(id, replica);
-    } finally {
-      lock.writeLock().unlock();
+      // Clear any pending additions for this replica as we have now seen it.
+      containerReplicaPendingOps.completeAddReplica(id,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     }
   }
 
   @Override
   public void removeContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
-    lock.writeLock().lock();
-    try {
-      containers.removeContainerReplica(id,
-          replica);
-    } finally {
-      lock.writeLock().unlock();
+    try (AutoCloseableLock ignored = writeLock(id)) {
+      containers.removeContainerReplica(id, replica);
+      // Remove any pending delete replication operations for the deleted
+      // replica.
+      containerReplicaPendingOps.completeDeleteReplica(id,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     }
   }
 
   @Override
   public void updateDeleteTransactionId(
       final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-    lock.writeLock().lock();
-    try {
-      // TODO: Refactor this. Error handling is not done.
-      for (Map.Entry<ContainerID, Long> transaction :
-          deleteTransactionMap.entrySet()) {
+
+    // TODO: Refactor this. Error handling is not done.
+    for (Map.Entry<ContainerID, Long> transaction :
+        deleteTransactionMap.entrySet()) {
+      ContainerID containerID = transaction.getKey();
+      try (AutoCloseableLock ignored = writeLock(containerID)) {
         final ContainerInfo info = containers.getContainerInfo(
             transaction.getKey());
         if (info == null) {
@@ -421,8 +421,6 @@ public final class ContainerStateManagerImpl
         info.updateDeleteTransactionId(transaction.getValue());
         transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
       }
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
@@ -438,48 +436,46 @@ public final class ContainerStateManagerImpl
     final ContainerID lastID =
         lastUsedMap.getOrDefault(key, containerIDs.first());
 
+
     // There is a small issue here. The first time, we will skip the first
     // container. But in most cases it will not matter.
     NavigableSet<ContainerID> resultSet = containerIDs.tailSet(lastID, false);
     if (resultSet.isEmpty()) {
       resultSet = containerIDs;
     }
+    ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
+    if (selectedContainer == null) {
 
-    lock.readLock().lock();
-    try {
-      ContainerInfo selectedContainer = findContainerWithSpace(size, resultSet);
-      if (selectedContainer == null) {
+      // If we did not find any space in the tailSet, we need to look for
+      // space in the headset, we need to pass true to deal with the
+      // situation that we have a lone container that has space. That is we
+      // ignored the last used container under the assumption we can find
+      // other containers with space, but if we have a single container that is
+      // not true. Hence, we need to include the last used container as the
+      // last element in the sorted set.
 
-        // If we did not find any space in the tailSet, we need to look for
-        // space in the headset, we need to pass true to deal with the
-        // situation that we have a lone container that has space. That is we
-        // ignored the last used container under the assumption we can find
-        // other containers with space, but if have a single container that is
-        // not true. Hence we need to include the last used container as the
-        // last element in the sorted set.
-
-        resultSet = containerIDs.headSet(lastID, true);
-        selectedContainer = findContainerWithSpace(size, resultSet);
-      }
-
-      // TODO: cleanup entries in lastUsedMap
-      if (selectedContainer != null) {
-        lastUsedMap.put(key, selectedContainer.containerID());
-      }
-      return selectedContainer;
-    } finally {
-      lock.readLock().unlock();
+      resultSet = containerIDs.headSet(lastID, true);
+      selectedContainer = findContainerWithSpace(size, resultSet);
     }
+
+    // TODO: cleanup entries in lastUsedMap
+    if (selectedContainer != null) {
+      lastUsedMap.put(key, selectedContainer.containerID());
+    }
+    return selectedContainer;
   }
 
   private ContainerInfo findContainerWithSpace(final long size,
-      final NavigableSet<ContainerID> searchSet) {
-    // Get the container with space to meet our request.
+                                               final NavigableSet<ContainerID>
+                                                   searchSet) {
+      // Get the container with space to meet our request.
     for (ContainerID id : searchSet) {
-      final ContainerInfo containerInfo = containers.getContainerInfo(id);
-      if (containerInfo.getUsedBytes() + size <= this.containerSize) {
-        containerInfo.updateLastUsedTime();
-        return containerInfo;
+      try (AutoCloseableLock ignored = readLock(id)) {
+        final ContainerInfo containerInfo = containers.getContainerInfo(id);
+        if (containerInfo.getUsedBytes() + size <= this.containerSize) {
+          containerInfo.updateLastUsedTime();
+          return containerInfo;
+        }
       }
     }
     return null;
@@ -488,31 +484,26 @@ public final class ContainerStateManagerImpl
 
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
-    lock.writeLock().lock();
-    try {
-      final ContainerID cid = ContainerID.getFromProtobuf(id);
+    final ContainerID cid = ContainerID.getFromProtobuf(id);
+    try (AutoCloseableLock ignoredGlobal = writeLock();
+         AutoCloseableLock ignored = writeLock(cid)) {
       final ContainerInfo containerInfo = containers.getContainerInfo(cid);
       ExecutionUtil.create(() -> {
         transactionBuffer.removeFromBuffer(containerStore, cid);
         containers.removeContainer(cid);
       }).onException(() -> containerStore.put(cid, containerInfo)).execute();
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
   @Override
   public void reinitialize(
       Table<ContainerID, ContainerInfo> store) throws IOException {
-    lock.writeLock().lock();
-    try {
+    try (AutoCloseableLock ignored = writeLock()) {
       close();
       this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();
       initialize();
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
@@ -523,6 +514,22 @@ public final class ContainerStateManagerImpl
     } catch (Exception e) {
       throw new IOException(e);
     }
+  }
+
+  private AutoCloseableLock readLock() {
+    return AutoCloseableLock.acquire(lock.readLock());
+  }
+
+  private AutoCloseableLock writeLock() {
+    return AutoCloseableLock.acquire(lock.writeLock());
+  }
+
+  private AutoCloseableLock readLock(ContainerID id) {
+    return AutoCloseableLock.acquire(stripedLock.get(id).readLock());
+  }
+
+  private AutoCloseableLock writeLock(ContainerID id) {
+    return AutoCloseableLock.acquire(stripedLock.get(id).writeLock());
   }
 
   public static Builder newBuilder() {
@@ -538,6 +545,7 @@ public final class ContainerStateManagerImpl
     private SCMRatisServer scmRatisServer;
     private Table<ContainerID, ContainerInfo> table;
     private DBTransactionBuffer transactionBuffer;
+    private ContainerReplicaPendingOps containerReplicaPendingOps;
 
     public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
       this.transactionBuffer = buffer;
@@ -564,13 +572,20 @@ public final class ContainerStateManagerImpl
       return this;
     }
 
+    public Builder setContainerReplicaPendingOps(
+        final ContainerReplicaPendingOps pendingOps) {
+      containerReplicaPendingOps = pendingOps;
+      return this;
+    }
+
     public ContainerStateManager build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(pipelineMgr);
       Preconditions.checkNotNull(table);
 
       final ContainerStateManager csm = new ContainerStateManagerImpl(
-          conf, pipelineMgr, table, transactionBuffer);
+          conf, pipelineMgr, table, transactionBuffer,
+          containerReplicaPendingOps);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(RequestType.CONTAINER, csm,

@@ -21,19 +21,26 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -41,8 +48,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -56,7 +61,7 @@ public class TestKeyPurging {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private ObjectStore store;
@@ -64,6 +69,7 @@ public class TestKeyPurging {
 
   private static final int NUM_KEYS = 10;
   private static final int KEY_SIZE = 100;
+  private OzoneClient client;
 
   @Before
   public void setup() throws Exception {
@@ -81,18 +87,20 @@ public class TestKeyPurging {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = OzoneClientFactory.getRpcClient(conf);
+    store = client.getObjectStore();
     om = cluster.getOzoneManager();
   }
 
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testKeysPurgingByKeyDeletingService() throws Exception {
     // Create Volume and Bucket
     String volumeName = UUID.randomUUID().toString();
@@ -139,7 +147,7 @@ public class TestKeyPurging {
         () -> {
           try {
             return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
-                .size() == 0;
+                .getKeyBlocksList().size() == 0;
           } catch (IOException e) {
             return false;
           }

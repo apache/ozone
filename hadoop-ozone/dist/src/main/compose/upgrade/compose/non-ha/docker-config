@@ -31,6 +31,7 @@ OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.client.address=scm
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
@@ -40,3 +41,7 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+# Does not take effect on Ozone versions < 1.4.0
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

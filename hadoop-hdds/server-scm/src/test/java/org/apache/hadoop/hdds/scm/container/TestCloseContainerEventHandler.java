@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -38,16 +39,21 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.lease.Lease;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,14 +81,18 @@ public class TestCloseContainerEventHandler {
   private ArgumentCaptor<CommandForDatanode> commandCaptor;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws Exception {
     MockitoAnnotations.initMocks(this);
     containerManager = Mockito.mock(ContainerManager.class);
     pipelineManager = Mockito.mock(PipelineManager.class);
     SCMContext scmContext = Mockito.mock(SCMContext.class);
+    Mockito.when(scmContext.isLeader()).thenReturn(true);
     eventPublisher = Mockito.mock(EventPublisher.class);
+    LeaseManager leaseManager = Mockito.mock(LeaseManager.class);
+    Mockito.when(leaseManager.acquire(any(), anyLong(), any())).thenAnswer(
+        invocation -> invocation.getArgument(2, Callable.class).call());
     eventHandler = new CloseContainerEventHandler(
-        pipelineManager, containerManager, scmContext);
+        pipelineManager, containerManager, scmContext, leaseManager, 0);
   }
 
   @Test
@@ -110,6 +120,56 @@ public class TestCloseContainerEventHandler {
     eventHandler.onMessage(container.containerID(), eventPublisher);
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+  }
+
+  @Test
+  public void testCloseContainerWithDelayByLeaseManager()
+      throws Exception {
+    final Pipeline pipeline = createPipeline(RATIS_REP_CONFIG, 3);
+    final ContainerInfo container =
+        createContainer(RATIS_REP_CONFIG, pipeline.getId());
+    container.setState(HddsProtos.LifeCycleState.CLOSING);
+    Mockito.when(containerManager.getContainer(container.containerID()))
+        .thenReturn(container);
+
+    SCMContext scmContext = Mockito.mock(SCMContext.class);
+    Mockito.when(scmContext.isLeader()).thenReturn(true);
+    long timeoutInMs = 2000;
+    Mockito.when(pipelineManager.getPipeline(pipeline.getId()))
+        .thenReturn(pipeline);
+    LeaseManager<Object> leaseManager = new LeaseManager<>("test", timeoutInMs);
+    leaseManager.start();
+    LeaseManager mockLeaseManager = Mockito.mock(LeaseManager.class);
+    List<Lease<Object>> leaseList = new ArrayList<>(1);
+    Mockito.when(mockLeaseManager.acquire(any(), anyLong(), any())).thenAnswer(
+        invocation -> {
+          leaseList.add(leaseManager.acquire(
+              invocation.getArgument(0, Object.class),
+              invocation.getArgument(1),
+              invocation.getArgument(2, Callable.class)));
+          return leaseList.get(0);
+        });
+    CloseContainerEventHandler closeHandler = new CloseContainerEventHandler(
+        pipelineManager, containerManager, scmContext,
+        mockLeaseManager, timeoutInMs);
+    closeHandler.onMessage(container.containerID(), eventPublisher);
+    Mockito.verify(mockLeaseManager, atLeastOnce())
+        .acquire(any(), anyLong(), any());
+    Assert.assertTrue(leaseList.size() > 0);
+    // immediate check if event is published
+    Mockito.verify(eventPublisher, never())
+        .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    // wait for event to happen
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Mockito.verify(eventPublisher, atLeastOnce())
+            .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+      } catch (Throwable ex) {
+        return false;
+      }
+      return true;
+    }, 1000, (int) timeoutInMs * 3);
+    leaseManager.shutdown();
   }
 
   @Test

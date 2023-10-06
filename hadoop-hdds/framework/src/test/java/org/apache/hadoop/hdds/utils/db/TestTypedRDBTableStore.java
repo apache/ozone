@@ -28,7 +28,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -52,6 +51,7 @@ import org.rocksdb.StatsLevel;
  * Tests for RocksDBTable Store.
  */
 public class TestTypedRDBTableStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -65,6 +65,8 @@ public class TestTypedRDBTableStore {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
@@ -79,9 +81,10 @@ public class TestTypedRDBTableStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
 
-    codecRegistry = new CodecRegistry();
+    codecRegistry = CodecRegistry.newBuilder().build();
 
   }
 
@@ -90,6 +93,7 @@ public class TestTypedRDBTableStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -249,8 +253,7 @@ public class TestTypedRDBTableStore {
         String key = Integer.toString(x);
         String value = Integer.toString(x);
         testTable.addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(value),
-            x));
+            CacheValue.get(x, value));
       }
 
       // As we have added to cache, so get should return value even if it
@@ -275,11 +278,10 @@ public class TestTypedRDBTableStore {
         String value = Integer.toString(x);
         if (x % 2 == 0) {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), x));
+              CacheValue.get(x, value));
         } else {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.absent(),
-              x));
+              CacheValue.get(x));
         }
       }
 
@@ -363,11 +365,11 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.of(value), 1L));
+          CacheValue.get(1L, value));
       Assertions.assertTrue(testTable.isExist(key));
 
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.absent(), 1L));
+          CacheValue.get(1L));
       Assertions.assertFalse(testTable.isExist(key));
     }
   }
@@ -403,7 +405,7 @@ public class TestTypedRDBTableStore {
       Assertions.assertArrayEquals(value, testTable.get(key));
       Assertions.assertNotSame(value, actualValue);
       testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), 1L));
+              CacheValue.get(1L, value));
       Assertions.assertSame(value, testTable.get(key));
     }
   }

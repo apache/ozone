@@ -151,11 +151,57 @@ Incorrect values for end and start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Zero byte file
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
-                                Should contain             ${result}        InvalidRange
+    ${result} =			        Execute                    ozone sh bucket info /s3v/${BUCKET}
+    ${linked} = 		        Execute				       echo '${result}' | jq -j '.sourceVolume,"/",.sourceBucket'
+    ${eval} = 			        Evaluate			       "source" in """${linked}"""
+    	      			        IF	${eval} == ${True}
+    ${result} =                 Execute				       ozone sh bucket info ${linked}
+				                END
+    ${fsolayout} =    		    Evaluate    	   	       "OPTIMIZED" in """${result}"""
 
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
-                                Should contain             ${result}        InvalidRange
+    ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
+    	      			        IF 	${fsolayout} == ${True}
+                                Should contain              ${result}       NoSuchKey
+				                ELSE
+                                Should contain              ${result}       InvalidRange
+				                END
 
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
-                                Should contain             ${result}        InvalidRange
+    ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
+                                IF 	${fsolayout} == ${True}
+                                Should contain              ${result}       NoSuchKey
+                                ELSE
+                                Should contain              ${result}       InvalidRange
+				                END
+
+    ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
+    	      			        IF 	${fsolayout} == ${True}
+                                Should contain              ${result}       NoSuchKey
+				                ELSE
+                                Should contain              ${result}       InvalidRange
+				                END
+
+Create file with user defined metadata
+                                Execute                   echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
+
+    ${result} =                 Execute AWSS3APICli       head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1
+                                Should contain            ${result}    \"custom-key1\": \"custom-value1\"
+                                Should contain            ${result}    \"custom-key2\": \"custom-value2\"
+
+    ${result} =                 Execute                   ozone sh key info /s3v/${BUCKET}/${PREFIX}/putobject/custom-metadata/key1
+                                Should contain            ${result}   \"custom-key1\" : \"custom-value1\"
+                                Should contain            ${result}   \"custom-key2\" : \"custom-value2\"
+
+Create file with user defined metadata with gdpr enabled value in request
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="gdprEnabled=true,custom-key2=custom-value2"
+    ${result} =                 Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2
+                                Should contain             ${result}   \"custom-key2\": \"custom-value2\"
+                                Should not contain         ${result}   \"gdprEnabled\": \"true\"
+
+
+Create file with user defined metadata size larger than 2 KB
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
+    ${result} =                 Execute AWSS3APICli and ignore error        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"
+                                Should not contain                          ${result}   custom-key1: ${custom_metadata_value}

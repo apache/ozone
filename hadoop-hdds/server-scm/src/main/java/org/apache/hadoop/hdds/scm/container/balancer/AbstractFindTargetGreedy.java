@@ -164,7 +164,14 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     replicaList.add(target);
     ContainerPlacementStatus placementStatus = placementPolicyValidateProxy
         .validateContainerPlacement(replicaList, containerInfo);
-    return placementStatus.isPolicySatisfied();
+
+    boolean isPolicySatisfied = placementStatus.isPolicySatisfied();
+    if (!isPolicySatisfied) {
+      logger.debug("Moving container {} from source {} to target {} will not " +
+              "satisfy placement policy.", containerID, source.getUuidString(),
+          target.getUuidString());
+    }
+    return isPolicySatisfied;
   }
 
   /**
@@ -185,10 +192,26 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       // MaxSizeEnteringTarget
       //2 current usage of target datanode plus sizeEnteringAfterMove
       // is smaller than or equal to upperLimit
-      return sizeEnteringAfterMove <= config.getMaxSizeEnteringTarget() &&
-          Double.compare(nodeManager.getUsageInfo(target)
-              .calculateUtilization(sizeEnteringAfterMove), upperLimit) <= 0;
+      if (sizeEnteringAfterMove > config.getMaxSizeEnteringTarget()) {
+        logger.debug("{} bytes cannot enter datanode {} because 'size" +
+                ".entering.target.max' limit is {} and {} bytes have already " +
+                "entered.", size, target.getUuidString(),
+            config.getMaxSizeEnteringTarget(),
+            sizeEnteringNode.get(target));
+        return false;
+      }
+      if (Double.compare(nodeManager.getUsageInfo(target)
+          .calculateUtilization(sizeEnteringAfterMove), upperLimit) > 0) {
+        logger.debug("{} bytes cannot enter datanode {} because its " +
+                "utilization will exceed the upper limit of {}.", size,
+            target.getUuidString(), upperLimit);
+        return false;
+      }
+      return true;
     }
+
+    logger.warn("No record of how much size has entered datanode {}",
+        target.getUuidString());
     return false;
   }
 
@@ -222,10 +245,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     setConfiguration(conf);
     setUpperLimit(upLimit);
     sizeEnteringNode.clear();
-    potentialDataNodes.forEach(
-        p -> sizeEnteringNode.put(p.getDatanodeDetails(), 0L));
-    potentialTargets.clear();
-    potentialTargets.addAll(potentialDataNodes);
+    resetTargets(potentialDataNodes);
   }
 
   @VisibleForTesting
@@ -240,4 +260,22 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    */
   @VisibleForTesting
   public abstract void sortTargetForSource(DatanodeDetails source);
+
+  /**
+   * Resets the collection of potential target datanodes that are considered
+   * to identify a target for a source.
+   * @param targets potential targets
+   */
+  void resetTargets(Collection<DatanodeUsageInfo> targets) {
+    potentialTargets.clear();
+    targets.forEach(datanodeUsageInfo -> {
+      sizeEnteringNode.putIfAbsent(datanodeUsageInfo.getDatanodeDetails(), 0L);
+      potentialTargets.add(datanodeUsageInfo);
+    });
+  }
+
+  NodeManager getNodeManager() {
+    return nodeManager;
+  }
+
 }

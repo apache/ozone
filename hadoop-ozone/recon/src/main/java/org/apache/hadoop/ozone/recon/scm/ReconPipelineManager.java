@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +63,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
                                SCMContext scmContext) {
     super(conf, scmhaManager, nodeManager, pipelineStateManager,
         pipelineFactory, eventPublisher, scmContext,
-        new MonotonicClock(ZoneOffset.UTC));
+        Clock.system(ZoneOffset.UTC));
   }
 
   public static ReconPipelineManager newReconPipelineManager(
@@ -97,7 +96,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    * @throws IOException on exception.
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm)
-      throws IOException, TimeoutException {
+      throws IOException {
 
     acquireWriteLock();
     try {
@@ -143,7 +142,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
             getStateManager().updatePipelineState(
                 pipelineID.getProtobuf(),
                 HddsProtos.PipelineState.PIPELINE_CLOSED);
-          } catch (IOException | TimeoutException e) {
+          } catch (IOException e) {
             LOG.warn("Pipeline {} not found while updating state. ",
                 p.getId(), e);
           }
@@ -151,7 +150,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
           closePipeline(p, false);
-        } catch (IOException | TimeoutException e) {
+        } catch (IOException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }
       });
@@ -166,7 +165,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    */
   @VisibleForTesting
   public void addPipeline(Pipeline pipeline)
-      throws IOException, TimeoutException {
+      throws IOException {
     acquireWriteLock();
     try {
       getStateManager().addPipeline(

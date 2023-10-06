@@ -16,12 +16,14 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -30,7 +32,9 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.AfterClass;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -50,9 +54,10 @@ public class TestListStatus {
   private static String scmId;
   private static String omId;
   private static OzoneBucket fsoOzoneBucket;
+  private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -71,10 +76,11 @@ public class TestListStatus {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a LEGACY bucket
     fsoOzoneBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
@@ -84,6 +90,7 @@ public class TestListStatus {
 
   @AfterClass
   public static void teardownClass() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

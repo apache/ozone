@@ -382,7 +382,8 @@ public class OzoneTokenIdentifier extends
         .append(", strToSign=").append(getStrToSign())
         .append(", signature=").append(getSignature())
         .append(", awsAccessKeyId=").append(getAwsAccessId())
-        .append(", omServiceId=").append(getOmServiceId());
+        .append(", omServiceId=").append(getOmServiceId())
+        .append(", omCertSerialId=").append(getOmCertSerialId());
     return buffer.toString();
   }
 }

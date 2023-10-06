@@ -133,6 +133,7 @@ public class PipelineReportHandler implements
       }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
+        LOGGER.info("Opened pipeline {}", pipelineID);
       }
     }
     if (pipeline.isHealthy()) {

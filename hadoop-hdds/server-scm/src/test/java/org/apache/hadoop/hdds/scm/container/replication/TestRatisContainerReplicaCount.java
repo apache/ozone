@@ -17,16 +17,22 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.RatisContainerReplicaCount;
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -34,8 +40,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,7 +65,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -61,7 +74,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   @Test
@@ -70,7 +83,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 2, false);
+    validate(rcnt, false, 2, false, false);
   }
 
   @Test
@@ -80,7 +93,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, false);
   }
 
   /**
@@ -95,7 +108,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   /**
@@ -109,7 +122,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   /**
@@ -123,7 +136,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 1, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, false);
   }
 
   @Test
@@ -133,7 +146,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, -1, true);
+    validate(rcnt, true, -1, true, false);
   }
 
   @Test
@@ -143,7 +156,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -153,7 +166,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 2, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   @Test
@@ -162,7 +175,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -171,7 +184,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 1, 1, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   @Test
@@ -180,7 +193,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 2, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, false);
   }
 
   /**
@@ -194,17 +207,18 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
-  @Test
-  void testOneDecommissionedReplica() {
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
+  void testOneDecommissionReplica(HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONING);
+        registerNodes(IN_SERVICE, IN_SERVICE, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -214,17 +228,18 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
-  @Test
-  void testAllDecommissioned() {
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
+  void testAllDecommissioned(HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(DECOMMISSIONED, DECOMMISSIONED, DECOMMISSIONED);
+        registerNodes(state, state, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 3, false);
+    validate(rcnt, false, 3, false, true);
   }
 
   @Test
@@ -233,7 +248,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
 
   }
 
@@ -243,7 +258,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 1, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
   @Test
@@ -252,21 +267,23 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   /**
    * Maintenance tests from here.
    */
 
-  @Test
-  void testOneHealthyTwoMaintenanceMinRepOfTwo() {
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#maintenanceStates")
+  void testOneHealthyTwoMaintenanceMinRepOfTwo(
+      HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(IN_SERVICE, IN_MAINTENANCE, IN_MAINTENANCE);
+        registerNodes(IN_SERVICE, state, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -276,7 +293,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -286,7 +303,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 1);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -296,7 +313,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
   @Test
@@ -306,7 +323,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 2, false);
+    validate(rcnt, false, 2, false, true);
   }
 
   /**
@@ -321,7 +338,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   /**
@@ -337,7 +354,8 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, -1, true);
+    validate(rcnt, true, -1, true, false);
+    assertTrue(rcnt.isSafelyOverReplicated());
   }
 
   @Test
@@ -346,7 +364,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -355,7 +373,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 1, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
   @Test
@@ -364,7 +382,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -375,7 +393,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -413,6 +431,180 @@ class TestRatisContainerReplicaCount {
   }
 
   @Test
+  void testSufficientReplicationWithMismatchedReplicaState() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0);
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, CLOSING));
+
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    validate(rcnt, true, 0, false, false);
+  }
+
+  @Test
+  void testReplicaCounts() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0);
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, CLOSING));
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, UNHEALTHY));
+
+    // First, test by not considering UNHEALTHY replicas.
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertFalse(rcnt.isOverReplicated());
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY = 1
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+
+    // Now, test by considering UNHEALTHY replicas
+    rcnt = new RatisContainerReplicaCount(container, replicas,
+        Collections.emptyList(), 2, true);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertTrue(rcnt.isOverReplicated());
+    assertEquals(1, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY = 1
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+  }
+
+  @Test
+  void testUnhealthyReplicaOnDecommissionedNodeWithPendingDelete() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(ContainerID.valueOf(1L), CLOSED, 0, 0);
+    replicas.add(createContainerReplica(ContainerID.valueOf(1L), 0,
+        IN_SERVICE, CLOSING));
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(ContainerID.valueOf(1L), 0,
+            DECOMMISSIONED, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    // First, test by not considering UNHEALTHY replicas.
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertFalse(rcnt.isOverReplicated());
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY decommissioned is counted, too
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // due to considerUnhealthy=false
+    assertEquals(0, rcnt.getDecommissionCount());
+
+    // Now, test by considering UNHEALTHY replicas
+    rcnt = new RatisContainerReplicaCount(container, replicas,
+        Collections.emptyList(), 2, true);
+    assertTrue(rcnt.isSufficientlyReplicated());
+    assertFalse(rcnt.isOverReplicated());
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+
+    // CLOSED + CLOSED + CLOSING = 3
+    assertEquals(3, rcnt.getHealthyReplicaCount());
+    // CLOSING = 1
+    assertEquals(1, rcnt.getMisMatchedReplicaCount());
+    // CLOSED + CLOSED = 2
+    assertEquals(2, rcnt.getMatchingReplicaCount());
+    // UNHEALTHY decommissioned is counted as unhealthy
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // due to considerUnhealthy=true
+    assertEquals(1, rcnt.getDecommissionCount());
+  }
+
+  /**
+   * There is a CLOSED container with 3 CLOSED replicas and 1 UNHEALTHY
+   * replica. There is a pending delete on the UNHEALTHY replica.
+   * Expectation: If considerUnhealthy in RatisContainerReplicaCount is
+   * false, the pending delete on the UNHEALTHY replica should be ignored.
+   * The container should be sufficiently replicated.
+   * If considerUnhealthy is true, the pending delete should be considered,
+   * but the container is still sufficiently replicated because we have
+   * enough CLOSED replicas.
+   */
+  @Test
+  void testSufficientReplicationWithPendingDeleteOnUnhealthyReplica() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        ContainerID.valueOf(1L), 0, IN_SERVICE, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    List<ContainerReplicaOp> ops = new ArrayList<>();
+    ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplica.getDatanodeDetails(), 0));
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(container, replicas, ops, 2, false);
+    validate(withoutUnhealthy, true, 0, false, false);
+
+    RatisContainerReplicaCount withUnhealthy =
+        new RatisContainerReplicaCount(container, replicas, ops, 2, true);
+    validate(withUnhealthy, true, 0, false, false);
+  }
+
+  /**
+   * Scenario: A CLOSED RATIS container with 2 CLOSED and 1 UNHEALTHY replicas.
+   * Expectation: If considerUnhealthy is false, this container is not
+   * sufficiently replicated and replicaDelta is 1.
+   */
+  @Test
+  public void testUnderReplicationBecauseOfUnhealthyReplica() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        ContainerID.valueOf(1L), 0, IN_SERVICE, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2,
+            false);
+    validate(withoutUnhealthy, false, 1, false, false);
+  }
+
+  @Test
   void testIsHealthyWithMaintReplicaIsHealthy() {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, IN_MAINTENANCE,
@@ -433,12 +625,222 @@ class TestRatisContainerReplicaCount {
     assertFalse(rcnt.isSufficientlyReplicated());
   }
 
+  @Test
+  void testOverReplicatedWithAndWithoutPending() {
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
+        IN_SERVICE, IN_SERVICE, IN_SERVICE);
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 2, 3, 2);
+    assertTrue(rcnt.isOverReplicated(false));
+    assertFalse(rcnt.isOverReplicated(true));
+    assertEquals(2, rcnt.getExcessRedundancy(false));
+    assertEquals(0, rcnt.getExcessRedundancy(true));
+  }
+
+  /**
+   * A container is safely over replicated if:
+   * 1. It is over replicated.
+   * 2. Has at least replication factor number of matching replicas.
+   * 3. # matching replicas - replication factor >= pending deletes.
+   */
+  @Test
+  void testSafelyOverReplicated() {
+    /*
+    First case: 3 CLOSED, 2 UNHEALTHY, 1 pending delete.
+    Expectation: Not safely over replicated because rule 3 is violated.
+     */
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), CLOSED, 0, 0, 0);
+    Set<ContainerReplica> unhealthyReplicas =
+        createReplicas(container.containerID(), UNHEALTHY, 0, 0);
+    replicas.addAll(unhealthyReplicas);
+    List<ContainerReplicaOp> ops = new ArrayList<>();
+    ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplicas.iterator().next().getDatanodeDetails(), 0));
+
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(container, replicas, ops, 2, false);
+    validate(withoutUnhealthy, true, 0, false, false);
+    assertFalse(withoutUnhealthy.isSafelyOverReplicated());
+
+    RatisContainerReplicaCount withUnhealthy =
+        new RatisContainerReplicaCount(container, replicas, ops, 2, true);
+    validate(withUnhealthy, true, -1, true, false);
+    assertFalse(withUnhealthy.isSafelyOverReplicated());
+
+    /*
+    Second case: 2 CLOSED, 1 CLOSING, 1 UNHEALTHY
+     */
+    container = createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    replicas = createReplicas(container.containerID(), CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            UNHEALTHY);
+    ContainerReplica misMatchedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE, CLOSING);
+    replicas.add(unhealthyReplica);
+    replicas.add(misMatchedReplica);
+
+    withoutUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2,
+            false);
+    validate(withoutUnhealthy, true, 0, false, false);
+    assertFalse(withoutUnhealthy.isSafelyOverReplicated());
+
+    withUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2,
+            true);
+    validate(withUnhealthy, true, -1, true, false);
+    // Violates rule 2
+    assertFalse(withUnhealthy.isSafelyOverReplicated());
+    // now check by adding a CLOSED replica
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, CLOSED));
+    withUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2,
+            true);
+    validate(withUnhealthy, true, -2, true, false);
+    assertTrue(withUnhealthy.isSafelyOverReplicated());
+  }
+
+  @Test
+  void testRemainingRedundancy() {
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
+        IN_SERVICE, IN_SERVICE);
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
+    Assert.assertEquals(2, rcnt.getRemainingRedundancy());
+    replica = registerNodes(IN_SERVICE);
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
+    Assert.assertEquals(0, rcnt.getRemainingRedundancy());
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
+    Assert.assertEquals(0, rcnt.getRemainingRedundancy());
+  }
+
+  @Test
+  void testSufficientlyReplicatedWithAndWithoutPending() {
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
+    RatisContainerReplicaCount rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
+    assertFalse(rcnt.isSufficientlyReplicated(true));
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
+    assertTrue(rcnt.isSufficientlyReplicated(true));
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+
+    replica = registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+    assertFalse(rcnt.isSufficientlyReplicated(true));
+    rcnt =
+        new RatisContainerReplicaCount(container, replica, 1, 1, 3, 2);
+    assertFalse(rcnt.isSufficientlyReplicated(false));
+    assertTrue(rcnt.isSufficientlyReplicated(true));
+
+  }
+
+  @Test
+  void testQuasiClosedReplicaWithCorrectSequenceID() {
+    final ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    final Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), CLOSED, 0, 0);
+    final Set<ContainerReplica> quasiClosedReplica =
+        createReplicas(container.containerID(), QUASI_CLOSED, 0);
+    replicas.addAll(quasiClosedReplica);
+
+    final RatisContainerReplicaCount crc =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    validate(crc, true, 0, false, false);
+    assertTrue(crc.isSufficientlyReplicated(true));
+    assertEquals(0, crc.getUnhealthyReplicaCount());
+
+    // With additional unhealthy replica
+
+    final Set<ContainerReplica> unhealthyReplica =
+        createReplicas(container.containerID(), UNHEALTHY, 0);
+    replicas.addAll(unhealthyReplica);
+
+    final RatisContainerReplicaCount crcWithUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    validate(crcWithUnhealthy, true, 0, false, false);
+    assertTrue(crcWithUnhealthy.isSufficientlyReplicated(true));
+    assertEquals(1, crcWithUnhealthy.getUnhealthyReplicaCount());
+  }
+
+  @Test
+  void testQuasiClosedReplicaWithInCorrectSequenceID() {
+
+    final long sequenceID = 101;
+    final ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED, sequenceID);
+    final ContainerID containerID = container.containerID();
+
+    final ContainerReplica replicaOne = createContainerReplica(
+        containerID, 0, IN_SERVICE, State.CLOSED, sequenceID);
+    final ContainerReplica replicaTwo = createContainerReplica(
+        containerID, 0, IN_SERVICE, State.CLOSED, sequenceID);
+
+    final ContainerReplica quasiCloseReplica = createContainerReplica(
+        containerID, 0, IN_SERVICE, State.QUASI_CLOSED, sequenceID - 5);
+
+    final Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(replicaOne);
+    replicas.add(replicaTwo);
+    replicas.add(quasiCloseReplica);
+
+    final RatisContainerReplicaCount crc =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    validate(crc, false, 1, false, false);
+    assertFalse(crc.isSufficientlyReplicated(true));
+    assertEquals(1, crc.getUnhealthyReplicaCount());
+
+    // With additional unhealthy replica
+
+    final Set<ContainerReplica> unhealthyReplica =
+        createReplicas(container.containerID(), UNHEALTHY, 0);
+    replicas.addAll(unhealthyReplica);
+
+    final RatisContainerReplicaCount crcWithUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false);
+    validate(crcWithUnhealthy, false, 1, false, false);
+    assertFalse(crcWithUnhealthy.isSufficientlyReplicated(true));
+    assertEquals(2, crcWithUnhealthy.getUnhealthyReplicaCount());
+  }
+
   private void validate(RatisContainerReplicaCount rcnt,
       boolean sufficientlyReplicated, int replicaDelta,
-      boolean overReplicated) {
+      boolean overReplicated, boolean insufficientDueToOutOfService) {
     assertEquals(sufficientlyReplicated, rcnt.isSufficientlyReplicated());
     assertEquals(overReplicated, rcnt.isOverReplicated());
     assertEquals(replicaDelta, rcnt.additionalReplicaNeeded());
+    assertEquals(insufficientDueToOutOfService,
+        rcnt.insufficientDueToOutOfService());
   }
 
   private Set<ContainerReplica> registerNodes(

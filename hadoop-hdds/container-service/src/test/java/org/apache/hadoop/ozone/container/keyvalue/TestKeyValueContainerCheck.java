@@ -71,17 +71,17 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID, containerData.getVolume());
+            containerID, containerData.getVolume(), container);
 
     // first run checks on a Open Container
-    boolean valid = kvCheck.fastCheck();
+    boolean valid = kvCheck.fastCheck().isHealthy();
     assertTrue(valid);
 
     container.close();
 
     // next run checks on a Closed Container
     valid = kvCheck.fullCheck(new DataTransferThrottler(
-        c.getBandwidthPerVolume()), null);
+        c.getBandwidthPerVolume()), null).isHealthy();
     assertTrue(valid);
   }
 
@@ -106,7 +106,7 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID, containerData.getVolume());
+            containerID, containerData.getVolume(), container);
 
     File dbFile = KeyValueContainerLocationUtil
         .getContainerDBFile(containerData);
@@ -131,12 +131,12 @@ public class TestKeyValueContainerCheck
     }
 
     // metadata check should pass.
-    boolean valid = kvCheck.fastCheck();
+    boolean valid = kvCheck.fastCheck().isHealthy();
     assertTrue(valid);
 
     // checksum validation should fail.
     valid = kvCheck.fullCheck(new DataTransferThrottler(
-            sc.getBandwidthPerVolume()), null);
+            sc.getBandwidthPerVolume()), null).isHealthy();
     assertFalse(valid);
   }
 }

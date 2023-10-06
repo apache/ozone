@@ -99,4 +99,7 @@ public interface DatanodeStore extends Closeable {
    * @return true if the DB is closed.
    */
   boolean isClosed();
+
+  default void compactionIfNeeded() throws Exception {
+  }
 }

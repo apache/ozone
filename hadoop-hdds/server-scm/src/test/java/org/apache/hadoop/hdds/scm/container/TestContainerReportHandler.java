@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -36,6 +38,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -46,6 +49,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +58,12 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -63,6 +71,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
@@ -89,7 +98,7 @@ public class TestContainerReportHandler {
     nodeManager = new MockNodeManager(true, 10);
     containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestContainerReportHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -103,6 +112,8 @@ public class TestContainerReportHandler {
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
+            Clock.system(ZoneId.systemDefault())))
         .build();
     publisher = Mockito.mock(EventPublisher.class);
 
@@ -153,6 +164,62 @@ public class TestContainerReportHandler {
     }
 
     FileUtil.fullyDelete(testDir);
+  }
+
+  private void testReplicaIndexUpdate(ContainerInfo container,
+               DatanodeDetails dn, int replicaIndex,
+               Map<DatanodeDetails, Integer> expectedReplicaMap) {
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+            container.containerID(), ContainerReplicaProto.State.CLOSED,
+            dn.getUuidString(), 2000000000L, 100000000L, replicaIndex);
+    final ContainerReportFromDatanode containerReportFromDatanode =
+            new ContainerReportFromDatanode(dn, containerReport);
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+            nodeManager, containerManager);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+    Assert.assertEquals(containerStateManager
+            .getContainerReplicas(container.containerID()).stream()
+            .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
+                    ContainerReplica::getReplicaIndex)), expectedReplicaMap);
+
+  }
+
+  @Test
+  public void testECReplicaIndexValidation() throws NodeNotFoundException,
+          IOException, TimeoutException {
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+            NodeStatus.inServiceHealthy()).iterator();
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final DatanodeDetails datanodeTwo = nodeIterator.next();
+    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeDetails datanodeFour = nodeIterator.next();
+    final DatanodeDetails datanodeFive = nodeIterator.next();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo container = getECContainer(LifeCycleState.CLOSED,
+            PipelineID.randomId(), replicationConfig);
+    nodeManager.addContainer(datanodeOne, container.containerID());
+    nodeManager.addContainer(datanodeTwo, container.containerID());
+    nodeManager.addContainer(datanodeThree, container.containerID());
+    nodeManager.addContainer(datanodeFour, container.containerID());
+    nodeManager.addContainer(datanodeFive, container.containerID());
+    containerStateManager.addContainer(container.getProtobuf());
+    Set<ContainerReplica> replicas =
+            HddsTestUtils.getReplicasWithReplicaIndex(container.containerID(),
+            ContainerReplicaProto.State.CLOSED,
+            HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT,
+            HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT,
+            1000000L,
+            datanodeOne, datanodeTwo, datanodeThree,
+            datanodeFour, datanodeFive);
+    Map<DatanodeDetails, Integer> replicaMap = replicas.stream()
+            .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
+                    ContainerReplica::getReplicaIndex));
+    replicas.forEach(r -> containerStateManager.updateContainerReplica(
+                    container.containerID(), r));
+    testReplicaIndexUpdate(container, datanodeOne, 0, replicaMap);
+    testReplicaIndexUpdate(container, datanodeOne, 6, replicaMap);
+    replicaMap.put(datanodeOne, 2);
+    testReplicaIndexUpdate(container, datanodeOne, 2, replicaMap);
   }
 
   @Test
@@ -338,6 +405,107 @@ public class TestContainerReportHandler {
 
     Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(containerOne.containerID()).getState());
+  }
+
+  @Test
+  public void testClosingToClosedForECContainer()
+      throws NodeNotFoundException, IOException, TimeoutException {
+    // Create an EC 3-2 container
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo container = getECContainer(LifeCycleState.CLOSING,
+        PipelineID.randomId(), replicationConfig);
+    List<DatanodeDetails> dns = setupECContainerForTesting(container);
+    createAndHandleContainerReport(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(1), 2);
+    // index is 2; container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+
+    createAndHandleContainerReport(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(2), 3);
+    // index is 3; container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+
+    createAndHandleContainerReport(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(0), 1);
+    // index is 1; container should transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container.containerID()).getState());
+
+    // Test with an EC 6-3 container
+    replicationConfig = new ECReplicationConfig(6, 3);
+    final ContainerInfo container2 = getECContainer(LifeCycleState.CLOSING,
+        PipelineID.randomId(), replicationConfig);
+    dns = setupECContainerForTesting(container2);
+
+    createAndHandleContainerReport(container2.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(5), 6);
+    // index is 6, container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container2.containerID()).getState());
+
+    createAndHandleContainerReport(container2.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
+    // index is 9, container should transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container2.containerID()).getState());
+  }
+
+  /**
+   * Creates the required number of DNs that will hold a replica each for the
+   * specified EC container. Registers these DNs with the NodeManager, adds this
+   * container and its replicas to ContainerStateManager etc.
+   *
+   * @param container must be an EC container
+   * @return List of datanodes that host replicas of this container
+   */
+  private List<DatanodeDetails> setupECContainerForTesting(
+      ContainerInfo container)
+      throws IOException, TimeoutException, NodeNotFoundException {
+    Assertions.assertEquals(HddsProtos.ReplicationType.EC,
+        container.getReplicationType());
+    final int numDatanodes =
+        container.getReplicationConfig().getRequiredNodes();
+    // Register required number of datanodes with NodeManager
+    List<DatanodeDetails> dns = new ArrayList<>(numDatanodes);
+    for (int i = 0; i < numDatanodes; i++) {
+      dns.add(randomDatanodeDetails());
+      nodeManager.register(dns.get(i), null, null);
+    }
+
+    // Add this container to ContainerStateManager
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // Create its replicas and add them to ContainerStateManager
+    Set<ContainerReplica> replicas =
+        HddsTestUtils.getReplicasWithReplicaIndex(container.containerID(),
+            ContainerReplicaProto.State.CLOSING,
+            HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT,
+            HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT,
+            container.getSequenceId(),
+            dns.toArray(new DatanodeDetails[0]));
+    for (ContainerReplica r : replicas) {
+      containerStateManager.updateContainerReplica(container.containerID(), r);
+    }
+
+    // Tell NodeManager that each DN hosts a replica of this container
+    for (DatanodeDetails dn : dns) {
+      nodeManager.addContainer(dn, container.containerID());
+    }
+    return dns;
+  }
+
+  private void createAndHandleContainerReport(ContainerID containerID,
+                                              ContainerReplicaProto.State state,
+                                              DatanodeDetails datanodeDetails,
+                                              int replicaIndex) {
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        getContainerReportFromDatanode(containerID, state,
+            datanodeDetails, 2000000000L, 100000L, replicaIndex);
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+        nodeManager, containerManager);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
   }
 
   @Test

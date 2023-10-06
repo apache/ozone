@@ -44,11 +44,9 @@ public class UnknownEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.UNKNOWN);
-    namespaceSummaryResponse.setStatus(ResponseStatus.PATH_NOT_FOUND);
-
-    return namespaceSummaryResponse;
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.UNKNOWN)
+        .setStatus(ResponseStatus.PATH_NOT_FOUND).build();
   }
 
   @Override

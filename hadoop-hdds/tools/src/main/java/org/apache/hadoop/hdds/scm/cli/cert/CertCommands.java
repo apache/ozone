@@ -40,6 +40,7 @@ import picocli.CommandLine.Spec;
     subcommands = {
         InfoSubcommand.class,
         ListSubcommand.class,
+        CleanExpiredCertsSubcommand.class,
     })
 
 @MetaInfServices(SubcommandWithParent.class)

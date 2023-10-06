@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 
-import java.util.Set;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
@@ -32,9 +34,20 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 public interface ContainerReplicaCount {
   ContainerInfo getContainer();
 
-  Set<ContainerReplica> getReplicas();
+  List<ContainerReplica> getReplicas();
 
   boolean isSufficientlyReplicated();
+
+  /**
+   * Checks if a container has enough replicas to allow the specified
+   * datanode to be taken offline. This method is the interface between the
+   * decommissioning flow and Replication Manager.
+   * @param datanode the datanode being taken offline
+   * @param nodeManager an instance of {@link NodeManager}
+   * @return true if the datanode can be taken offline, otherwise false
+   */
+  boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager);
 
   boolean isOverReplicated();
 
@@ -59,6 +72,8 @@ public interface ContainerReplicaCount {
             containerState, r.getState()));
 
   }
+
+  boolean isHealthyEnoughForOffline();
 
   /**
    * Return true if there are insufficient replicas to recover this container.

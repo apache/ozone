@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -27,13 +27,18 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.debug.PrefixParser;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.net.URI;
@@ -42,6 +47,9 @@ import java.net.URI;
  * Test Ozone Prefix Parser.
  */
 public class TestOzoneFileSystemPrefixParser {
+
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   private static MiniOzoneCluster cluster = null;
 
@@ -69,8 +77,10 @@ public class TestOzoneFileSystemPrefixParser {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    try (OzoneClient client = cluster.newClient()) {
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    }
 
     String rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
@@ -92,7 +102,7 @@ public class TestOzoneFileSystemPrefixParser {
     IOUtils.closeQuietly(fs);
   }
 
-  @Test(timeout = 120000)
+  @Test
   public void testPrefixParsePath() throws Exception {
 
     cluster.stop();

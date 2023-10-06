@@ -20,6 +20,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -44,7 +46,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import javax.ws.rs.core.Response;
 
@@ -53,11 +57,12 @@ import javax.ws.rs.core.Response;
  */
 public class TestReconWithOzoneManagerFSO {
 
+  private static OzoneClient client;
   /**
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static ObjectStore store;
@@ -75,11 +80,13 @@ public class TestReconWithOzoneManagerFSO {
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-    store = cluster.getClient().getObjectStore();
+    client = cluster.newClient();
+    store = client.getObjectStore();
   }
 
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -128,8 +135,10 @@ public class TestReconWithOzoneManagerFSO {
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();
     Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
-    Assert.assertEquals(1, entity.getNumTotalKey());
-    Assert.assertEquals(0, entity.getNumTotalDir());
+    Assert.assertEquals(1, entity.getCountStats().getNumTotalKey());
+    Assert.assertEquals(0, entity.getCountStats().getNumTotalDir());
+    Assert.assertEquals(-1, entity.getCountStats().getNumVolume());
+    Assert.assertEquals(-1, entity.getCountStats().getNumBucket());
     for (int i = 0; i < 10; i++) {
       Assert.assertNotNull(impl.getOMMetadataManagerInstance()
               .getVolumeTable().get("/vol" + i));
@@ -149,10 +158,10 @@ public class TestReconWithOzoneManagerFSO {
             (NamespaceSummaryResponse) rootBasicRes.getEntity();
     Assert.assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
     // one additional dummy volume at creation
-    Assert.assertEquals(13, rootBasicEntity.getNumVolume());
-    Assert.assertEquals(12, rootBasicEntity.getNumBucket());
-    Assert.assertEquals(12, rootBasicEntity.getNumTotalDir());
-    Assert.assertEquals(12, rootBasicEntity.getNumTotalKey());
+    Assert.assertEquals(13, rootBasicEntity.getCountStats().getNumVolume());
+    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumBucket());
+    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumTotalDir());
+    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumTotalKey());
   }
 
   /**

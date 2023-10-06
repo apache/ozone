@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -50,7 +51,6 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -99,7 +99,6 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     config.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(config);
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 10, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 10, TimeUnit.SECONDS);
     conf.setQuietMode(false);
@@ -152,6 +151,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
    */
   @AfterEach
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -247,7 +247,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -255,6 +256,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-6113")
   public void testWatchForCommitDatanodeFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
@@ -334,7 +336,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -433,15 +436,12 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     // now close the stream, It will update the ack length after watchForCommit
 
     key.close();
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     validateData(keyName, data1);
   }
@@ -502,7 +502,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertTrue(keyOutputStream.getLocationInfoList().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -572,7 +573,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -662,7 +664,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -754,7 +757,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
@@ -848,7 +852,8 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);

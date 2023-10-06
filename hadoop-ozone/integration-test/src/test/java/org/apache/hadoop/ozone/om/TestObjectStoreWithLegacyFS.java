@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -47,7 +49,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +67,10 @@ import java.util.UUID;
 public class TestObjectStoreWithLegacyFS {
 
   @Rule
-  public Timeout timeout = Timeout.seconds(200);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(200));
 
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
 
   private String volumeName;
 
@@ -87,6 +92,7 @@ public class TestObjectStoreWithLegacyFS {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
   /**
@@ -94,6 +100,7 @@ public class TestObjectStoreWithLegacyFS {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -105,10 +112,9 @@ public class TestObjectStoreWithLegacyFS {
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
         BucketLayout.OBJECT_STORE);
-    volume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+    volume = client.getObjectStore().getVolume(volumeName);
   }
 
   /**
@@ -145,10 +151,10 @@ public class TestObjectStoreWithLegacyFS {
   private boolean assertKeyCount(
       Table<String, OmKeyInfo> keyTable,
       String dbKey, int expectedCnt, String keyName) {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        itr = keyTable.iterator();
     int countKeys = 0;
-    try {
+    int matchingKeys = 0;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+          itr = keyTable.iterator()) {
       itr.seek(dbKey);
       while (itr.hasNext()) {
 
@@ -157,16 +163,20 @@ public class TestObjectStoreWithLegacyFS {
           break;
         }
         countKeys++;
-        Assert.assertTrue(keyValue.getKey().endsWith(keyName));
+        matchingKeys += keyValue.getKey().endsWith(keyName) ? 1 : 0;
       }
     } catch (IOException ex) {
       LOG.info("Test failed with: " + ex.getMessage(), ex);
       Assert.fail("Test failed with: " + ex.getMessage());
     }
-    if (countKeys != expectedCnt) {
+    if (countKeys > expectedCnt) {
+      Assert.fail("Test failed with: too many keys found, expected "
+          + expectedCnt + " keys, found " + countKeys + " keys");
+    }
+    if (matchingKeys != expectedCnt) {
       LOG.info("Couldn't find KeyName:{} in KeyTable, retrying...", keyName);
     }
-    return countKeys == expectedCnt;
+    return countKeys == expectedCnt && matchingKeys == expectedCnt;
   }
 
   @Test

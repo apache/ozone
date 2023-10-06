@@ -43,13 +43,17 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
@@ -157,7 +161,10 @@ public class TestS3GatewayMetrics {
           null, "random", null,
           null, null);
       fail();
-    } catch (OS3Exception e) {
+    } catch (OS3Exception ex) {
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+          ex.getErrorMessage());
     }
 
     long curMetric = metrics.getGetBucketFailure();
@@ -169,22 +176,34 @@ public class TestS3GatewayMetrics {
 
     long oriMetric = metrics.getCreateBucketSuccess();
 
-    bucketEndpoint.put(bucketName, null,
-        null, null);
-    long curMetric = metrics.getCreateBucketSuccess();
+    try {
+      bucketEndpoint.put("newBucket", null, null, null);
 
-    assertEquals(1L, curMetric - oriMetric);
+      long curMetric = metrics.getCreateBucketSuccess();
+      assertEquals(1L, curMetric - oriMetric);
+
+    } catch (OS3Exception ex) {
+      fail(); // Should not throw error for new bucket
+    }
+
   }
 
   @Test
   public void testCreateBucketFailure() throws Exception {
-    // Creating an error by trying to create a bucket that already exists
     long oriMetric = metrics.getCreateBucketFailure();
 
-    bucketEndpoint.put(bucketName, null, null, null);
+    try {
+      // Creating an error by trying to create a bucket that already exists
+      bucketEndpoint.put(bucketName, null, null, null);
+      fail();
 
-    long curMetric = metrics.getCreateBucketFailure();
-    assertEquals(1L, curMetric - oriMetric);
+    } catch (OS3Exception ex) {
+      Assert.assertEquals(HTTP_CONFLICT, ex.getHttpCode());
+      Assert.assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
+
+      long curMetric = metrics.getCreateBucketFailure();
+      assertEquals(1L, curMetric - oriMetric);
+    }
   }
 
   @Test
@@ -373,8 +392,9 @@ public class TestS3GatewayMetrics {
     keyEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
     // GET the key from the bucket
-    keyEndpoint.get(bucketName, keyName, null, 0,
-        null, body);
+    Response response = keyEndpoint.get(bucketName, keyName, null, 0, null);
+    StreamingOutput stream = (StreamingOutput) response.getEntity();
+    stream.write(new ByteArrayOutputStream());
     long curMetric = metrics.getGetKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -385,7 +405,7 @@ public class TestS3GatewayMetrics {
     // Fetching a non-existent key
     try {
       keyEndpoint.get(bucketName, "unknownKey", null, 0,
-          null, null);
+          null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
@@ -517,7 +537,7 @@ public class TestS3GatewayMetrics {
 
     // Listing out the parts by providing the uploadID
     keyEndpoint.get(bucketName, keyName,
-        uploadID, 3, null, null);
+        uploadID, 3, null);
     long curMetric = metrics.getListPartsSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -529,7 +549,7 @@ public class TestS3GatewayMetrics {
     try {
       // Listing out the parts by providing the uploadID after aborting
       keyEndpoint.get(bucketName, keyName,
-          "wrong_id", 3, null, null);
+          "wrong_id", 3, null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());

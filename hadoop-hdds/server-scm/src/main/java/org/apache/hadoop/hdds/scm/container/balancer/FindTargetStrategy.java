@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
+import javax.annotation.Nonnull;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -60,4 +62,11 @@ public interface FindTargetStrategy {
   void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
                     ContainerBalancerConfiguration config, Double upperLimit);
 
+  /**
+   * Resets the collection of target {@link DatanodeUsageInfo} that can be
+   * selected for balancing.
+   * @param targets collection of target {@link DatanodeDetails}
+   *               that containers can be moved to
+   */
+  void resetPotentialTargets(@Nonnull Collection<DatanodeDetails> targets);
 }

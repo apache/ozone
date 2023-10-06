@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -52,7 +54,9 @@ import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
@@ -64,9 +68,10 @@ public class TestOzoneManagerRestart {
   private static String clusterId;
   private static String scmId;
   private static String omId;
+  private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(240);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(240));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -84,13 +89,16 @@ public class TestOzoneManagerRestart {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    // Use OBS layout for key rename testing.
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.OBJECT_STORE.name());
     cluster =  MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-
+    client = cluster.newClient();
   }
 
   /**
@@ -98,6 +106,7 @@ public class TestOzoneManagerRestart {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -107,7 +116,6 @@ public class TestOzoneManagerRestart {
   public void testRestartOMWithVolumeOperation() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
 
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     objectStore.createVolume(volumeName);
@@ -137,8 +145,6 @@ public class TestOzoneManagerRestart {
   public void testRestartOMWithBucketOperation() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
 
@@ -179,8 +185,6 @@ public class TestOzoneManagerRestart {
 
     String newKey1 = "key1new" + RandomStringUtils.randomNumeric(5);
     String newKey2 = "key2new" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
 

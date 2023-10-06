@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.4"
+version: "3.8"
 
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
@@ -27,7 +27,7 @@ x-common-config:
 
 x-replication:
   &replication
-  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
+  OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
 services:
   datanode:
@@ -60,6 +60,14 @@ services:
       OZONE_OPTS:
       <<: *replication
     command: ["ozone","scm"]
+  httpfs:
+    <<: *common-config
+    environment:
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    ports:
+      - 14000:14000
+    command: [ "ozone","httpfs" ]
   s3g:
     <<: *common-config
     environment:

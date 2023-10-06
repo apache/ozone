@@ -34,13 +34,9 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
                                   String volumeName, String bucketName,
                                   String keyName) throws IOException {
-    boolean acquiredLock;
-
-    acquiredLock = omMetadataManager.getLock()
-        .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
-
-    return acquiredLock;
+    return omMetadataManager.getLock()
+        .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
   }
 
   @Override
@@ -49,21 +45,15 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
                                String keyName) {
     omMetadataManager.getLock()
         .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName);
-
-    return;
   }
 
   @Override
   public boolean acquireReadLock(OMMetadataManager omMetadataManager,
                                  String volumeName, String bucketName,
                                  String keyName) throws IOException {
-    boolean acquiredLock;
-
-    acquiredLock = omMetadataManager.getLock()
-        .acquireReadLock(BUCKET_LOCK, volumeName, bucketName);
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
-
-    return acquiredLock;
+    return omMetadataManager.getLock()
+        .acquireReadLock(BUCKET_LOCK, volumeName, bucketName);
   }
 
   @Override
@@ -72,7 +62,5 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
                               String keyName) {
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
-
-    return;
   }
 }

@@ -186,6 +186,7 @@ message DatanodeUsageInfoProto {
     optional int64 used = 2;
     optional int64 remaining = 3;
     optional DatanodeDetailsProto node = 4;
+    optional int64 containerCount = 5;
 }
 
 /**
@@ -260,6 +261,17 @@ message AddScmRequestProto {
 }
 
 message AddScmResponseProto {
+    required bool success = 1;
+    optional string scmId = 2;
+}
+
+message RemoveScmRequestProto {
+    required string clusterId = 1;
+    required string scmId = 2;
+    required string ratisAddr = 3;
+}
+
+message RemoveScmResponseProto {
     required bool success = 1;
     optional string scmId = 2;
 }
@@ -356,9 +368,10 @@ message BlockTokenSecretProto {
     required string ownerId = 1;
     required string blockId = 2;
     required uint64 expiryDate = 3;
-    required string omCertSerialId = 4;
+    optional string omCertSerialId = 4 [deprecated=true];
     repeated AccessModeProto modes = 5;
     required uint64 maxLength = 6;
+    optional UUID secretKeyId = 7;
 }
 
 message BlockID {
@@ -404,6 +417,7 @@ message ContainerReplicaHistoryProto {
     required int64 firstSeenTime = 2;
     required int64 lastSeenTime = 3;
     required int64 bcsId = 4;
+    optional string state = 5;
 }
 
 message SCMContainerReplicaProto {
@@ -450,4 +464,34 @@ message ContainerBalancerConfigurationProto {
 
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
+    optional int64 moveReplicationTimeout = 20;
+}
+
+message TransferLeadershipRequestProto {
+    required string newLeaderId = 1;
+}
+
+message TransferLeadershipResponseProto {
+}
+
+message DeletedBlocksTransactionInfo {
+    optional int64 txID = 1;
+    optional int64 containerID = 2;
+    repeated int64 localID = 3;
+    optional int32 count = 4;
+}
+
+message CompactionFileInfoProto {
+    optional string fileName = 1;
+    optional string startKey = 2;
+    optional string endKey = 3;
+    optional string columnFamily = 4;
+}
+
+message CompactionLogEntryProto {
+    optional uint64 dbSequenceNumber = 1;
+    optional uint64 compactionTime = 2;
+    repeated CompactionFileInfoProto inputFileIntoList = 3;
+    repeated CompactionFileInfoProto outputFileIntoList = 4;
+    optional string compactionReason = 5;
 }

@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -31,7 +31,9 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.UUID;
@@ -80,7 +82,7 @@ public class TestOzoneFileSystemWithLinks {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
@@ -88,6 +90,7 @@ public class TestOzoneFileSystemWithLinks {
   private static BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
@@ -110,11 +113,12 @@ public class TestOzoneFileSystemWithLinks {
         .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.newClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -133,6 +137,7 @@ public class TestOzoneFileSystemWithLinks {
 
   @AfterClass
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -180,7 +185,6 @@ public class TestOzoneFileSystemWithLinks {
   public void testLoopInLinkBuckets() throws Exception {
     String linksVolume = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
 
     // Create volume
@@ -225,11 +229,9 @@ public class TestOzoneFileSystemWithLinks {
 
     try {
       FileSystem.get(conf);
-      Assert.fail("Should throw Exception due to loop in Link Buckets");
     } catch (OMException oe) {
       // Expected exception
-      Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
-          oe.getResult());
+      Assert.fail("Should not throw Exception and show orphan buckets");
     }
   }
 

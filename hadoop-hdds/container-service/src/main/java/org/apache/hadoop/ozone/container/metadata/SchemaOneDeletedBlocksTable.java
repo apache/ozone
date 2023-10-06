@@ -76,6 +76,11 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
+  public void deleteRange(String beginKey, String endKey) throws IOException {
+    super.deleteRange(prefix(beginKey), prefix(endKey));
+  }
+
+  @Override
   public boolean isExist(String key) throws IOException {
     return super.isExist(prefix(key));
   }

@@ -17,22 +17,29 @@
  */
 
 import React from 'react';
-import axios from 'axios';
-import {Icon, Table, Tooltip} from 'antd';
+import {Icon, Table, Tooltip, Tabs} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import filesize from 'filesize';
 import moment from 'moment';
 import {showDataFetchError, timeFormat} from 'utils/common';
 import './missingContainers.less';
+import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const size = filesize.partial({standard: 'iec'});
+const {TabPane} = Tabs;
 
-interface IMissingContainerResponse {
+interface IContainerResponse {
   containerID: number;
+  containerState: string;
+  unhealthySince: string;
+  expectedReplicaCount: number;
+  actualReplicaCount: number;
+  replicaDeltaCount: number;
+  reason: string;
   keys: number;
-  replicas: IContainerReplica[];
-  missingSince: number;
   pipelineID: string;
+  replicas: IContainerReplicas[];
 }
 
 export interface IContainerReplica {
@@ -42,9 +49,21 @@ export interface IContainerReplica {
   lastReportTimestamp: number;
 }
 
-export interface IMissingContainersResponse {
-  totalCount: number;
-  containers: IMissingContainerResponse[];
+export interface IContainerReplicas {
+  containerId: number;
+  datanodeUuid: string;
+  datanodeHost: string;
+  firstSeenTime: number;
+  lastSeenTime: number;
+  lastBcsId: number;
+}
+
+interface IUnhealthyContainersResponse {
+  missingCount: number;
+  underReplicatedCount: number;
+  overReplicatedCount: number;
+  misReplicatedCount: number;
+  containers: IContainerResponse[];
 }
 
 interface IKeyResponse {
@@ -62,65 +81,6 @@ interface IContainerKeysResponse {
   totalCount: number;
   keys: IKeyResponse[];
 }
-
-const COLUMNS = [
-  {
-    title: 'Container ID',
-    dataIndex: 'containerID',
-    key: 'containerID',
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.containerID - b.containerID
-  },
-  {
-    title: 'No. of Keys',
-    dataIndex: 'keys',
-    key: 'keys',
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.keys - b.keys
-  },
-  {
-    title: 'Datanodes',
-    dataIndex: 'replicas',
-    key: 'replicas',
-    render: (replicas: IContainerReplica[]) => (
-      <div>
-        {replicas.map(replica => {
-          const tooltip = (
-            <div>
-              <div>First Report Time: {timeFormat(replica.firstReportTimestamp)}</div>
-              <div>Last Report Time: {timeFormat(replica.lastReportTimestamp)}</div>
-            </div>
-          );
-          return (
-            <div key={replica.datanodeHost}>
-              <Tooltip
-                placement='left'
-                title={tooltip}
-              >
-                <Icon type='info-circle' className='icon-small'/>
-              </Tooltip>
-              <span className='pl-5'>
-                {replica.datanodeHost}
-              </span>
-            </div>
-          );
-        }
-        )}
-      </div>
-    )
-  },
-  {
-    title: 'Pipeline ID',
-    dataIndex: 'pipelineID',
-    key: 'pipelineID',
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
-  },
-  {
-    title: 'Missing Since',
-    dataIndex: 'missingSince',
-    key: 'missingSince',
-    render: (missingSince: number) => timeFormat(missingSince),
-    sorter: (a: IMissingContainerResponse, b: IMissingContainerResponse) => a.missingSince - b.missingSince
-  }
-];
 
 const KEY_TABLE_COLUMNS = [
   {
@@ -158,6 +118,79 @@ const KEY_TABLE_COLUMNS = [
   }
 ];
 
+const CONTAINER_TAB_COLUMNS = [
+  {
+    title: 'Container ID',
+    dataIndex: 'containerID',
+    key: 'containerID',
+    isSearchable: true,
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.containerID - b.containerID
+  },
+  {
+    title: 'No. of Keys',
+    dataIndex: 'keys',
+    key: 'keys',
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.keys - b.keys
+  },
+  {
+    title: 'Actual/Expected Replica(s)',
+    dataIndex: 'expectedReplicaCount',
+    key: 'expectedReplicaCount',
+    render: (expectedReplicaCount: number, record: IContainerResponse) => {
+      const actualReplicaCount = record.actualReplicaCount;
+      return (
+        <span>
+          {actualReplicaCount} / {expectedReplicaCount}
+        </span>
+      );
+    }
+  },
+  {
+    title: 'Datanodes',
+    dataIndex: 'replicas',
+    key: 'replicas',
+    render: (replicas: IContainerReplicas[]) => (
+      <div>
+        {replicas && replicas.map(replica => {
+          const tooltip = (
+            <div>
+              <div>First Report Time: {timeFormat(replica.firstSeenTime)}</div>
+              <div>Last Report Time: {timeFormat(replica.lastSeenTime)}</div>
+            </div>
+          );
+          return (
+            <div key={replica.datanodeHost}>
+              <Tooltip
+                placement='left'
+                title={tooltip}
+              >
+                <Icon type='info-circle' className='icon-small'/>
+              </Tooltip>
+              <span className='pl-5'>
+                {replica.datanodeHost}
+              </span>
+            </div>
+          );
+        }
+        )}
+      </div>
+    )
+  },
+  {
+    title: 'Pipeline ID',
+    dataIndex: 'pipelineID',
+    key: 'pipelineID',
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+  },
+  {
+    title: 'Unhealthy Since',
+    dataIndex: 'unhealthySince',
+    key: 'unhealthySince',
+    render: (unhealthySince: number) => timeFormat(unhealthySince),
+    sorter: (a: IContainerResponse, b: IContainerResponse) => a.unhealthySince - b.unhealthySince
+  }
+];
+
 interface IExpandedRow {
   [key: number]: IExpandedRowState;
 }
@@ -171,18 +204,25 @@ interface IExpandedRowState {
 
 interface IMissingContainersState {
   loading: boolean;
-  dataSource: IMissingContainerResponse[];
-  totalCount: number;
+  missingDataSource: IContainerResponse[];
+  underReplicatedDataSource: IContainerResponse[];
+  overReplicatedDataSource: IContainerResponse[];
+  misReplicatedDataSource: IContainerResponse[];
   expandedRowData: IExpandedRow;
 }
+
+let cancelContainerSignal: AbortController;
+let cancelRowExpandSignal: AbortController;
 
 export class MissingContainers extends React.Component<Record<string, object>, IMissingContainersState> {
   constructor(props = {}) {
     super(props);
     this.state = {
       loading: false,
-      dataSource: [],
-      totalCount: 0,
+      missingDataSource: [],
+      underReplicatedDataSource: [],
+      overReplicatedDataSource: [],
+      misReplicatedDataSource: [],
       expandedRowData: {}
     };
   }
@@ -192,14 +232,33 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     this.setState({
       loading: true
     });
-    axios.get('/api/v1/containers/missing').then(response => {
-      const missingContainersResponse: IMissingContainersResponse = response.data;
-      const totalCount = missingContainersResponse.totalCount;
-      const missingContainers: IMissingContainerResponse[] = missingContainersResponse.containers;
+
+    const { request, controller } = AxiosGetHelper('/api/v1/containers/unhealthy', cancelContainerSignal);
+    cancelContainerSignal = controller;
+
+    request.then(allContainersResponse => {
+
+      const allContainersResponseData: IUnhealthyContainersResponse = allContainersResponse.data;
+      const allContainers: IContainerResponse[] = allContainersResponseData.containers;
+
+      const missingContainersResponseData = allContainers && allContainers.filter(item => item.containerState === 'MISSING');
+      const mContainers: IContainerResponse[] = missingContainersResponseData;
+
+      const underReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'UNDER_REPLICATED');
+      const uContainers: IContainerResponse[] = underReplicatedResponseData;
+      
+      const overReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'OVER_REPLICATED');
+      const oContainers: IContainerResponse[] = overReplicatedResponseData;
+      
+      const misReplicatedResponseData = allContainers && allContainers.filter(item => item.containerState === 'MIS_REPLICATED');
+      const mrContainers: IContainerResponse[] = misReplicatedResponseData;
+ 
       this.setState({
         loading: false,
-        dataSource: missingContainers,
-        totalCount
+        missingDataSource: mContainers,
+        underReplicatedDataSource: uContainers,
+        overReplicatedDataSource: oContainers,
+        misReplicatedDataSource: mrContainers
       });
     }).catch(error => {
       this.setState({
@@ -209,11 +268,18 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     });
   }
 
+  componentWillUnmount(): void {
+    cancelRequests([
+      cancelContainerSignal,
+      cancelRowExpandSignal
+    ]);
+  }
+
   onShowSizeChange = (current: number, pageSize: number) => {
     console.log(current, pageSize);
   };
-
-  onRowExpandClick = (expanded: boolean, record: IMissingContainerResponse) => {
+  
+  onRowExpandClick = (expanded: boolean, record: IContainerResponse) => {
     if (expanded) {
       this.setState(({expandedRowData}) => {
         const expandedRowState: IExpandedRowState = expandedRowData[record.containerID] ?
@@ -223,7 +289,11 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
         };
       });
-      axios.get(`/api/v1/containers/${record.containerID}/keys`).then(response => {
+
+      const { request, controller } = AxiosGetHelper(`/api/v1/containers/${record.containerID}/keys`, cancelRowExpandSignal);
+      cancelRowExpandSignal = controller;
+
+      request.then(response => {
         const containerKeysResponse: IContainerKeysResponse = response.data;
         this.setState(({expandedRowData}) => {
           const expandedRowState: IExpandedRowState =
@@ -245,9 +315,12 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         showDataFetchError(error.toString());
       });
     }
+    else{
+      cancelRowExpandSignal && cancelRowExpandSignal.abort();
+    }
   };
 
-  expandedRowRender = (record: IMissingContainerResponse) => {
+  expandedRowRender = (record: IContainerResponse) => {
     const {expandedRowData} = this.state;
     const containerId = record.containerID;
     if (expandedRowData[containerId]) {
@@ -269,24 +342,60 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     return <div>Loading...</div>;
   };
 
+  searchColumn = () => {
+    return CONTAINER_TAB_COLUMNS.reduce<any[]>((filtered, column) => {
+      if (column.isSearchable) {
+        const newColumn = {
+          ...column,
+          ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+        };
+        filtered.push(newColumn);
+      } else {
+        filtered.push(column);
+      }
+
+      return filtered;
+    }, [])
+  };
+
   render() {
-    const {dataSource, loading, totalCount} = this.state;
+    const {missingDataSource, loading, underReplicatedDataSource, overReplicatedDataSource, misReplicatedDataSource} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} missing containers`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange
     };
+    
+    const generateTable = (dataSource) => {
+      return <Table
+        expandRowByClick dataSource={dataSource}
+        columns={this.searchColumn()}
+        loading={loading}
+        pagination={paginationConfig} rowKey='containerID'
+        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
+        onExpandedRowsChange={this.onRowExpandChange}/>
+    }
+
     return (
       <div className='missing-containers-container'>
         <div className='page-header'>
-          Missing Containers ({totalCount})
+          Containers
         </div>
         <div className='content-div'>
-          <Table
-            expandRowByClick dataSource={dataSource} columns={COLUMNS}
-            loading={loading}
-            pagination={paginationConfig} rowKey='containerID'
-            expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+          <Tabs defaultActiveKey='1'>
+            <TabPane key='1' tab={`Missing${(missingDataSource && missingDataSource.length > 0) ? ` (${missingDataSource.length})` : ''}`}>
+              {generateTable(missingDataSource)}
+            </TabPane>
+            <TabPane key='2' tab={`Under-Replicated${(underReplicatedDataSource && underReplicatedDataSource.length > 0) ? ` (${underReplicatedDataSource.length})` : ''}`}>
+              {generateTable(underReplicatedDataSource)}
+            </TabPane>
+            <TabPane key='3' tab={`Over-Replicated${(overReplicatedDataSource && overReplicatedDataSource.length > 0) ? ` (${overReplicatedDataSource.length})` : ''}`}>
+              {generateTable(overReplicatedDataSource)}
+            </TabPane>
+            <TabPane key='4' tab={`Mis-Replicated${(misReplicatedDataSource && misReplicatedDataSource.length > 0) ? ` (${misReplicatedDataSource.length})` : ''}`}>
+              {generateTable(misReplicatedDataSource)}
+            </TabPane>
+          </Tabs>
         </div>
       </div>
     );
