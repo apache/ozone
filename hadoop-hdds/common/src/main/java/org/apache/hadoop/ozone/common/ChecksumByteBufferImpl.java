@@ -28,7 +28,7 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
   private final Checksum checksum;
 
-  private static final Field isReadyOnlyField;
+  private static final Field IS_READY_ONLY_FIELD;
 
   static {
     Field f = null;
@@ -39,7 +39,7 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
     } catch (NoSuchFieldException e) {
       e.printStackTrace();
     }
-    isReadyOnlyField = f;
+    IS_READY_ONLY_FIELD = f;
   }
 
   public ChecksumByteBufferImpl(Checksum impl) {
@@ -52,9 +52,9 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
     // this is a hack to not do memory copy.
-    if (isReadyOnlyField != null) {
+    if (IS_READY_ONLY_FIELD != null) {
       try {
-        isReadyOnlyField.setBoolean(buffer, false);
+        IS_READY_ONLY_FIELD.setBoolean(buffer, false);
       } catch (IllegalAccessException e) {
         e.printStackTrace();
       }
