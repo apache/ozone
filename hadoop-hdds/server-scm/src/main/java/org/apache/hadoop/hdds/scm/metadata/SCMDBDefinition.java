@@ -182,7 +182,7 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           String.class,
           StringCodec.get(),
           ByteString.class,
-          ByteStringCodec.getInstance());
+          ByteStringCodec.get());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(

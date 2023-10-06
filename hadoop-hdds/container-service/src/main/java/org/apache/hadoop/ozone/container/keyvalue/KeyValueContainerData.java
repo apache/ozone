@@ -51,6 +51,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
@@ -137,6 +139,25 @@ public class KeyValueContainerData extends ContainerData {
    */
   public String getSchemaVersion() {
     return schemaVersion;
+  }
+
+  /**
+   * Returns schema version or the default value when the
+   * {@link KeyValueContainerData#schemaVersion} is null. The default value can
+   * be referred to {@link KeyValueContainerUtil#isSameSchemaVersion}.
+   *
+   * @return Schema version as a string.
+   * @throws UnsupportedOperationException If no valid schema version is found.
+   */
+  public String getSupportedSchemaVersionOrDefault() {
+    String[] versions = {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
+
+    for (String version : versions) {
+      if (this.hasSchema(version)) {
+        return version;
+      }
+    }
+    throw new UnsupportedOperationException("No valid schema version found.");
   }
 
   /**

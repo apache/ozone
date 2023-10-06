@@ -31,7 +31,9 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +47,7 @@ import static org.junit.Assert.fail;
 public class TestOzoneManagerLock {
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneManagerLock.class);

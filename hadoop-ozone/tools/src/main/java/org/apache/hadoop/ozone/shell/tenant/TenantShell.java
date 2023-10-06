@@ -38,7 +38,8 @@ public class TenantShell extends Shell {
   @Override
   public int execute(String[] argv) {
     TracingUtil.initTracing("tenant-shell", createOzoneConfiguration());
-    return TracingUtil.executeInNewSpan("tenant-shell",
+    String spanName = "ozone tenant " + String.join(" ", argv);
+    return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));
   }
 

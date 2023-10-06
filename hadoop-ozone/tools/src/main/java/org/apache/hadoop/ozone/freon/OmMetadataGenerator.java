@@ -396,8 +396,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       threadSeqId = getThreadSequenceId();
       startKeyName = getPath(threadSeqId * batchSize);
       getMetrics().timer(operation.name()).time(() -> {
-        List<OmKeyInfo> keyInfoList = ozoneManagerClient.listKeys(
-            volumeName, bucketName, startKeyName, "", batchSize);
+        List<OmKeyInfo> keyInfoList =
+            ozoneManagerClient.listKeys(volumeName, bucketName, startKeyName,
+                "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
           throw new NoSuchFileException(
               "There are not enough files for testing you should use "

@@ -241,6 +241,7 @@ public final class OmUtils {
     case ListBuckets:
     case LookupKey:
     case ListKeys:
+    case ListKeysLight:
     case ListTrash:
     case ServiceList:
     case ListMultiPartUploadParts:
@@ -320,6 +321,8 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
     case UnknownCommand:
       return false;
     case EchoRPC:

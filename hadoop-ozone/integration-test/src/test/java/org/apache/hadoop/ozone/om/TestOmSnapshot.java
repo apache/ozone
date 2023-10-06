@@ -74,15 +74,19 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.Ignore;
+import org.junit.experimental.categories.Category;
 import org.junit.jupiter.api.Assertions;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.rocksdb.LiveFileMetaData;
@@ -97,7 +101,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -174,7 +177,7 @@ public class TestOmSnapshot {
       Pattern.compile(SNAPSHOT_KEY_PATTERN_STRING);
 
   @Rule
-  public Timeout timeout = new Timeout(300, TimeUnit.SECONDS);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -1714,8 +1717,8 @@ public class TestOmSnapshot {
    * snapshots pertaining to different buckets. This will test the
    * sst filtering code path.
    */
-  @Ignore //TODO - Fix in HDDS-8005
   @Test
+  @Category(UnhealthyTest.class) @Unhealthy("HDDS-8005")
   public void testSnapDiffWithMultipleSSTs()
       throws Exception {
     // Create a volume and 2 buckets

@@ -482,7 +482,7 @@ public class TestSstFilteringService {
     String startKey = null;
     while (true) {
       List<OmKeyInfo> omKeyInfoList = omMetadataReader.listKeys(volume, bucket,
-          startKey, null, 1000);
+          startKey, null, 1000).getKeys();
       if (omKeyInfoList.isEmpty()) {
         break;
       }

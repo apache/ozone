@@ -49,7 +49,9 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
         OZONE_SCM_STALENODE_INTERVAL;
 
@@ -62,7 +64,7 @@ public class Test2WayCommitInRatis {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;

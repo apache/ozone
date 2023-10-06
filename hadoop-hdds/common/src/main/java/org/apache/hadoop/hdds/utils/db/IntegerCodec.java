@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import javax.annotation.Nonnull;
 import java.nio.ByteBuffer;
-import java.util.function.IntFunction;
 
 /**
  * Codec to serialize/deserialize {@link Integer}.
@@ -44,7 +43,7 @@ public final class IntegerCodec implements Codec<Integer> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull Integer object,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
     return allocator.apply(Integer.BYTES).putInt(object);
   }
 

@@ -53,7 +53,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -62,7 +64,7 @@ import org.junit.rules.Timeout;
  */
 public class TestHddsClientUtils {
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
