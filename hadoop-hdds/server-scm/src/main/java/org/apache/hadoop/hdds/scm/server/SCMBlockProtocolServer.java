@@ -235,6 +235,7 @@ public class SCMBlockProtocolServer implements
       LOG.debug("SCM is informed by OM to delete {} blocks",
           keyBlocksInfoList.size());
     }
+
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
