@@ -103,7 +103,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       treeEndpointFailed: false,
       inputPathValid: undefined,
       helpMessage: "",
-      isHeatmapEnabled: this.props.location.state ? this.props.location.state.isHeatmapAvailable : false
+      isHeatmapEnabled: this.props.location.state ? this.props.location.state.isHeatmapEnabled : false
     };
   }
 

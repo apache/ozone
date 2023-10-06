@@ -30,7 +30,7 @@ const {Sider} = Layout;
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
-  isHeatmapAvailable: boolean;
+  isHeatmapEnabled: boolean;
   isLoading: boolean;
   location: object
 }
@@ -39,7 +39,7 @@ class NavBar extends React.Component<INavBarProps> {
   constructor(props = {}) {
     super(props);
     this.state = {
-      isHeatmapAvailable: false,
+      isHeatmapEnabled: false,
       isLoading: false
     };
   }
@@ -62,7 +62,7 @@ class NavBar extends React.Component<INavBarProps> {
       // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
       this.setState({
         isLoading: false,
-        isHeatmapAvailable: !disabledFeaturesFlag
+        isHeatmapEnabled: !disabledFeaturesFlag
       });
     }).catch(error => {
       this.setState({
@@ -74,7 +74,7 @@ class NavBar extends React.Component<INavBarProps> {
 
   render() {
     const {location} = this.props;
-    const { isHeatmapAvailable } = this.state;
+    const { isHeatmapEnabled } = this.state;
     return (
       <Sider
         collapsible
@@ -136,13 +136,13 @@ class NavBar extends React.Component<INavBarProps> {
             <Link to='/DiskUsage'/>
           </Menu.Item>
           {
-            isHeatmapAvailable ?
+            isHeatmapEnabled ?
               <Menu.Item key='/Heatmap'>
                 <Icon type='bar-chart' />
                 <span>Heatmap</span>
                 <Link to={{
                   pathname: '/Heatmap',
-                  state: { isHeatmapAvailable: true}
+                  state: { isHeatmapEnabled: true}
                 }}
                 />
               </Menu.Item>
