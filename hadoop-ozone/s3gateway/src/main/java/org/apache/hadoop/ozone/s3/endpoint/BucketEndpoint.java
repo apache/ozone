@@ -118,7 +118,7 @@ public class BucketEndpoint extends EndpointBase {
     Iterator<? extends OzoneKey> ozoneKeyIterator;
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
-    OzoneBucket bucket = getBucket(bucketName);
+    OzoneBucket bucket;
 
     try {
       if (aclMarker != null) {
@@ -154,6 +154,7 @@ public class BucketEndpoint extends EndpointBase {
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
 
+      bucket = getBucket(bucketName);
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
     } catch (OMException ex) {
@@ -207,6 +208,7 @@ public class BucketEndpoint extends EndpointBase {
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey next = ozoneKeyIterator.next();
       if (bucket.getBucketLayout().isFileSystemOptimized() &&
+          StringUtils.isNotEmpty(prefix) &&
           !prefix.contains(next.getName())) {
         // prefix has delimiter but key don't have
         // example prefix: dir1/ key: dir123
