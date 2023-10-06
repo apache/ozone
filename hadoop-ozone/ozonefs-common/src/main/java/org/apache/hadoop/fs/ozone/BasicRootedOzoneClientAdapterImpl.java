@@ -1357,23 +1357,11 @@ public class BasicRootedOzoneClientAdapterImpl
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot) {
-        deleteSnapshot(toSnapshot, ofsPath);
+        OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, ofsPath);
       }
       if (takeTemporaryFromSnapshot) {
-        deleteSnapshot(fromSnapshot, ofsPath);
+        OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, ofsPath);
       }
-    }
-  }
-
-  private void deleteSnapshot(String snapshot, OFSPath ofsPath) {
-    try {
-      objectStore.deleteSnapshot(ofsPath.getVolumeName(),
-          ofsPath.getBucketName(), snapshot);
-    } catch (IOException exception) {
-      LOG.warn("Failed to delete the temp snapshot with name {} in bucket"
-              + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
-          ofsPath.getBucketName(), ofsPath.getVolumeName(),
-          exception.getMessage());
     }
   }
 
