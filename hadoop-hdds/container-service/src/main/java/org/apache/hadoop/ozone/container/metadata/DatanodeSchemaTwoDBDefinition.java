@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * This class defines the RocksDB structure for datanodes following schema
@@ -87,6 +88,10 @@ public class DatanodeSchemaTwoDBDefinition
           METADATA,
           DELETED_BLOCKS,
           DELETE_TRANSACTION);
+
+  public static Set<String> getColumnFamiliesName() {
+    return COLUMN_FAMILIES.keySet();
+  }
 
   @Override
   public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {

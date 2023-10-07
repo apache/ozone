@@ -71,7 +71,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 
 /**
- * Tests for UpgradeSubCommand class.
+ * Tests for UpgradeManager class.
  */
 public class TestUpgradeManager {
 
@@ -277,7 +277,7 @@ public class TestUpgradeManager {
       Map<String, BlockData>> blockDataMap, List<UpgradeManager.Result> results,
                                UpgradeManager upgradeManager)
       throws IOException {
-    Map<Long, UpgradeTask.Result> resultMap = new HashMap<>();
+    Map<Long, UpgradeTask.UpgradeContainerResult> resultMap = new HashMap<>();
 
     for (UpgradeManager.Result result : results) {
       resultMap.putAll(result.getResultMap());
@@ -288,7 +288,7 @@ public class TestUpgradeManager {
       final KeyValueContainerData containerData = entry.getKey();
       final Map<String, BlockData> blockKeyValue = entry.getValue();
 
-      final UpgradeTask.Result result =
+      final UpgradeTask.UpgradeContainerResult result =
           resultMap.get(containerData.getContainerID());
       final KeyValueContainerData v3ContainerData =
           (KeyValueContainerData) result.getNewContainerData();

@@ -51,14 +51,12 @@ public final class UpgradeUtils {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    Preconditions.checkState(idFile.exists(), "Datanode id file not exists");
+    Preconditions.checkState(idFile.exists(),
+        "Datanode id file: " + idFilePath + " not exists");
     return ContainerUtils.readDatanodeDetailsFrom(idFile);
   }
 
   public static File getContainerDBPath(HddsVolume volume) {
-    File clusterIdDir = new File(volume.getStorageDir(),
-        volume.getClusterID());
-    File storageIdDir = new File(clusterIdDir, volume.getStorageID());
-    return new File(storageIdDir, CONTAINER_DB_NAME);
+    return new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
   }
 }

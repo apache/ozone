@@ -47,6 +47,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -78,7 +79,7 @@ public class UpgradeTask {
       final UpgradeManager.Result result =
           new UpgradeManager.Result(hddsVolume);
 
-      List<Result> resultList = new ArrayList<>();
+      List<UpgradeContainerResult> resultList = new ArrayList<>();
       final File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
 
       Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
@@ -88,34 +89,41 @@ public class UpgradeTask {
       File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
 
       if (storageDirs == null) {
-        LOG.error("IO error for the volume {}, skipped loading",
-            hddsVolumeRootDir);
-        return null;
+        result.fail(new Exception(
+            "Storage dir not found for the volume " + hddsVolumeRootDir +
+                ", skipped upgrade."));
+        return result;
       }
 
-
       if (storageDirs.length > 0) {
-        File clusterIDDir = new File(hddsVolumeRootDir,
+        File clusterIDDir = new File(hddsVolume.getStorageDir(),
             hddsVolume.getClusterID());
         File idDir = clusterIDDir;
         if (storageDirs.length == 1 && !clusterIDDir.exists()) {
           idDir = storageDirs[0];
         } else {
           if (!clusterIDDir.exists()) {
-            LOG.error("Volume {} is in an inconsistent state. Expected " +
-                    "clusterID directory {} not found.", hddsVolumeRootDir,
-                clusterIDDir);
-            return null;
+            result.fail(new Exception("Volume " + hddsVolumeRootDir +
+                " is in an inconsistent state. Expected " +
+                "clusterID directory " + clusterIDDir + " not found."));
+            return result;
           }
         }
 
         LOG.info("Start to upgrade containers on volume {}", hddsVolumeRootDir);
         File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
+
+        if (!currentDir.exists()) {
+          result.fail(new Exception(
+              "Storage current dir not found for the volume " +
+                  hddsVolumeRootDir + ", skipped upgrade."));
+          return result;
+        }
         File[] containerTopDirs = currentDir.listFiles();
         if (containerTopDirs != null) {
           for (File containerTopDir : containerTopDirs) {
             try {
-              final List<Result> results =
+              final List<UpgradeContainerResult> results =
                   upgradeSubContainerDir(containerTopDir);
               resultList.addAll(results);
             } catch (IOException e) {
@@ -124,6 +132,11 @@ public class UpgradeTask {
             }
           }
         }
+      } else {
+        result.fail(new Exception(
+            "Storage dir not found for the volume " + hddsVolumeRootDir +
+                ", skipped upgrade."));
+        return result;
       }
 
       result.setResultList(resultList);
@@ -132,16 +145,19 @@ public class UpgradeTask {
     });
   }
 
-  private List<Result> upgradeSubContainerDir(File containerTopDir)
-      throws IOException {
-    List<Result> resultList = new ArrayList<>();
+  private List<UpgradeContainerResult> upgradeSubContainerDir(
+      File containerTopDir) throws IOException {
+    List<UpgradeContainerResult> resultList = new ArrayList<>();
     if (containerTopDir.isDirectory()) {
       File[] containerDirs = containerTopDir.listFiles();
       if (containerDirs != null) {
         for (File containerDir : containerDirs) {
           final ContainerData containerData = parseContainerData(containerDir);
-          if (containerData != null) {
-            final Result result = new Result(containerData);
+          if (containerData != null &&
+              ((KeyValueContainerData) containerData)
+                  .hasSchema(OzoneConsts.SCHEMA_V2)) {
+            final UpgradeContainerResult result =
+                new UpgradeContainerResult(containerData);
             upgradeContainer(containerData, result);
             resultList.add(result);
           }
@@ -202,8 +218,8 @@ public class UpgradeTask {
     }
   }
 
-  private void upgradeContainer(ContainerData containerData, Result result)
-      throws IOException {
+  private void upgradeContainer(ContainerData containerData,
+      UpgradeContainerResult result) throws IOException {
     final DBStore targetDBStore = datanodeStoreSchemaThree.getStore();
 
     // open container schema v2 rocksdb
@@ -212,34 +228,18 @@ public class UpgradeTask {
             true);
     final DBStore sourceDBStore = dbStore.getStore();
 
-    final String blockDataTableName =
-        DatanodeSchemaTwoDBDefinition.BLOCK_DATA.getName();
-    final long blockDataCount =
-        transferTableData(targetDBStore, sourceDBStore,
-            blockDataTableName, containerData);
+    final Set<String> columnFamiliesName =
+        DatanodeSchemaTwoDBDefinition.getColumnFamiliesName();
 
-    final String metadataTableName =
-        DatanodeSchemaTwoDBDefinition.METADATA.getName();
-    final long metadataCount =
-        transferTableData(targetDBStore, sourceDBStore,
-            metadataTableName, containerData);
-
-    final String deletedBlocksTableName =
-        DatanodeSchemaTwoDBDefinition.DELETED_BLOCKS.getName();
-    final long deletedBlocksCount =
-        transferTableData(targetDBStore, sourceDBStore,
-            deletedBlocksTableName, containerData);
-
-    final String deleteTransactionTableName =
-        DatanodeSchemaTwoDBDefinition.DELETE_TRANSACTION.getName();
-    final long deleteTransactionCount =
-        transferTableData(targetDBStore, sourceDBStore,
-            deleteTransactionTableName, containerData);
+    long total = 0L;
+    for (String tableName : columnFamiliesName) {
+      total += transferTableData(targetDBStore, sourceDBStore, tableName,
+          containerData);
+    }
 
     rewriteAndBackupContainerDataFile(containerData, result);
 
-    result.setTotalRow(blockDataCount + metadataCount + deletedBlocksCount +
-        deleteTransactionCount);
+    result.setTotalRow(total);
   }
 
   private long transferTableData(DBStore targetDBStore,
@@ -275,7 +275,7 @@ public class UpgradeTask {
   }
 
   private void rewriteAndBackupContainerDataFile(ContainerData containerData,
-                                                 Result result)
+                                                 UpgradeContainerResult result)
       throws IOException {
     if (containerData instanceof KeyValueContainerData) {
       final KeyValueContainerData keyValueContainerData =
@@ -310,19 +310,20 @@ public class UpgradeTask {
   }
 
   /**
-   * This class response upgrade v2 to v3 container result.
+   * This class represents upgrade v2 to v3 container result.
    */
-  public static class Result {
+  public static class UpgradeContainerResult {
     private final ContainerData originContainerData;
     private ContainerData newContainerData;
     private long totalRow = 0L;
     private final long startTimeMs = System.currentTimeMillis();
     private long endTimeMs = 0L;
-    private Status status = Status.FAIL;
+    private Status status;
 
-    public Result(
+    public UpgradeContainerResult(
         ContainerData originContainerData) {
       this.originContainerData = originContainerData;
+      this.status = Status.FAIL;
     }
 
     public long getTotalRow() {

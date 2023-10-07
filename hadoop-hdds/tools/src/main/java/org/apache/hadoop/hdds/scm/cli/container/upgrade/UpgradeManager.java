@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container.upgrade;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -58,17 +59,13 @@ public class UpgradeManager {
         .getHddsVolumes(configuration, StorageVolume.VolumeType.DATA_VOLUME,
             detail.getUuidString());
 
-    for (StorageVolume storageVolume : dataVolumeSet.getVolumesList()) {
-      final HddsVolume volume = (HddsVolume) storageVolume;
-      volume.loadDbStore(false);
-    }
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(dataVolumeSet, null, false, LOG);
     initVolumeStoreMap(dataVolumeSet, configuration);
     upgradeAll(dataVolumeSet, configuration);
   }
 
   public void initVolumeStoreMap(MutableVolumeSet dataVolumeSet,
-                                 OzoneConfiguration configuration)
-      throws IOException {
+      OzoneConfiguration configuration) throws IOException {
     for (StorageVolume storageVolume : dataVolumeSet.getVolumesList()) {
       final HddsVolume volume = (HddsVolume) storageVolume;
       final File containerDBPath = getContainerDBPath(volume);
@@ -84,8 +81,8 @@ public class UpgradeManager {
                                  OzoneConfiguration configuration) {
     List<Result> results = new ArrayList<>();
     final List<StorageVolume> volumesList = volumeSet.getVolumesList();
-    List<CompletableFuture<Result>> volumeFutures =
-        new ArrayList<>(volumesList.size());
+    Map<HddsVolume, CompletableFuture<Result>> volumeFutures =
+        new HashMap<>();
     long startTime = System.currentTimeMillis();
 
     LOG.info("Start upgrade {} volumes container LayoutVersion",
@@ -93,21 +90,29 @@ public class UpgradeManager {
 
     for (StorageVolume volume : volumesList) {
       final HddsVolume hddsVolume = (HddsVolume) volume;
-      final UpgradeTask upgradeVolume =
+      final UpgradeTask task =
           new UpgradeTask(configuration, hddsVolume,
-              volumeStoreMap.get(hddsVolume.getStorageDir()
-                  .getAbsolutePath()));
+              getDBStore(hddsVolume));
 
       final CompletableFuture<Result> future =
-          upgradeVolume.getUpgradeFutureByVolume();
-      volumeFutures.add(future);
+          task.getUpgradeFutureByVolume();
+      volumeFutures.put(hddsVolume, future);
     }
 
-    for (CompletableFuture<Result> volumeFuture : volumeFutures) {
-      final Result result = volumeFuture.join();
-      results.add(result);
-      LOG.info("Finish upgrade containers on volume {}, result {}",
-          result.getHddsVolumeRootDir(), result);
+    for (Map.Entry<HddsVolume, CompletableFuture<Result>> entry : volumeFutures
+        .entrySet()) {
+      final HddsVolume hddsVolume = entry.getKey();
+      final CompletableFuture<Result> volumeFuture = entry.getValue();
+
+      try {
+        final Result result = volumeFuture.get();
+        results.add(result);
+        LOG.info("Finish upgrade containers on volume {}, result {}",
+            hddsVolume.getVolumeRootDir(), result);
+      } catch (Exception e) {
+        LOG.error("Upgrade containers on volume {} failed",
+            hddsVolume.getVolumeRootDir(), e);
+      }
     }
 
     LOG.info("Upgrade all volume container LayoutVersion costs {}s",
@@ -124,7 +129,7 @@ public class UpgradeManager {
    * This class response upgrade v2 to v3 container result.
    */
   public static class Result {
-    private Map<Long, UpgradeTask.Result> resultMap;
+    private Map<Long, UpgradeTask.UpgradeContainerResult> resultMap;
     private final HddsVolume hddsVolume;
     private final long startTimeMs = System.currentTimeMillis();
     private long endTimeMs = 0L;
@@ -139,21 +144,18 @@ public class UpgradeManager {
       return hddsVolume;
     }
 
-    public String getHddsVolumeRootDir() {
-      return hddsVolume.getVolumeRootDir();
-    }
-
     public long getCost() {
       return endTimeMs - startTimeMs;
     }
 
-    public void setResultList(List<UpgradeTask.Result> resultList) {
+    public void setResultList(
+        List<UpgradeTask.UpgradeContainerResult> resultList) {
       resultMap = new HashMap<>();
       resultList.forEach(res -> resultMap
           .put(res.getOriginContainerData().getContainerID(), res));
     }
 
-    public Map<Long, UpgradeTask.Result> getResultMap() {
+    public Map<Long, UpgradeTask.UpgradeContainerResult> getResultMap() {
       return resultMap;
     }
 
@@ -173,7 +175,7 @@ public class UpgradeManager {
       final StringBuilder stringBuilder = new StringBuilder();
       stringBuilder.append("Result{");
       stringBuilder.append("volumeDir=");
-      stringBuilder.append(hddsVolume.getHddsRootDir());
+      stringBuilder.append(getHddsVolume().getHddsRootDir());
       stringBuilder.append(", resultList=");
       AtomicLong total = new AtomicLong(0L);
       resultMap.forEach((k, r) -> {
