@@ -17,7 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.TimeDuration;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.TimeUnit;
@@ -152,4 +161,30 @@ public class TestDatanodeConfiguration {
         subject.getDiskCheckTimeout().toMillis());
   }
 
+  @Test
+  public void testConf() throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    final String dir = "dummy/dir";
+    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+
+    final DatanodeRatisServerConfig ratisConf = conf.getObject(
+        DatanodeRatisServerConfig.class);
+    Assertions.assertEquals(1, ratisConf.getLogAppenderWaitTimeMin(),
+        "getLogAppenderWaitTimeMin");
+
+    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
+    ratisConf.setLogAppenderWaitTimeMin(0);
+    conf.setFromObject(ratisConf);
+    assertWaitTimeMin(TimeDuration.ZERO, conf);
+  }
+
+  static void assertWaitTimeMin(TimeDuration expected,
+      OzoneConfiguration conf) throws Exception {
+    final DatanodeDetails dn = MockPipeline.createPipeline(1).getFirstNode();
+    final RaftProperties p = ContainerTestUtils.newXceiverServerRatis(dn, conf)
+        .newRaftProperties();
+    final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
+    Assertions.assertEquals(expected, t,
+        RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+  }
 }

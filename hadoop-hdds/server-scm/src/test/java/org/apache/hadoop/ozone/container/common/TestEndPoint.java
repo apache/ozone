@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
@@ -618,6 +619,8 @@ public class TestEndPoint {
   private StateContext getContext(DatanodeDetails datanodeDetails) {
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
+    Mockito.when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", ozoneConf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);

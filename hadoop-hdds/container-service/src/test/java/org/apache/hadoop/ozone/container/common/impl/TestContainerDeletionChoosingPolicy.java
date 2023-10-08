@@ -231,7 +231,7 @@ public class TestContainerDeletionChoosingPolicy {
     Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(null);
     blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, 10, conf, "");
+        TimeUnit.MILLISECONDS, 10, conf);
     return blockDeletingService;
 
   }

@@ -266,6 +266,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -507,7 +508,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
-                this::reconfOzoneReadOnlyAdmins);
+                this::reconfOzoneReadOnlyAdmins)
+            .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
+                this::reconfOzoneKeyDeletingLimitPerTask);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -4779,6 +4782,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
     return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneKeyDeletingLimitPerTask(String newVal) {
+    Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
+        OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
+    getConfiguration().set(OZONE_KEY_DELETING_LIMIT_PER_TASK, newVal);
+
+    getKeyManager().getDeletingService()
+        .setKeyLimitPerTask(Integer.parseInt(newVal));
+    return newVal;
   }
 
   public void validateReplicationConfig(ReplicationConfig replicationConfig)

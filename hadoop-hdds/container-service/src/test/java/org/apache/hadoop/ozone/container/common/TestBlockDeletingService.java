@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -508,7 +509,7 @@ public class TestBlockDeletingService {
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
-        1_000_000, 1_000_000, TimeUnit.SECONDS, 1, conf, "");
+        1_000_000, 1_000_000, TimeUnit.SECONDS, 1, conf);
 
     // On the first run, the container with incorrect metadata should consume
     // the block deletion limit, and the correct container with fewer pending
@@ -841,7 +842,7 @@ public class TestBlockDeletingService {
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.NANOSECONDS,
-        10, conf, "");
+        10, conf);
     svc.start();
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
@@ -863,7 +864,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf, "");
+        10, conf, "", mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data

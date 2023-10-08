@@ -2184,6 +2184,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
+  @Override
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }
