@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeUtils.getContainerDBPath;
 
 /**
- * This class manage upgrade v2 to v3 container.
+ * This class manages v2 to v3 container upgrade.
  */
 public class UpgradeManager {
 
@@ -78,7 +78,7 @@ public class UpgradeManager {
   }
 
   public List<Result> upgradeAll(MutableVolumeSet volumeSet,
-                                 OzoneConfiguration configuration) {
+      OzoneConfiguration configuration) {
     List<Result> results = new ArrayList<>();
     final List<StorageVolume> volumesList = volumeSet.getVolumesList();
     Map<HddsVolume, CompletableFuture<Result>> volumeFutures =
@@ -126,7 +126,7 @@ public class UpgradeManager {
   }
 
   /**
-   * This class response upgrade v2 to v3 container result.
+   * This class contains v2 to v3 container upgrade result.
    */
   public static class Result {
     private Map<Long, UpgradeTask.UpgradeContainerResult> resultMap;

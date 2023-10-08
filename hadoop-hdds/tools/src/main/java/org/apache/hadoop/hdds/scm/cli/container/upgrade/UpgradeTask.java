@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container.upgrade;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -51,7 +52,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * This class process upgrade v2 to v3 container.
+ * This class implements the v2 to v3 container upgrade process.
  */
 public class UpgradeTask {
 
@@ -62,12 +63,14 @@ public class UpgradeTask {
   private final HddsVolume hddsVolume;
   private final DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree;
 
-  private static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX =
-      ".v2.container";
+  private static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
+  private static final Set<String> COLUMN_FAMILIES_NAME =
+      (new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration()))
+          .getMap().keySet();
 
   public UpgradeTask(ConfigurationSource config,
-                     HddsVolume hddsVolume,
-                     DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree) {
+      HddsVolume hddsVolume,
+      DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree) {
     this.config = config;
     this.hddsVolume = hddsVolume;
     this.datanodeStoreSchemaThree = datanodeStoreSchemaThree;
@@ -116,7 +119,7 @@ public class UpgradeTask {
         if (!currentDir.exists()) {
           result.fail(new Exception(
               "Storage current dir not found for the volume " +
-                  hddsVolumeRootDir + ", skipped upgrade."));
+                  currentDir + ", skipped upgrade."));
           return result;
         }
         File[] containerTopDirs = currentDir.listFiles();
@@ -228,23 +231,18 @@ public class UpgradeTask {
             true);
     final DBStore sourceDBStore = dbStore.getStore();
 
-    final Set<String> columnFamiliesName =
-        DatanodeSchemaTwoDBDefinition.getColumnFamiliesName();
-
     long total = 0L;
-    for (String tableName : columnFamiliesName) {
+    for (String tableName : COLUMN_FAMILIES_NAME) {
       total += transferTableData(targetDBStore, sourceDBStore, tableName,
           containerData);
     }
 
     rewriteAndBackupContainerDataFile(containerData, result);
-
-    result.setTotalRow(total);
+    result.success(total);
   }
 
   private long transferTableData(DBStore targetDBStore,
-                                 DBStore sourceDBStore, String tableName,
-                                 ContainerData containerData)
+      DBStore sourceDBStore, String tableName, ContainerData containerData)
       throws IOException {
     final Table<byte[], byte[]> deleteTransactionTable =
         sourceDBStore.getTable(tableName);
@@ -255,8 +253,7 @@ public class UpgradeTask {
   }
 
   private long transferTableData(Table<byte[], byte[]> targetTable,
-                                 Table<byte[], byte[]> sourceTable,
-                                 ContainerData containerData)
+      Table<byte[], byte[]> sourceTable, ContainerData containerData)
       throws IOException {
     long count = 0;
     try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>>
@@ -275,8 +272,7 @@ public class UpgradeTask {
   }
 
   private void rewriteAndBackupContainerDataFile(ContainerData containerData,
-                                                 UpgradeContainerResult result)
-      throws IOException {
+      UpgradeContainerResult result) throws IOException {
     if (containerData instanceof KeyValueContainerData) {
       final KeyValueContainerData keyValueContainerData =
           (KeyValueContainerData) containerData;
@@ -305,7 +301,6 @@ public class UpgradeTask {
           copyContainerData, originContainerFile);
 
       result.setNewContainerData(copyContainerData);
-      result.success();
     }
   }
 
@@ -339,10 +334,6 @@ public class UpgradeTask {
       this.newContainerData = newContainerData;
     }
 
-    public void setTotalRow(long totalRow) {
-      this.totalRow = totalRow;
-    }
-
     public long getCostMs() {
       return endTimeMs - startTimeMs;
     }
@@ -355,7 +346,8 @@ public class UpgradeTask {
       return newContainerData;
     }
 
-    public void success() {
+    public void success(long rowCount) {
+      this.totalRow = rowCount;
       this.endTimeMs = System.currentTimeMillis();
       this.status = Status.SUCCESS;
     }
