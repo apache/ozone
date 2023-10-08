@@ -82,6 +82,10 @@ public class CloseContainerCommand
     return pipelineID;
   }
 
+  public boolean isForce() {
+    return force;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();

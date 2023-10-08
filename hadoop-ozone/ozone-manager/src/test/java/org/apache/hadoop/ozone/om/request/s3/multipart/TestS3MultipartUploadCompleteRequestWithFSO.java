@@ -71,7 +71,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
     // add parentDir to dirTable
     long parentID = getParentID(volumeName, bucketName, keyName);
-    long txnId = 50;
+    long txnId = 2;
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =

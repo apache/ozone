@@ -33,11 +33,14 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -53,11 +56,14 @@ import static org.mockito.Mockito.when;
 public class TestOzoneManagerRatisRequest {
   @Rule public TemporaryFolder folder = new TemporaryFolder();
 
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
   private OzoneManager ozoneManager;
   private OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
   private OMMetadataManager omMetadataManager;
 
-  @Test(timeout = 300_000)
+  @Test
   public void testRequestWithNonExistentBucket()
       throws Exception {
     // Test: Creating a client request for a bucket which doesn't exist.

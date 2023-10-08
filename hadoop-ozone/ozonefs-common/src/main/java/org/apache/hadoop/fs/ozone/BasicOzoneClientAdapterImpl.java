@@ -357,6 +357,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       bucket.deleteDirectory(keyName, recursive);
       return true;
     } catch (OMException ome) {
+      if (OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+        LOG.warn("delete key failed {}", ome.getMessage());
+        return false;
+      }
       LOG.error("delete key failed {}", ome.getMessage());
       if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
         throw new PathIsNotEmptyDirectoryException(ome.getMessage());

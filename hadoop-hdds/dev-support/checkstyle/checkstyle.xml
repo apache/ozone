@@ -208,5 +208,11 @@
 
         <module name="ModifierOrder"/>
 
+        <module name="Regexp">
+            <property name="format" value="@Test\(.*timeout|=\s*Timeout\.|=\s*new Timeout\("/>
+            <property name="illegalPattern" value="true"/>
+            <property name="message" value="Please use JUnit5AwareTimeout, see HDDS-9361"/>
+        </module>
     </module>
+
 </module>

@@ -36,20 +36,28 @@ UNIT_CHECKS=$(grep -lr '^#checks:unit' hadoop-ozone/dev-support/checks \
 
 if [[ -n "${SPACE_DELIMITED_ALL_CHECKS}" ]]; then
     SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "     # add framing blanks
+    basic=()
     for item in ${BASIC_CHECKS[@]}; do
       if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then          # use $item as regexp
         basic+=($item)
       fi
     done
+    if [[ -n "${basic[@]}" ]]; then
+        initialization::ga_output needs-basic-check "true"
+    fi
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${basic[@]})"
 
+    unit=()
     for item in ${UNIT_CHECKS[@]}; do
       if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then    # use $item as regexp
         unit+=($item)
       fi
     done
-    initialization::ga_output basic-unit \
+    if [[ -n "${unit[@]}" ]]; then
+        initialization::ga_output needs-unit-check "true"
+    fi
+    initialization::ga_output unit-checks \
         "$(initialization::parameters_to_json ${unit[@]})"
 fi
 

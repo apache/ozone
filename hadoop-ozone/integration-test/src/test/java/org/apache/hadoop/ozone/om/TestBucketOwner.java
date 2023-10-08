@@ -36,7 +36,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +57,7 @@ import static org.junit.Assert.fail;
  * Test for Ozone Bucket Owner.
  */
 public class TestBucketOwner {
-  @Rule public Timeout timeout = Timeout.seconds(120);
+  @Rule public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   private static MiniOzoneCluster cluster;
   private static final Logger LOG =

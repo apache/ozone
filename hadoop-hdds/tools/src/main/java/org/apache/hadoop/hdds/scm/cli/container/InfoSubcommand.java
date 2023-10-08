@@ -20,11 +20,17 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -34,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,10 +87,17 @@ public class InfoSubcommand extends ScmSubcommand {
     }
 
     if (json) {
-      ContainerWithPipelineAndReplicas wrapper =
-          new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
-              container.getPipeline(), replicas);
-      LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+      if (container.getPipeline().size() != 0) {
+        ContainerWithPipelineAndReplicas wrapper =
+            new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
+                container.getPipeline(), replicas);
+        LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+      } else {
+        ContainerWithoutDatanodes wrapper =
+            new ContainerWithoutDatanodes(container.getContainerInfo(),
+                container.getPipeline(), replicas);
+        LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
+      }
     } else {
       // Print container report info.
       LOG.info("Container id: {}", containerID);
@@ -153,6 +167,85 @@ public class InfoSubcommand extends ScmSubcommand {
 
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
+    }
+  }
+
+  private static class ContainerWithoutDatanodes {
+
+    private ContainerInfo containerInfo;
+    private PipelineWithoutDatanodes pipeline;
+    private List<ContainerReplicaInfo> replicas;
+
+    ContainerWithoutDatanodes(ContainerInfo container, Pipeline pipeline,
+                                     List<ContainerReplicaInfo> replicas) {
+      this.containerInfo = container;
+      this.pipeline = new PipelineWithoutDatanodes(pipeline);
+      this.replicas = replicas;
+    }
+
+    public ContainerInfo getContainerInfo() {
+      return containerInfo;
+    }
+
+    public PipelineWithoutDatanodes getPipeline() {
+      return pipeline;
+    }
+
+    public List<ContainerReplicaInfo> getReplicas() {
+      return replicas;
+    }
+  }
+
+  // All Pipeline information except the ones dependent on datanodes
+  private static final class PipelineWithoutDatanodes {
+    private final PipelineID id;
+    private final ReplicationConfig replicationConfig;
+    private final Pipeline.PipelineState state;
+    private Instant creationTimestamp;
+    private Map<DatanodeDetails, Long> nodeStatus;
+
+    private PipelineWithoutDatanodes(Pipeline pipeline) {
+      this.id = pipeline.getId();
+      this.replicationConfig = pipeline.getReplicationConfig();
+      this.state = pipeline.getPipelineState();
+      this.creationTimestamp = pipeline.getCreationTimestamp();
+      this.nodeStatus = new HashMap<>(); // All DNs down
+    }
+
+    public PipelineID getId() {
+      return id;
+    }
+
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
+    }
+
+    public Pipeline.PipelineState getPipelineState() {
+      return state;
+    }
+
+    public Instant getCreationTimestamp() {
+      return creationTimestamp;
+    }
+
+    public HddsProtos.ReplicationType getType() {
+      return replicationConfig.getReplicationType();
+    }
+
+    public boolean isEmpty() {
+      return nodeStatus.isEmpty();
+    }
+
+    public List<DatanodeDetails> getNodes() {
+      return new ArrayList<>(nodeStatus.keySet());
+    }
+
+    public boolean isAllocationTimeout() {
+      return false;
+    }
+
+    public boolean isHealthy() {
+      return false; // leaderId is always null, So pipeline is unhealthy
     }
   }
 }

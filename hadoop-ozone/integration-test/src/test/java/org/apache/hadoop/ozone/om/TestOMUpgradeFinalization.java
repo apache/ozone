@@ -53,7 +53,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -67,7 +69,7 @@ public class TestOMUpgradeFinalization {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300000));
   private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;

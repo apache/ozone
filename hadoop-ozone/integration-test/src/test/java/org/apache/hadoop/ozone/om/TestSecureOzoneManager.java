@@ -34,7 +34,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -69,7 +71,7 @@ public class TestSecureOzoneManager {
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(25);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(25));
 
   /**
    * Create a MiniDFSCluster for testing.

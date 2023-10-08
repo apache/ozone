@@ -52,5 +52,9 @@ public class TestDatanodeMetrics {
     // Assert we can handle zero capacity.
     assertTrue(metric.isGreater(zeroMetric.get()));
 
+    // Another case when nodes have similar weight
+    SCMNodeStat stat1 = new SCMNodeStat(10000000L, 50L, 9999950L);
+    SCMNodeStat stat2 = new SCMNodeStat(10000000L, 51L, 9999949L);
+    assertTrue(new SCMNodeMetric(stat2).isGreater(stat1));
   }
 }

@@ -953,8 +953,9 @@ public class TestKeyManagerImpl {
     assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListKeys (latestLocationVersion is always true for ListKeys)
-    List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
-        keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
+    List<OmKeyInfo> keyInfos =
+        keyManager.listKeys(keyArgs.getVolumeName(), keyArgs.getBucketName(),
+            "", keyArgs.getKeyName(), 100).getKeys();
     assertEquals(keyInfos.size(), 1);
     assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
   }

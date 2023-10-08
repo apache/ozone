@@ -551,9 +551,6 @@ function calculate_test_types_to_run() {
 function set_outputs() {
     # print results outside the group to increase visibility
 
-    if [[ -n "${BASIC_CHECKS}" ]]; then
-        initialization::ga_output needs-basic-checks "true"
-    fi
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"
 

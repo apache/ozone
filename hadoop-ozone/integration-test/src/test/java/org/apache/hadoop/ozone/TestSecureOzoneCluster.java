@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -150,7 +148,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
-import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
@@ -1143,7 +1141,6 @@ final class TestSecureOzoneCluster {
    * Tests delegation token renewal after a certificate renew.
    */
   @Test
-  @Flaky("HDDS-8622")
   public void testDelegationTokenRenewCrossCertificateRenew() throws Exception {
     try {
       // Setup secure OM for start.
@@ -1184,31 +1181,24 @@ final class TestSecureOzoneCluster {
       assertEquals("OzoneToken", token1.getKind().toString());
       assertEquals(OmUtils.getOmRpcAddress(newConf),
           token1.getService().toString());
-      OzoneTokenIdentifier temp = new OzoneTokenIdentifier();
-      ByteArrayInputStream buf = new ByteArrayInputStream(
-          token1.getIdentifier());
-      DataInputStream in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(omCertId1, temp.getOmCertSerialId());
+      assertEquals(omCertId1, token1.decodeIdentifier().getOmCertSerialId());
 
       // Renew delegation token
       long expiryTime = omClient.renewDelegationToken(token1);
       assertTrue(expiryTime > 0);
 
       // Wait for OM certificate to renew
-      GenericTestUtils.waitFor(() -> !omCertId1.equals(
-          certClient.getCertificate().getSerialNumber().toString()),
-          100, certLifetime);
+      LambdaTestUtils.await(certLifetime, 100, () ->
+          !StringUtils.equals(token1.decodeIdentifier().getOmCertSerialId(),
+              omClient.getDelegationToken(new Text("om"))
+                  .decodeIdentifier().getOmCertSerialId()));
       String omCertId2 =
           certClient.getCertificate().getSerialNumber().toString();
       assertNotEquals(omCertId1, omCertId2);
       // Get a new delegation token
       Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
           new Text("om"));
-      buf = new ByteArrayInputStream(token2.getIdentifier());
-      in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(omCertId2, temp.getOmCertSerialId());
+      assertEquals(omCertId2, token2.decodeIdentifier().getOmCertSerialId());
 
       // Because old certificate is still valid, so renew old token will succeed
       expiryTime = omClient.renewDelegationToken(token1);
