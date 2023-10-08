@@ -228,6 +228,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private boolean displayTable(ManagedRocksIterator iterator,
                                DBColumnFamilyDefinition dbColumnFamilyDef,
                                PrintWriter printWriter, boolean schemaV3) {
+    exception = false;
     if (printWriter == null) {
       printWriter = out();
     }
