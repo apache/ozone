@@ -294,6 +294,7 @@ public class UpgradeTask {
 
       // backup v2 container data file
       NativeIO.renameTo(originContainerFile, bakFile);
+      result.setBackupContainerFilePath(bakFile.getAbsolutePath());
 
       // gen new v3 container data file
       ContainerDataYaml.createContainerFile(
@@ -301,6 +302,7 @@ public class UpgradeTask {
           copyContainerData, originContainerFile);
 
       result.setNewContainerData(copyContainerData);
+      result.setNewContainerFilePath(originContainerFile.getAbsolutePath());
     }
   }
 
@@ -314,6 +316,9 @@ public class UpgradeTask {
     private final long startTimeMs = System.currentTimeMillis();
     private long endTimeMs = 0L;
     private Status status;
+
+    private String backupContainerFilePath;
+    private String newContainerFilePath;
 
     public UpgradeContainerResult(
         ContainerData originContainerData) {
@@ -346,6 +351,14 @@ public class UpgradeTask {
       return newContainerData;
     }
 
+    public void setBackupContainerFilePath(String backupContainerFilePath) {
+      this.backupContainerFilePath = backupContainerFilePath;
+    }
+
+    public void setNewContainerFilePath(String newContainerFilePath) {
+      this.newContainerFilePath = newContainerFilePath;
+    }
+
     public void success(long rowCount) {
       this.totalRow = rowCount;
       this.endTimeMs = System.currentTimeMillis();
@@ -358,13 +371,20 @@ public class UpgradeTask {
       stringBuilder.append("Result{");
       stringBuilder.append("containerID=");
       stringBuilder.append(originContainerData.getContainerID());
-      stringBuilder.append(", schemaV2MetadataPath=");
+      stringBuilder.append(", originContainerSchemaVersion=");
       stringBuilder.append(
-          ((KeyValueContainerData) originContainerData).getMetadataPath());
+          ((KeyValueContainerData) originContainerData).getSchemaVersion());
+
       if (newContainerData != null) {
-        stringBuilder.append(", schemaV3MetadataPath=");
+        stringBuilder.append(", schemaV2ContainerFileBackupPath=");
+        stringBuilder.append(backupContainerFilePath);
+
+        stringBuilder.append(", newContainerSchemaVersion=");
         stringBuilder.append(
-            ((KeyValueContainerData) newContainerData).getMetadataPath());
+            ((KeyValueContainerData) newContainerData).getSchemaVersion());
+
+        stringBuilder.append(", schemaV3ContainerFilePath=");
+        stringBuilder.append(newContainerFilePath);
       }
       stringBuilder.append(", totalRow=");
       stringBuilder.append(totalRow);
