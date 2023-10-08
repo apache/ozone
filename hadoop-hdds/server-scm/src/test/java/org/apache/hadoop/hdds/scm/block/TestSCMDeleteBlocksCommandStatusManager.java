@@ -30,10 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.NEED_RESEND;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.PENDING_EXECUTED;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.SENT;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.EXECUTED;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.TO_BE_SENT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatusData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -159,25 +156,10 @@ public class TestSCMDeleteBlocksCommandStatusManager {
     manager.updateStatusByDNCommandStatus(dnId1, scmCmdId4,
         StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
 
-    assertEquals(PENDING_EXECUTED, dnStatusRecord.get(scmCmdId1).getStatus());
-    assertEquals(EXECUTED, dnStatusRecord.get(scmCmdId2).getStatus());
-    assertEquals(NEED_RESEND, dnStatusRecord.get(scmCmdId3).getStatus());
-    assertEquals(PENDING_EXECUTED, dnStatusRecord.get(scmCmdId4).getStatus());
-
-    // PENDING_EXECUTED -> PENDING_EXECUTED
-    manager.updateStatusByDNCommandStatus(dnId1, scmCmdId1,
-        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
-    assertEquals(PENDING_EXECUTED, dnStatusRecord.get(scmCmdId1).getStatus());
-
-    // PENDING_EXECUTED -> EXECUTED
-    manager.updateStatusByDNCommandStatus(dnId1, scmCmdId1,
-        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.EXECUTED);
-    assertEquals(EXECUTED, dnStatusRecord.get(scmCmdId1).getStatus());
-
-    // PENDING_EXECUTED -> NEED_RESEND
-    manager.updateStatusByDNCommandStatus(dnId1, scmCmdId4,
-        StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED);
-    assertEquals(NEED_RESEND, dnStatusRecord.get(scmCmdId4).getStatus());
+    assertEquals(SENT, dnStatusRecord.get(scmCmdId1).getStatus());
+    assertNull(dnStatusRecord.get(scmCmdId2));
+    assertNull(dnStatusRecord.get(scmCmdId3));
+    assertEquals(SENT, dnStatusRecord.get(scmCmdId4).getStatus());
   }
 
   @Test
@@ -203,11 +185,11 @@ public class TestSCMDeleteBlocksCommandStatusManager {
     Map<Long, CmdStatusData> dnStatusRecord =
         manager.getScmCmdStatusRecord().get(dnId1);
     assertNotNull(dnStatusRecord.get(scmCmdId1));
-    assertNotNull(dnStatusRecord.get(scmCmdId2));
-    assertNotNull(dnStatusRecord.get(scmCmdId3));
+    assertNull(dnStatusRecord.get(scmCmdId2));
+    assertNull(dnStatusRecord.get(scmCmdId3));
     assertNotNull(dnStatusRecord.get(scmCmdId4));
 
-    manager.cleanSCMCommandForDn(dnId1, Long.MAX_VALUE);
+    manager.cleanTimeoutSCMCommand(dnId1, Long.MAX_VALUE);
 
     // scmCmdId1 is PENDING_EXECUTED will be cleaned up after timeout
     assertNotNull(dnStatusRecord.get(scmCmdId1));
@@ -216,7 +198,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
     // scmCmdId4 is SENT will be cleaned up after timeout
     assertNotNull(dnStatusRecord.get(scmCmdId4));
 
-    manager.cleanSCMCommandForDn(dnId1, -1);
+    manager.cleanTimeoutSCMCommand(dnId1, -1);
     assertNull(dnStatusRecord.get(scmCmdId1));
     assertNull(dnStatusRecord.get(scmCmdId4));
   }

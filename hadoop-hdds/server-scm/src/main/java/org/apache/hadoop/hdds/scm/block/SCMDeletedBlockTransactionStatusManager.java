@@ -55,9 +55,6 @@ import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.EXECUTED;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.NEED_RESEND;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.PENDING_EXECUTED;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.SENT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.TO_BE_SENT;
 
@@ -86,7 +83,6 @@ public class SCMDeletedBlockTransactionStatusManager
   /**
    * Before the DeletedBlockTransaction is executed on DN and reported to
    * SCM, it is managed by this {@link SCMDeleteBlocksCommandStatusManager}.
-   *
    * After the DeletedBlocksTransaction in the DeleteBlocksCommand is
    * committed on the SCM, it is managed by
    * {@link SCMDeletedBlockTransactionStatusManager#transactionToDNsCommitMap}
@@ -124,9 +120,7 @@ public class SCMDeletedBlockTransactionStatusManager
 
     private static final CmdStatus DEFAULT_STATUS = TO_BE_SENT;
     private static final Set<CmdStatus> STATUSES_REQUIRING_TIMEOUT =
-        new HashSet<>(Arrays.asList(SENT, PENDING_EXECUTED));
-    private static final Set<CmdStatus> FINIAL_STATUSES = new HashSet<>(
-        Arrays.asList(EXECUTED, NEED_RESEND));
+        new HashSet<>(Arrays.asList(SENT));
 
     public SCMDeleteBlocksCommandStatusManager() {
       this.scmCmdStatusRecord = new ConcurrentHashMap<>();
@@ -139,18 +133,14 @@ public class SCMDeletedBlockTransactionStatusManager
       // The DeleteBlocksCommand has not yet been sent.
       // This is the initial status of the command after it's created.
       TO_BE_SENT,
-      // This status indicates that the DeleteBlocksCommand has been sent
-      // to the DataNode, but the Datanode has not reported any new status
-      // for the DeleteBlocksCommand.
+      // If the DeleteBlocksCommand has been sent but has not been executed
+      // completely by DN, the DeleteBlocksCommand's state will be SENT.
+      // Note that the state of SENT includes the following possibilities.
+      //   - The command was sent but not received
+      //   - The command was sent and received by the DN,
+      //     and is waiting to be executed.
+      //   - The Command sent and being executed by DN
       SENT,
-      // The DeleteBlocksCommand has been received by Datanode and
-      // is waiting for executed.
-      PENDING_EXECUTED,
-      // The DeleteBlocksCommand was executed, and the execution was successful
-      EXECUTED,
-      // The DeleteBlocksCommand was executed but failed to execute,
-      // or was lost before it was executed.
-      NEED_RESEND
     }
 
     protected static final class CmdStatusData {
@@ -217,7 +207,7 @@ public class SCMDeletedBlockTransactionStatusManager
     }
 
     protected void onSent(UUID dnId, long scmCmdId) {
-      updateStatus(dnId, scmCmdId, SENT);
+      updateStatus(dnId, scmCmdId, CommandStatus.Status.PENDING);
     }
 
     protected void onDatanodeDead(UUID dnId) {
@@ -227,10 +217,7 @@ public class SCMDeletedBlockTransactionStatusManager
 
     protected void updateStatusByDNCommandStatus(UUID dnId, long scmCmdId,
         CommandStatus.Status newState) {
-      CmdStatus status = fromProtoCommandStatus(newState);
-      if (status != null) {
-        updateStatus(dnId, scmCmdId, status);
-      }
+      updateStatus(dnId, scmCmdId, newState);
     }
 
     protected void cleanAllTimeoutSCMCommand(long timeoutMs) {
@@ -242,25 +229,10 @@ public class SCMDeletedBlockTransactionStatusManager
       }
     }
 
-    protected void cleanSCMCommandForDn(UUID dnId, long timeoutMs) {
-      cleanTimeoutSCMCommand(dnId, timeoutMs);
-      cleanFinalStatusSCMCommand(dnId);
-    }
-
-    private void cleanTimeoutSCMCommand(UUID dnId, long timeoutMs) {
+    public void cleanTimeoutSCMCommand(UUID dnId, long timeoutMs) {
       for (CmdStatus status : STATUSES_REQUIRING_TIMEOUT) {
         removeTimeoutScmCommand(
             dnId, getScmCommandIds(dnId, status), timeoutMs);
-      }
-    }
-
-    private void cleanFinalStatusSCMCommand(UUID dnId) {
-      for (CmdStatus status : FINIAL_STATUSES) {
-        for (Long scmCmdId : getScmCommandIds(dnId, status)) {
-          CmdStatusData stateData = removeScmCommand(dnId, scmCmdId);
-          LOG.debug("Clean SCMCommand status: {} for DN: {}, stateData: {}",
-              status, dnId, stateData);
-        }
       }
     }
 
@@ -286,7 +258,8 @@ public class SCMDeletedBlockTransactionStatusManager
       return record.get(scmCmdId).getUpdateTime();
     }
 
-    private void updateStatus(UUID dnId, long scmCmdId, CmdStatus newStatus) {
+    private void updateStatus(UUID dnId, long scmCmdId,
+        CommandStatus.Status newStatus) {
       Map<Long, CmdStatusData> recordForDn = scmCmdStatusRecord.get(dnId);
       if (recordForDn == null) {
         LOG.warn("Unknown Datanode: {} scmCmdId {} newStatus {}",
@@ -302,49 +275,27 @@ public class SCMDeletedBlockTransactionStatusManager
       boolean changed = false;
       CmdStatusData statusData = recordForDn.get(scmCmdId);
       CmdStatus oldStatus = statusData.getStatus();
-
       switch (newStatus) {
-      case SENT:
-        if (oldStatus == TO_BE_SENT) {
+      case PENDING:
+        if (oldStatus == TO_BE_SENT || oldStatus == SENT) {
           // TO_BE_SENT -> SENT: The DeleteBlocksCommand is sent by SCM,
           // The follow-up status has not been updated by Datanode.
+
+          // SENT -> SENT: The DeleteBlocksCommand continues to wait to be
+          // executed by Datanode.
           statusData.setStatus(SENT);
           changed = true;
         }
         break;
-      case PENDING_EXECUTED:
-        if (oldStatus == SENT || oldStatus == PENDING_EXECUTED) {
-          // SENT -> PENDING_EXECUTED: The DeleteBlocksCommand is sent and
-          // received by the Datanode, but the command is not executed by the
-          // Datanode, the command is waiting to be executed.
-
-          // PENDING_EXECUTED -> PENDING_EXECUTED: The DeleteBlocksCommand
-          // continues to wait to be executed by Datanode.
-          statusData.setStatus(PENDING_EXECUTED);
-          changed = true;
-        }
-        break;
-      case NEED_RESEND:
-        if (oldStatus == SENT || oldStatus == PENDING_EXECUTED) {
-          // SENT -> NEED_RESEND: The DeleteBlocksCommand is sent and lost
-          // before it is received by the DN.
-
-          // PENDING_EXECUTED -> NEED_RESEND: The DeleteBlocksCommand waited for
-          // a while and was executed, but the execution failed;.
-          // Or the DeleteBlocksCommand was lost while waiting(such as the
-          // Datanode restart).
-          statusData.setStatus(NEED_RESEND);
-          changed = true;
-        }
-        break;
       case EXECUTED:
-        if (oldStatus == SENT || oldStatus == PENDING_EXECUTED) {
-          // PENDING_EXECUTED -> EXECUTED: The Command waits for a period of
-          // time on the DN and is executed successfully.
-
-          // SENT -> EXECUTED: The DeleteBlocksCommand has been sent to
-          // Datanode, executed by DN, and executed successfully.
-          statusData.setStatus(EXECUTED);
+      case FAILED:
+        if (oldStatus == SENT) {
+          // Once the DN executes DeleteBlocksCommands, regardless of whether
+          // DeleteBlocksCommands is executed successfully or not,
+          // it will be deleted from record.
+          // Successful DeleteBlocksCommands are recorded in
+          // `transactionToDNsCommitMap`.
+          removeScmCommand(dnId, scmCmdId);
           changed = true;
         }
         break;
@@ -368,7 +319,6 @@ public class SCMDeletedBlockTransactionStatusManager
         Instant updateTime = getUpdateTime(dnId, scmCmdId);
         if (updateTime != null &&
             Duration.between(updateTime, now).toMillis() > timeoutMs) {
-          updateStatus(dnId, scmCmdId, NEED_RESEND);
           CmdStatusData state = removeScmCommand(dnId, scmCmdId);
           LOG.warn("Remove Timeout SCM BlockDeletionCommand {} for DN {} " +
               "after without update {}ms}", state, dnId, timeoutMs);
@@ -384,33 +334,9 @@ public class SCMDeletedBlockTransactionStatusManager
       if (record == null || record.get(scmCmdId) == null) {
         return null;
       }
-
-      CmdStatus status = record.get(scmCmdId).getStatus();
-      if (!FINIAL_STATUSES.contains(status)) {
-        LOG.error("Cannot Remove ScmCommand {} Non-final Status {} for DN: {}" +
-            ". final Status {}", scmCmdId, status, dnId, FINIAL_STATUSES);
-        return null;
-      }
-
       CmdStatusData statusData = record.remove(scmCmdId);
       LOG.debug("Remove ScmCommand {} for DN: {} ", statusData, dnId);
       return statusData;
-    }
-
-    private static CmdStatus fromProtoCommandStatus(
-        CommandStatus.Status protoCmdStatus) {
-      switch (protoCmdStatus) {
-      case PENDING:
-        return CmdStatus.PENDING_EXECUTED;
-      case EXECUTED:
-        return CmdStatus.EXECUTED;
-      case FAILED:
-        return CmdStatus.NEED_RESEND;
-      default:
-        LOG.error("Unknown protoCmdStatus: {} cannot convert " +
-            "to ScmDeleteBlockCommandStatus", protoCmdStatus);
-        return null;
-      }
     }
 
     public Map<UUID, Map<Long, CmdStatus>> getCommandStatusByTxId(
@@ -447,8 +373,8 @@ public class SCMDeletedBlockTransactionStatusManager
   }
 
   public void onSent(DatanodeDetails dnId, SCMCommand<?> scmCommand) {
-    scmDeleteBlocksCommandStatusManager.updateStatus(
-        dnId.getUuid(), scmCommand.getId(), SENT);
+    scmDeleteBlocksCommandStatusManager.onSent(
+        dnId.getUuid(), scmCommand.getId());
   }
 
   public Map<UUID, Map<Long, CmdStatus>> getCommandStatusByTxId(
@@ -612,18 +538,14 @@ public class SCMDeletedBlockTransactionStatusManager
       UUID dnId) {
     processSCMCommandStatus(deleteBlockStatus, dnId);
     scmDeleteBlocksCommandStatusManager.
-        cleanSCMCommandForDn(dnId, scmCommandTimeoutMs);
+        cleanTimeoutSCMCommand(dnId, scmCommandTimeoutMs);
   }
 
   private boolean inProcessing(UUID dnId, long deletedBlocksTxId,
       Map<UUID, Map<Long, CmdStatus>> commandStatus) {
     Map<Long, CmdStatus> deletedBlocksTxStatus = commandStatus.get(dnId);
-    if (deletedBlocksTxStatus == null ||
-        deletedBlocksTxStatus.get(deletedBlocksTxId) == null) {
-      return false;
-    }
-    return deletedBlocksTxStatus.get(deletedBlocksTxId) !=
-        CmdStatus.NEED_RESEND;
+    return deletedBlocksTxStatus != null &&
+        deletedBlocksTxStatus.get(deletedBlocksTxId) != null;
   }
 
   private void processSCMCommandStatus(List<CommandStatus> deleteBlockStatus,
