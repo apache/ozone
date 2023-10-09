@@ -503,6 +503,8 @@ execute_debug_tests() {
   local datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
   docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 
+  execute_robot_test ${SCM} debug/ozone-debug-lease-recovery.robot
+
   execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
 
   docker stop "${container}"
