@@ -77,32 +77,32 @@ public class TestPipelineStateMap {
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
 
     // EC Pipelines
-    map.addPipeline(
-        MockPipeline.createEcPipeline(new ECReplicationConfig(3, 2)));
-    map.addPipeline(
-        MockPipeline.createEcPipeline(new ECReplicationConfig(3, 2)));
+    map.addPipeline(MockPipeline.createEcPipeline(
+        new ECReplicationConfig(3, 2)));
+    map.addPipeline(MockPipeline.createEcPipeline(
+        new ECReplicationConfig(3, 2)));
     p = MockPipeline.createEcPipeline(new ECReplicationConfig(3, 2));
     map.addPipeline(p);
     map.updatePipelineState(p.getId(), Pipeline.PipelineState.CLOSED);
 
-    assertEquals(2,
-        map.getPipelineCount(StandaloneReplicationConfig.getInstance(ONE),
-            Pipeline.PipelineState.OPEN));
-    assertEquals(1,
-        map.getPipelineCount(RatisReplicationConfig.getInstance(THREE),
-            Pipeline.PipelineState.OPEN));
+    assertEquals(2, map.getPipelineCount(
+        StandaloneReplicationConfig.getInstance(ONE),
+        Pipeline.PipelineState.OPEN));
+    assertEquals(1, map.getPipelineCount(
+        RatisReplicationConfig.getInstance(THREE),
+        Pipeline.PipelineState.OPEN));
     assertEquals(2, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.OPEN));
 
     assertEquals(0, map.getPipelineCount(new ECReplicationConfig(6, 3),
         Pipeline.PipelineState.OPEN));
 
-    assertEquals(1,
-        map.getPipelineCount(StandaloneReplicationConfig.getInstance(ONE),
-            Pipeline.PipelineState.CLOSED));
-    assertEquals(1,
-        map.getPipelineCount(RatisReplicationConfig.getInstance(THREE),
-            Pipeline.PipelineState.CLOSED));
+    assertEquals(1, map.getPipelineCount(
+        StandaloneReplicationConfig.getInstance(ONE),
+        Pipeline.PipelineState.CLOSED));
+    assertEquals(1, map.getPipelineCount(
+        RatisReplicationConfig.getInstance(THREE),
+        Pipeline.PipelineState.CLOSED));
     assertEquals(1, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.CLOSED));
   }
