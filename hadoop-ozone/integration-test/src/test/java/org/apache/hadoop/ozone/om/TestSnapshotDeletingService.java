@@ -198,7 +198,6 @@ public class TestSnapshotDeletingService {
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
-  @Flaky("HDDS-9023")
   @Test
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
@@ -248,7 +247,7 @@ public class TestSnapshotDeletingService {
       }
     }
 
-    // Total 12 dirs, 19 keys.
+    // Total 12 dirs, 24 keys.
     assertTableRowCount(dirTable, 12);
     assertTableRowCount(keyTable, 24);
     assertTableRowCount(deletedDirTable, 0);
@@ -367,17 +366,15 @@ public class TestSnapshotDeletingService {
         .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
             getSnapshotPrefix("snap3"), true).get();
 
-    Table<String, OmKeyInfo> snapDeletedDirTable =
-        snap3.getMetadataManager().getDeletedDirTable();
-    Table<String, String> snapRenamedTable =
+    Table<String, String> snap3RenamedTable =
         snap3.getMetadataManager().getSnapshotRenamedTable();
-    Table<String, RepeatedOmKeyInfo> snapDeletedTable =
+    Table<String, RepeatedOmKeyInfo> snap3DeletedTable =
         snap3.getMetadataManager().getDeletedTable();
 
-    assertTableRowCount(snapRenamedTable, 4);
-    assertTableRowCount(snapDeletedDirTable, 3);
+    // Renamed Dir should not be moved.
+    assertTableRowCount(snap3RenamedTable, 3);
     // All the keys deleted before snapshot2 is moved to snap3
-    assertTableRowCount(snapDeletedTable, 15);
+    assertTableRowCount(snap3DeletedTable, 24);
 
     // Before deleting the last snapshot
     assertTableRowCount(renamedTable, 0);
@@ -389,8 +386,12 @@ public class TestSnapshotDeletingService {
 
     // Check entries moved to active DB
     assertTableRowCount(snapshotInfoTable, 1);
-    assertTableRowCount(renamedTable, 4);
-    assertTableRowCount(deletedDirTable, 3);
+    assertTableRowCount(renamedTable, 3);
+    // No directories are moved between snapshots.
+    // They are either expanded by KeyDeletingService for
+    // Active Snapshots or SnapshotDeletingService for
+    // Deleted Snapshots.
+    assertTableRowCount(deletedDirTable, 0);
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcSnap1 =
         om.getOmSnapshotManager().checkForSnapshot(
@@ -426,7 +427,7 @@ public class TestSnapshotDeletingService {
         }
       }
     }
-    assertTableRowCount(deletedTable, 15);
+    assertTableRowCount(deletedTable, 24);
 
     snap1 = null;
     rcSnap1.close();

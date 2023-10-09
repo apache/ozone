@@ -89,12 +89,10 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           moveDeletedKeysRequest.getReclaimKeysList();
       List<HddsProtos.KeyValue> renamedKeysList =
           moveDeletedKeysRequest.getRenamedKeysList();
-      List<String> movedDirs =
-          moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), fromSnapshot, nextSnapshot,
-          nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
+          nextDBKeysList, reclaimKeysList, renamedKeysList);
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(

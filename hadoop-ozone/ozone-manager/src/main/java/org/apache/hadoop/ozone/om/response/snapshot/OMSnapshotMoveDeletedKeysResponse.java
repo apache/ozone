@@ -55,22 +55,19 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private List<SnapshotMoveKeyInfos> nextDBKeysList;
   private List<SnapshotMoveKeyInfos> reclaimKeysList;
   private List<HddsProtos.KeyValue> renamedKeysList;
-  private List<String> movedDirs;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
       @Nonnull SnapshotInfo fromSnapshot,
       SnapshotInfo nextSnapshot,
       List<SnapshotMoveKeyInfos> nextDBKeysList,
       List<SnapshotMoveKeyInfos> reclaimKeysList,
-      List<HddsProtos.KeyValue> renamedKeysList,
-      List<String> movedDirs) {
+      List<HddsProtos.KeyValue> renamedKeysList) {
     super(omResponse);
     this.fromSnapshot = fromSnapshot;
     this.nextSnapshot = nextSnapshot;
     this.nextDBKeysList = nextDBKeysList;
     this.reclaimKeysList = reclaimKeysList;
     this.renamedKeysList = renamedKeysList;
-    this.movedDirs = movedDirs;
   }
 
   /**
@@ -117,8 +114,6 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
           try (BatchOperation writeBatch =
               nextSnapshotStore.initBatchOperation()) {
             processKeys(writeBatch, nextOmSnapshot.getMetadataManager());
-            processDirs(writeBatch, nextOmSnapshot.getMetadataManager(),
-                fromOmSnapshot);
             nextSnapshotStore.commitBatchOperation(writeBatch);
             nextSnapshotStore.getDb().flushWal(true);
             nextSnapshotStore.getDb().flush();
@@ -127,7 +122,6 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       } else {
         // Handle the case where there is no next Snapshot.
         processKeys(batchOperation, omMetadataManager);
-        processDirs(batchOperation, omMetadataManager, fromOmSnapshot);
       }
 
       // Update From Snapshot Deleted Table.
@@ -137,25 +131,12 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
           fromSnapshotStore.initBatchOperation()) {
         processReclaimKeys(fromSnapshotBatchOp,
             fromOmSnapshot.getMetadataManager());
-        deleteDirsFromSnapshot(fromSnapshotBatchOp, fromOmSnapshot);
         fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
         fromSnapshotStore.getDb().flushWal(true);
         fromSnapshotStore.getDb().flush();
       }
     }
 
-  }
-
-  private void deleteDirsFromSnapshot(BatchOperation batchOp,
-      OmSnapshot fromOmSnapshot)
-      throws IOException {
-    for (String movedDirsKey : movedDirs) {
-      // Delete dirs from current snapshot that are moved to next snapshot.
-      fromOmSnapshot
-          .getMetadataManager()
-          .getDeletedDirTable()
-          .deleteWithBatch(batchOp, movedDirsKey);
-    }
   }
 
   private void processReclaimKeys(BatchOperation batchOp,
@@ -175,23 +156,6 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       }
       metadataManager.getDeletedTable().putWithBatch(batchOp,
           dBKey.getKey(), omKeyInfos);
-    }
-  }
-
-  private void processDirs(BatchOperation batchOp,
-                           OMMetadataManager omMetadataManager,
-                           OmSnapshot fromOmSnapshot)
-      throws IOException {
-    for (String movedDirsKey : movedDirs) {
-      OmKeyInfo keyInfo = fromOmSnapshot.getMetadataManager()
-          .getDeletedDirTable()
-          .get(movedDirsKey);
-      if (keyInfo == null) {
-        continue;
-      }
-      // Move deleted dirs to next snapshot or active DB
-      omMetadataManager.getDeletedDirTable().putWithBatch(
-          batchOp, movedDirsKey, keyInfo);
     }
   }
 

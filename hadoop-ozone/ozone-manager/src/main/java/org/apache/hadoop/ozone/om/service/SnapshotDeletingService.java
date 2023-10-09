@@ -92,7 +92,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   // multiple times.
   private static final int SNAPSHOT_DELETING_CORE_POOL_SIZE = 1;
   private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
-  private final ClientId clientId = ClientId.randomId();
 
   private final OzoneManager ozoneManager;
   private final OmSnapshotManager omSnapshotManager;
@@ -245,11 +244,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           List<SnapshotMoveKeyInfos> toNextDBList = new ArrayList<>();
           // A list of renamed keys/files/dirs
           List<HddsProtos.KeyValue> renamedList = new ArrayList<>();
-          List<String> dirsToMove = new ArrayList<>();
 
           long remainNum = handleDirectoryCleanUp(snapshotDeletedDirTable,
-              previousDirTable, renamedTable, dbBucketKeyForDir, snapInfo,
-              omSnapshot, dirsToMove, renamedList);
+              dbBucketKeyForDir, snapInfo, omSnapshot);
           int deletionCount = 0;
 
           try (TableIterator<String, ? extends Table.KeyValue<String,
@@ -325,7 +322,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           snapshotLimit--;
           // Submit Move request to OM.
           submitSnapshotMoveDeletedKeys(snapInfo, toReclaimList,
-              toNextDBList, renamedList, dirsToMove);
+              toNextDBList, renamedList);
 
           // Properly decrement ref count for rcOmPreviousSnapshot
           if (rcOmPreviousSnapshot != null) {
@@ -374,18 +371,16 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .startsWith(dbBucketKeyForDir);
       }
 
-      return (isDirTableCleanedUp || snapshotDeletedDirTable.isEmpty()) &&
-          (isKeyTableCleanedUp || snapshotDeletedTable.isEmpty());
+      boolean dirTableEmpty = snapshotDeletedDirTable.isEmpty();
+      boolean deletedTableEmpty = snapshotDeletedTable.isEmpty();
+      return (isDirTableCleanedUp || dirTableEmpty) &&
+          (isKeyTableCleanedUp || deletedTableEmpty);
     }
 
-    @SuppressWarnings("checkstyle:ParameterNumber")
     private long handleDirectoryCleanUp(
         Table<String, OmKeyInfo> snapshotDeletedDirTable,
-        Table<String, OmDirectoryInfo> previousDirTable,
-        Table<String, String> renamedTable,
         String dbBucketKeyForDir, SnapshotInfo snapInfo,
-        OmSnapshot omSnapshot, List<String> dirsToMove,
-        List<HddsProtos.KeyValue> renamedList) {
+        OmSnapshot omSnapshot) {
 
       long dirNum = 0L;
       long subDirNum = 0L;
@@ -412,40 +407,34 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             break;
           }
 
-          if (isDirReclaimable(deletedDir, previousDirTable,
-              renamedTable, renamedList)) {
-            // Reclaim here
-            PurgePathRequest request = prepareDeleteDirRequest(
+          PurgePathRequest request = prepareDeleteDirRequest(
+              remainNum, deletedDir.getValue(), deletedDir.getKey(),
+              allSubDirList, omSnapshot.getKeyManager());
+          if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+              request.getSerializedSize())) {
+            if (purgePathRequestList.size() != 0) {
+              // if message buffer reaches max limit, avoid sending further
+              remainNum = 0;
+              break;
+            }
+            // if directory itself is having a lot of keys / files,
+            // reduce capacity to minimum level
+            remainNum = MIN_ERR_LIMIT_PER_TASK;
+            request = prepareDeleteDirRequest(
                 remainNum, deletedDir.getValue(), deletedDir.getKey(),
                 allSubDirList, omSnapshot.getKeyManager());
-            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
-                request.getSerializedSize())) {
-              if (purgePathRequestList.size() != 0) {
-                // if message buffer reaches max limit, avoid sending further
-                remainNum = 0;
-                break;
-              }
-              // if directory itself is having a lot of keys / files,
-              // reduce capacity to minimum level
-              remainNum = MIN_ERR_LIMIT_PER_TASK;
-              request = prepareDeleteDirRequest(
-                  remainNum, deletedDir.getValue(), deletedDir.getKey(),
-                  allSubDirList, omSnapshot.getKeyManager());
-            }
-            consumedSize += request.getSerializedSize();
-            purgePathRequestList.add(request);
-            remainNum = remainNum - request.getDeletedSubFilesCount();
-            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-            // Count up the purgeDeletedDir, subDirs and subFiles
-            if (request.getDeletedDir() != null
-                && !request.getDeletedDir().isEmpty()) {
-              dirNum++;
-            }
-            subDirNum += request.getMarkDeletedSubDirsCount();
-            subFileNum += request.getDeletedSubFilesCount();
-          } else {
-            dirsToMove.add(deletedDir.getKey());
           }
+          consumedSize += request.getSerializedSize();
+          purgePathRequestList.add(request);
+          remainNum = remainNum - request.getDeletedSubFilesCount();
+          remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+          // Count up the purgeDeletedDir, subDirs and subFiles
+          if (request.getDeletedDir() != null
+              && !request.getDeletedDir().isEmpty()) {
+            dirNum++;
+          }
+          subDirNum += request.getMarkDeletedSubDirsCount();
+          subFileNum += request.getDeletedSubFilesCount();
         }
 
         remainNum = optimizeDirDeletesAndSubmitRequest(remainNum, dirNum,
@@ -463,6 +452,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
     private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) {
       if (!purgeSnapshotKeys.isEmpty()) {
+        ClientId clientId = ClientId.randomId();
         SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
             .newBuilder()
             .addAllSnapshotDBKeys(purgeSnapshotKeys)
@@ -474,7 +464,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .setClientId(clientId.toString())
             .build();
 
-        submitRequest(omRequest);
+        submitRequest(omRequest, clientId);
       }
     }
 
@@ -498,57 +488,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    private boolean isDirReclaimable(
-        Table.KeyValue<String, OmKeyInfo> deletedDir,
-        Table<String, OmDirectoryInfo> previousDirTable,
-        Table<String, String> renamedTable,
-        List<HddsProtos.KeyValue> renamedList) throws IOException {
-
-      if (previousDirTable == null) {
-        return true;
-      }
-
-      String deletedDirDbKey = deletedDir.getKey();
-      OmKeyInfo deletedDirInfo = deletedDir.getValue();
-      String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
-          deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName(),
-          deletedDirInfo.getObjectID());
-
-      /*
-      snapshotRenamedTable: /volumeName/bucketName/objectID ->
-          /volumeId/bucketId/parentId/dirName
-       */
-      String dbKeyBeforeRename = renamedTable.getIfExist(dbRenameKey);
-      String prevDbKey = null;
-
-      if (dbKeyBeforeRename != null) {
-        prevDbKey = dbKeyBeforeRename;
-        HddsProtos.KeyValue renamedDir = HddsProtos.KeyValue
-            .newBuilder()
-            .setKey(dbRenameKey)
-            .setValue(dbKeyBeforeRename)
-            .build();
-        renamedList.add(renamedDir);
-      } else {
-        // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
-        // OzoneDeletePathKey. Changing it back to check the previous DirTable.
-        prevDbKey = ozoneManager.getMetadataManager()
-            .getOzoneDeletePathDirKey(deletedDirDbKey);
-      }
-
-      OmDirectoryInfo prevDirectoryInfo = previousDirTable.get(prevDbKey);
-      if (prevDirectoryInfo == null) {
-        return true;
-      }
-
-      return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
-    }
-
     public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
         List<SnapshotMoveKeyInfos> toReclaimList,
         List<SnapshotMoveKeyInfos> toNextDBList,
-        List<HddsProtos.KeyValue> renamedList,
-        List<String> dirsToMove) throws InterruptedException {
+        List<HddsProtos.KeyValue> renamedList) throws InterruptedException {
+      ClientId clientId = ClientId.randomId();
 
       SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
           SnapshotMoveDeletedKeysRequest.newBuilder()
@@ -558,7 +502,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           .addAllReclaimKeys(toReclaimList)
           .addAllNextDBKeys(toNextDBList)
           .addAllRenamedKeys(renamedList)
-          .addAllDeletedDirsToMove(dirsToMove)
           .build();
 
       OMRequest omRequest = OMRequest.newBuilder()
@@ -568,11 +511,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           .build();
 
       try (BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock()) {
-        submitRequest(omRequest);
+        submitRequest(omRequest, clientId);
       }
     }
 
-    public void submitRequest(OMRequest omRequest) {
+    public void submitRequest(OMRequest omRequest, ClientId clientId) {
       try {
         if (isRatisEnabled()) {
           OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
