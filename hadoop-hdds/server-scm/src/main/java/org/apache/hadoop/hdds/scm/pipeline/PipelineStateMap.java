@@ -198,10 +198,12 @@ public class PipelineStateMap implements PipelineMap {
   public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
     final AtomicBoolean pipelineInWrongState = new AtomicBoolean(false);
+    final AtomicBoolean pipelineNotFound = new AtomicBoolean(false);
 
     PipelineWithContainers removed =
         pipelines.compute(pipelineID, (pipelineID1, oldPwC) -> {
           if (oldPwC == null) {
+            pipelineNotFound.set(true);
             return null;
           }
           if (!oldPwC.getPipeline().isClosed()) {
@@ -213,14 +215,14 @@ public class PipelineStateMap implements PipelineMap {
           return null;
         });
 
-    if (removed == null) {
+    if (pipelineNotFound.get()) {
       throw new PipelineNotFoundException(format("%s not found", pipelineID));
     }
     if (pipelineInWrongState.get()) {
       throw new InvalidPipelineStateException(
           format("Pipeline with %s is not yet closed", pipelineID));
     }
-    return removed.getPipeline();
+    return removed == null ? null : removed.getPipeline();
   }
 
   @Override
