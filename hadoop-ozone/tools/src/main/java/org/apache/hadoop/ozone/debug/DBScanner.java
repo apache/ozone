@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
@@ -210,18 +211,15 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                                boolean schemaV3)
       throws IOException {
 
-    PrintWriter printWriter = null;
-    try {
-      if (fileName != null) {
-        printWriter = new PrintWriter(
-            new BufferedWriter(new PrintWriter(fileName, UTF_8.name())));
-      }
-      return displayTable(iterator, dbColumnFamilyDef, printWriter,
-          schemaV3);
-    } finally {
-      if (printWriter != null) {
-        printWriter.close();
-      }
+    if (fileName == null) {
+      // Print to stdout
+      return displayTable(iterator, dbColumnFamilyDef, out(), schemaV3);
+    }
+
+    // Write to file output
+    try (PrintWriter out = new PrintWriter(new BufferedWriter(
+        new PrintWriter(fileName, UTF_8.name())))) {
+      return displayTable(iterator, dbColumnFamilyDef, out, schemaV3);
     }
   }
 
@@ -229,9 +227,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                                DBColumnFamilyDefinition dbColumnFamilyDef,
                                PrintWriter printWriter, boolean schemaV3) {
     exception = false;
-    if (printWriter == null) {
-      printWriter = out();
-    }
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setNameFormat("DBScanner-%d")
         .build();
