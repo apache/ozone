@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -219,7 +218,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
               snapInfo, chainManager, omSnapshotManager);
           Table<String, OmKeyInfo> previousKeyTable = null;
-          Table<String, OmDirectoryInfo> previousDirTable = null;
           OmSnapshot omPreviousSnapshot = null;
 
           // Split RepeatedOmKeyInfo and update current snapshot deletedKeyTable
@@ -234,8 +232,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
             previousKeyTable = omPreviousSnapshot
                 .getMetadataManager().getKeyTable(bucketInfo.getBucketLayout());
-            previousDirTable = omPreviousSnapshot
-                .getMetadataManager().getDirectoryTable();
           }
 
           // Move key to either next non deleted snapshot's deletedTable
@@ -371,10 +367,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .startsWith(dbBucketKeyForDir);
       }
 
-      boolean dirTableEmpty = snapshotDeletedDirTable.isEmpty();
-      boolean deletedTableEmpty = snapshotDeletedTable.isEmpty();
-      return (isDirTableCleanedUp || dirTableEmpty) &&
-          (isKeyTableCleanedUp || deletedTableEmpty);
+      return (isDirTableCleanedUp || snapshotDeletedDirTable.isEmpty()) &&
+          (isKeyTableCleanedUp || snapshotDeletedTable.isEmpty());
     }
 
     private long handleDirectoryCleanUp(
