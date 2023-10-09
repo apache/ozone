@@ -52,7 +52,7 @@ import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 
 /**
@@ -119,6 +119,8 @@ public class DefaultApprover extends BaseApprover {
         toASN1Primitive().toString();
     String csrClusterId = x500Name.getRDNs(BCStyle.O)[0].getFirst().getValue().
         toASN1Primitive().toString();
+    String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
+        .toASN1Primitive().toString();
 
     if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&
@@ -126,15 +128,16 @@ public class DefaultApprover extends BaseApprover {
         // Special case to handle DN certificate generation as DN might not know
         // scmId and clusterId before registration. In secure mode registration
         // will succeed only after datanode has a valid certificate.
-        String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
-            .toASN1Primitive().toString();
-        x500Name = getDistinguishedName(cn, scmId, clusterId);
+        csrClusterId = clusterId;
+        csrScmId = scmId;
       } else {
         // Throw exception if scmId and clusterId doesn't match.
         throw new SCMSecurityException("ScmId and ClusterId in CSR subject" +
             " are incorrect.");
       }
     }
+    x500Name = getDistinguishedNameWithSN(cn, csrScmId, csrClusterId,
+        certSerialId);
 
     RSAKeyParameters rsa =
         (RSAKeyParameters) PublicKeyFactory.createKey(keyInfo);

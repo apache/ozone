@@ -550,7 +550,7 @@ wait_for_root_certificate(){
   local container=$1
   local timeout=$2
   local count=$3
-  local command="ozone admin cert list --role=scm | grep -v "scm-sub" | grep "scm" | wc -l"
+  local command="ozone admin cert list --role=scm -c 100 | grep -v "scm-sub" | grep "scm" | wc -l"
 
   #Reset the timer
   SECONDS=0
@@ -563,6 +563,6 @@ wait_for_root_certificate(){
       echo "$count root certificates are not found yet"
       sleep 1
   done
-  echo "Timed out waiting on $count root certificates"
+  echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
   return 1
 }

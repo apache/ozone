@@ -73,8 +73,9 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
  * PKCS10CertificationRequest to CertificateServer.
  */
 public final class CertificateSignRequest {
-  // Ozone Certificate distinguished format: (CN=Subject,OU=ScmID,O=ClusterID).
+  // Ozone Certificate distinguished format: (CN=Subject,OU=ScmID,O=ClusterID,SERIALNUMBER=SerialID).
   private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
+  private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT = "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
   private static final Logger LOG =
       LoggerFactory.getLogger(CertificateSignRequest.class);
   private final KeyPair keyPair;
@@ -107,6 +108,12 @@ public final class CertificateSignRequest {
 
   public static String getDistinguishedNameFormat() {
     return DISTINGUISHED_NAME_FORMAT;
+  }
+
+  public static X500Name getDistinguishedNameWithSN(String subject,
+      String scmID, String clusterID, String serialID) {
+    return new X500Name(String.format(DISTINGUISHED_NAME_WITH_SN_FORMAT,
+        subject, scmID, clusterID, serialID));
   }
 
   public static X500Name getDistinguishedName(String subject, String scmID,

@@ -70,7 +70,7 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
  * provided.
  */
 public final class SelfSignedCertificate {
-  private static final String NAME_FORMAT = "CN=%s,OU=%s,O=%s";
+  private static final String NAME_FORMAT = "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
   private String subject;
   private String clusterID;
   private String scmID;
@@ -110,10 +110,6 @@ public final class SelfSignedCertificate {
 
   private X509CertificateHolder generateCertificate(BigInteger caCertSerialId)
       throws OperatorCreationException, IOException {
-    // For the Root Certificate we form the name from Subject, SCM ID and
-    // Cluster ID.
-    String dnName = String.format(getNameFormat(), subject, scmID, clusterID);
-    X500Name name = new X500Name(dnName);
     byte[] encoded = key.getPublic().getEncoded();
     SubjectPublicKeyInfo publicKeyInfo =
         SubjectPublicKeyInfo.getInstance(encoded);
@@ -129,6 +125,11 @@ public final class SelfSignedCertificate {
     } else {
       serial = caCertSerialId;
     }
+    // For the Root Certificate we form the name from Subject, SCM ID and
+    // Cluster ID.
+    String dnName = String.format(getNameFormat(),
+        subject, scmID, clusterID, serial);
+    X500Name name = new X500Name(dnName);
 
     // Valid from the Start of the day when we generate this Certificate.
     Date validFrom =

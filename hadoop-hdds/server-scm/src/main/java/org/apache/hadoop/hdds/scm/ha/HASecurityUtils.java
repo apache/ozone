@@ -145,11 +145,9 @@ public final class HASecurityUtils {
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
           getScmSecurityClientWithFixedDuration(configuration);
 
-      // Fetch SCM certificate ID
-      String certId = secureScmClient.getNextCertificateId();
       // Generate CSR.
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          securityConfig, scmHostname, certId);
+          securityConfig, scmHostname);
 
       ScmNodeDetailsProto scmNodeDetailsProto =
           ScmNodeDetailsProto.newBuilder()
@@ -159,8 +157,7 @@ public final class HASecurityUtils {
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = secureScmClient.
-          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr),
-              certId, false);
+          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
       String pemEncodedCert = response.getX509Certificate();
 
       // Store SCM sub CA and root CA certificate.
@@ -204,7 +201,7 @@ public final class HASecurityUtils {
       String certId = BigInteger.ONE.add(BigInteger.ONE).toString();
 
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmHostname, certId);
+          config, scmHostname);
 
       CertPath subSCMCertHolderList = rootCAServer.
           requestCertificate(csr, KERBEROS_TRUSTED, SCM, certId).get();
@@ -255,7 +252,7 @@ public final class HASecurityUtils {
       SecurityConfig config, CertificateStore scmCertStore,
       SCMStorageConfig scmStorageConfig, BigInteger rootCertId,
       PKIProfile pkiProfile, String component) throws IOException {
-    String subject = String.format(SCM_ROOT_CA_PREFIX, rootCertId) +
+    String subject = SCM_ROOT_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
@@ -292,13 +289,12 @@ public final class HASecurityUtils {
    */
   private static PKCS10CertificationRequest generateCSR(
       SCMCertificateClient client, SCMStorageConfig scmStorageConfig,
-      SecurityConfig config, String scmHostname, String certSerialId)
+      SecurityConfig config, String scmHostname)
       throws IOException {
-    CertificateSignRequest.Builder builder = client.getCSRBuilder(certSerialId);
+    CertificateSignRequest.Builder builder = client.getCSRBuilder();
 
     // Get host name.
-    String subject = String.format(SCM_SUB_CA_PREFIX, certSerialId)
-        + scmHostname;
+    String subject = SCM_SUB_CA_PREFIX + scmHostname;
 
     builder.setConfiguration(config)
         .setScmID(scmStorageConfig.getScmId())

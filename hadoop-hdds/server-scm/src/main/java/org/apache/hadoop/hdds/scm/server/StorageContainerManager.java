@@ -861,7 +861,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final CertificateServer rootCertificateServer;
 
     // Start specific instance SCM CA server.
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime()) +
+    String subject = SCM_SUB_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {
       scmCertificateServer = configurator.getCertificateServer();

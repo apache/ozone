@@ -69,7 +69,11 @@ public class SequenceIdGenerator {
   public static final String LOCAL_ID = "localId";
   public static final String DEL_TXN_ID = "delTxnId";
   public static final String CONTAINER_ID = "containerId";
-  // certificate ID for all services
+
+  @Deprecated
+  public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
+  // Certificate ID for all services, including root certificates, whose ID
+  // were using "rootCertificateId" before.
   public static final String CERTIFICATE_ID = "CertificateId";
 
   private static final long INVALID_SEQUENCE_ID = 0;

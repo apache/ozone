@@ -195,8 +195,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    */
   @Override
   public String getDataNodeCertificate(
-      DatanodeDetailsProto dnDetails,
-      String certSignReq) throws IOException {
+      DatanodeDetailsProto dnDetails, String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
@@ -311,13 +310,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    *
    * @param scmNodeDetails   - SCM Node Details.
    * @param certSignReq      - Certificate signing request.
-   * @param certSerialId    - Certificate Id
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq, String certSerialId) throws IOException {
-    return getSCMCertificate(scmNodeDetails, certSignReq, certSerialId, false);
+      String certSignReq) throws IOException {
+    return getSCMCertificate(scmNodeDetails, certSignReq, false);
   }
 
   /**
@@ -325,14 +323,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    *
    * @param scmNodeDetails   - SCM Node Details.
    * @param certSignReq      - Certificate signing request.
-   * @param certSerialId    - Certificate Id
    * @param isRenew          - if SCM is renewing certificate or not.
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq, String certSerialId, boolean isRenew)
-      throws IOException {
+      String certSignReq, boolean isRenew) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
     // Check clusterID
     if (!storageContainerManager.getClusterId().equals(
@@ -346,16 +342,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), isRenew, config,
         "getSCMCertificate");
 
-    if (Strings.isNullOrEmpty(certSerialId)) {
-      certSerialId = getNextCertificateId();
-      LOGGER.warn("SCM certificate serial ID is null. Set it to {}" +
-          certSerialId);
-    }
-
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
-    return getEncodedCertToString(certSignReq, NodeType.SCM, certSerialId);
+    return getEncodedCertToString(certSignReq, NodeType.SCM,
+        getNextCertificateId());
   }
 
   /**
@@ -545,8 +536,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     return pemEncodedCerts;
   }
 
-  @Override
-  public String getNextCertificateId() throws IOException {
+  private String getNextCertificateId() throws IOException {
     return String.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
   }
 
