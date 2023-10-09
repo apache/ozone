@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
+import org.apache.hadoop.hdds.scm.block.ScmBlockDeletingServiceMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
@@ -301,8 +302,8 @@ public class TestStorageContainerManager {
     // is created by default.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
-    conf.setTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
-        1000, TimeUnit.MILLISECONDS);
+    /*conf.setTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        1000, TimeUnit.MILLISECONDS);*/
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(100)
         .build();
@@ -328,6 +329,9 @@ public class TestStorageContainerManager {
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
 
+      ScmBlockDeletingServiceMetrics metrics =
+          cluster.getStorageContainerManager().getScmBlockManager()
+              .getDeletedBlockLog().getMetrics();
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
 
@@ -342,7 +346,11 @@ public class TestStorageContainerManager {
             cluster.getStorageContainerManager().getScmHAManager()
                 .asSCMHADBTransactionBuffer().flush();
           }
-          return delLog.getNumOfValidTransactions() == 0;
+          int numOfValidTransactions = delLog.getNumOfValidTransactions();
+          LOG.info("Deleted Log Num Of Valid Transactions: {}",
+              numOfValidTransactions);
+          LOG.info("SCMBlockDeletingServiceMetrics: {}", metrics.toString());
+          return numOfValidTransactions == 0;
         } catch (IOException e) {
           return false;
         }

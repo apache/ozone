@@ -503,4 +503,9 @@ public class DeletedBlockLogImpl
       return;
     }
   }
+
+  @Override
+  public ScmBlockDeletingServiceMetrics getMetrics() {
+    return metrics;
+  }
 }
