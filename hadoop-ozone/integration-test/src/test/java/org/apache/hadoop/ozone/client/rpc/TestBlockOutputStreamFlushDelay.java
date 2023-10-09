@@ -325,7 +325,6 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
-  @Flaky("HDDS-7875")
   public void testMultiChunkWrite() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -419,7 +418,6 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
-  @Flaky("HDDS-7875")
   public void testMultiChunkWrite2() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -494,7 +492,6 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
-  @Flaky("HDDS-7875")
   public void testFullBufferCondition() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
