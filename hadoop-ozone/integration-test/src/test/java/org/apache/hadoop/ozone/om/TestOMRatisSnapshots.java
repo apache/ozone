@@ -158,7 +158,7 @@ public class TestOMRatisSnapshots {
 
     OzoneManagerRatisServerConfig omRatisConf =
         conf.getObject(OzoneManagerRatisServerConfig.class);
-    omRatisConf.setLogAppenderWaitTimeMin(1);
+    omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
 
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
