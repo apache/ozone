@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -94,6 +95,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     OmBucketInfo omBucketInfo = null;
+    OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -102,8 +104,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       checkACLsWithFSO(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE);
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      acquiredLock = ozoneLockStrategy.acquireWriteLock(omMetadataManager,
+          volumeName, bucketName, keyName);
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -179,8 +181,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName,
+            bucketName, keyName);
       }
     }
 
