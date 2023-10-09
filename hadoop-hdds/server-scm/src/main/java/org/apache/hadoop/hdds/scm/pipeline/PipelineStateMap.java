@@ -24,13 +24,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -201,13 +197,30 @@ public class PipelineStateMap implements PipelineMap {
   @Override
   public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-    Pipeline pipeline = getPipeline(pipelineID);
-    if (!pipeline.isClosed()) {
+    final AtomicBoolean pipelineInWrongState = new AtomicBoolean(false);
+
+    PipelineWithContainers removed =
+        pipelines.compute(pipelineID, (pipelineID1, oldPwC) -> {
+          if (oldPwC == null) {
+            return null;
+          }
+          if (!oldPwC.getPipeline().isClosed()) {
+            // do not change the value if pipeline in the wrong state
+            pipelineInWrongState.set(true);
+            return oldPwC;
+          }
+          // remove value
+          return null;
+        });
+
+    if (removed == null) {
+      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+    }
+    if (pipelineInWrongState.get()) {
       throw new InvalidPipelineStateException(
           format("Pipeline with %s is not yet closed", pipelineID));
     }
-    pipelines.remove(pipelineID);
-    return pipeline;
+    return removed.getPipeline();
   }
 
   @Override
