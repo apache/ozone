@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om;
 
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +41,7 @@ public class TestGrpcOzoneManagerServer {
   private GrpcOzoneManagerServer server;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(30);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   @Test
   public void testStartStop() throws Exception {

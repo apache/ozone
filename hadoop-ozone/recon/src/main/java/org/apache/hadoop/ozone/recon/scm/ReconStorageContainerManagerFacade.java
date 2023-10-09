@@ -41,6 +41,7 @@ import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -684,6 +685,11 @@ public class ReconStorageContainerManagerFacade
   @Override
   public SCMNodeDetails getScmNodeDetails() {
     return reconNodeDetails;
+  }
+
+  @Override
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return null;
   }
 
   public DBStore getScmDBStore() {

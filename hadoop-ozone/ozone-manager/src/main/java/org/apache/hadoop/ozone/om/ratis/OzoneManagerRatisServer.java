@@ -143,7 +143,8 @@ public final class OzoneManagerRatisServer {
     this.omRatisAddress = addr;
     this.port = addr.getPort();
     this.ratisStorageDir = OzoneManagerRatisUtils.getOMRatisDirectory(conf);
-    RaftProperties serverProperties = newRaftProperties(conf);
+    final RaftProperties serverProperties = newRaftProperties(
+        conf, port, ratisStorageDir);
 
     this.raftPeerId = localRaftPeerId;
     this.raftGroupId = RaftGroupId.valueOf(
@@ -571,7 +572,8 @@ public final class OzoneManagerRatisServer {
 
   //TODO simplify it to make it shorter
   @SuppressWarnings("methodlength")
-  private RaftProperties newRaftProperties(ConfigurationSource conf) {
+  public static RaftProperties newRaftProperties(ConfigurationSource conf,
+      int port, String ratisStorageDir) {
     // Set RPC type
     final String rpcType = conf.get(
         OMConfigKeys.OZONE_OM_RATIS_RPC_TYPE_KEY,
@@ -727,17 +729,8 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
         snapshotAutoTriggerThreshold);
 
-    createRaftServerProperties(conf, properties);
+    getOMHAConfigs(conf).forEach(properties::set);
     return properties;
-  }
-
-  private void createRaftServerProperties(ConfigurationSource ozoneConf,
-      RaftProperties raftProperties) {
-    Map<String, String> ratisServerConf =
-        getOMHAConfigs(ozoneConf);
-    ratisServerConf.forEach((key, val) -> {
-      raftProperties.set(key, val);
-    });
   }
 
   private static Map<String, String> getOMHAConfigs(
