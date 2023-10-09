@@ -713,6 +713,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     keyArgs.setIsMultipartKey(args.getIsMultipartKey());
 
+    keyArgs.setSortDatanodes(args.getSortDatanodes());
 
     req.setKeyArgs(keyArgs.build());
 
@@ -743,7 +744,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
-        .setDataSize(args.getDataSize());
+        .setDataSize(args.getDataSize())
+        .setSortDatanodes(args.getSortDatanodes());
 
     if (args.getReplicationConfig() != null) {
       if (args.getReplicationConfig() instanceof ECReplicationConfig) {

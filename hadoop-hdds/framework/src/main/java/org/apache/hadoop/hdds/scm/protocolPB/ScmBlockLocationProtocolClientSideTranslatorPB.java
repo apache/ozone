@@ -142,6 +142,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * @param num               - number of blocks.
    * @param replicationConfig - replication configuration of the blocks.
    * @param excludeList       - exclude list while allocating blocks.
+   * @param clientMachine     - client address, depends, can be hostname or
+   *                            ipaddress.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
@@ -149,7 +151,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      String owner, ExcludeList excludeList,
+      String clientMachine
   ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
@@ -159,6 +162,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
             .setNumBlocks(num)
             .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
+            .setClient(clientMachine)
             .setExcludeList(excludeList.getProtoBuf());
 
     switch (replicationConfig.getReplicationType()) {

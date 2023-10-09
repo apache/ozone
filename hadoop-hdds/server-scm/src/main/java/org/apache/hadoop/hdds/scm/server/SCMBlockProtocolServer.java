@@ -24,6 +24,7 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -177,7 +178,8 @@ public class SCMBlockProtocolServer implements
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      String owner, ExcludeList excludeList,
+      String clientMachine
   ) throws IOException {
     scm.checkAdminAccess(getRemoteUser(), false);
     Map<String, String> auditMap = Maps.newHashMap();
@@ -196,7 +198,9 @@ public class SCMBlockProtocolServer implements
         AllocatedBlock block = scm.getScmBlockManager()
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
+          List<String> uuidList = toNodeUuid(block.getPipeline().getNodes());
           blocks.add(block);
+          sortDatanodes(uuidList, clientMachine);
         }
       }
 
@@ -222,6 +226,15 @@ public class SCMBlockProtocolServer implements
       throw ex;
     }
   }
+
+  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
+    List<String> nodeSet = new ArrayList<>(nodes.size());
+    for (DatanodeDetails node : nodes) {
+      nodeSet.add(node.getUuidString());
+    }
+    return nodeSet;
+  }
+
 
   /**
    * Delete blocks for a set of object keys.

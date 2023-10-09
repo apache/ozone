@@ -1370,6 +1370,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
+        .setSortDatanodesInPipeline(true)
         .setAcls(getAclList());
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
