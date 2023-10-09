@@ -17,6 +17,14 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -25,9 +33,6 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-
-import java.io.IOException;
-import java.util.*;
 
 /**
  * Provides {@link Pipeline} factory methods for testing.
