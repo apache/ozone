@@ -627,6 +627,11 @@ public final class OmUtils {
           "Cannot create key under path reserved for "
               + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
               OMException.ResultCodes.INVALID_KEY_NAME);
+    } else if (keyName != null &&
+        keyName.equals(OM_SNAPSHOT_INDICATOR)) {
+      throw new OMException(
+          "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+          OMException.ResultCodes.INVALID_KEY_NAME);
     }
   }
 
