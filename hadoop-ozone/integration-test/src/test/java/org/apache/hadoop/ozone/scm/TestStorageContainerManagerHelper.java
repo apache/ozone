@@ -54,12 +54,16 @@ import org.junit.Rule;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A helper class used by {@link TestStorageContainerManager} to generate
  * some keys and helps to verify containers and blocks locations.
  */
 public class TestStorageContainerManagerHelper {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestStorageContainerManagerHelper.class);
 
   /**
     * Set a timeout for each test.
@@ -170,6 +174,16 @@ public class TestStorageContainerManagerHelper {
         for (Table.KeyValue<String, DeletedBlocksTransaction> txn :
             txnsInTxnTable) {
           conID.addAll(txn.getValue().getLocalIDList());
+        }
+        LOG.info("Block list for container Id {} at DN side: {}",
+            entry.getKey(), conID);
+        LOG.info("Block list for container Id {} at SCM side: {}",
+            entry.getKey(), containerBlocks.get(entry.getKey()));
+        if (conID.size() != containerBlocks.get(entry.getKey()).size()) {
+          return false;
+        }
+        if (!conID.containsAll(containerBlocks.get(entry.getKey()))) {
+          return false;
         }
         if (!conID.equals(containerBlocks.get(entry.getKey()))) {
           return false;
