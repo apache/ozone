@@ -83,11 +83,15 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       }
 
       long startTime = System.currentTimeMillis();
-
-      RESPONSE response = methodCall.apply(request);
-
-      protocolMessageMetrics.increment(type,
-          System.currentTimeMillis() - startTime);
+      protocolMessageMetrics.increaseConcurrency();
+      RESPONSE response;
+      try {
+        response = methodCall.apply(request);
+      } finally {
+        protocolMessageMetrics.increment(type,
+            System.currentTimeMillis() - startTime);
+        protocolMessageMetrics.decreaseConcurrency();
+      }
 
       if (logger.isTraceEnabled()) {
         logger.trace(

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -44,6 +45,8 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   private Map<KEY, AtomicLong> elapsedTimes =
       new ConcurrentHashMap<>();
 
+  private AtomicInteger concurrency = new AtomicInteger(0);
+
   public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
       String description, KEY[] types) {
     return new ProtocolMessageMetrics<KEY>(name, description, types);
@@ -62,6 +65,14 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   public void increment(KEY key, long duration) {
     counters.get(key).incrementAndGet();
     elapsedTimes.get(key).addAndGet(duration);
+  }
+
+  public void increaseConcurrency() {
+    concurrency.incrementAndGet();
+  }
+
+  public void decreaseConcurrency() {
+    concurrency.decrementAndGet();
   }
 
   public void register() {
@@ -88,6 +99,9 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
       builder.endRecord();
 
     });
+    MetricsRecordBuilder builder = collector.addRecord(name);
+    builder.addCounter(new MetricName("concurrency", "Number of requests processed concurrently"),
+        concurrency.get());
   }
 
   /**
