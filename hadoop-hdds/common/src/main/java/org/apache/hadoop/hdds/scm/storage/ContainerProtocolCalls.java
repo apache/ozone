@@ -724,4 +724,30 @@ public final class ContainerProtocolCalls  {
     }
     return datanodeToResponseMap;
   }
+
+  public static HashMap<DatanodeDetails, ReadContainerResponseProto>
+      readContainerFromAllNodes(XceiverClientSpi client, long containerID,
+      String encodedToken) throws IOException, InterruptedException {
+    String id = client.getPipeline().getFirstNode().getUuidString();
+    HashMap<DatanodeDetails, ReadContainerResponseProto> datanodeToResponseMap
+        = new HashMap<>();
+    ContainerCommandRequestProto.Builder request =
+        ContainerCommandRequestProto.newBuilder();
+    request.setCmdType(Type.ReadContainer);
+    request.setContainerID(containerID);
+    request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
+    request.setDatanodeUuid(id);
+    if (encodedToken != null) {
+      request.setEncodedToken(encodedToken);
+    }
+    Map<DatanodeDetails, ContainerCommandResponseProto> responses =
+        client.sendCommandOnAllNodes(request.build());
+    for (Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry :
+        responses.entrySet()) {
+      datanodeToResponseMap.put(entry.getKey(),
+          entry.getValue().getReadContainer());
+    }
+    return datanodeToResponseMap;
+  }
+
 }
