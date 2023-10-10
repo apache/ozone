@@ -208,6 +208,7 @@ public class PipelineStateMap implements PipelineMap {
   @Override
   public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
+    // final containers to retrieve result from lambda
     final AtomicBoolean pipelineInWrongState = new AtomicBoolean(false);
     final AtomicBoolean pipelineNotFound = new AtomicBoolean(false);
     final AtomicReference<PipelineWithContainers> removedValue = new AtomicReference<>(null);
