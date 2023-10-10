@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -96,6 +97,7 @@ import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -115,6 +117,7 @@ public final class OzoneManagerRatisServer {
   private final OzoneManager ozoneManager;
   private final OzoneManagerStateMachine omStateMachine;
   private final String ratisStorageDir;
+  private final OMPerformanceMetrics perfMetrics;
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -174,6 +177,7 @@ public final class OzoneManagerRatisServer {
         .setParameters(parameters)
         .setStateMachine(omStateMachine)
         .build();
+    this.perfMetrics = om.getPerfMetrics();
   }
 
   /**
@@ -246,11 +250,16 @@ public final class OzoneManagerRatisServer {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest =
-          createWriteRaftClientRequest(omRequest);
-      RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+      RaftClientRequest raftClientRequest = captureLatencyNs(
+          perfMetrics.getConvertRatisRequestLatencyNs(),
+          () -> createWriteRaftClientRequest(omRequest));
+      RaftClientReply raftClientReply = captureLatencyNs(
+          perfMetrics.getRatisLatencyNs(),
+          () -> submitRequestToRatis(raftClientRequest));
 
-      return processReply(omRequest, raftClientReply);
+      return captureLatencyNs(
+          perfMetrics.getConvertRatisResponseLatencyNs(),
+          () -> processReply(omRequest, raftClientReply));
     } else {
       LOG.info("Rejecting write request on OM {} because it is in prepare " +
           "mode: {}", ozoneManager.getOMNodeId(),
