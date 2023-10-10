@@ -352,6 +352,7 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 500, 10000);
+      Thread.sleep(1000);
       Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
