@@ -239,8 +239,8 @@ public class TestStorageVolumeChecker {
 
     DatanodeDetails datanodeDetails =
         ContainerTestUtils.createDatanodeDetails();
-    OzoneContainer ozoneContainer =
-        ContainerTestUtils.getOzoneContainer(datanodeDetails, conf);
+    OzoneContainer ozoneContainer = ContainerTestUtils.
+        getOzoneContainerWithMockContext(datanodeDetails, conf);
     MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
     ContainerSet containerSet = ozoneContainer.getContainerSet();
 

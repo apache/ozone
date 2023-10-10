@@ -113,17 +113,23 @@ public final class ContainerTestUtils {
         new LegacyHadoopConfigurationSource(conf));
   }
 
-  public static OzoneContainer getOzoneContainer(
+  public static OzoneContainer getOzoneContainerWithMockContext(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
-    DatanodeStateMachine stateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
+    StateContext context = getMockContext(datanodeDetails, conf);
+    return new OzoneContainer(datanodeDetails, conf, context);
+  }
+
+  public static StateContext getMockContext(DatanodeDetails datanodeDetails,
+      OzoneConfiguration conf) {
+    DatanodeStateMachine stateMachine = Mockito.mock(
+        DatanodeStateMachine.class);
     Mockito.when(stateMachine.getReconfigurationHandler())
         .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    return context;
   }
 
   public static DatanodeDetails createDatanodeDetails() {
