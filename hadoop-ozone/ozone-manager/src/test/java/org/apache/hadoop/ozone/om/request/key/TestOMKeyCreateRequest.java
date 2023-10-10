@@ -644,21 +644,21 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    Map<String, String> invalidKeyScenarios = new HashMap<String, String>()
-    {{
-      put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
-          "Cannot create key under path reserved for snapshot: "
-              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-      put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
-          "Cannot create key under path reserved for snapshot: "
-              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-      put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
-          "Cannot create key under path reserved for snapshot: "
-              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-      put(OM_SNAPSHOT_INDICATOR,
-          "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
-
-    }};
+    Map<String, String> invalidKeyScenarios = new HashMap<String, String>() {
+      {
+        put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR,
+            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
+      }
+    };
 
     for (String invalidKeyName : invalidKeyScenarios.keySet()) {
       KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
