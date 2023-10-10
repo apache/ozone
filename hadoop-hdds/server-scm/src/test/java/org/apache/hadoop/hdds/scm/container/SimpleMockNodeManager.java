@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -48,7 +49,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,20 +59,22 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class SimpleMockNodeManager implements NodeManager {
 
-  private Map<UUID, DatanodeInfo> nodeMap = new ConcurrentHashMap<>();
-  private Map<UUID, Set<PipelineID>> pipelineMap = new ConcurrentHashMap<>();
-  private Map<UUID, Set<ContainerID>> containerMap = new ConcurrentHashMap<>();
+  private Map<DatanodeID, DatanodeInfo> nodeMap = new ConcurrentHashMap<>();
+  private Map<DatanodeID, Set<PipelineID>> pipelineMap =
+      new ConcurrentHashMap<>();
+  private Map<DatanodeID, Set<ContainerID>> containerMap =
+      new ConcurrentHashMap<>();
 
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null));
+    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, null));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    DatanodeInfo dni = nodeMap.get(dd.getUuid());
+    DatanodeInfo dni = nodeMap.get(dd.getID());
     dni.setNodeStatus(status);
   }
 
@@ -92,7 +94,7 @@ public class SimpleMockNodeManager implements NodeManager {
     for (int i = 0; i < count; i++) {
       pipelines.add(PipelineID.randomId());
     }
-    pipelineMap.put(dd.getUuid(), pipelines);
+    pipelineMap.put(dd.getID(), pipelines);
   }
 
   /**
@@ -106,7 +108,7 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    DatanodeInfo dni = nodeMap.get(datanodeDetails.getUuid());
+    DatanodeInfo dni = nodeMap.get(datanodeDetails.getID());
     if (dni != null) {
       return dni.getNodeStatus();
     } else {
@@ -126,7 +128,7 @@ public class SimpleMockNodeManager implements NodeManager {
                                       NodeOperationalState newState,
                                       long opStateExpiryEpocSec)
       throws NodeNotFoundException {
-    DatanodeInfo dni = nodeMap.get(dn.getUuid());
+    DatanodeInfo dni = nodeMap.get(dn.getID());
     if (dni == null) {
       throw new NodeNotFoundException();
     }
@@ -146,7 +148,7 @@ public class SimpleMockNodeManager implements NodeManager {
    */
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails datanodeDetails) {
-    Set<PipelineID> p = pipelineMap.get(datanodeDetails.getUuid());
+    Set<PipelineID> p = pipelineMap.get(datanodeDetails.getID());
     if (p == null || p.size() == 0) {
       return null;
     } else {
@@ -163,7 +165,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public void setContainers(DatanodeDetails dn,
                             Set<ContainerID> containerIds)
       throws NodeNotFoundException {
-    containerMap.put(dn.getUuid(), containerIds);
+    containerMap.put(dn.getID(), containerIds);
   }
 
   /**
@@ -176,12 +178,12 @@ public class SimpleMockNodeManager implements NodeManager {
    * @throws NodeNotFoundException
    */
   @Override
-  public Set<ContainerID> getContainers(DatanodeDetails dn)
+  public Set<ContainerID> getContainers(DatanodeID dn)
       throws NodeNotFoundException {
     // The concrete implementation of this method in SCMNodeManager will return
     // an empty set if there are no containers, and will never return null.
     return containerMap
-        .computeIfAbsent(dn.getUuid(), key -> new HashSet<>());
+        .computeIfAbsent(dn, key -> new HashSet<>());
   }
 
   /**
@@ -270,7 +272,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(DatanodeID dnId, SCMCommand command) {
   }
 
   /**
@@ -313,7 +315,8 @@ public class SimpleMockNodeManager implements NodeManager {
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID,
+                                  SCMCommandProto.Type cmdType) {
     return 0;
   }
 
@@ -342,12 +345,12 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand> getCommandQueue(DatanodeID dnID) {
     return null;
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
+  public DatanodeDetails getNodeByID(DatanodeID uuid) {
     return null;
   }
 

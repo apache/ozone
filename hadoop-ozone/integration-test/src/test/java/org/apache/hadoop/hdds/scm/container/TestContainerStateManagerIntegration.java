@@ -19,11 +19,11 @@ package org.apache.hadoop.hdds.scm.container;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -335,10 +335,10 @@ public class TestContainerStateManagerIntegration {
   public void testReplicaMap() throws Exception {
     DatanodeDetails dn1 = DatanodeDetails.newBuilder().setHostName("host1")
         .setIpAddress("1.1.1.1")
-        .setUuid(UUID.randomUUID()).build();
+        .setID(DatanodeID.randomID()).build();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder().setHostName("host2")
         .setIpAddress("2.2.2.2")
-        .setUuid(UUID.randomUUID()).build();
+        .setID(DatanodeID.randomID()).build();
 
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());

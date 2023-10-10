@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -31,7 +32,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 
@@ -122,7 +122,7 @@ public class TestECBlockOutputStreamEntry {
 
   private DatanodeDetails aNode(String ip, String hostName, int port) {
     return DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .setIpAddress(ip)
         .setHostName(hostName)
         .addPort(

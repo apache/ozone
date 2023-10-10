@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto
     .ContainerProtos.ContainerType;
@@ -496,7 +497,7 @@ public class TestHddsDispatcher {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(UUID.randomUUID())
+    builder.setID(DatanodeID.randomID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(containerPort)

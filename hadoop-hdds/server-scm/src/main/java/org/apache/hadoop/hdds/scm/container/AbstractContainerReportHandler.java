@@ -424,7 +424,7 @@ public class AbstractContainerReportHandler {
       return;
     }
     publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-        new CommandForDatanode<>(dn.getUuid(), command));
+        new CommandForDatanode<>(dn.getID(), command));
     logger.info("Sending delete container command for " + reason +
         " container {} to datanode {}", containerID.getId(), dn);
   }

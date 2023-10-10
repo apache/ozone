@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.node.states;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
@@ -46,21 +46,22 @@ public class Node2ContainerMap extends Node2ObjectsMap<ContainerID> {
   /**
    * Returns null if there no containers associated with this datanode ID.
    *
-   * @param datanode - UUID
+   * @param datanode - DatanodeID
    * @return Set of containers or Null.
    */
-  public Set<ContainerID> getContainers(UUID datanode) {
+  public Set<ContainerID> getContainers(DatanodeID datanode) {
     return getObjects(datanode);
   }
 
   /**
    * Insert a new datanode into Node2Container Map.
    *
-   * @param datanodeID   -- Datanode UUID
+   * @param datanodeID   -- DatanodeID
    * @param containerIDs - List of ContainerIDs.
    */
   @Override
-  public void insertNewDatanode(UUID datanodeID, Set<ContainerID> containerIDs)
+  public void insertNewDatanode(DatanodeID datanodeID,
+                                Set<ContainerID> containerIDs)
       throws SCMException {
     super.insertNewDatanode(datanodeID, containerIDs);
   }
@@ -68,12 +69,12 @@ public class Node2ContainerMap extends Node2ObjectsMap<ContainerID> {
   /**
    * Updates the Container list of an existing DN.
    *
-   * @param datanodeID - UUID of DN.
+   * @param datanodeID - DatanodeID
    * @param containers - Set of Containers tht is present on DN.
    * @throws SCMException - if we don't know about this datanode, for new DN
    *                        use addDatanodeInContainerMap.
    */
-  public void setContainersForDatanode(UUID datanodeID,
+  public void setContainersForDatanode(DatanodeID datanodeID,
       Set<ContainerID> containers) throws SCMException {
     Preconditions.checkNotNull(datanodeID);
     Preconditions.checkNotNull(containers);

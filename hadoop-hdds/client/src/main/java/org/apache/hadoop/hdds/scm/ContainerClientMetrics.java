@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -30,7 +31,6 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -53,7 +53,7 @@ public final class ContainerClientMetrics {
   private MutableCounterLong totalWriteChunkBytes;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
-  private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
+  private final Map<DatanodeID, MutableCounterLong> writeChunksCallsByLeaders;
   private final MetricsRegistry registry;
 
   public static synchronized ContainerClientMetrics acquire() {
@@ -132,7 +132,7 @@ public final class ContainerClientMetrics {
   }
 
   @VisibleForTesting
-  public Map<UUID, MutableCounterLong> getWriteChunksCallsByLeaders() {
+  public Map<DatanodeID, MutableCounterLong> getWriteChunksCallsByLeaders() {
     return writeChunksCallsByLeaders;
   }
 }

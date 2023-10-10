@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -862,7 +863,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
   }
 
   private static DatanodeDetails createRandomDatanodeDetails() {
-    UUID uuid = UUID.randomUUID();
+    DatanodeID dnId = DatanodeID.randomID();
     String ipAddress =
         RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
             .nextInt(256) + "." + RANDOM.nextInt(256);
@@ -874,7 +875,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(uuid).setHostName("localhost")
+    builder.setID(dnId).setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)
         .addPort(ratisPort)

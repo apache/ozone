@@ -109,7 +109,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
               RatisHelper.newRaftGroup(groupId, peers, priorityList);
           server.addGroup(pipelineIdProto, peers, priorityList);
           peers.stream().filter(
-              d -> !d.getUuid().equals(dn.getUuid()))
+              d -> !d.getID().equals(dn.getID()))
               .forEach(d -> {
                 final RaftPeer peer = RatisHelper.toRaftPeer(d);
                 try (RaftClient client = newRaftClient.apply(peer,

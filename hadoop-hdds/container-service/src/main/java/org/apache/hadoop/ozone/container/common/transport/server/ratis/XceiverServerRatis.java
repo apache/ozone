@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -48,6 +47,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
@@ -660,7 +660,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private void handlePipelineFailure(RaftGroupId groupId,
       RoleInfoProto roleInfoProto) {
     String msg;
-    UUID datanode = RatisHelper.toDatanodeId(roleInfoProto.getSelf());
+    DatanodeID datanode = RatisHelper.toDatanodeId(roleInfoProto.getSelf());
     RaftPeerId id = RaftPeerId.valueOf(roleInfoProto.getSelf().getId());
     switch (roleInfoProto.getRole()) {
     case CANDIDATE:
@@ -834,7 +834,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   void handleApplyTransactionFailure(RaftGroupId groupId,
       RaftProtos.RaftPeerRole role) {
-    UUID dnId = RatisHelper.toDatanodeId(getServer().getId());
+    DatanodeID dnId = RatisHelper.toDatanodeId(getServer().getId());
     String msg =
         "Ratis Transaction failure in datanode " + dnId + " with role " + role
             + " .Triggering pipeline close action.";

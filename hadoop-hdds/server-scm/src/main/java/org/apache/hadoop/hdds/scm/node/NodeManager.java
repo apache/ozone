@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,7 +46,6 @@ import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.Collection;
 
 /**
@@ -259,19 +259,19 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   /**
    * Return set of containerIDs available on a datanode.
-   * @param datanodeDetails DatanodeDetails
+   * @param id DatanodeID
    * @return set of containerIDs
    */
-  Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
+  Set<ContainerID> getContainers(DatanodeID id)
       throws NodeNotFoundException;
 
   /**
    * Add a {@link SCMCommand} to the command queue, which are
    * handled by HB thread asynchronously.
-   * @param dnId datanode uuid
+   * @param dnId DatanodeID
    * @param command
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand command);
+  void addDatanodeCommand(DatanodeID dnId, SCMCommand command);
 
 
   /**
@@ -311,11 +311,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Get the number of commands of the given type queued in the SCM CommandQueue
    * for the given datanode.
-   * @param dnID The UUID of the datanode.
+   * @param dnID The DatanodeID.
    * @param cmdType The Type of command to query the current count for.
    * @return The count of commands queued, or zero if none.
    */
-  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
+  int getCommandQueueCount(DatanodeID dnID, SCMCommandProto.Type cmdType);
 
   /**
    * Get the total number of pending commands of the given type on the given
@@ -353,23 +353,19 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
-   * @param dnID - Datanode uuid.
+   * @param dnID - DatanodeID .
    * @return list of commands
    */
   // TODO: We can give better name to this method!
-  List<SCMCommand> getCommandQueue(UUID dnID);
+  List<SCMCommand> getCommandQueue(DatanodeID dnID);
 
   /**
-   * Given datanode uuid, returns the DatanodeDetails for the node.
+   * Given datanode ID, returns the DatanodeDetails for the node.
    *
-   * @param uuid datanode uuid
+   * @param id DatanodeID
    * @return the given datanode, or null if not found
    */
-  @Nullable DatanodeDetails getNodeByUuid(@Nullable String uuid);
-
-  default @Nullable DatanodeDetails getNodeByUuid(@Nullable UUID uuid) {
-    return uuid != null ? getNodeByUuid(uuid.toString()) : null;
-  };
+  @Nullable DatanodeDetails getNodeByID(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

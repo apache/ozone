@@ -127,7 +127,7 @@ public class TestPipelinePlacementFactory {
         false, 10);
     nodeManager = Mockito.spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByID(dn.getID()))
           .thenReturn(dn);
     }
 

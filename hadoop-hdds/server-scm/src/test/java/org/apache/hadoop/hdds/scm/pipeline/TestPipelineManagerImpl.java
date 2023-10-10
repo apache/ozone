@@ -586,8 +586,8 @@ public class TestPipelineManagerImpl {
         pipeline.getPipelineState());
 
     // Now, "unregister" one of the nodes in the pipeline
-    DatanodeDetails firstDN = nodeManager.getNodeByUuid(
-        pipeline.getNodes().get(0).getUuidString());
+    DatanodeDetails firstDN = nodeManager.getNodeByID(
+        pipeline.getNodes().get(0).getID());
     nodeManager.getClusterNetworkTopologyMap().remove(firstDN);
 
     pipelineManager.scrubPipelines();

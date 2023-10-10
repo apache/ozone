@@ -101,7 +101,7 @@ public class PipelineActionHandler
         return;
       }
       publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(datanode.getUuid(), command));
+          new CommandForDatanode<>(datanode.getID(), command));
     } catch (IOException ioe) {
       LOG.error("Could not execute pipeline action={} pipeline={}",
           action, pid, ioe);

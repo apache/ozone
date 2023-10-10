@@ -222,7 +222,7 @@ public class TestDeadNodeHandler {
 
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
-    datanode1 = nodeManager.getNodeByUuid(datanode1.getUuidString());
+    datanode1 = nodeManager.getNodeByID(datanode1.getID());
     Assertions.assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,
@@ -249,7 +249,7 @@ public class TestDeadNodeHandler {
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
     DeleteBlocksCommand cmd = new DeleteBlocksCommand(Collections.emptyList());
-    nodeManager.addDatanodeCommand(datanode1.getUuid(), cmd);
+    nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
     deadNodeHandler.onMessage(datanode1, publisher);
@@ -258,7 +258,7 @@ public class TestDeadNodeHandler {
     Assertions.assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     Assertions.assertEquals(0, 
-        nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+        nodeManager.getCommandQueueCount(datanode1.getID(), cmd.getType()));
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

@@ -190,7 +190,7 @@ public class RatisPipelineProvider
         .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setNodes(dns)
         .setSuggestedLeaderId(
-            suggestedLeader != null ? suggestedLeader.getUuid() : null)
+            suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
     // Send command to datanodes to create pipeline
@@ -206,7 +206,7 @@ public class RatisPipelineProvider
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
           pipeline.getId(), node.getUuidString());
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(node.getUuid(), createCommand));
+          new CommandForDatanode<>(node.getID(), createCommand));
     });
 
     return pipeline;
@@ -268,7 +268,7 @@ public class RatisPipelineProvider
     closeCommand.setTerm(scmContext.getTermOfLeader());
     pipeline.getNodes().forEach(node -> {
       final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(node.getUuid(), closeCommand);
+          new CommandForDatanode<>(node.getID(), closeCommand);
       LOG.info("Send pipeline:{} close command to datanode {}",
           pipeline.getId(), datanodeCommand.getDatanodeId());
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);

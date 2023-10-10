@@ -38,7 +38,7 @@ public final class MockDatanodeDetails {
    * @return DatanodeDetails
    */
   public static DatanodeDetails randomDatanodeDetails() {
-    return createDatanodeDetails(UUID.randomUUID());
+    return createDatanodeDetails(DatanodeID.randomID());
   }
 
   /**
@@ -61,11 +61,11 @@ public final class MockDatanodeDetails {
   /**
    * Creates DatanodeDetails using the given UUID.
    *
-   * @param uuid Datanode's UUID
+   * @param uuid DatanodeID
    *
    * @return DatanodeDetails
    */
-  public static DatanodeDetails createDatanodeDetails(UUID uuid) {
+  public static DatanodeDetails createDatanodeDetails(DatanodeID uuid) {
     Random random = ThreadLocalRandom.current();
     String ipAddress = random.nextInt(256)
         + "." + random.nextInt(256)
@@ -93,7 +93,7 @@ public final class MockDatanodeDetails {
       String hostname, String ipAddress, String networkLocation, int port) {
 
     DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(uuid))
+        .setID(DatanodeID.fromUuidString(uuid))
         .setHostName(hostname)
         .setIpAddress(ipAddress)
         .setNetworkLocation(networkLocation)

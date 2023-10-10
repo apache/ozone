@@ -147,7 +147,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
     DatanodeDetails datanodeDetails =
-        nodeManager.getNodeByUuid(dnFromReport.getUuid());
+        nodeManager.getNodeByID(dnFromReport.getID());
     if (datanodeDetails == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);
@@ -164,7 +164,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         final List<ContainerReplicaProto> replicas =
             containerReport.getReportsList();
         final Set<ContainerID> expectedContainersInDatanode =
-            nodeManager.getContainers(datanodeDetails);
+            nodeManager.getContainers(datanodeDetails.getID());
 
         for (ContainerReplicaProto replica : replicas) {
           ContainerID cid = ContainerID.valueOf(replica.getContainerID());

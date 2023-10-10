@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -112,7 +113,7 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   @Before
   public void setup() throws IOException {
@@ -360,7 +361,7 @@ public class TestReplicationManager {
     handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
     Assert.assertTrue(commandsSent.iterator().hasNext());
-    assertEquals(unhealthy.getDatanodeDetails().getUuid(),
+    assertEquals(unhealthy.getDatanodeDetails().getID(),
         commandsSent.iterator().next().getKey());
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         commandsSent.iterator().next().getValue().getType());
@@ -401,7 +402,7 @@ public class TestReplicationManager {
     Assert.assertTrue(commandsSent.iterator().hasNext());
 
     // unhealthy replica can't be deleted because it has a unique origin DN
-    Assert.assertNotEquals(unhealthy.getDatanodeDetails().getUuid(),
+    Assert.assertNotEquals(unhealthy.getDatanodeDetails().getID(),
         commandsSent.iterator().next().getKey());
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         commandsSent.iterator().next().getValue().getType());
@@ -782,12 +783,12 @@ public class TestReplicationManager {
     // a delete command should also have been sent for UNHEALTHY replica of
     // index 1
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    Pair<DatanodeID, SCMCommand<?>> command = commandsSent.iterator().next();
     Assertions.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         command.getValue().getType());
     DeleteContainerCommand deleteCommand =
         (DeleteContainerCommand) command.getValue();
-    assertEquals(unhealthyReplica1.getDatanodeDetails().getUuid(),
+    assertEquals(unhealthyReplica1.getDatanodeDetails().getID(),
         command.getKey());
     assertEquals(container.containerID(),
         ContainerID.valueOf(deleteCommand.getContainerID()));
@@ -1230,8 +1231,8 @@ public class TestReplicationManager {
 
     ArgumentCaptor<SCMCommand> command =
         ArgumentCaptor.forClass(SCMCommand.class);
-    ArgumentCaptor<UUID> targetUUID =
-        ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<DatanodeID> targetUUID =
+        ArgumentCaptor.forClass(DatanodeID.class);
     Mockito.verify(nodeManager).addDatanodeCommand(targetUUID.capture(),
         command.capture());
 
@@ -1239,7 +1240,7 @@ public class TestReplicationManager {
         (ReplicateContainerCommand)command.getValue();
     Assertions.assertEquals(datanodeDeadline, sentCommand.getDeadline());
     Assertions.assertEquals(LOW, sentCommand.getPriority());
-    Assertions.assertEquals(src.getUuid(), targetUUID.getValue());
+    Assertions.assertEquals(src.getID(), targetUUID.getValue());
     Assertions.assertEquals(target, sentCommand.getTargetDatanode());
   }
 
@@ -1294,8 +1295,9 @@ public class TestReplicationManager {
         container, new ArrayList<>(sourceNodes), destination, replicaIndex);
 
     Assertions.assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
-    Assertions.assertEquals(expectedTarget.getUuid(), cmdWithTarget.getLeft());
+    Pair<DatanodeID, SCMCommand<?>> cmdWithTarget = commandsSent
+        .iterator().next();
+    Assertions.assertEquals(expectedTarget.getID(), cmdWithTarget.getLeft());
     Assertions.assertEquals(ReplicateContainerCommand.class,
         cmdWithTarget.getRight().getClass());
     ReplicateContainerCommand cmd =
@@ -1356,8 +1358,8 @@ public class TestReplicationManager {
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
     Assertions.assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
+    Pair<DatanodeID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assertions.assertEquals(cmdTarget.getID(), cmd.getLeft());
     assertEquals(0, replicationManager.getMetrics()
         .getEcReconstructionCmdsDeferredTotal());
   }

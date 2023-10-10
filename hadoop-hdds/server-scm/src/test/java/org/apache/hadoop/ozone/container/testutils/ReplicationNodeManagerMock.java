@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.container.testutils;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -51,7 +52,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.LinkedList;
 
 /**
@@ -314,11 +314,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
 
   /**
    * Return set of containerIDs available on a datanode.
-   * @param uuid - DatanodeID
+   * @param id - DatanodeID
    * @return - set of containerIDs
    */
   @Override
-  public Set<ContainerID> getContainers(DatanodeDetails uuid) {
+  public Set<ContainerID> getContainers(DatanodeID id) {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 
@@ -406,7 +406,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(DatanodeID dnId, SCMCommand command) {
     this.commandQueue.addCommand(dnId, command);
   }
 
@@ -461,7 +461,8 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID,
+                                  SCMCommandProto.Type cmdType) {
     return commandQueue.getDatanodeCommandCount(dnID, cmdType);
   }
 
@@ -496,12 +497,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand> getCommandQueue(DatanodeID dnID) {
     return null;
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String address) {
+  public DatanodeDetails getNodeByID(DatanodeID id) {
     return null;
   }
 

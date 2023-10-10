@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -346,9 +347,10 @@ public class SCMBlockProtocolServer implements
       if (possibleClients.size() > 0) {
         client = possibleClients.get(0);
       }
-      List<Node> nodeList = new ArrayList();
-      nodes.stream().forEach(uuid -> {
-        DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
+      List<Node> nodeList = new ArrayList<>();
+      nodes.forEach(uuid -> {
+        DatanodeDetails node = nodeManager.getNodeByID(
+            DatanodeID.fromUuidString(uuid));
         if (node != null) {
           nodeList.add(node);
         }

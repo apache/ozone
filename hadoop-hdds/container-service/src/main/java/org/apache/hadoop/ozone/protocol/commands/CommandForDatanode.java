@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
-import java.util.UUID;
-
 import com.google.protobuf.Message;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
 
 /**
@@ -28,17 +27,16 @@ import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
 public class CommandForDatanode<T extends Message> implements
     IdentifiableEventPayload {
 
-  private final UUID datanodeId;
+  private final DatanodeID datanodeId;
 
   private final SCMCommand<T> command;
 
-  // TODO: Command for datanode should take DatanodeDetails as parameter.
-  public CommandForDatanode(UUID datanodeId, SCMCommand<T> command) {
+  public CommandForDatanode(DatanodeID datanodeId, SCMCommand<T> command) {
     this.datanodeId = datanodeId;
     this.command = command;
   }
 
-  public UUID getDatanodeId() {
+  public DatanodeID getDatanodeId() {
     return datanodeId;
   }
 

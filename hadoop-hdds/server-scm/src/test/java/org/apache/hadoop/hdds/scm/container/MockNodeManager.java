@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -68,7 +69,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
@@ -106,11 +106,11 @@ public class MockNodeManager implements NodeManager {
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
   private boolean safemode;
-  private final Map<UUID, List<SCMCommand>> commandMap;
+  private final Map<DatanodeID, List<SCMCommand>> commandMap;
   private Node2PipelineMap node2PipelineMap;
   private final Node2ContainerMap node2ContainerMap;
   private NetworkTopology clusterMap;
-  private ConcurrentMap<String, Set<String>> dnsToUuidMap;
+  private ConcurrentMap<String, Set<DatanodeID>> dnsToDnIDMap;
   private int numHealthyDisksPerDatanode;
   private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
@@ -122,7 +122,7 @@ public class MockNodeManager implements NodeManager {
     this.nodeMetricMap = new HashMap<>();
     this.node2PipelineMap = new Node2PipelineMap();
     this.node2ContainerMap = new Node2ContainerMap();
-    this.dnsToUuidMap = new ConcurrentHashMap<>();
+    this.dnsToDnIDMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
     this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
   }
@@ -194,7 +194,7 @@ public class MockNodeManager implements NodeManager {
         } catch (NodeNotFoundException e) {
           LOG.warn("Could not find Datanode {} for adding containers to it. " +
                   "Skipping this node.", usageInfo
-              .getDatanodeDetails().getUuidString());
+              .getDatanodeDetails().getID());
           continue;
         }
 
@@ -476,7 +476,7 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails dnId) {
-    return node2PipelineMap.getPipelines(dnId.getUuid());
+    return node2PipelineMap.getPipelines(dnId.getID());
   }
 
   /**
@@ -486,7 +486,7 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public int getPipelinesCount(DatanodeDetails datanodeDetails) {
-    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getID());
   }
 
   /**
@@ -528,9 +528,9 @@ public class MockNodeManager implements NodeManager {
                            ContainerID containerId)
       throws NodeNotFoundException {
     try {
-      Set<ContainerID> set = node2ContainerMap.getContainers(dd.getUuid());
+      Set<ContainerID> set = node2ContainerMap.getContainers(dd.getID());
       set.add(containerId);
-      node2ContainerMap.setContainersForDatanode(dd.getUuid(), set);
+      node2ContainerMap.setContainersForDatanode(dd.getID(), set);
     } catch (SCMException e) {
       e.printStackTrace();
     }
@@ -540,16 +540,16 @@ public class MockNodeManager implements NodeManager {
   public void removeContainer(DatanodeDetails dd,
       ContainerID containerId) {
     try {
-      Set<ContainerID> set = node2ContainerMap.getContainers(dd.getUuid());
+      Set<ContainerID> set = node2ContainerMap.getContainers(dd.getID());
       set.remove(containerId);
-      node2ContainerMap.setContainersForDatanode(dd.getUuid(), set);
+      node2ContainerMap.setContainersForDatanode(dd.getID(), set);
     } catch (SCMException e) {
       e.printStackTrace();
     }
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(DatanodeID dnId, SCMCommand command) {
     if (commandMap.containsKey(dnId)) {
       List<SCMCommand> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
@@ -615,7 +615,8 @@ public class MockNodeManager implements NodeManager {
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID,
+                                  SCMCommandProto.Type cmdType) {
     return 0;
   }
 
@@ -645,16 +646,16 @@ public class MockNodeManager implements NodeManager {
 
   /**
    * Update set of containers available on a datanode.
-   * @param uuid - DatanodeID
+   * @param id - DatanodeID
    * @param containerIds - Set of containerIDs
    * @throws SCMException - if datanode is not known. For new datanode use
    *                        addDatanodeInContainerMap call.
    */
   @Override
-  public void setContainers(DatanodeDetails uuid, Set<ContainerID> containerIds)
+  public void setContainers(DatanodeDetails id, Set<ContainerID> containerIds)
       throws NodeNotFoundException {
     try {
-      node2ContainerMap.setContainersForDatanode(uuid.getUuid(), containerIds);
+      node2ContainerMap.setContainersForDatanode(id.getID(), containerIds);
     } catch (SCMException e) {
       throw new NodeNotFoundException(e.getMessage());
     }
@@ -662,21 +663,21 @@ public class MockNodeManager implements NodeManager {
 
   /**
    * Return set of containerIDs available on a datanode.
-   * @param uuid - DatanodeID
+   * @param id - DatanodeID
    * @return - set of containerIDs
    */
   @Override
-  public Set<ContainerID> getContainers(DatanodeDetails uuid) {
-    return node2ContainerMap.getContainers(uuid.getUuid());
+  public Set<ContainerID> getContainers(DatanodeID id) {
+    return node2ContainerMap.getContainers(id);
   }
 
   // Returns the number of commands that is queued to this node manager.
   public int getCommandCount(DatanodeDetails dd) {
-    List<SCMCommand> list = commandMap.get(dd.getUuid());
+    List<SCMCommand> list = commandMap.get(dd.getID());
     return (list == null) ? 0 : list.size();
   }
 
-  public void clearCommandQueue(UUID dnId) {
+  public void clearCommandQueue(DatanodeID dnId) {
     if (commandMap.containsKey(dnId)) {
       commandMap.put(dnId, new LinkedList<>());
     }
@@ -737,10 +738,10 @@ public class MockNodeManager implements NodeManager {
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
     try {
-      node2ContainerMap.insertNewDatanode(datanodeDetails.getUuid(),
+      node2ContainerMap.insertNewDatanode(datanodeDetails.getID(),
           Collections.emptySet());
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
-          datanodeDetails.getUuidString());
+          datanodeDetails.getID());
       if (clusterMap != null) {
         datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
         clusterMap.add(datanodeDetails);
@@ -756,16 +757,16 @@ public class MockNodeManager implements NodeManager {
    * running on that host. As each address can have many DNs running on it,
    * this is a one to many mapping.
    * @param dnsName String representing the hostname or IP of the node
-   * @param uuid String representing the UUID of the registered node.
+   * @param id DatanodeID.
    */
   private synchronized void addEntryTodnsToUuidMap(
-      String dnsName, String uuid) {
-    Set<String> dnList = dnsToUuidMap.get(dnsName);
+      String dnsName, DatanodeID id) {
+    Set<DatanodeID> dnList = dnsToDnIDMap.get(dnsName);
     if (dnList == null) {
       dnList = ConcurrentHashMap.newKeySet();
-      dnsToUuidMap.put(dnsName, dnList);
+      dnsToDnIDMap.put(dnsName, dnList);
     }
-    dnList.add(uuid);
+    dnList.add(id);
   }
 
   /**
@@ -865,25 +866,25 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand> getCommandQueue(DatanodeID dnID) {
     return null;
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + uuid);
+  public DatanodeDetails getNodeByID(DatanodeID id) {
+    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
     return node == null ? null : (DatanodeDetails)node;
   }
 
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     List<DatanodeDetails> results = new LinkedList<>();
-    Set<String> uuids = dnsToUuidMap.get(address);
-    if (uuids == null) {
+    Set<DatanodeID> ids = dnsToDnIDMap.get(address);
+    if (ids == null) {
       return results;
     }
-    for (String uuid : uuids) {
-      DatanodeDetails dn = getNodeByUuid(uuid);
+    for (DatanodeID id : ids) {
+      DatanodeDetails dn = getNodeByID(id);
       if (dn != null) {
         results.add(dn);
       }

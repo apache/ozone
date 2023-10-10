@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -942,7 +943,7 @@ public class TestSCMNodeManager {
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
           .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
-      assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
+      assertEquals(captor.getValue().getDatanodeId(), node1.getID());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
     } else {
@@ -973,11 +974,11 @@ public class TestSCMNodeManager {
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
     for (int i = 0; i < 3; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(), ReplicateContainerCommand
+      nodeManager.addDatanodeCommand(node1.getID(), ReplicateContainerCommand
           .toTarget(1, MockDatanodeDetails.randomDatanodeDetails()));
     }
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new DeleteBlocksCommand(emptyList()));
     }
 
@@ -1033,7 +1034,7 @@ public class TestSCMNodeManager {
 
     // Add a a few more commands to the queue and check the counts are the sum.
     for (int i = 0; i < 5; i++) {
-      nodeManager.addDatanodeCommand(node1.getUuid(),
+      nodeManager.addDatanodeCommand(node1.getID(),
           new CloseContainerCommand(1, PipelineID.randomId()));
     }
     Assertions.assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
@@ -1055,8 +1056,8 @@ public class TestSCMNodeManager {
       throws AuthenticationException, IOException {
     SCMNodeManager nodeManager = createNodeManager(getConf());
 
-    UUID datanode1 = UUID.randomUUID();
-    UUID datanode2 = UUID.randomUUID();
+    DatanodeID datanode1 = DatanodeID.randomID();
+    DatanodeID datanode2 = DatanodeID.randomID();
     long containerID = 1;
 
     SCMCommand<?> closeContainerCommand =
@@ -1771,7 +1772,7 @@ public class TestSCMNodeManager {
               Arrays.asList(report), emptyList()),
                   HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
-          new CommandForDatanode<>(datanodeDetails.getUuid(),
+          new CommandForDatanode<>(datanodeDetails.getID(),
               new CloseContainerCommand(1L,
                   PipelineID.randomId())));
 

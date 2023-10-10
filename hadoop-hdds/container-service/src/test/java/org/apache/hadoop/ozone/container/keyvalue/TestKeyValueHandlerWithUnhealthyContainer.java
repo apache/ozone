@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -39,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
@@ -177,7 +177,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
   private KeyValueHandler getDummyHandler() {
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(DATANODE_UUID))
+        .setID(DatanodeID.fromUuidString(DATANODE_UUID))
         .setHostName("dummyHost")
         .setIpAddress("1.2.3.4")
         .build();

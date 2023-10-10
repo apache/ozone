@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.junit.Before;
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import java.util.Collections;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -46,9 +46,9 @@ public class TestContainerClientMetrics {
   public void testRecordChunkMetrics() {
     ContainerClientMetrics metrics = ContainerClientMetrics.acquire();
     PipelineID pipelineId1 = PipelineID.randomId();
-    UUID leaderId1 = UUID.randomUUID();
+    DatanodeID leaderId1 = DatanodeID.randomID();
     PipelineID pipelineId2 = PipelineID.randomId();
-    UUID leaderId2 = UUID.randomUUID();
+    DatanodeID leaderId2 = DatanodeID.randomID();
     PipelineID pipelineId3 = PipelineID.randomId();
 
     metrics.recordWriteChunk(createPipeline(pipelineId1, leaderId1), 10);
@@ -104,7 +104,7 @@ public class TestContainerClientMetrics {
     Assertions.assertNotNull(ContainerClientMetrics.acquire());
   }
 
-  private Pipeline createPipeline(PipelineID piplineId, UUID leaderId) {
+  private Pipeline createPipeline(PipelineID piplineId, DatanodeID leaderId) {
     return Pipeline.newBuilder()
         .setId(piplineId)
         .setReplicationConfig(Mockito.mock(ReplicationConfig.class))

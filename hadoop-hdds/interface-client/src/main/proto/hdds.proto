@@ -33,8 +33,12 @@ message UUID {
    required int64 leastSigBits = 2;
 }
 
+message DatanodeIDProto {
+    required UUID uuid = 1;
+}
+
 message DatanodeDetailsProto {
-    // deprecated, please use uuid128 instead
+    // deprecated, please use DatanodeIDProto instead
     optional string uuid = 1;  // UUID assigned to the Datanode.
     required string ipAddress = 2;     // IP address
     required string hostName = 3;      // hostname
@@ -45,8 +49,10 @@ message DatanodeDetailsProto {
     optional string networkLocation = 7; // Network topology location
     optional NodeOperationalState persistedOpState = 8; // The Operational state persisted in the datanode.id file
     optional int64 persistedOpStateExpiry = 9; // The seconds after the epoch when the OpState should expire
-    // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
+
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
+    // TODO: Replace UUID with DatanodeID and  make it required
+    optional DatanodeIDProto id = 101;
 }
 
 /**
@@ -127,8 +133,11 @@ message Pipeline {
     optional UUID suggestedLeaderID = 9;
     repeated uint32 memberReplicaIndexes = 10;
     optional ECReplicationConfig ecReplicationConfig = 11;
-    // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
+
     optional UUID leaderID128 = 100;
+    // TODO: Replace UUID with DatanodeIDProto
+    optional DatanodeIDProto leaderDnID = 101;
+    optional DatanodeIDProto suggesterLeaderDnID = 102;
 }
 
 message KeyValue {

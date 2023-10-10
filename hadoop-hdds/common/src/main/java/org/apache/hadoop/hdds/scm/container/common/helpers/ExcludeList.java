@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -29,7 +30,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -122,7 +122,7 @@ public class ExcludeList {
     });
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     excludeListProto.getDatanodesList().forEach(dn -> {
-      builder.setUuid(UUID.fromString(dn));
+      builder.setID(DatanodeID.fromUuidString(dn));
       excludeList.addDatanode(builder.build());
     });
     excludeListProto.getPipelineIdsList().forEach(pipelineID -> {

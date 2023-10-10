@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -163,7 +163,7 @@ public class SCMBlockDeletingService extends BackgroundService
         // are handled for deleteBlocks Type, then it will be considered
         // in this iteration
         final Set<DatanodeDetails> included = datanodes.stream().filter(
-            dn -> nodeManager.getCommandQueueCount(dn.getUuid(),
+            dn -> nodeManager.getCommandQueueCount(dn.getID(),
                 Type.deleteBlocksCommand) == 0).collect(Collectors.toSet());
         try {
           DatanodeDeletedBlockTransactions transactions =
@@ -174,9 +174,9 @@ public class SCMBlockDeletingService extends BackgroundService
           }
 
           Set<Long> processedTxIDs = new HashSet<>();
-          for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+          for (Map.Entry<DatanodeID, List<DeletedBlocksTransaction>> entry :
               transactions.getDatanodeTransactionMap().entrySet()) {
-            UUID dnId = entry.getKey();
+            DatanodeID dnId = entry.getKey();
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
             if (!dnTXs.isEmpty()) {
               processedTxIDs.addAll(dnTXs.stream()

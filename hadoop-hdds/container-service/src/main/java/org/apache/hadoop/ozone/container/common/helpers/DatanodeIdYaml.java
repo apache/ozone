@@ -27,12 +27,12 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
@@ -93,7 +93,7 @@ public final class DatanodeIdYaml {
       }
 
       DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-      builder.setUuid(UUID.fromString(datanodeDetailsYaml.getUuid()))
+      builder.setID(DatanodeID.fromUuidString(datanodeDetailsYaml.getUuid()))
           .setIpAddress(datanodeDetailsYaml.getIpAddress())
           .setHostName(datanodeDetailsYaml.getHostName())
           .setCertSerialId(datanodeDetailsYaml.getCertSerialId());
@@ -267,7 +267,7 @@ public final class DatanodeIdYaml {
     }
 
     return new DatanodeDetailsYaml(
-        datanodeDetails.getUuid().toString(),
+        datanodeDetails.getID().toString(),
         datanodeDetails.getIpAddress(),
         datanodeDetails.getHostName(),
         datanodeDetails.getCertSerialId(),

@@ -500,10 +500,12 @@ public class TestIncrementalContainerReportHandler {
     });
     Assertions.assertEquals(3, containerStateManager
         .getContainerReplicas(container.containerID()).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeOne).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
-        .size());
+    Assertions.assertEquals(1, nodeManager.getContainers(
+        datanodeOne.getID()).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(
+        datanodeTwo.getID()).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(
+        datanodeThree.getID()).size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
             ContainerReplicaProto.State.DELETED,
@@ -514,10 +516,12 @@ public class TestIncrementalContainerReportHandler {
     reportHandler.onMessage(icr, publisher);
     Assertions.assertEquals(2, containerStateManager
         .getContainerReplicas(container.containerID()).size());
-    Assertions.assertEquals(0, nodeManager.getContainers(datanodeOne).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
-        .size());
+    Assertions.assertEquals(0, nodeManager.getContainers(
+        datanodeOne.getID()).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(
+        datanodeTwo.getID()).size());
+    Assertions.assertEquals(1, nodeManager.getContainers(
+        datanodeThree.getID()).size());
   }
 
   @Test
@@ -539,7 +543,8 @@ public class TestIncrementalContainerReportHandler {
     containerStateManager.addContainer(container.getProtobuf());
     containerStateManager.addContainer(containerTwo.getProtobuf());
 
-    Assertions.assertEquals(0, nodeManager.getContainers(datanode).size());
+    Assertions.assertEquals(0, nodeManager.getContainers(
+        datanode.getID()).size());
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -570,7 +575,8 @@ public class TestIncrementalContainerReportHandler {
         t1.get();
         t2.get();
 
-        Set<ContainerID> nmContainers = nodeManager.getContainers(datanode);
+        Set<ContainerID> nmContainers = nodeManager.getContainers(
+            datanode.getID());
         if (nmContainers.contains(container.containerID())) {
           // If we find "container" in the NM, then we must also have it in
           // Container Manager.

@@ -359,7 +359,7 @@ public class TestKeyManagerUnit {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dn1.getUuid())
+        .setLeaderId(dn1.getID())
         .setNodes(Arrays.asList(dn1, dn2, dn3))
         .build();
 
@@ -368,7 +368,7 @@ public class TestKeyManagerUnit {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dn1.getUuid())
+        .setLeaderId(dn1.getID())
         .setNodes(Arrays.asList(dn2, dn3, dn4))
         .build();
 
@@ -453,7 +453,7 @@ public class TestKeyManagerUnit {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dnOne.getUuid())
+        .setLeaderId(dnOne.getID())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
         .build();
 
@@ -462,7 +462,7 @@ public class TestKeyManagerUnit {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dnFour.getUuid())
+        .setLeaderId(dnFour.getID())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
         .build();
 

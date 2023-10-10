@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto
@@ -84,7 +85,7 @@ public class TestSCMNodeMetrics {
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .build();
 
     nodeManager.register(registeredDatanode, createNodeReport(),

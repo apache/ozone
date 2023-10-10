@@ -20,9 +20,9 @@ package org.apache.hadoop.hdds.scm.node.states;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
-import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
 import java.util.TreeSet;
@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.DUP
 public class Node2ObjectsMap<T> {
 
   @SuppressWarnings("visibilitymodifier")
-  protected final Map<UUID, Set<T>> dn2ObjectMap;
+  protected final Map<DatanodeID, Set<T>> dn2ObjectMap;
 
   /**
    * Constructs a Node2ContainerMap Object.
@@ -53,26 +53,26 @@ public class Node2ObjectsMap<T> {
    * Returns true if this a datanode that is already tracked by
    * Node2ContainerMap.
    *
-   * @param datanodeID - UUID of the Datanode.
+   * @param id - DatanodeID of the Datanode.
    * @return True if this is tracked, false if this map does not know about it.
    */
-  public boolean isKnownDatanode(UUID datanodeID) {
-    Preconditions.checkNotNull(datanodeID);
-    return dn2ObjectMap.containsKey(datanodeID);
+  public boolean isKnownDatanode(DatanodeID id) {
+    Preconditions.checkNotNull(id);
+    return dn2ObjectMap.containsKey(id);
   }
 
   /**
    * Insert a new datanode into Node2Container Map.
    *
-   * @param datanodeID   -- Datanode UUID
+   * @param id -- Datanode DatanodeID
    * @param containerIDs - List of ContainerIDs.
    */
   @VisibleForTesting
-  public void insertNewDatanode(UUID datanodeID, Set<T> containerIDs)
+  public void insertNewDatanode(DatanodeID id, Set<T> containerIDs)
       throws SCMException {
     Preconditions.checkNotNull(containerIDs);
-    Preconditions.checkNotNull(datanodeID);
-    if (dn2ObjectMap.putIfAbsent(datanodeID, new HashSet<>(containerIDs))
+    Preconditions.checkNotNull(id);
+    if (dn2ObjectMap.putIfAbsent(id, new HashSet<>(containerIDs))
         != null) {
       throw new SCMException("Node already exists in the map",
           DUPLICATE_DATANODE);
@@ -85,7 +85,7 @@ public class Node2ObjectsMap<T> {
    * @param datanodeID - Datanode ID.
    */
   @VisibleForTesting
-  public void removeDatanode(UUID datanodeID) {
+  public void removeDatanode(DatanodeID datanodeID) {
     Preconditions.checkNotNull(datanodeID);
     dn2ObjectMap.computeIfPresent(datanodeID, (k, v) -> null);
   }
@@ -93,12 +93,12 @@ public class Node2ObjectsMap<T> {
   /**
    * Returns null if there no containers associated with this datanode ID.
    *
-   * @param datanode - UUID
+   * @param id - DatanodeID
    * @return Set of containers or Null.
    */
-  Set<T> getObjects(UUID datanode) {
-    Preconditions.checkNotNull(datanode);
-    final Set<T> s = dn2ObjectMap.get(datanode);
+  Set<T> getObjects(DatanodeID id) {
+    Preconditions.checkNotNull(id);
+    final Set<T> s = dn2ObjectMap.get(id);
     return s != null ? new HashSet<>(s) : Collections.emptySet();
   }
 
@@ -106,11 +106,11 @@ public class Node2ObjectsMap<T> {
     return new ReportResult.ReportResultBuilder<>();
   }
 
-  public ReportResult<T> processReport(UUID datanodeID, Set<T> objects) {
-    Preconditions.checkNotNull(datanodeID);
+  public ReportResult<T> processReport(DatanodeID id, Set<T> objects) {
+    Preconditions.checkNotNull(id);
     Preconditions.checkNotNull(objects);
 
-    if (!isKnownDatanode(datanodeID)) {
+    if (!isKnownDatanode(id)) {
       return newBuilder()
           .setStatus(ReportResult.ReportStatus.NEW_DATANODE_FOUND)
           .setNewEntries(objects)
@@ -118,7 +118,7 @@ public class Node2ObjectsMap<T> {
     }
 
     // Conditions like Zero length containers should be handled by removeAll.
-    Set<T> currentSet = dn2ObjectMap.get(datanodeID);
+    Set<T> currentSet = dn2ObjectMap.get(id);
     TreeSet<T> newObjects = new TreeSet<>(objects);
     newObjects.removeAll(currentSet);
 

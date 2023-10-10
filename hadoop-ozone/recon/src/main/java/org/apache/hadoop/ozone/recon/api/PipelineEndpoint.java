@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -156,11 +157,11 @@ public class PipelineEndpoint {
   }
 
   private Long getLastLeaderElectionElapsedTimeMetricValue(String groupId,
-                                                           UUID uuid) {
+                                                           DatanodeID dnId) {
     String metricsQuery = String.format(
             "query=ratis_leader_election_lastLeaderElectionElapsedTime{group=" +
                     "\"%s\",exported_instance=\"%s\"}", groupId,
-            uuid.toString());
+            dnId.toString());
     try {
       List<Metric> metrics = metricsServiceProvider.getMetricsInstant(
               metricsQuery);

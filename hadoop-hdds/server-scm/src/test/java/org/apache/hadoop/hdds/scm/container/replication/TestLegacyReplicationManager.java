@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -1584,7 +1585,7 @@ public class TestLegacyReplicationManager {
         if (command.getCommand().getType() ==
             SCMCommandProto.Type.deleteContainerCommand) {
           if (command.getDatanodeId() ==
-              unhealthy.getDatanodeDetails().getUuid()) {
+              unhealthy.getDatanodeDetails().getID()) {
             unhealthyDeleted = true;
           } else {
             closedDeleted = true;
@@ -1606,7 +1607,7 @@ public class TestLegacyReplicationManager {
         if (command.getCommand().getType() ==
             SCMCommandProto.Type.deleteContainerCommand) {
           if (command.getDatanodeId() ==
-              unhealthy.getDatanodeDetails().getUuid()) {
+              unhealthy.getDatanodeDetails().getID()) {
             unhealthyDeleted = true;
           } else {
             closedDeleted = true;
@@ -1625,13 +1626,13 @@ public class TestLegacyReplicationManager {
     @Test
     public void testOverReplicatedUnhealthy() throws Exception {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
-      Set<UUID> unhealthyContainerDNIDs = new HashSet<>();
+      Set<DatanodeID> unhealthyContainerDNIDs = new HashSet<>();
 
       final int numReplicas = 4;
       for (int i = 0; i < numReplicas; i++) {
         ContainerReplica replica = addReplica(container,
             NodeStatus.inServiceHealthy(), UNHEALTHY);
-        unhealthyContainerDNIDs.add(replica.getDatanodeDetails().getUuid());
+        unhealthyContainerDNIDs.add(replica.getDatanodeDetails().getID());
       }
 
       // No replications should be scheduled.
@@ -1848,7 +1849,7 @@ public class TestLegacyReplicationManager {
               .anyMatch(c -> c.getCommand().getType() ==
                   SCMCommandProto.Type.deleteContainerCommand &&
                   c.getDatanodeId().equals(
-                      unhealthyReplica.getDatanodeDetails().getUuid())));
+                      unhealthyReplica.getDatanodeDetails().getID())));
 
       ReplicationManagerReport report = replicationManager.getContainerReport();
       Assertions.assertEquals(1, report.getStat(LifeCycleState.QUASI_CLOSED));
@@ -2211,7 +2212,7 @@ public class TestLegacyReplicationManager {
       Optional<CommandForDatanode> cmd =
           datanodeCommandHandler.getReceivedCommands().stream().findFirst();
       Assertions.assertTrue(cmd.isPresent());
-      Assertions.assertEquals(replicaOne.getDatanodeDetails().getUuid(),
+      Assertions.assertEquals(replicaOne.getDatanodeDetails().getID(),
           cmd.get().getDatanodeId());
 
       ReplicationManagerReport report = replicationManager.getContainerReport();
@@ -3159,10 +3160,10 @@ public class TestLegacyReplicationManager {
 
     Assertions.assertEquals(targetDNs.length, deleteCommands.size());
 
-    Set<UUID> targetDNIDs = Arrays.stream(targetDNs)
-        .map(DatanodeDetails::getUuid)
+    Set<DatanodeID> targetDNIDs = Arrays.stream(targetDNs)
+        .map(DatanodeDetails::getID)
         .collect(Collectors.toSet());
-    Set<UUID> chosenDNIDs = deleteCommands.stream()
+    Set<DatanodeID> chosenDNIDs = deleteCommands.stream()
         .map(CommandForDatanode::getDatanodeId)
         .collect(Collectors.toSet());
 
@@ -3180,12 +3181,15 @@ public class TestLegacyReplicationManager {
             SCMCommandProto.Type.deleteContainerCommand)
         .collect(Collectors.toList());
 
-    Set<UUID> deleteCandidateIDs = Arrays.stream(validDeleteDNs)
-        .map(DatanodeDetails::getUuid)
+    Set<DatanodeID> deleteCandidateIDs = Arrays.stream(validDeleteDNs)
+        .map(DatanodeDetails::getID)
         .collect(Collectors.toSet());
-    Set<UUID> chosenDNIDs = deleteCommands.stream()
+    Set<DatanodeID> chosenDNIDs = deleteCommands.stream()
         .map(CommandForDatanode::getDatanodeId)
         .collect(Collectors.toSet());
+    System.out.println("========");
+    System.out.println(deleteCandidateIDs);
+    System.out.println(chosenDNIDs);
 
     Assertions.assertTrue(deleteCandidateIDs.containsAll(chosenDNIDs));
   }
@@ -3201,10 +3205,10 @@ public class TestLegacyReplicationManager {
             SCMCommandProto.Type.deleteContainerCommand)
         .collect(Collectors.toList());
 
-    Set<UUID> deleteDNIDs = Arrays.stream(deleteDN)
-        .map(DatanodeDetails::getUuid)
+    Set<DatanodeID> deleteDNIDs = Arrays.stream(deleteDN)
+        .map(DatanodeDetails::getID)
         .collect(Collectors.toSet());
-    Set<UUID> chosenDNIDs = deleteCommands.stream()
+    Set<DatanodeID> chosenDNIDs = deleteCommands.stream()
         .map(CommandForDatanode::getDatanodeId)
         .collect(Collectors.toSet());
 
@@ -3381,7 +3385,7 @@ public class TestLegacyReplicationManager {
                              final DatanodeDetails datanode) {
       return commands.stream().anyMatch(dc ->
           dc.getCommand().getType().equals(type) &&
-              dc.getDatanodeId().equals(datanode.getUuid()));
+              dc.getDatanodeId().equals(datanode.getID()));
     }
 
     private void clearState() {

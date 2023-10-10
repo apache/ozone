@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -39,7 +40,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Sets.newHashSet;
@@ -182,7 +182,7 @@ public class TestScmClient {
 
   private DatanodeDetails randomDatanode() {
     return DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .setHostName(randomAlphabetic(5))
         .setIpAddress(randomAlphabetic(5))
         .build();

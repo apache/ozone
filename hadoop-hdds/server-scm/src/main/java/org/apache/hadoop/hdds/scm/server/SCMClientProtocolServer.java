@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
@@ -1129,7 +1130,8 @@ public class SCMClientProtocolServer implements
     // get datanodes by ip or uuid
     List<DatanodeDetails> nodes = new ArrayList<>();
     if (!Strings.isNullOrEmpty(uuid)) {
-      nodes.add(scm.getScmNodeManager().getNodeByUuid(uuid));
+      nodes.add(scm.getScmNodeManager()
+          .getNodeByID(DatanodeID.fromUuidString(uuid)));
     } else if (!Strings.isNullOrEmpty(ipaddress)) {
       nodes = scm.getScmNodeManager().getNodesByAddress(ipaddress);
     } else {

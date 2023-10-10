@@ -241,7 +241,7 @@ public class TestDeleteContainerHandler {
     // is zero there is a lingering block on disk.
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     // Check the log for the error message when deleting non-empty containers
     GenericTestUtils.LogCapturer logCapturer =
@@ -264,7 +264,7 @@ public class TestDeleteContainerHandler {
 
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -361,7 +361,7 @@ public class TestDeleteContainerHandler {
     // there is a lingering block on disk but isEmpty container flag is true.
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -405,7 +405,7 @@ public class TestDeleteContainerHandler {
         containerId.getId(), pipeline.getId());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     Container containerInternalObj =
         hddsDatanodeService.
@@ -443,7 +443,7 @@ public class TestDeleteContainerHandler {
     // flag is true, there is a lingering block on disk.
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
 
     // Check the log for the error message when deleting non-empty containers
@@ -477,7 +477,7 @@ public class TestDeleteContainerHandler {
     // Send the delete command.It should fail as still block table is non-empty
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
     Thread.sleep(5000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
@@ -487,7 +487,7 @@ public class TestDeleteContainerHandler {
 
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -527,7 +527,7 @@ public class TestDeleteContainerHandler {
         containerId.getId(), pipeline.getId());
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerClosed(hddsDatanodeService, containerId.getId()),
@@ -565,7 +565,7 @@ public class TestDeleteContainerHandler {
     // is non-zero(Invalid).
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -651,7 +651,7 @@ public class TestDeleteContainerHandler {
         false);
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     // Deleting a non-empty container should fail on DN when the force flag
     // is false.
@@ -681,7 +681,7 @@ public class TestDeleteContainerHandler {
     // Send the delete command again. It should succeed this time.
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
@@ -717,7 +717,7 @@ public class TestDeleteContainerHandler {
         containerId.getId(), false);
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     // Here it should not delete it, and the container should exist in the
     // containerset
@@ -741,7 +741,7 @@ public class TestDeleteContainerHandler {
     command = new DeleteContainerCommand(containerId.getId(), true);
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
-    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+    nodeManager.addDatanodeCommand(datanodeDetails.getID(), command);
 
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),

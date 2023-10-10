@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -177,8 +178,8 @@ public class TestReplicatedFileChecksumHelper {
 
     RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
 
-    List<DatanodeDetails> dns = Arrays.asList(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build());
+    List<DatanodeDetails> dns = Collections.singletonList(
+        DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build());
     Pipeline pipeline;
     pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())

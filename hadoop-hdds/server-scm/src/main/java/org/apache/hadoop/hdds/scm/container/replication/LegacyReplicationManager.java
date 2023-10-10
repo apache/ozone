@@ -1591,7 +1591,7 @@ public class LegacyReplicationManager {
     }
     closeContainerCommand.setEncodedToken(getContainerToken(containerID));
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-        new CommandForDatanode<>(datanode.getUuid(), closeContainerCommand));
+        new CommandForDatanode<>(datanode.getID(), closeContainerCommand));
   }
 
   private String getContainerToken(ContainerID containerID) {
@@ -1695,7 +1695,7 @@ public class LegacyReplicationManager {
       return false;
     }
     final CommandForDatanode<T> datanodeCommand =
-        new CommandForDatanode<>(datanode.getUuid(), command);
+        new CommandForDatanode<>(datanode.getID(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
     return true;
   }

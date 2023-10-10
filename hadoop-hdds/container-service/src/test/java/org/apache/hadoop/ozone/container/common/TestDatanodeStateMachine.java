@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc.RPC;
@@ -433,7 +434,7 @@ public class TestDatanodeStateMachine {
     DatanodeDetails.Port streamPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.RATIS_DATASTREAM, 0);
     return DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(containerPort)

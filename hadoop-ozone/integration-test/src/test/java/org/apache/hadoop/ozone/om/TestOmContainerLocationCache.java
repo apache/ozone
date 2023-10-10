@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -94,7 +95,6 @@ import java.io.InputStream;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
@@ -144,9 +144,9 @@ public class TestOmContainerLocationCache {
   private static XceiverClientGrpc mockDn1Protocol;
   private static XceiverClientGrpc mockDn2Protocol;
   private static final DatanodeDetails DN1 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN2 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static long testContainerId = 1L;
 
 

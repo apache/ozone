@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +37,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -102,7 +102,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private final ConfigurationSource ozoneConfiguration;
 
   // Map to track commit index at every server
-  private final ConcurrentHashMap<UUID, Long> commitInfoMap;
+  private final ConcurrentHashMap<DatanodeID, Long> commitInfoMap;
 
   private final XceiverClientMetrics metrics
       = XceiverClientManager.getXceiverClientMetrics();
@@ -218,7 +218,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
 
   @VisibleForTesting
-  public ConcurrentMap<UUID, Long> getCommitInfoMap() {
+  public ConcurrentMap<DatanodeID, Long> getCommitInfoMap() {
     return commitInfoMap;
   }
 
@@ -254,9 +254,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         .mapToLong(Long::longValue).min().orElse(0);
   }
 
-  private void addDatanodetoReply(UUID address, XceiverClientReply reply) {
+  private void addDatanodetoReply(DatanodeID dnID, XceiverClientReply reply) {
+    // TODO: Replace DatanodeDetails with DatanodeID
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(address);
+    builder.setID(dnID);
     reply.addDatanode(builder.build());
   }
 
@@ -299,16 +300,16 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       reply.getCommitInfos().stream()
           .filter(i -> i.getCommitIndex() < index)
           .forEach(proto -> {
-            UUID address = RatisHelper.toDatanodeId(proto.getServer());
-            addDatanodetoReply(address, clientReply);
+            DatanodeID dnID = RatisHelper.toDatanodeId(proto.getServer());
+            addDatanodetoReply(dnID, clientReply);
             // since 3 way commit has failed, the updated map from now on  will
             // only store entries for those datanodes which have had successful
             // replication.
-            commitInfoMap.remove(address);
+            commitInfoMap.remove(dnID);
             LOG.info(
                 "Could not commit index {} on pipeline {} to all the nodes. " +
                 "Server {} has failed. Committed by majority.",
-                index, pipeline, address);
+                index, pipeline, dnID);
           });
       return clientReply;
     }
@@ -361,7 +362,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             ContainerCommandResponseProto response =
                 ContainerCommandResponseProto
                     .parseFrom(reply.getMessage().getContent());
-            UUID serverId = RatisHelper.toDatanodeId(reply.getReplierId());
+            DatanodeID serverId = RatisHelper.toDatanodeId(
+                reply.getReplierId());
             if (response.getResult() == ContainerProtos.Result.SUCCESS) {
               updateCommitInfosMap(reply.getCommitInfos());
             }

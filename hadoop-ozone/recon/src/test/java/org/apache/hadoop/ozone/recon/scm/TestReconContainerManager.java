@@ -37,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -205,9 +206,9 @@ public class TestReconContainerManager
     final ContainerID containerID1 = ContainerID.valueOf(cIDlong1);
 
     // Init DN01
-    final UUID uuid1 = UUID.randomUUID();
+    final DatanodeID dn1 = DatanodeID.randomID();
     final DatanodeDetails datanodeDetails1 = DatanodeDetails.newBuilder()
-        .setUuid(uuid1).setHostName("host1").setIpAddress("127.0.0.1").build();
+        .setID(dn1).setHostName("host1").setIpAddress("127.0.0.1").build();
     ContainerReplica containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
         .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L).build();
@@ -232,8 +233,8 @@ public class TestReconContainerManager
     assertEquals(1, repHistMap.size());
     // Should only have 1 entry for this replica (on DN01)
     assertEquals(1, repHistMap.get(cIDlong1).size());
-    ContainerReplicaHistory repHist1 = repHistMap.get(cIDlong1).get(uuid1);
-    assertEquals(uuid1, repHist1.getUuid());
+    ContainerReplicaHistory repHist1 = repHistMap.get(cIDlong1).get(dn1);
+    assertEquals(dn1.getUuid(), repHist1.getUuid());
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist1.getLastSeenTime(), repHist1.getFirstSeenTime());
     assertEquals(containerReplica1.getSequenceId().longValue(),
@@ -251,9 +252,9 @@ public class TestReconContainerManager
     assertEquals(1051L, repHist1.getBcsId());
 
     // Init DN02
-    final UUID uuid2 = UUID.randomUUID();
+    final DatanodeID dn2 = DatanodeID.randomID();
     final DatanodeDetails datanodeDetails2 = DatanodeDetails.newBuilder()
-        .setUuid(uuid2).setHostName("host2").setIpAddress("127.0.0.2").build();
+        .setID(dn2).setHostName("host2").setIpAddress("127.0.0.2").build();
     final ContainerReplica containerReplica2 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
         .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L).build();
@@ -265,8 +266,8 @@ public class TestReconContainerManager
     assertEquals(1, repHistMap.size());
     // Should have 2 entries for this replica (on DN01 and DN02)
     assertEquals(2, repHistMap.get(cIDlong1).size());
-    ContainerReplicaHistory repHist2 = repHistMap.get(cIDlong1).get(uuid2);
-    assertEquals(uuid2, repHist2.getUuid());
+    ContainerReplicaHistory repHist2 = repHistMap.get(cIDlong1).get(dn2);
+    assertEquals(dn2.getUuid(), repHist2.getUuid());
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist2.getLastSeenTime(), repHist2.getFirstSeenTime());
     assertEquals(1051L, repHist2.getBcsId());
@@ -278,7 +279,7 @@ public class TestReconContainerManager
     // Should have 1 entry for this replica
     assertEquals(1, repHistMap.get(cIDlong1).size());
     // And the only entry should match DN02
-    assertEquals(uuid2,
+    assertEquals(dn2,
         repHistMap.get(cIDlong1).keySet().iterator().next());
   }
 }

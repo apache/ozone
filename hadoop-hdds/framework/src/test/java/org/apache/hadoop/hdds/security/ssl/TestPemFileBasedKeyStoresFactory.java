@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.ssl;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -47,7 +48,6 @@ import org.junit.Test;
 import javax.net.ssl.SSLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 
@@ -159,7 +159,7 @@ public class TestPemFileBasedKeyStoresFactory {
   private ContainerCommandResponseProto sendRequest(
       XceiverClientProtocolServiceStub stub) throws Exception {
     DatanodeDetails dn = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID()).build();
+        .setID(DatanodeID.randomID()).build();
     List<DatanodeDetails> nodes = new ArrayList();
     nodes.add(dn);
     Pipeline pipeline = Pipeline.newBuilder().setId(PipelineID.randomId())

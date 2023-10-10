@@ -22,11 +22,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
@@ -84,7 +84,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     return DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(containerPort)

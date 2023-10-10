@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.scm.server.
@@ -170,6 +170,6 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     // If SCM receives heartbeat from a node after it restarts and the node
     // is not registered, it should send a Re-Register command back to the node.
     Mockito.verify(mockNodeManager, Mockito.times(1)).addDatanodeCommand(
-        Mockito.any(UUID.class), Mockito.any(ReregisterCommand.class));
+        Mockito.any(DatanodeID.class), Mockito.any(ReregisterCommand.class));
   }
 }

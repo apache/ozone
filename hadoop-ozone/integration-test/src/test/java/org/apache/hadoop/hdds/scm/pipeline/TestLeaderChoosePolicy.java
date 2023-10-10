@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -36,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY;
@@ -83,9 +83,9 @@ public class TestLeaderChoosePolicy {
           pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
     }
 
-    Map<UUID, Integer> leaderCount = new HashMap<>();
+    Map<DatanodeID, Integer> leaderCount = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
-      UUID leader = pipeline.getLeaderId();
+      DatanodeID leader = pipeline.getLeaderId();
       if (!leaderCount.containsKey(leader)) {
         leaderCount.put(leader, 0);
       }
@@ -94,7 +94,7 @@ public class TestLeaderChoosePolicy {
     }
 
     Assert.assertTrue(leaderCount.size() == dnNum);
-    for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
+    for (Map.Entry<DatanodeID, Integer> entry: leaderCount.entrySet()) {
       Assert.assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
     }
   }

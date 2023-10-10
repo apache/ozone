@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.junit.jupiter.api.Assertions;
@@ -29,7 +30,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TestNode2ContainerMap {
   private static final int DATANODE_COUNT = 300;
   private static final int CONTAINER_COUNT = 1000;
-  private final Map<UUID, TreeSet<ContainerID>> testData = new
+  private final Map<DatanodeID, TreeSet<ContainerID>> testData = new
       ConcurrentHashMap<>();
 
   private void generateData() {
@@ -48,11 +48,11 @@ public class TestNode2ContainerMap {
         long currentCnIndex = (long) (dnIndex * CONTAINER_COUNT) + cnIndex;
         currentSet.add(ContainerID.valueOf(currentCnIndex));
       }
-      testData.put(UUID.randomUUID(), currentSet);
+      testData.put(DatanodeID.randomID(), currentSet);
     }
   }
 
-  private UUID getFirstKey() {
+  private DatanodeID getFirstKey() {
     return testData.keySet().iterator().next();
   }
 
@@ -64,8 +64,8 @@ public class TestNode2ContainerMap {
   @Test
   public void testIsKnownDatanode() throws SCMException {
     Node2ContainerMap map = new Node2ContainerMap();
-    UUID knownNode = getFirstKey();
-    UUID unknownNode = UUID.randomUUID();
+    DatanodeID knownNode = getFirstKey();
+    DatanodeID unknownNode = DatanodeID.randomID();
     Set<ContainerID> containerIDs = testData.get(knownNode);
     map.insertNewDatanode(knownNode, containerIDs);
     Assertions.assertTrue(map.isKnownDatanode(knownNode),
@@ -77,7 +77,7 @@ public class TestNode2ContainerMap {
   @Test
   public void testInsertNewDatanode() throws SCMException {
     Node2ContainerMap map = new Node2ContainerMap();
-    UUID knownNode = getFirstKey();
+    DatanodeID knownNode = getFirstKey();
     Set<ContainerID> containerIDs = testData.get(knownNode);
     map.insertNewDatanode(knownNode, containerIDs);
     Set<ContainerID> readSet = map.getContainers(knownNode);
@@ -99,7 +99,7 @@ public class TestNode2ContainerMap {
 
   @Test
   public void testProcessReportCheckOneNode() throws SCMException {
-    UUID key = getFirstKey();
+    DatanodeID key = getFirstKey();
     Set<ContainerID> values = testData.get(key);
     Node2ContainerMap map = new Node2ContainerMap();
     map.insertNewDatanode(key, values);
@@ -111,7 +111,7 @@ public class TestNode2ContainerMap {
 
   @Test
   public void testUpdateDatanodeMap() throws SCMException {
-    UUID datanodeId = getFirstKey();
+    DatanodeID datanodeId = getFirstKey();
     Set<ContainerID> values = testData.get(datanodeId);
     Node2ContainerMap map = new Node2ContainerMap();
     map.insertNewDatanode(datanodeId, values);
@@ -137,11 +137,12 @@ public class TestNode2ContainerMap {
   public void testProcessReportInsertAll() throws SCMException {
     Node2ContainerMap map = new Node2ContainerMap();
 
-    for (Map.Entry<UUID, TreeSet<ContainerID>> keyEntry : testData.entrySet()) {
+    for (Map.Entry<DatanodeID, TreeSet<ContainerID>> keyEntry :
+        testData.entrySet()) {
       map.insertNewDatanode(keyEntry.getKey(), keyEntry.getValue());
     }
     // Assert all Keys are known datanodes.
-    for (UUID key : testData.keySet()) {
+    for (DatanodeID key : testData.keySet()) {
       Assertions.assertTrue(map.isKnownDatanode(key));
     }
   }
@@ -172,7 +173,7 @@ public class TestNode2ContainerMap {
     Node2ContainerMap map = new Node2ContainerMap();
     // If we attempt to process a node that is not present in the map,
     // we get a result back that says, NEW_NODE_FOUND.
-    UUID key = getFirstKey();
+    DatanodeID key = getFirstKey();
     TreeSet<ContainerID> values = testData.get(key);
     ReportResult result = map.processReport(key, values);
     Assertions.assertEquals(ReportResult.ReportStatus.NEW_DATANODE_FOUND,
@@ -191,7 +192,7 @@ public class TestNode2ContainerMap {
   @Test
   public void testProcessReportDetectNewContainers() throws SCMException {
     Node2ContainerMap map = new Node2ContainerMap();
-    UUID key = getFirstKey();
+    DatanodeID key = getFirstKey();
     TreeSet<ContainerID> values = testData.get(key);
     map.insertNewDatanode(key, values);
 
@@ -230,7 +231,7 @@ public class TestNode2ContainerMap {
   @Test
   public void testProcessReportDetectMissingContainers() throws SCMException {
     Node2ContainerMap map = new Node2ContainerMap();
-    UUID key = getFirstKey();
+    DatanodeID key = getFirstKey();
     TreeSet<ContainerID> values = testData.get(key);
     map.insertNewDatanode(key, values);
 
@@ -270,7 +271,7 @@ public class TestNode2ContainerMap {
   public void testProcessReportDetectNewAndMissingContainers() throws
       SCMException {
     Node2ContainerMap map = new Node2ContainerMap();
-    UUID key = getFirstKey();
+    DatanodeID key = getFirstKey();
     TreeSet<ContainerID> values = testData.get(key);
     map.insertNewDatanode(key, values);
 

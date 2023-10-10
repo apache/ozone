@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -32,7 +33,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Test for the CommandQueue class.
@@ -59,8 +59,8 @@ public class TestCommandQueue {
         .ReplicationCommandPriority.LOW);
 
 
-    UUID datanode1UUID = UUID.randomUUID();
-    UUID datanode2UUID = UUID.randomUUID();
+    DatanodeID datanode1UUID = DatanodeID.randomID();
+    DatanodeID datanode2UUID = DatanodeID.randomID();
 
     commandQueue.addCommand(datanode1UUID, closeContainerCommand);
     commandQueue.addCommand(datanode1UUID, closeContainerCommand);
@@ -75,7 +75,7 @@ public class TestCommandQueue {
 
     // Check zero returned for unknown DN
     Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
-        UUID.randomUUID(), SCMCommandProto.Type.closeContainerCommand));
+        DatanodeID.randomID(), SCMCommandProto.Type.closeContainerCommand));
 
     Assert.assertEquals(2, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closeContainerCommand));

@@ -21,6 +21,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -68,7 +69,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -134,13 +134,13 @@ public class TestDeletedBlockLog {
 
   private void setupContainerManager() throws IOException {
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
             .build());
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
             .build());
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
             .build());
 
     when(containerManager.getContainerReplicas(anyObject()))
@@ -256,7 +256,7 @@ public class TestDeletedBlockLog {
       DatanodeDetails... dns) throws IOException {
     for (DatanodeDetails dnDetails : dns) {
       deletedBlockLog
-          .commitTransactions(transactionResults, dnDetails.getUuid());
+          .commitTransactions(transactionResults, dnDetails.getID());
     }
     scmHADBTransactionBuffer.flush();
   }
@@ -312,7 +312,7 @@ public class TestDeletedBlockLog {
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
     for (DatanodeDetails dn : dnList) {
       txns.addAll(Optional.ofNullable(
-          transactions.getDatanodeTransactionMap().get(dn.getUuid()))
+          transactions.getDatanodeTransactionMap().get(dn.getID()))
           .orElseGet(LinkedList::new));
     }
     return txns;
@@ -455,7 +455,7 @@ public class TestDeletedBlockLog {
     blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);
     Assertions.assertEquals(30 * THREE, blocks.size());
     commitTransactions(blocks, dnList.get(1), dnList.get(2),
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+        DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
             .build());
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);

@@ -295,6 +295,7 @@ public final class HddsTestUtils {
     Preconditions.checkNotNull(nodeId);
     Preconditions.checkNotNull(path);
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
+    // TODO: Change UUID to DatanodeID
     srb.setStorageUuid(nodeId.toString())
         .setStorageLocation(path)
         .setCapacity(capacity)

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -48,7 +49,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -286,16 +286,16 @@ public class TestNodeStateManager {
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
-    nsm.addContainer(dn.getUuid(), ContainerID.valueOf(1));
-    nsm.addContainer(dn.getUuid(), ContainerID.valueOf(2));
+    nsm.addContainer(dn.getID(), ContainerID.valueOf(1));
+    nsm.addContainer(dn.getID(), ContainerID.valueOf(2));
 
-    Set<ContainerID> containerSet = nsm.getContainers(dn.getUuid());
+    Set<ContainerID> containerSet = nsm.getContainers(dn.getID());
     assertEquals(2, containerSet.size());
     Assertions.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
     Assertions.assertTrue(containerSet.contains(ContainerID.valueOf(2)));
 
-    nsm.removeContainer(dn.getUuid(), ContainerID.valueOf(2));
-    containerSet = nsm.getContainers(dn.getUuid());
+    nsm.removeContainer(dn.getID(), ContainerID.valueOf(2));
+    containerSet = nsm.getContainers(dn.getID());
     assertEquals(1, containerSet.size());
     Assertions.assertTrue(containerSet.contains(ContainerID.valueOf(1)));
     Assertions.assertFalse(containerSet.contains(ContainerID.valueOf(2)));
@@ -354,14 +354,14 @@ public class TestNodeStateManager {
   @Test
   public void testUpdateNode() throws NodeAlreadyExistsException,
           NodeNotFoundException {
-    UUID dnUuid = UUID.randomUUID();
+    DatanodeID dnUuid = DatanodeID.randomID();
     String ipAddress = "1.2.3.4";
     String hostName = "test-host";
     StorageContainerDatanodeProtocolProtos.LayoutVersionProto
             layoutVersionProto =
             UpgradeUtils.toLayoutVersionProto(1, 2);
     DatanodeDetails dn = DatanodeDetails.newBuilder()
-            .setUuid(dnUuid)
+            .setID(dnUuid)
             .setIpAddress(ipAddress)
             .setHostName(hostName)
             .setPersistedOpState(HddsProtos.NodeOperationalState.IN_MAINTENANCE)
@@ -373,7 +373,7 @@ public class TestNodeStateManager {
     StorageContainerDatanodeProtocolProtos.LayoutVersionProto
             newLayoutVersionProto = UpgradeUtils.defaultLayoutVersionProto();
     DatanodeDetails newDn = DatanodeDetails.newBuilder()
-            .setUuid(dnUuid)
+            .setID(dnUuid)
             .setIpAddress(newIpAddress)
             .setHostName(newHostName)
             .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
@@ -389,7 +389,7 @@ public class TestNodeStateManager {
   }
 
   private DatanodeDetails generateDatanode() {
-    return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+    return DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
   }
 
   static class  MockEventPublisher implements EventPublisher {

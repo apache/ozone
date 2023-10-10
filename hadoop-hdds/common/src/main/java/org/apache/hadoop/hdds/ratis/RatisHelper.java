@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -99,15 +99,15 @@ public final class RatisHelper {
     return id.getUuidString();
   }
 
-  public static UUID toDatanodeId(String peerIdString) {
-    return UUID.fromString(peerIdString);
+  public static DatanodeID toDatanodeId(String peerIdString) {
+    return DatanodeID.fromUuidString(peerIdString);
   }
 
-  public static UUID toDatanodeId(RaftPeerId peerId) {
+  public static DatanodeID toDatanodeId(RaftPeerId peerId) {
     return toDatanodeId(peerId.toString());
   }
 
-  public static UUID toDatanodeId(RaftProtos.RaftPeerProto peerId) {
+  public static DatanodeID toDatanodeId(RaftProtos.RaftPeerProto peerId) {
     return toDatanodeId(RaftPeerId.valueOf(peerId.getId()));
   }
 

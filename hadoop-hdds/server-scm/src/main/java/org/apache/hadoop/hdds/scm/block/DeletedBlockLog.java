@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
@@ -30,7 +31,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * The DeletedBlockLog is a persisted log in SCM to keep tracking
@@ -95,7 +95,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param dnID - ID of datanode which acknowledges the delete block command.
    */
   void commitTransactions(List<DeleteBlockTransactionResult> transactionResults,
-      UUID dnID);
+                          DatanodeID dnID);
 
   /**
    * Creates block deletion transactions for a set of containers,

@@ -142,7 +142,7 @@ public class TestContainerPlacementFactory {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNodeByID(dn.getID()))
           .thenReturn(dn);
     }
 

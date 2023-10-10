@@ -18,13 +18,13 @@
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 /**
  * Tests the exclude nodes list behavior at client.
@@ -35,18 +35,18 @@ public class TestExcludeList {
   @Test
   public void excludeNodesShouldBeCleanedBasedOnGivenTime() {
     ExcludeList list = new ExcludeList(10, clock);
-    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    list.addDatanode(DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
     Assertions.assertTrue(list.getDatanodes().size() == 1);
     clock.fastForward(11);
     Assertions.assertTrue(list.getDatanodes().size() == 0);
-    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    list.addDatanode(DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .setIpAddress("127.0.0.2").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    list.addDatanode(DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .setIpAddress("127.0.0.3").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
@@ -56,7 +56,7 @@ public class TestExcludeList {
   @Test
   public void excludeNodeShouldNotBeCleanedIfExpiryTimeIsZero() {
     ExcludeList list = new ExcludeList(0, clock);
-    list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    list.addDatanode(DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());

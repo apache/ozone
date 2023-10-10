@@ -262,6 +262,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     SortDatanodesResponseProto.Builder resp =
         SortDatanodesResponseProto.newBuilder();
     try {
+      // TODO: Change the name list from String to DatanodeID
       List<String> nodeList = request.getNodeNetworkNameList();
       final List<DatanodeDetails> results =
           impl.sortDatanodes(nodeList, request.getClient());

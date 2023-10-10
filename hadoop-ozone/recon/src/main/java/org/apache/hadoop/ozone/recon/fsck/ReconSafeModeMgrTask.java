@@ -110,7 +110,7 @@ public class ReconSafeModeMgrTask {
     allNodes.forEach(node -> {
       try {
         currentContainersInAllDatanodes.addAll(
-            nodeManager.getContainers(node));
+            nodeManager.getContainers(node.getID()));
       } catch (NodeNotFoundException e) {
         LOG.error("{} node not found.", node.getUuid());
       }

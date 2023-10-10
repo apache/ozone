@@ -108,7 +108,7 @@ public class NodeEndpoint {
               new DatanodePipeline(pipelineID.getId(),
                   pipeline.getReplicationConfig(), leaderNode);
           pipelines.add(datanodePipeline);
-          if (datanode.getUuid().equals(pipeline.getLeaderId())) {
+          if (datanode.getID().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();
           }
           int openContainerPerPipeline =
@@ -124,7 +124,8 @@ public class NodeEndpoint {
         }
       });
       try {
-        Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
+        Set<ContainerID> allContainers = nodeManager.getContainers(
+            datanode.getID());
 
         builder.withContainers(allContainers.size());
         builder.withOpenContainers(openContainers.get());

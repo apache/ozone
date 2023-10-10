@@ -29,6 +29,7 @@ import java.util.UUID;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -84,7 +85,7 @@ public class ReconNodeManager extends SCMNodeManager {
   private static int reconStaleDatanodeMultiplier = 3;
 
   private static final DatanodeDetails EMPTY_DATANODE_DETAILS =
-      DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
 
   public ReconNodeManager(OzoneConfiguration conf,
                           SCMStorageConfig scmStorageConfig,
@@ -293,7 +294,7 @@ public class ReconNodeManager extends SCMNodeManager {
           nodeStatus.getOperationalState());
 
       setNodeOperationalState(dnDetails, nodeOperationalStateFromScm);
-      DatanodeDetails scmDnd = getNodeByUuid(dnDetails.getUuid());
+      DatanodeDetails scmDnd = getNodeByID(dnDetails.getID());
       scmDnd.setPersistedOpState(nodeOperationalStateFromScm);
     }
   }

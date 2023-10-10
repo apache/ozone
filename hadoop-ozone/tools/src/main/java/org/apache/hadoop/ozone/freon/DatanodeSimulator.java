@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -457,7 +458,7 @@ public class DatanodeSimulator implements Callable<Void> {
   private DatanodeDetails randomDatanodeDetails(ConfigurationSource config)
       throws UnknownHostException {
     DatanodeDetails details = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .build();
     details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
     details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);

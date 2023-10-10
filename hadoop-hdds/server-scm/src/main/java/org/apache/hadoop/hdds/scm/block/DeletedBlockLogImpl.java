@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.block;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
 import java.util.LinkedHashSet;
@@ -33,6 +32,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -83,7 +83,7 @@ public class DeletedBlockLogImpl
   private final ContainerManager containerManager;
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
-  private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  private final Map<Long, Set<DatanodeID>> transactionToDNsCommitMap;
   // Maps txId to its retry counts;
   private final Map<Long, Integer> transactionToRetryCountMap;
   // The access to DeletedBlocksTXTable is protected by
@@ -237,11 +237,11 @@ public class DeletedBlockLogImpl
    */
   @Override
   public void commitTransactions(
-      List<DeleteBlockTransactionResult> transactionResults, UUID dnID) {
+      List<DeleteBlockTransactionResult> transactionResults, DatanodeID dnID) {
     lock.lock();
     try {
       ArrayList<Long> txIDsToBeDeleted = new ArrayList<>();
-      Set<UUID> dnsWithCommittedTxn;
+      Set<DatanodeID> dnsWithCommittedTxn;
       for (DeleteBlockTransactionResult transactionResult :
           transactionResults) {
         if (isTransactionFailed(transactionResult)) {
@@ -276,9 +276,9 @@ public class DeletedBlockLogImpl
           // the nodes returned in the pipeline match the replication factor.
           if (min(replicas.size(), dnsWithCommittedTxn.size())
               >= container.getReplicationConfig().getRequiredNodes()) {
-            List<UUID> containerDns = replicas.stream()
+            List<DatanodeID> containerDns = replicas.stream()
                 .map(ContainerReplica::getDatanodeDetails)
-                .map(DatanodeDetails::getUuid)
+                .map(DatanodeDetails::getID)
                 .collect(Collectors.toList());
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
@@ -410,11 +410,11 @@ public class DeletedBlockLogImpl
             .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
             .build();
     for (ContainerReplica replica : replicas) {
-      UUID dnID = replica.getDatanodeDetails().getUuid();
+      DatanodeID dnID = replica.getDatanodeDetails().getID();
       if (!dnList.contains(replica.getDatanodeDetails())) {
         continue;
       }
-      Set<UUID> dnsWithTransactionCommitted =
+      Set<DatanodeID> dnsWithTransactionCommitted =
           transactionToDNsCommitMap.get(updatedTxn.getTxID());
       if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
           .contains(dnID)) {
@@ -505,7 +505,7 @@ public class DeletedBlockLogImpl
       ContainerBlocksDeletionACKProto ackProto =
           deleteBlockStatus.getCmdStatus().getBlockDeletionAck();
       commitTransactions(ackProto.getResultsList(),
-          UUID.fromString(ackProto.getDnId()));
+          DatanodeID.fromUuidString(ackProto.getDnId()));
       metrics.incrBlockDeletionCommandSuccess();
     } else if (status == CommandStatus.Status.FAILED) {
       metrics.incrBlockDeletionCommandFailure();

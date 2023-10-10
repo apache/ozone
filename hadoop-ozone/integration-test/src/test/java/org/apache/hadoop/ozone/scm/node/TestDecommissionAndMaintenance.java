@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -59,7 +60,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -198,10 +198,10 @@ public class TestDecommissionAndMaintenance {
     // Once we have a DN id, look it up in the NM, as the datanodeDetails
     // instance in the pipeline may not be the same as the one stored in the
     // NM.
-    final UUID dnID = pipeline.getNodes().stream()
+    final DatanodeID dnID = pipeline.getNodes().stream()
         .filter(node -> ecPipeline.getNodes().contains(node))
-        .findFirst().get().getUuid();
-    final DatanodeDetails toDecommission = nm.getNodeByUuid(dnID.toString());
+        .findFirst().get().getID();
+    final DatanodeDetails toDecommission = nm.getNodeByID(dnID);
 
     scmClient.decommissionNodes(Arrays.asList(
         getDNHostAndPort(toDecommission)));
@@ -268,14 +268,14 @@ public class TestDecommissionAndMaintenance {
 
     // After the SCM restart, the DN should report as DECOMMISSIONING, then
     // it should re-enter the decommission workflow and move to DECOMMISSIONED
-    DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    DatanodeDetails newDn = nm.getNodeByID(dn.getID());
     waitForDnToReachOpState(newDn, DECOMMISSIONED);
     waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
 
     // Now the node is decommissioned, so restart SCM again
     cluster.restartStorageContainerManager(true);
     setManagers();
-    newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    newDn = nm.getNodeByID(dn.getID());
 
     // On initial registration, the DN should report its operational state
     // and if it is decommissioned, that should be updated in the NodeStatus
@@ -293,7 +293,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
     // Now restart it and ensure it remains IN_SERVICE
     cluster.restartHddsDatanode(dnIndex, true);
-    newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    newDn = nm.getNodeByID(dn.getID());
 
     // As this is not an initial registration since SCM was started, the DN
     // should report its operational state and if it differs from what SCM
@@ -331,10 +331,10 @@ public class TestDecommissionAndMaintenance {
     // Once we have a DN id, look it up in the NM, as the datanodeDetails
     // instance in the pipeline may not be the same as the one stored in the
     // NM.
-    final UUID dnID = pipeline.getNodes().stream()
+    final DatanodeID dnID = pipeline.getNodes().stream()
         .filter(node -> ecPipeline.getNodes().contains(node))
-        .findFirst().get().getUuid();
-    final DatanodeDetails dn = nm.getNodeByUuid(dnID.toString());
+        .findFirst().get().getID();
+    final DatanodeDetails dn = nm.getNodeByID(dnID);
 
     scmClient.startMaintenanceNodes(Arrays.asList(
         getDNHostAndPort(dn)), 0);
@@ -364,7 +364,7 @@ public class TestDecommissionAndMaintenance {
 
     // Restart the DN and it should keep the IN_MAINTENANCE state
     cluster.restartHddsDatanode(dn, true);
-    DatanodeDetails newDN = nm.getNodeByUuid(dn.getUuid().toString());
+    DatanodeDetails newDN = nm.getNodeByID(dn.getID());
     waitForDnToReachHealthState(newDN, HEALTHY);
     waitForDnToReachPersistedOpState(newDN, IN_MAINTENANCE);
 
@@ -378,7 +378,7 @@ public class TestDecommissionAndMaintenance {
 
     // Now restart it and ensure it remains IN_SERVICE
     cluster.restartHddsDatanode(dnIndex, true);
-    DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    DatanodeDetails newDn = nm.getNodeByID(dn.getID());
 
     // As this is not an initial registration since SCM was started, the DN
     // should report its operational state and if it differs from what SCM
@@ -487,7 +487,7 @@ public class TestDecommissionAndMaintenance {
 
     List<DatanodeDetails> newDns = new ArrayList<>();
     for (DatanodeDetails dn : forMaintenance) {
-      newDns.add(nm.getNodeByUuid(dn.getUuid().toString()));
+      newDns.add(nm.getNodeByID(dn.getID()));
     }
 
     // Ensure all 3 DNs go to maintenance

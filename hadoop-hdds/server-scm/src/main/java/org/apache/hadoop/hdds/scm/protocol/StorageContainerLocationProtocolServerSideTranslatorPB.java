@@ -1162,6 +1162,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           request, int clientVersion) throws IOException {
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
 
+    // TODO: Change the uuid to DatanodeID
     // get info by ip or uuid
     if (request.hasUuid() || request.hasIpaddress()) {
       infoList = impl.getDatanodeUsageInfo(request.getIpaddress(),

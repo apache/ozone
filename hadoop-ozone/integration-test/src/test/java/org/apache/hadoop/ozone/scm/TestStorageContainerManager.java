@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -832,7 +833,7 @@ public class TestStorageContainerManager {
       Assert.assertEquals(datanodeNum, allNodes.size());
       for (DatanodeDetails node : allNodes) {
         DatanodeInfo datanodeInfo = (DatanodeInfo) scm.getScmNodeManager()
-            .getNodeByUuid(node.getUuidString());
+            .getNodeByID(node.getID());
         Assert.assertTrue(datanodeInfo.getLastHeartbeatTime() > start);
         Assert.assertEquals(datanodeInfo.getUuidString(),
             datanodeInfo.getNetworkName());
@@ -907,8 +908,8 @@ public class TestStorageContainerManager {
       setInternalState(rm.getLegacyReplicationManager(),
           "eventPublisher", publisher);
 
-      UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
-          .getDatanodeDetails().getUuid();
+      DatanodeID dnID = cluster.getHddsDatanodes().iterator().next()
+          .getDatanodeDetails().getID();
 
       CloseContainerCommand closeContainerCommand =
           new CloseContainerCommand(selectedContainer.getContainerID(),
@@ -929,11 +930,11 @@ public class TestStorageContainerManager {
 
       if (rm.getConfig().isLegacyEnabled()) {
         CommandForDatanode commandForDatanode = new CommandForDatanode(
-            dnUuid, closeContainerCommand);
+            dnID, closeContainerCommand);
         verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
-            CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
+            CloseContainerCommandMatcher(dnID, commandForDatanode)));
       } else {
-        verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
+        verify(nodeManager).addDatanodeCommand(dnID, closeContainerCommand);
       }
     } finally {
       cluster.shutdown();
@@ -949,8 +950,8 @@ public class TestStorageContainerManager {
       queues.add(new ContainerReportQueue());
     }
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-        .build();
+    DatanodeDetails dn = DatanodeDetails.newBuilder()
+        .setID(DatanodeID.randomID()).build();
     ContainerReportFromDatanode dndata
         = new ContainerReportFromDatanode(dn, report);
     ContainerReportHandler containerReportHandler =
@@ -1020,12 +1021,12 @@ public class TestStorageContainerManager {
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
-        .build();
+    DatanodeDetails dn = DatanodeDetails.newBuilder()
+        .setID(DatanodeID.randomID()).build();
     ContainerReportFromDatanode dndata1
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
-    dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata2
         = new ContainerReportFromDatanode(dn, report);
@@ -1044,7 +1045,8 @@ public class TestStorageContainerManager {
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
     }
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder()
+        .setID(DatanodeID.randomID())
         .build();
     IncrementalContainerReportProto report
         = IncrementalContainerReportProto.getDefaultInstance();
@@ -1095,9 +1097,9 @@ public class TestStorageContainerManager {
       implements ArgumentMatcher<CommandForDatanode> {
 
     private final CommandForDatanode cmd;
-    private final UUID uuid;
+    private final DatanodeID uuid;
 
-    CloseContainerCommandMatcher(UUID uuid, CommandForDatanode cmd) {
+    CloseContainerCommandMatcher(DatanodeID uuid, CommandForDatanode cmd) {
       this.uuid = uuid;
       this.cmd = cmd;
     }

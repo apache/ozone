@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -36,7 +37,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import java.util.Arrays;
 import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -305,7 +305,7 @@ public class TestNodeDecommissionManager {
     DatanodeDetails multiDn = dns.get(0);
 
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(UUID.randomUUID())
+    builder.setID(DatanodeID.randomID())
         .setHostName(multiDn.getHostName())
         .setIpAddress(multiDn.getIpAddress())
         .addPort(DatanodeDetails.newPort(

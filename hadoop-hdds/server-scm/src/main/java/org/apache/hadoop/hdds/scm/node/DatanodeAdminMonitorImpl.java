@@ -341,7 +341,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     List<ContainerID> underReplicatedIDs = new ArrayList<>();
     List<ContainerID> unhealthyIDs = new ArrayList<>();
     Set<ContainerID> containers =
-        nodeManager.getContainers(dn);
+        nodeManager.getContainers(dn.getID());
     for (ContainerID cid : containers) {
       try {
         ContainerReplicaCount replicaSet =

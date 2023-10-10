@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -456,7 +456,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
       DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
+          .setID(DatanodeID.randomID()).build();
       details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
       details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       return details;

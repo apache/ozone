@@ -19,11 +19,11 @@
 package org.apache.hadoop.hdds.scm.node.states;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -44,19 +44,19 @@ public class Node2PipelineMap extends Node2ObjectsMap<PipelineID> {
   /**
    * Returns null if there are no pipelines associated with this datanode ID.
    *
-   * @param datanode - UUID
+   * @param datanode DatanodeID
    * @return Set of pipelines or Null.
    */
-  public Set<PipelineID> getPipelines(UUID datanode) {
+  public Set<PipelineID> getPipelines(DatanodeID datanode) {
     return getObjects(datanode);
   }
 
   /**
    * Return 0 if there are no pipelines associated with this datanode ID.
-   * @param datanode - UUID
+   * @param datanode - DatanodeID
    * @return Number of pipelines or 0.
    */
-  public int getPipelinesCount(UUID datanode) {
+  public int getPipelinesCount(DatanodeID datanode) {
     return getObjects(datanode).size();
   }
 
@@ -67,7 +67,7 @@ public class Node2PipelineMap extends Node2ObjectsMap<PipelineID> {
    */
   public synchronized void addPipeline(Pipeline pipeline) {
     for (DatanodeDetails details : pipeline.getNodes()) {
-      UUID dnId = details.getUuid();
+      DatanodeID dnId = details.getID();
       dn2ObjectMap.computeIfAbsent(dnId, k -> ConcurrentHashMap.newKeySet())
           .add(pipeline.getId());
     }
@@ -75,7 +75,7 @@ public class Node2PipelineMap extends Node2ObjectsMap<PipelineID> {
 
   public synchronized void removePipeline(Pipeline pipeline) {
     for (DatanodeDetails details : pipeline.getNodes()) {
-      UUID dnId = details.getUuid();
+      DatanodeID dnId = details.getID();
       dn2ObjectMap.computeIfPresent(dnId,
           (k, v) -> {
             v.remove(pipeline.getId());

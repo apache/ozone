@@ -22,9 +22,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
 import org.junit.jupiter.api.Assertions;
@@ -51,16 +51,16 @@ public class ReplicationSupervisorScheduling {
     //locks representing the limited resource of remote and local disks
 
     //datanode -> disk -> lock object (remote resources)
-    Map<UUID, Map<Integer, Object>> volumeLocks = new HashMap<>();
+    Map<DatanodeID, Map<Integer, Object>> volumeLocks = new HashMap<>();
 
     //disk -> lock (local resources)
     Map<Integer, Object> destinationLocks = new HashMap<>();
 
     //init the locks
     for (DatanodeDetails datanode : datanodes) {
-      volumeLocks.put(datanode.getUuid(), new HashMap<>());
+      volumeLocks.put(datanode.getID(), new HashMap<>());
       for (int i = 0; i < 10; i++) {
-        volumeLocks.get(datanode.getUuid()).put(i, new Object());
+        volumeLocks.get(datanode.getID()).put(i, new Object());
       }
     }
 
@@ -76,11 +76,11 @@ public class ReplicationSupervisorScheduling {
           task.getSources().get(random.nextInt(task.getSources().size()));
 
       final Map<Integer, Object> volumes =
-          volumeLocks.get(sourceDatanode.getUuid());
+          volumeLocks.get(sourceDatanode.getID());
       Object volumeLock = volumes.get(random.nextInt(volumes.size()));
       synchronized (volumeLock) {
         System.out.println("Downloading " + task.getContainerId() + " from "
-            + sourceDatanode.getUuid());
+            + sourceDatanode.getID());
         try {
           volumeLock.wait(1000);
         } catch (InterruptedException ex) {

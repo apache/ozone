@@ -243,7 +243,7 @@ public class TestSCMContainerPlacementRackScatter {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNodeByID(dn.getID()))
           .thenReturn(dn);
     }
     when(nodeManager.getClusterNetworkTopologyMap())
@@ -515,7 +515,7 @@ public class TestSCMContainerPlacementRackScatter {
     Assertions.assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
     for (DatanodeInfo dn: dnInfoList) {
-      when(nodeManager.getNodeByUuid(dn.getUuid()))
+      when(nodeManager.getNodeByID(dn.getID()))
           .thenReturn(dn);
     }
 
