@@ -66,7 +66,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -92,7 +91,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ConfigurationSource conf;
   private int invocationCount;
   private long totalTime;
-  private final ExecutorService executor;
+  private final ThreadPoolExecutor executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
   private final OzoneContainer ozoneContainer;
@@ -112,7 +111,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
     schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
 
-    this.executor = Executors.newFixedThreadPool(
+    this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
         dnConf.getBlockDeleteThreads(), new ThreadFactoryBuilder()
             .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
     this.deleteCommandQueues =
@@ -682,4 +681,28 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     return blockDeleteMetrics;
   }
 
+  @VisibleForTesting
+  public ThreadPoolExecutor getExecutor() {
+    return executor;
+  }
+
+  public void setPoolSize(int size) {
+    if (size <= 0) {
+      throw new IllegalArgumentException("Pool size must be positive.");
+    }
+
+    int currentCorePoolSize = executor.getCorePoolSize();
+
+    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
+    // equal to the corePoolSize. We must make sure this invariant holds when
+    // changing the pool size. Therefore, we take into account whether the
+    // new size is greater or smaller than the current core pool size.
+    if (size > currentCorePoolSize) {
+      executor.setMaximumPoolSize(size);
+      executor.setCorePoolSize(size);
+    } else {
+      executor.setCorePoolSize(size);
+      executor.setMaximumPoolSize(size);
+    }
+  }
 }
