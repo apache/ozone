@@ -1138,6 +1138,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * For testing purpose only. This allows setting up ScmBlockLocationClient
+   * without having to fully setup a working cluster.
+   */
+  @VisibleForTesting
+  public void setScmBlockLocationClient(
+      ScmBlockLocationClient scmBlockLocationClient) {
+    this.scmBlockLocationClient = scmBlockLocationClient;
+  }
+
+  /**
    * For testing purpose only. This allows testing token in integration test
    * without fully setting up a working secure cluster.
    */

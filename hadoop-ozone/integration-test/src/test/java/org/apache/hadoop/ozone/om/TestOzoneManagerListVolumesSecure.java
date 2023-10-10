@@ -45,6 +45,7 @@ import java.util.concurrent.Callable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.client.ScmBlockLocationClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -209,6 +210,8 @@ public class TestOzoneManagerListVolumesSecure {
     OzoneManager.setTestSecureOmFlag(true);
 
     om = OzoneManager.createOm(conf);
+    om.setScmBlockLocationClient(new ScmBlockLocationClient(
+        new ScmBlockLocationTestingClient(null, null, 0)));
     om.setCertClient(new CertificateClientTestImpl(conf));
     om.start();
 
