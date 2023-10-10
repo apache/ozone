@@ -179,7 +179,8 @@ public class TestPipelineStateMap {
     assertEquals(0, map.getContainers(closedPipeline.getId()).size());
   }
 
-  // Same test script as in testAddContainerToPipeline(), except adding container to closed pipeline
+  // Same test script as in testAddContainerToPipeline(),
+  // except adding container to closed pipeline
   @Test
   void testAddContainerToPipelineSCMStart() throws IOException {
     final Pipeline pipeline1 = MockPipeline.createPipeline(1);
@@ -286,7 +287,8 @@ public class TestPipelineStateMap {
     assertThat(new Pipeline[]{pipeline3}).hasSameElementsAs(map.getPipelines(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)));
     assertEquals(0, map.getPipelines(
-            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ZERO))
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ZERO))
         .size());
   }
 
@@ -456,8 +458,11 @@ public class TestPipelineStateMap {
         datanodeDetails1, Collections.singletonList(pipeline1.getId())));
     // check open standalone all exclusions - empty by DatanodeDetails exclusion
     assertEquals(0, map.getPipelines(
-            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-            Pipeline.PipelineState.OPEN, datanodeDetails1, Collections.emptyList())
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE),
+            Pipeline.PipelineState.OPEN,
+            datanodeDetails1,
+            Collections.emptyList())
         .size());
     // check open standalone all exclusions - empty by DatanodeDetails exclusion
     assertEquals(0, map.getPipelines(StandaloneReplicationConfig.getInstance(

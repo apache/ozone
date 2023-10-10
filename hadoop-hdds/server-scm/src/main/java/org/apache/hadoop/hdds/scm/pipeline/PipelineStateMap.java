@@ -68,7 +68,8 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+  public void addContainerToPipeline(PipelineID pipelineID,
+                                     ContainerID containerID)
       throws IOException {
     addContainerToPipeline(pipelineID, containerID, true);
   }
@@ -114,7 +115,8 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
+  public Pipeline getPipeline(PipelineID pipelineID)
+      throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
@@ -147,9 +149,10 @@ public class PipelineStateMap implements PipelineMap {
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
 
     return pipelines.values().stream().filter(pipelineWithContainers ->
-            pipelineWithContainers.getPipeline().getReplicationConfig()
-                .equals(replicationConfig) &&
-                pipelineWithContainers.getPipeline().getPipelineState() == state)
+            pipelineWithContainers.getPipeline()
+                .getReplicationConfig().equals(replicationConfig) &&
+                pipelineWithContainers.getPipeline()
+                    .getPipelineState() == state)
         .map(PipelineWithContainers::getPipeline).collect(Collectors.toList());
   }
 
@@ -164,7 +167,8 @@ public class PipelineStateMap implements PipelineMap {
 
   @Override
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
-                                     PipelineState state, Collection<DatanodeDetails> excludeDns,
+                                     PipelineState state,
+                                     Collection<DatanodeDetails> excludeDns,
                                      Collection<PipelineID> excludePipelines) {
     Preconditions
         .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
@@ -212,7 +216,8 @@ public class PipelineStateMap implements PipelineMap {
     // final containers to retrieve result from lambda
     final AtomicBoolean pipelineInWrongState = new AtomicBoolean(false);
     final AtomicBoolean pipelineNotFound = new AtomicBoolean(false);
-    final AtomicReference<PipelineWithContainers> removedValue = new AtomicReference<>(null);
+    final AtomicReference<PipelineWithContainers> removedValue =
+        new AtomicReference<>(null);
 
     pipelines.compute(pipelineID, (pipelineID1, oldPwC) -> {
       if (oldPwC == null) {
