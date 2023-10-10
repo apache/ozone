@@ -134,14 +134,18 @@ public class BlockDeletingService extends BackgroundService {
             .setContainerBlockInfo(containerBlockInfo)
             .setPriority(TASK_PRIORITY_DEFAULT);
         containerBlockInfos = builder.build();
+        LOG.info("Added block deleting task for container :{} on DN: {}",
+            containerBlockInfo.getContainerData().getContainerID(),
+            this.ozoneContainer.getDatanodeDetails().getUuid());
         queue.add(containerBlockInfos);
         totalBlocks += containerBlockInfo.getNumBlocksToDelete();
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
-        LOG.debug("Queued {} blocks from {} containers for deletion",
-            totalBlocks, containers.size());
+        LOG.info("Queued {} blocks from {} containers for deletion on DN: {}",
+            totalBlocks, containers.size(), this.ozoneContainer.
+                getDatanodeDetails().getUuid());
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
@@ -173,7 +177,8 @@ public class BlockDeletingService extends BackgroundService {
                       ContainerUtils.getPendingDeletionBlocks(containerData));
               return containerData;
             }));
-
+    LOG.info("containerDataMap: {} for DN: {]", containerDataMap,
+        this.ozoneContainer.getDatanodeDetails().getUuid());
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
@@ -189,7 +194,8 @@ public class BlockDeletingService extends BackgroundService {
         .isValidContainerType(containerData.getContainerType())) {
       return false;
     } else if (!containerData.isClosed()) {
-      LOG.info("isDeletionAllowed : false because Container is not closed");
+      LOG.info("isDeletionAllowed : false because Container is not closed on" +
+          " DN: {}", this.ozoneContainer.getDatanodeDetails().getUuid());
       return false;
     } else {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
@@ -212,6 +218,8 @@ public class BlockDeletingService extends BackgroundService {
         PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
         // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
+          LOG.info("isDeletionAllowed : true because ratis server not exists " +
+              "for DN {}", this.ozoneContainer.getDatanodeDetails().getUuid());
           return true;
         }
         try {
@@ -224,10 +232,14 @@ public class BlockDeletingService extends BackgroundService {
                     + "index is {}. Deletion is not allowed in this container "
                     + "yet.", containerBCSID,
                 containerData.getOriginPipelineId(), minReplicatedIndex);
+            LOG.info("isDeletionAllowed : false because minReplicatedIndex " +
+                "< containerBCSID for DN: {}", this.ozoneContainer.
+                getDatanodeDetails().getUuid());
             return false;
           } else {
             LOG.info("isDeletionAllowed : true because minReplicatedIndex " +
-                "< containerBCSID");
+                "> containerBCSID for DN: {}", this.ozoneContainer.
+                getDatanodeDetails().getUuid());
             return true;
           }
         } catch (IOException ioe) {
@@ -241,7 +253,8 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
       }
-      LOG.info("isDeletionAllowed : true");
+      LOG.info("isDeletionAllowed : true for DN: {}", this.ozoneContainer.
+          getDatanodeDetails().getUuid());
       return true;
     }
   }

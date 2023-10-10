@@ -551,4 +551,8 @@ public class OzoneContainer {
   public ContainerMetrics getMetrics() {
     return metrics;
   }
+
+  public DatanodeDetails getDatanodeDetails() {
+    return datanodeDetails;
+  }
 }

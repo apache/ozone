@@ -349,8 +349,9 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      LOG.info("Container : {}, To-Delete blocks : {}",
-          containerData.getContainerID(), delBlocks.size());
+      LOG.info("Container : {}, To-Delete blocks : {} on DN: {}",
+          containerData.getContainerID(), delBlocks.size(),
+          this.ozoneContainer.getDatanodeDetails().getUuid());
 
       Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
           .getHandler(container.getContainerType()));
@@ -434,7 +435,7 @@ public class BlockDeletingTask implements BackgroundTask {
       for (Long blkLong : entry.getLocalIDList()) {
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
-        LOG.debug("Deleting block {}", blkLong);
+        LOG.info("Deleting block {}", blkLong);
         if (blkInfo == null) {
           try {
             handler.deleteUnreferenced(container, blkLong);
@@ -451,6 +452,10 @@ public class BlockDeletingTask implements BackgroundTask {
         boolean deleted = false;
         try {
           handler.deleteBlock(container, blkInfo);
+          LOG.info("Container Id: {}, Block deleted info: {} on DN: {}",
+              container.getContainerData().getContainerID(),
+              blkInfo.getBlockID(),
+              this.ozoneContainer.getDatanodeDetails().getUuid());
           blocksDeleted++;
           deleted = true;
         } catch (IOException e) {

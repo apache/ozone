@@ -1188,7 +1188,7 @@ public class KeyValueHandler extends Handler {
     if (LOG.isDebugEnabled()) {
       for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
         ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
-        LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
+        LOG.info("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
     }
   }
