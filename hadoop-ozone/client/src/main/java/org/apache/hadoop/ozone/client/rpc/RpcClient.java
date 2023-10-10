@@ -2050,6 +2050,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setSortDatanodesInPipeline(true)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);

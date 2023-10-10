@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -198,9 +199,11 @@ public class SCMBlockProtocolServer implements
         AllocatedBlock block = scm.getScmBlockManager()
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
-          List<String> uuidList = toNodeUuid(block.getPipeline().getNodes());
-          block.getPipeline().setNodesInOrder(
-              sortDatanodes(uuidList, clientMachine));
+          if (StringUtils.isNotEmpty(clientMachine)) {
+            List<String> uuidList = toNodeUuid(block.getPipeline().getNodes());
+            block.getPipeline().setNodesInOrder(
+                sortDatanodes(uuidList, clientMachine));
+          }
           blocks.add(block);
         }
       }
