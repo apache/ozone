@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
@@ -76,6 +77,10 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.event.Level;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -233,6 +238,19 @@ public class TestOMKeyRequest {
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager())
         .thenReturn(omSnapshotManager);
+
+
+    final boolean keyPathLockEnabled =
+        ozoneConfiguration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+    final boolean fileSystemPathsEnable =
+        ozoneConfiguration.getBoolean(OZONE_OM_KEY_PATH_LOCK_ENABLED,
+            OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT);
+
+    final OzoneLockProvider ozoneLockProvider =
+        new OzoneLockProvider(keyPathLockEnabled, fileSystemPathsEnable);
+    when(ozoneManager.getOzoneLockProvider())
+        .thenReturn(ozoneLockProvider);
 
     // Enable DEBUG level logging for relevant classes
     GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
