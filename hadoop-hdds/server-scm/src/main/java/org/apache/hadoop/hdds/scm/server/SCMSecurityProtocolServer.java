@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 
 import java.io.IOException;
