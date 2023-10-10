@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -53,6 +55,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
+import static org.slf4j.MDC.put;
 
 /**
  * Tests OMFileCreateRequest.
@@ -486,13 +489,23 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    String[] invalidKeyNames = {
-        OM_SNAPSHOT_INDICATOR + "/" + keyName,
-        OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
-        OM_SNAPSHOT_INDICATOR + "/a/b/" + keyName
-    };
+    Map<String, String> invalidKeyScenarios = new HashMap<String, String>()
+    {{
+      put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
+          "Cannot create key under path reserved for snapshot: "
+          + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+      put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+          "Cannot create key under path reserved for snapshot: "
+              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+      put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+          "Cannot create key under path reserved for snapshot: "
+              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+      put(OM_SNAPSHOT_INDICATOR,
+          "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
 
-    for (String invalidKeyName : invalidKeyNames) {
+    }};
+
+    for (String invalidKeyName : invalidKeyScenarios.keySet()) {
       OMRequest omRequest = createFileRequest(volumeName, bucketName,
           invalidKeyName, HddsProtos.ReplicationFactor.ONE,
           HddsProtos.ReplicationType.RATIS, false, false);
@@ -504,8 +517,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
           () -> omFileCreateRequest.preExecute(ozoneManager));
 
       Assert.assertTrue(ex.getMessage().contains(
-          "Cannot create key under path reserved for snapshot: "
-              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+          invalidKeyScenarios.get(invalidKeyName)));
     }
   }
 
