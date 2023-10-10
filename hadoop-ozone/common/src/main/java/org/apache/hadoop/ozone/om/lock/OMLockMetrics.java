@@ -85,8 +85,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param readLockWaitingTimeMs read lock waiting time (ms)
    */
   public void setReadLockWaitingTimeMsStat(long readLockWaitingTimeMs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            this.readLockWaitingTimeMsStat.add(readLockWaitingTimeMs));
+    MetricUtil.executeStatAddAction(this.readLockWaitingTimeMsStat::add,
+        readLockWaitingTimeMs);
   }
 
   /**
@@ -95,8 +95,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param readLockHeldTimeMs read lock held time (ms)
    */
   public void setReadLockHeldTimeMsStat(long readLockHeldTimeMs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            this.readLockHeldTimeMsStat.add(readLockHeldTimeMs));
+    MetricUtil.executeStatAddAction(this.readLockHeldTimeMsStat::add,
+        readLockHeldTimeMs);
   }
 
   /**
@@ -105,8 +105,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param writeLockWaitingTimeMs write lock waiting time (ms)
    */
   public void setWriteLockWaitingTimeMsStat(long writeLockWaitingTimeMs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            this.writeLockWaitingTimeMsStat.add(writeLockWaitingTimeMs));
+    MetricUtil.executeStatAddAction(this.writeLockWaitingTimeMsStat::add,
+        writeLockWaitingTimeMs);
   }
 
   /**
@@ -115,8 +115,8 @@ public final class OMLockMetrics implements MetricsSource {
    * @param writeLockHeldTimeMs write lock held time (ms)
    */
   public void setWriteLockHeldTimeMsStat(long writeLockHeldTimeMs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            this.writeLockHeldTimeMsStat.add(writeLockHeldTimeMs));
+    MetricUtil.executeStatAddAction(this.writeLockHeldTimeMsStat::add,
+        writeLockHeldTimeMs);
   }
 
   /**

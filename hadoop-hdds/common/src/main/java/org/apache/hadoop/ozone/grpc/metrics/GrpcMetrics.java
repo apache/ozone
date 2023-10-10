@@ -156,29 +156,25 @@ public class GrpcMetrics implements MetricsSource {
   }
 
   public void addGrpcQueueTime(int queueTime) {
-    MetricUtil.executeMetricsUpdateAction(() -> {
-      grpcQueueTime.add(queueTime);
-      if (grpcQuantileEnable) {
-        for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
-          if (q != null) {
-            q.add(queueTime);
-          }
+    MetricUtil.executeStatAddAction(grpcQueueTime::add, queueTime);
+    if (grpcQuantileEnable) {
+      for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
+        if (q != null) {
+          MetricUtil.executeStatAddAction(q::add, queueTime);
         }
       }
-    });
+    }
   }
 
   public void addGrpcProcessingTime(int processingTime) {
-    MetricUtil.executeMetricsUpdateAction(() -> {
-      grpcProcessingTime.add(processingTime);
-      if (grpcQuantileEnable) {
-        for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
-          if (q != null) {
-            q.add(processingTime);
-          }
+    MetricUtil.executeStatAddAction(grpcProcessingTime::add, processingTime);
+    if (grpcQuantileEnable) {
+      for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
+        if (q != null) {
+          MetricUtil.executeStatAddAction(q::add, processingTime);
         }
       }
-    });
+    }
   }
 
   public void inrcNumOpenClientConnections() {

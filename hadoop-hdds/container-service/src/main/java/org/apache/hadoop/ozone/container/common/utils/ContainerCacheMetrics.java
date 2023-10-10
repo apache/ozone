@@ -86,11 +86,11 @@ public final class ContainerCacheMetrics {
   }
 
   public void incDbCloseLatency(long millis) {
-    MetricUtil.executeMetricsUpdateAction(() -> dbCloseLatency.add(millis));
+    MetricUtil.executeStatAddAction(dbCloseLatency::add, millis);
   }
 
   public void incDbOpenLatency(long millis) {
-    MetricUtil.executeMetricsUpdateAction(() -> dbOpenLatency.add(millis));
+    MetricUtil.executeStatAddAction(dbOpenLatency::add, millis);
   }
 
   public long getNumDbGetOps() {

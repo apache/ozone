@@ -365,79 +365,68 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   public void updateGetBucketSuccessStats(long startNanos) {
     getBucketSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getBucketSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getBucketSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateGetBucketFailureStats(long startNanos) {
     getBucketFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getBucketFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getBucketFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCreateBucketSuccessStats(long startNanos) {
     createBucketSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            createBucketSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(createBucketSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCreateBucketFailureStats(long startNanos) {
     createBucketFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            createBucketFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(createBucketFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateHeadBucketSuccessStats(long startNanos) {
     headBucketSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            headBucketSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(headBucketSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateDeleteBucketSuccessStats(long startNanos) {
     deleteBucketSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            deleteBucketSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(deleteBucketSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateDeleteBucketFailureStats(long startNanos) {
     deleteBucketFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            deleteBucketFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(deleteBucketFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateGetAclSuccessStats(long startNanos) {
     getAclSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getAclSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getAclSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateGetAclFailureStats(long startNanos) {
     getAclFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getAclFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getAclFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updatePutAclSuccessStats(long startNanos) {
     putAclSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            putAclSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(putAclSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updatePutAclFailureStats(long startNanos) {
     putAclFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            putAclFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(putAclFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void incListKeyCount(int count) {
@@ -446,186 +435,167 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   public void updateListMultipartUploadsSuccessStats(long startNanos) {
     listMultipartUploadsSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listMultipartUploadsSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(listMultipartUploadsSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateListMultipartUploadsFailureStats(long startNanos) {
     listMultipartUploadsFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listMultipartUploadsFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(listMultipartUploadsFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   // RootEndpoint
 
   public void updateListS3BucketsSuccessStats(long startNanos) {
     listS3BucketsSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listS3BucketsSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(listS3BucketsSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateListS3BucketsFailureStats(long startNanos) {
     listS3BucketsFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listS3BucketsFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(listS3BucketsFailureLatencyNs::add,
+        Time.monotonicNowNanos());
   }
 
   // ObjectEndpoint
 
   public void updateCreateMultipartKeySuccessStats(long startNanos) {
     createMultipartKeySuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            createMultipartKeySuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(createMultipartKeySuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCreateMultipartKeyFailureStats(long startNanos) {
     createMultipartKeyFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            createMultipartKeyFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(createMultipartKeyFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCopyObjectSuccessStats(long startNanos) {
     copyObjectSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            copyObjectSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(copyObjectSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCopyObjectFailureStats(long startNanos) {
     copyObjectFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            copyObjectFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(copyObjectFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCreateKeySuccessStats(long startNanos) {
     createKeySuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            createKeySuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(createKeySuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCreateKeyFailureStats(long startNanos) {
     createKeyFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            createKeyFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(createKeyFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateListPartsSuccessStats(long startNanos) {
     listPartsSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listPartsSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(listPartsSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateListPartsFailureStats(long startNanos) {
     listPartsFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listPartsFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(listPartsFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateGetKeySuccessStats(long startNanos) {
     getKeySuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getKeySuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getKeySuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateGetKeyFailureStats(long startNanos) {
     getKeyFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getKeyFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateHeadKeySuccessStats(long startNanos) {
     headKeySuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            headKeySuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(headKeySuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateHeadKeyFailureStats(long startNanos) {
     headKeyFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            headKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(headKeyFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateInitMultipartUploadSuccessStats(long startNanos) {
     initMultipartUploadSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            initMultipartUploadSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(initMultipartUploadSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateInitMultipartUploadFailureStats(long startNanos) {
     initMultipartUploadFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            initMultipartUploadFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(initMultipartUploadFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCompleteMultipartUploadSuccessStats(long startNanos) {
     completeMultipartUploadSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            completeMultipartUploadSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(
+        completeMultipartUploadSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCompleteMultipartUploadFailureStats(long startNanos) {
     completeMultipartUploadFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            completeMultipartUploadFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(
+        completeMultipartUploadFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateAbortMultipartUploadSuccessStats(long startNanos) {
     abortMultipartUploadSuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            abortMultipartUploadSuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(abortMultipartUploadSuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateAbortMultipartUploadFailureStats(long startNanos) {
     abortMultipartUploadFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            abortMultipartUploadFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(abortMultipartUploadFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateDeleteKeySuccessStats(long startNanos) {
     deleteKeySuccess.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            deleteKeySuccessLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(deleteKeySuccessLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateDeleteKeyFailureStats(long startNanos) {
     deleteKeyFailure.incr();
-    MetricUtil.executeMetricsUpdateAction(() ->
-            deleteKeyFailureLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(deleteKeyFailureLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateGetKeyMetadataStats(long startNanos) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(getKeyMetadataLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateCopyKeyMetadataStats(long startNanos) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            copyKeyMetadataLatencyNs
-                    .add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(copyKeyMetadataLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void updatePutKeyMetadataStats(long startNanos) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            putKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos));
+    MetricUtil.executeStatAddAction(putKeyMetadataLatencyNs::add,
+        Time.monotonicNowNanos() - startNanos);
   }
 
   public void incCopyObjectSuccessLength(long bytes) {

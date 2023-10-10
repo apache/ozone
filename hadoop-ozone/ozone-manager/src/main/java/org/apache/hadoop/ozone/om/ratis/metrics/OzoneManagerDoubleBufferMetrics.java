@@ -108,7 +108,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void updateFlushTime(long time) {
-    MetricUtil.executeMetricsUpdateAction(() -> flushTime.add(time));
+    MetricUtil.executeStatAddAction(flushTime::add, time);
   }
 
   @VisibleForTesting
@@ -125,7 +125,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void updateQueueSize(long size) {
-    MetricUtil.executeMetricsUpdateAction(() -> queueSize.add(size));
+    MetricUtil.executeStatAddAction(queueSize::add, size);
   }
 
   @VisibleForTesting

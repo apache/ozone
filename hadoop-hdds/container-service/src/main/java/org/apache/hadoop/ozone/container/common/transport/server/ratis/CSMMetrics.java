@@ -199,10 +199,9 @@ public class CSMMetrics {
 
   public void incPipelineLatencyMs(ContainerProtos.Type type,
       long latencyMillis) {
-    MetricUtil.executeMetricsUpdateAction(() -> {
-      opsLatencyMs[type.ordinal()].add(latencyMillis);
-      transactionLatencyMs.add(latencyMillis);
-    });
+    MetricUtil.executeStatAddAction(opsLatencyMs[type.ordinal()]::add,
+        latencyMillis);
+    MetricUtil.executeStatAddAction(transactionLatencyMs::add, latencyMillis);
   }
 
   public void incNumStartTransactionVerifyFailures() {
@@ -214,13 +213,11 @@ public class CSMMetrics {
   }
 
   public void recordApplyTransactionCompletionNs(long latencyNanos) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            applyTransactionNs.add(latencyNanos));
+    MetricUtil.executeStatAddAction(applyTransactionNs::add, latencyNanos);
   }
 
   public void recordWriteStateMachineCompletionNs(long latencyNanos) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            writeStateMachineDataNs.add(latencyNanos));
+    MetricUtil.executeStatAddAction(writeStateMachineDataNs::add, latencyNanos);
   }
 
   public void incNumDataCacheMiss() {

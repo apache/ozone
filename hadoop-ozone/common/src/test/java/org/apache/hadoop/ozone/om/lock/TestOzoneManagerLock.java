@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 /**
  * Class tests OzoneManagerLock.
@@ -424,9 +426,11 @@ public class TestOzoneManagerLock {
         try (MockedStatic<MetricUtil> metricUtilMock =
                  Mockito.mockStatic(MetricUtil.class)) {
           metricUtilMock.when(() ->
-                  MetricUtil.executeMetricsUpdateAction(any(Runnable.class)))
+                  MetricUtil.executeStatAddAction(any(Consumer.class),
+                      anyLong()))
               .thenAnswer((invocation) -> {
-                ((Runnable) invocation.getArguments()[0]).run();
+                ((Consumer) invocation.getArguments()[0])
+                    .accept(invocation.getArguments()[1]);
                 return null;
               });
           lock.acquireReadLock(resource, resourceName);
@@ -469,9 +473,11 @@ public class TestOzoneManagerLock {
         try (MockedStatic<MetricUtil> metricUtilMock =
                  Mockito.mockStatic(MetricUtil.class)) {
           metricUtilMock.when(() ->
-                  MetricUtil.executeMetricsUpdateAction(any(Runnable.class)))
+                  MetricUtil.executeStatAddAction(any(Consumer.class),
+                      anyLong()))
               .thenAnswer((invocation) -> {
-                ((Runnable) invocation.getArguments()[0]).run();
+                ((Consumer) invocation.getArguments()[0])
+                    .accept(invocation.getArguments()[1]);
                 return null;
               });
           lock.acquireWriteLock(resource, resourceName);
@@ -514,10 +520,10 @@ public class TestOzoneManagerLock {
       readThreads[i] = new Thread(() -> {
         try (MockedStatic<MetricUtil> metricUtilMock =
                  Mockito.mockStatic(MetricUtil.class)) {
-          metricUtilMock.when(() ->
-                  MetricUtil.executeMetricsUpdateAction(any(Runnable.class)))
-              .thenAnswer((invocation) -> {
-                ((Runnable) invocation.getArguments()[0]).run();
+          metricUtilMock.when(() -> MetricUtil.executeStatAddAction(
+              any(Consumer.class), anyLong())).thenAnswer((invocation) -> {
+                ((Consumer) invocation.getArguments()[0])
+                    .accept(invocation.getArguments()[1]);
                 return null;
               });
           lock.acquireReadLock(resource, resourceName);

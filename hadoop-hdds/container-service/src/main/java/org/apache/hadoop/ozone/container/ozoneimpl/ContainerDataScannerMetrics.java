@@ -51,7 +51,7 @@ public final class ContainerDataScannerMetrics
   }
 
   public void incNumBytesScanned(long bytes) {
-    MetricUtil.executeMetricsUpdateAction(() -> numBytesScanned.add(bytes));
+    MetricUtil.executeStatAddAction(numBytesScanned::add, bytes);
   }
 
   private ContainerDataScannerMetrics(String name, MetricsSystem ms) {

@@ -19,6 +19,7 @@ package org.apache.hadoop.util;
 
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 
@@ -34,10 +35,13 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
  */
 public final class MetricUtil {
 
-  private static ExecutorService executor = Executors.newFixedThreadPool(10);
+  private static final ExecutorService EXECUTOR =
+      Executors.newFixedThreadPool(10,
+          new ThreadFactoryBuilder().setDaemon(true)
+              .setNameFormat("metrics-mutable-rate-handler-%d").build());
 
   static {
-    ShutdownHookManager.get().addShutdownHook(() -> executor.shutdownNow(),
+    ShutdownHookManager.get().addShutdownHook(() -> EXECUTOR.shutdownNow(),
         DEFAULT_SHUTDOWN_HOOK_PRIORITY);
   }
 
@@ -51,8 +55,7 @@ public final class MetricUtil {
     try {
       return block.get();
     } finally {
-      executeMetricsUpdateAction(() ->
-              metric.add(Time.monotonicNowNanos() - start));
+      executeStatAddAction(metric::add, Time.monotonicNowNanos() - start);
     }
   }
 
@@ -63,8 +66,7 @@ public final class MetricUtil {
     try {
       block.run();
     } finally {
-      executeMetricsUpdateAction(() ->
-              metric.add(Time.monotonicNowNanos() - start));
+      executeStatAddAction(metric::add, Time.monotonicNowNanos() - start);
     }
   }
 
@@ -75,14 +77,14 @@ public final class MetricUtil {
     try {
       return block.get();
     } finally {
-      executeMetricsUpdateAction(() ->
-              latencySetter.accept(Time.monotonicNowNanos() - start));
+      executeStatAddAction(latencySetter, Time.monotonicNowNanos() - start);
     }
   }
 
-  public static void executeMetricsUpdateAction(Runnable action) {
-    if (!executor.isTerminated() && !executor.isShutdown()) {
-      executor.submit(action);
+  public static void executeStatAddAction(Consumer<Long> metric,
+                                          long statValue) {
+    if (!EXECUTOR.isTerminated() && !EXECUTOR.isShutdown()) {
+      EXECUTOR.submit(() -> metric.accept(statValue));
     }
   }
 

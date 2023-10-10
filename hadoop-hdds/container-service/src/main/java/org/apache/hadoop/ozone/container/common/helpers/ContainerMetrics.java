@@ -117,12 +117,11 @@ public class ContainerMetrics {
 
   public void incContainerOpsLatencies(ContainerProtos.Type type,
                                        long latencyMillis) {
-    MetricUtil.executeMetricsUpdateAction(() -> {
-      opsLatency[type.ordinal()].add(latencyMillis);
-      for (MutableQuantiles q: opsLatQuantiles[type.ordinal()]) {
-        q.add(latencyMillis);
-      }
-    });
+    MetricUtil.executeStatAddAction(opsLatency[type.ordinal()]::add,
+        latencyMillis);
+    for (MutableQuantiles q: opsLatQuantiles[type.ordinal()]) {
+      MetricUtil.executeStatAddAction(q::add, latencyMillis);
+    }
   }
 
   public void incContainerBytesStats(ContainerProtos.Type type, long bytes) {

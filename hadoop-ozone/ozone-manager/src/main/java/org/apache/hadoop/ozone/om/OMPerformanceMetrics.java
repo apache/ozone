@@ -116,8 +116,7 @@ public class OMPerformanceMetrics {
 
 
   public void addLookupLatency(long latencyInNs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            lookupLatencyNs.add(latencyInNs));
+    MetricUtil.executeStatAddAction(lookupLatencyNs::add, latencyInNs);
   }
 
   public MutableRate getLookupRefreshLocationLatencyNs() {
@@ -138,8 +137,7 @@ public class OMPerformanceMetrics {
   }
 
   public void addS3VolumeContextLatencyNs(long latencyInNs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            s3VolumeContextLatencyNs.add(latencyInNs));
+    MetricUtil.executeStatAddAction(s3VolumeContextLatencyNs::add, latencyInNs);
   }
 
   public MutableRate getLookupResolveBucketLatencyNs() {
@@ -147,8 +145,7 @@ public class OMPerformanceMetrics {
   }
 
   public void addGetKeyInfoLatencyNs(long value) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            getKeyInfoLatencyNs.add(value));
+    MetricUtil.executeStatAddAction(getKeyInfoLatencyNs::add, value);
   }
 
   public MutableRate getGetKeyInfoAclCheckLatencyNs() {
@@ -176,18 +173,16 @@ public class OMPerformanceMetrics {
   }
 
   public void setForceContainerCacheRefresh(boolean value) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            forceContainerCacheRefresh.add(value ? 1L : 0L));
+    MetricUtil.executeStatAddAction(forceContainerCacheRefresh::add,
+        value ? 1L : 0L);
   }
 
   public void setCheckAccessLatencyNs(long latencyInNs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            checkAccessLatencyNs.add(latencyInNs));
+    MetricUtil.executeStatAddAction(checkAccessLatencyNs::add, latencyInNs);
   }
 
   public void addListKeysLatencyNs(long latencyInNs) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            listKeysLatencyNs.add(latencyInNs));
+    MetricUtil.executeStatAddAction(listKeysLatencyNs::add, latencyInNs);
   }
 
   public MutableRate getValidateRequestLatencyNs() {

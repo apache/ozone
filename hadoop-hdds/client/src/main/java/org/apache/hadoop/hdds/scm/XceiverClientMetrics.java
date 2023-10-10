@@ -96,8 +96,8 @@ public class XceiverClientMetrics {
 
   public void addContainerOpsLatency(ContainerProtos.Type type,
       long latencyMillis) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            containerOpsLatency[type.ordinal()].add(latencyMillis));
+    MetricUtil.executeStatAddAction(containerOpsLatency[type.ordinal()]::add,
+        latencyMillis);
   }
 
   public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {

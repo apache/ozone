@@ -54,7 +54,7 @@ public class EventWatcherMetrics {
   }
 
   public void updateFinishingTime(long duration) {
-    MetricUtil.executeMetricsUpdateAction(() -> completionTime.add(duration));
+    MetricUtil.executeStatAddAction(completionTime::add, duration);
   }
 
   @VisibleForTesting

@@ -360,12 +360,11 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public void addReplicationTime(long millis) {
-    MetricUtil.executeMetricsUpdateAction(() ->
-            this.replicationTime.add(millis));
+    MetricUtil.executeStatAddAction(this.replicationTime::add, millis);
   }
 
   public void addDeletionTime(long millis) {
-    MetricUtil.executeMetricsUpdateAction(() -> this.deletionTime.add(millis));
+    MetricUtil.executeStatAddAction(this.deletionTime::add, millis);
   }
 
   public void incrInflightSkipped(InflightType type) {
