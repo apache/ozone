@@ -116,11 +116,13 @@ public class DatanodeDetails extends NodeImpl implements
    */
   @SuppressWarnings("parameternumber")
   private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
-      String networkLocation, List<Port> ports, String certSerialId,
-      String version, long setupTime, String revision, String buildDate,
-      HddsProtos.NodeOperationalState persistedOpState,
-      long persistedOpStateExpiryEpochSec,
-      int initialVersion, int currentVersion) {
+                          String networkLocation, List<Port> ports,
+                          String certSerialId,
+                          String version, long setupTime, String revision,
+                          String buildDate,
+                          HddsProtos.NodeOperationalState persistedOpState,
+                          long persistedOpStateExpiryEpochSec,
+                          int initialVersion, int currentVersion) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.uuidString = uuid.toString();
