@@ -199,8 +199,9 @@ public class SCMBlockProtocolServer implements
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           List<String> uuidList = toNodeUuid(block.getPipeline().getNodes());
+          block.getPipeline().setNodesInOrder(
+              sortDatanodes(uuidList, clientMachine));
           blocks.add(block);
-          sortDatanodes(uuidList, clientMachine);
         }
       }
 
