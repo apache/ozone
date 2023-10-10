@@ -719,6 +719,7 @@ final class TestSecureOzoneCluster {
       LOG.info("Attempting to get S3 secret for first time...");
       // Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);
+      LOG.info("S3Secret for {}: {}", username, attempt1.getAwsSecret());
 
       LOG.info("Attempting to get S3 secret for second time...");
       // A second getS3Secret on the same username should throw exception
@@ -734,6 +735,10 @@ final class TestSecureOzoneCluster {
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
 
+      // Check if the s3 secret has been revoked or not.
+      S3SecretValue s3SecretValue = omClient.getS3Secret(username);
+      LOG.info("S3Secret for {}: {} after revoking", username, s3SecretValue.getAwsSecret());
+
       LOG.info("Attempting to set S3 secret after revoking...");
       // Set secret should fail since the accessId is revoked
       final String secretKeySet = "somesecret1";
@@ -748,6 +753,7 @@ final class TestSecureOzoneCluster {
       LOG.info("Getting a new secret...");
       // Get a new secret
       S3SecretValue attempt3 = omClient.getS3Secret(username);
+      LOG.info("S3Secret for {}: {}", username, attempt3.getAwsSecret());
 
       LOG.info("Checking if the secrets are different...");
       // secret should differ because it has been revoked previously
