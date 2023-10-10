@@ -44,10 +44,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
@@ -103,62 +99,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       String component) {
     this(securityConfig, scmClient, scmId, null, certSerialId, null,
         component);
-  }
-
-  @Override
-  protected InitResponse handleCase(InitCase init)
-      throws CertificateException {
-    // This is similar to OM.
-    switch (init) {
-    case NONE:
-      LOG.info("Creating keypair for client as keypair and certificate not " +
-          "found.");
-      bootstrapClientKeys();
-      return GETCERT;
-    case CERT:
-      LOG.error("Private key not found, while certificate is still present." +
-          "Delete keypair and try again.");
-      return FAILURE;
-    case PUBLIC_KEY:
-      LOG.error("Found public key but private key and certificate missing.");
-      return FAILURE;
-    case PRIVATE_KEY:
-      LOG.info("Found private key but public key and certificate is missing.");
-      // TODO: Recovering public key from private might be possible in some
-      //  cases.
-      return FAILURE;
-    case PUBLICKEY_CERT:
-      LOG.error("Found public key and certificate but private key is " +
-          "missing.");
-      return FAILURE;
-    case PRIVATEKEY_CERT:
-      LOG.info("Found private key and certificate but public key missing.");
-      if (recoverPublicKey()) {
-        return SUCCESS;
-      } else {
-        LOG.error("Public key recovery failed.");
-        return FAILURE;
-      }
-    case PUBLICKEY_PRIVATEKEY:
-      LOG.info("Found private and public key but certificate is missing.");
-      if (validateKeyPair(getPublicKey())) {
-        return RECOVER;
-      } else {
-        LOG.error("Keypair validation failed.");
-        return FAILURE;
-      }
-    case ALL:
-      LOG.info("Found certificate file along with KeyPair.");
-      if (validateKeyPairAndCertificate()) {
-        return SUCCESS;
-      } else {
-        return FAILURE;
-      }
-    default:
-      LOG.error("Unexpected case: {} (private/public/cert)",
-          Integer.toBinaryString(init.ordinal()));
-      return FAILURE;
-    }
   }
 
   /**

@@ -27,7 +27,6 @@ import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 
 /**
@@ -103,7 +102,7 @@ public abstract class CommonCertificateClient extends DefaultCertificateClient {
     case PUBLICKEY_PRIVATEKEY:
       log.info("Found private and public key but certificate is missing.");
       if (validateKeyPair(getPublicKey())) {
-        return RECOVER;
+        return GETCERT;
       } else {
         log.error("Keypair validation failed.");
         return FAILURE;
