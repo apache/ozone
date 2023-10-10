@@ -23,7 +23,7 @@ summary: Decommissioning of SCM, OM and Datanode.
   limitations under the License.
 -->
 
-#DataNode Decommission
+# DataNode Decommission
 
 The DataNode decommission is the process that removes the existing DataNode from the Ozone cluster while ensuring that the new data should not be written to the decommissioned DataNode. When you initiate the process of decommissioning a DataNode, Ozone automatically ensures that all the storage containers on that DataNode have an additional copy created on another DataNode before the decommission completes. So, datanode will keep running after it has been decommissioned and may be used for reads, but not for writes until it is stopped manually.
 
@@ -57,7 +57,7 @@ ozone admin datanode recommission [-hV] [-id=<scmServiceId>]
        [--scm=<scm>] [<hosts>...]
 ```
 
-## OM Decommission
+# OM Decommission
 
 Ozone Manager (OM) decommissioning is the process in which you gracefully remove one of the OM from the OM HA Ring.
 
@@ -77,15 +77,16 @@ Storage Container Manager (SCM) decommissioning is the process in which you can 
 
 To decommission a SCM and remove the node from the SCM HA ring, the following steps need to be executed.
 ```shell
-ozone admin scm decommission [-hV] [-id=<scmServiceId>] -nodeid=<nodeId>
-                                    [--scm=<scm>]
+ozone admin scm decommission [-hV] [-id=<scmServiceId>] [--scm=<scm>] -nodeid=<nodeId>
 ```
 You can obtain the 'nodeId' by executing this command, **"ozone admin scm roles"**
 
-**Note -** If you want to decommission a **primordial** scm, you may first transfer the leadership to a non primordial scm and then decommission the primordial scm.
+**Note -** If you want to decommission the **leader** scm, you must first transfer the leadership to a different scm and then decommission the node.
 
 To transfer the leader, we can excute below command,
 ```shell
 ozone admin scm transfer --service-id=scmservice -n ${nodeId}
 ```
 After successful leadership change we can follow the above decommissioning command to decommission the scm node.
+
+Note: During SCM decommissioning the private key of the decommissioned SCM should be manually deleted. The private keys can be found inside _hdds.metadata.dir_. Manual deletion is needed until we have certificate revocation support (HDDS-8399)
