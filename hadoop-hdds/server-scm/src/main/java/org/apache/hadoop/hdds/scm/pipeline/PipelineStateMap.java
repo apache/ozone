@@ -187,7 +187,8 @@ public class PipelineStateMap implements PipelineMap {
         "Pipeline Id cannot be null");
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
-      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+      throw new PipelineNotFoundException(
+          format("%s not found", pipelineID));
     }
     return new TreeSet<>(pipelineWithContainers.getContainers());
   }
@@ -249,7 +250,8 @@ public class PipelineStateMap implements PipelineMap {
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
       throw new PipelineNotFoundException(
-          format("%s not found", pipelineID));    }
+          format("%s not found", pipelineID));
+    }
     Set<ContainerID> containerIDs = pipelineWithContainers.getContainers();
     containerIDs.remove(containerID);
   }
