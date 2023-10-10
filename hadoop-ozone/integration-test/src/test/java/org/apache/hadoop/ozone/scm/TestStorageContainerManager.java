@@ -332,7 +332,7 @@ public class TestStorageContainerManager {
               .getDeletedBlockLog().getMetrics();
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
-
+      LOG.error("Before wait for number of valid transactions..");
       // Once TXs are written into the log, SCM starts to fetch TX
       // entries from the log and schedule block deletions in HB interval,
       // after sometime, all the TX should be proceed and by then
@@ -345,9 +345,9 @@ public class TestStorageContainerManager {
                 .asSCMHADBTransactionBuffer().flush();
           }
           int numOfValidTransactions = delLog.getNumOfValidTransactions();
-          LOG.info("Deleted Log Num Of Valid Transactions: {}",
+          LOG.error("Deleted Log Num Of Valid Transactions: {}",
               numOfValidTransactions);
-          LOG.info("SCMBlockDeletingServiceMetrics: {}", metrics.toString());
+          LOG.error("SCMBlockDeletingServiceMetrics: {}", metrics.toString());
           return numOfValidTransactions == 0;
         } catch (IOException e) {
           return false;
