@@ -699,72 +699,90 @@ final class TestSecureOzoneCluster {
   @Flaky("HDDS-9349")
   public void testGetSetRevokeS3Secret() throws Exception {
 
+    LOG.info("Setting up OM for start...");
     // Setup secure OM for start
     setupOm(conf);
     try {
+      LOG.info("Starting OM...");
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       String username = ugi.getUserName();
 
+      LOG.info("Getting first OM client...");
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
           RandomStringUtils.randomAscii(5));
 
+      LOG.info("Attempting to get S3 secret for first time...");
       // Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);
 
+      LOG.info("Attempting to get S3 secret for second time...");
       // A second getS3Secret on the same username should throw exception
       try {
         omClient.getS3Secret(username);
       } catch (OMException omEx) {
+        LOG.info("Expected exception caught: {}", omEx.getMessage());
         assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
             omEx.getResult());
       }
 
+      LOG.info("Revoking the existing secret...");
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
 
+      LOG.info("Attempting to set S3 secret after revoking...");
       // Set secret should fail since the accessId is revoked
       final String secretKeySet = "somesecret1";
       try {
         omClient.setS3Secret(username, secretKeySet);
       } catch (OMException omEx) {
+        LOG.info("Expected exception caught: {}", omEx.getMessage());
         assertEquals(OMException.ResultCodes.ACCESS_ID_NOT_FOUND,
             omEx.getResult());
       }
 
+      LOG.info("Getting a new secret...");
       // Get a new secret
       S3SecretValue attempt3 = omClient.getS3Secret(username);
 
+      LOG.info("Checking if the secrets are different...");
       // secret should differ because it has been revoked previously
       assertNotEquals(attempt3.getAwsSecret(), attempt1.getAwsSecret());
 
+      LOG.info("Checking if the access keys are the same...");
       // accessKey is still the same because it is derived from username
       assertEquals(attempt3.getAwsAccessKey(), attempt1.getAwsAccessKey());
 
+      LOG.info("Admin attempting to set secret...");
       // Admin can set secret for any user
       S3SecretValue attempt4 = omClient.setS3Secret(username, secretKeySet);
       assertEquals(secretKeySet, attempt4.getAwsSecret());
 
+      LOG.info("Attempting to get S3 secret after admin has set it...");
       // A second getS3Secret on the same username should throw exception
       try {
         omClient.getS3Secret(username);
       } catch (OMException omEx) {
+        LOG.info("Expected exception caught: {}", omEx.getMessage());
         assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
             omEx.getResult());
       }
 
+      LOG.info("Cleaning up...");
       // Clean up
       omClient.revokeS3Secret(username);
 
+      LOG.info("Admin attempting to get and revoke other users' secrets...");
       // Admin can get and revoke other users' secrets
       // omClient's ugi is current user, which is added as an OM admin
       omClient.getS3Secret("HADOOP/ALICE");
       omClient.revokeS3Secret("HADOOP/ALICE");
 
+      LOG.info("Non-admin tests...");
       // testUser is not an admin
       final UserGroupInformation ugiNonAdmin =
           UserGroupInformation.loginUserFromKeytabAndReturnUGI(
@@ -774,23 +792,28 @@ final class TestSecureOzoneCluster {
           OmTransportFactory.create(conf, ugiNonAdmin, null),
           RandomStringUtils.randomAscii(5));
 
+      LOG.info("Non-admin attempting to get secret...");
       try {
         omClientNonAdmin.getS3Secret("HADOOP/JOHN");
         // Expected to fail because current ugi isn't an admin
         fail("non-admin getS3Secret didn't fail as intended");
       } catch (IOException ex) {
+        LOG.info("Expected exception caught: {}", ex.getMessage());
         GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
       }
 
+      LOG.info("Non-admin attempting to revoke secret...");
       try {
         omClientNonAdmin.revokeS3Secret("HADOOP/DOE");
         // Expected to fail because current ugi isn't an admin
         fail("non-admin revokeS3Secret didn't fail as intended");
       } catch (IOException ex) {
+        LOG.info("Expected exception caught: {}", ex.getMessage());
         GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
       }
 
     } finally {
+      LOG.info("Closing OM...");
       IOUtils.closeQuietly(om);
     }
   }
