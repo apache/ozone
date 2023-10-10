@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
@@ -25,6 +28,9 @@ import java.util.zip.Checksum;
  * {@link ChecksumByteBuffer} implementation based on {@link Checksum}.
  */
 public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChecksumByteBufferImpl.class);
 
   private final Checksum checksum;
 
@@ -37,7 +43,7 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
           .getDeclaredField("isReadOnly");
       f.setAccessible(true);
     } catch (NoSuchFieldException e) {
-      e.printStackTrace();
+      LOG.error("No isReadOnly field in ByteBuffer", e);
     }
     IS_READY_ONLY_FIELD = f;
   }
@@ -56,7 +62,7 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
       try {
         IS_READY_ONLY_FIELD.setBoolean(buffer, false);
       } catch (IllegalAccessException e) {
-        e.printStackTrace();
+        LOG.error("Cannot access isReadOnly in ByteBuffer", e);
       }
     }
 
