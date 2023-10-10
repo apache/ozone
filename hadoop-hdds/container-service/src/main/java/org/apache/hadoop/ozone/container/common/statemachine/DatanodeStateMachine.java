@@ -169,8 +169,9 @@ public class DatanodeStateMachine implements Closeable {
     this.dnCRLStore = crlStore;
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
-        new ThreadFactoryBuilder()
-            .setNameFormat("Datanode State Machine Task Thread - %d").build());
+        new ThreadFactoryBuilder().setNameFormat(
+            datanodeDetails.threadNamePrefix() +
+                "Datanode State Machine Task Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     // OzoneContainer instance is used in a non-thread safe way by the context
@@ -225,8 +226,8 @@ public class DatanodeStateMachine implements Closeable {
         ecReconstructionCoordinator);
 
     pipelineCommandExecutorService = Executors
-        .newSingleThreadExecutor(new ThreadFactoryBuilder()
-            .setNameFormat("PipelineCommandHandlerThread-%d").build());
+        .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(
+            datanodeDetails + "PipelineCommandHandlerThread-%d").build());
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -551,7 +552,8 @@ public class DatanodeStateMachine implements Closeable {
     };
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("Datanode State Machine Daemon Thread")
+        .setNameFormat(datanodeDetails.threadNamePrefix() +
+            "Datanode State Machine Daemon Thread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
@@ -689,7 +691,8 @@ public class DatanodeStateMachine implements Closeable {
   private Thread getCommandHandlerThread(Runnable processCommandQueue) {
     Thread handlerThread = new Thread(processCommandQueue);
     handlerThread.setDaemon(true);
-    handlerThread.setName("Command processor thread");
+    handlerThread.setName(
+        datanodeDetails.threadNamePrefix() + "Command processor thread");
     handlerThread.setUncaughtExceptionHandler((Thread t, Throwable e) -> {
       // Let us just restart this thread after logging a critical error.
       // if this thread is not running we cannot handle commands from SCM.
