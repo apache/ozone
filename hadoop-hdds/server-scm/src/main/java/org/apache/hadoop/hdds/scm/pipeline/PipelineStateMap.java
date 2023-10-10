@@ -239,7 +239,7 @@ public class PipelineStateMap implements PipelineMap {
 
   @Override
   public void removeContainerFromPipeline(PipelineID pipelineID,
-                                          ContainerID containerID) throws IOException {
+      ContainerID containerID) throws IOException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
     Preconditions.checkNotNull(containerID,
@@ -247,8 +247,8 @@ public class PipelineStateMap implements PipelineMap {
 
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
-      throw new PipelineNotFoundException(format("%s not found", pipelineID));
-    }
+      throw new PipelineNotFoundException(
+          format("%s not found", pipelineID));    }
     Set<ContainerID> containerIDs = pipelineWithContainers.getContainers();
     containerIDs.remove(containerID);
   }
