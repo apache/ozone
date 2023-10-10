@@ -559,7 +559,7 @@ public class TestPipelineStateMap {
     assertThrows(InvalidPipelineStateException.class,
         () -> map.removePipeline(pipeline1.getId()));
     // remove pipeline with closed state
-    map.removePipeline(pipeline2.getId());
+    assertEquals(pipeline2, map.removePipeline(pipeline2.getId()));
     assertThat(new Pipeline[]{pipeline1, pipeline3}).hasSameElementsAs(
         map.getPipelines());
     // remove pipeline by id that does not exist in the map
