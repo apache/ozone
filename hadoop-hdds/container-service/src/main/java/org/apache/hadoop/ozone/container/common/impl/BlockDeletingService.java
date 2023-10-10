@@ -189,6 +189,7 @@ public class BlockDeletingService extends BackgroundService {
         .isValidContainerType(containerData.getContainerType())) {
       return false;
     } else if (!containerData.isClosed()) {
+      LOG.info("isDeletionAllowed : false because Container is not closed");
       return false;
     } else {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
@@ -218,13 +219,15 @@ public class BlockDeletingService extends BackgroundService {
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex < containerBCSID) {
-            LOG.warn("Close Container log Index {} is not replicated across all"
+            LOG.info("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
                     + "yet.", containerBCSID,
                 containerData.getOriginPipelineId(), minReplicatedIndex);
             return false;
           } else {
+            LOG.info("isDeletionAllowed : true because minReplicatedIndex " +
+                "< containerBCSID");
             return true;
           }
         } catch (IOException ioe) {
@@ -238,6 +241,7 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
       }
+      LOG.info("isDeletionAllowed : true");
       return true;
     }
   }

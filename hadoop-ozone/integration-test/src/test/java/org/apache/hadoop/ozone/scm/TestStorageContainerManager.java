@@ -145,7 +145,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -296,7 +295,7 @@ public class TestStorageContainerManager {
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    scmConfig.setBlockDeletionInterval(Duration.ofSeconds(1));
+    scmConfig.setBlockDeletionInterval(Duration.ofMillis(500));
     conf.setFromObject(scmConfig);
     // Reset container provision size, otherwise only one container
     // is created by default.
@@ -482,10 +481,6 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    conf.setTimeDuration(
-        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
-        1000,
-        TimeUnit.MILLISECONDS);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
