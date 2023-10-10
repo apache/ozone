@@ -198,7 +198,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerProtos.WriteChunkRequestProto.newBuilder()
             .setBlockID(blockID.get().getDatanodeBlockIDProtobuf());
 
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    String id = pipeline.getClosestNode().getUuidString();
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.StreamInit)

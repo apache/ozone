@@ -348,7 +348,7 @@ public final class Pipeline {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
-    for (DatanodeDetails dn : getNodesInOrder()) {
+    for (DatanodeDetails dn : nodeStatus.keySet()) {
       members.add(dn.toProto(clientVersion));
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }

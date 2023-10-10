@@ -440,14 +440,14 @@ public final class RatisHelper {
     RaftPeerId primaryId = null;
     List<RaftPeerId> raftPeers = new ArrayList<>();
 
-    for (DatanodeDetails dn : pipeline.getNodes()) {
+    for (DatanodeDetails dn : pipeline.getNodesInOrder()) {
       final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
       try {
-        if (dn == pipeline.getFirstNode()) {
+        if (dn == pipeline.getClosestNode()) {
           primaryId = raftPeerId;
         }
       } catch (IOException e) {
-        LOG.error("Can not get FirstNode from the pipeline: {} with " +
+        LOG.error("Can not get ClosestNode from the pipeline: {} with " +
             "exception: {}", pipeline, e.getLocalizedMessage());
         return null;
       }
