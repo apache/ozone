@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -131,7 +132,7 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public   List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
     Preconditions
         .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
     return getPipelines(
@@ -139,7 +140,7 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
                                        PipelineState state) {
     Preconditions
         .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
@@ -166,8 +167,7 @@ public class PipelineStateMap implements PipelineMap {
                                      PipelineState state, Collection<DatanodeDetails> excludeDns,
                                      Collection<PipelineID> excludePipelines) {
     Preconditions
-        .checkNotNull(replicationConfig,
-        "ReplicationConfig cannot be null");
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
     Preconditions
         .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
@@ -199,7 +199,8 @@ public class PipelineStateMap implements PipelineMap {
         "Pipeline Id cannot be null");
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
-      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+      throw new PipelineNotFoundException(
+          format("%s not found", pipelineID));
     }
     return pipelineWithContainers.getContainers().size();
   }
@@ -209,21 +210,22 @@ public class PipelineStateMap implements PipelineMap {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
     final AtomicBoolean pipelineInWrongState = new AtomicBoolean(false);
     final AtomicBoolean pipelineNotFound = new AtomicBoolean(false);
+    final AtomicReference<PipelineWithContainers> removedValue = new AtomicReference<>(null);
 
-    PipelineWithContainers removed =
-        pipelines.compute(pipelineID, (pipelineID1, oldPwC) -> {
-          if (oldPwC == null) {
-            pipelineNotFound.set(true);
-            return null;
-          }
-          if (!oldPwC.getPipeline().isClosed()) {
-            // do not change the value if pipeline in the wrong state
-            pipelineInWrongState.set(true);
-            return oldPwC;
-          }
-          // remove value
-          return null;
-        });
+    pipelines.compute(pipelineID, (pipelineID1, oldPwC) -> {
+      if (oldPwC == null) {
+        pipelineNotFound.set(true);
+        return null;
+      }
+      if (!oldPwC.getPipeline().isClosed()) {
+        // do not change the value if pipeline in the wrong state
+        pipelineInWrongState.set(true);
+        return oldPwC;
+      }
+      // remove value
+      removedValue.set(oldPwC);
+      return null;
+    });
 
     if (pipelineNotFound.get()) {
       throw new PipelineNotFoundException(format("%s not found", pipelineID));
@@ -232,7 +234,7 @@ public class PipelineStateMap implements PipelineMap {
       throw new InvalidPipelineStateException(
           format("Pipeline with %s is not yet closed", pipelineID));
     }
-    return removed == null ? null : removed.getPipeline();
+    return removedValue.get().getPipeline();
   }
 
   @Override

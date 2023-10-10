@@ -148,6 +148,7 @@ public interface PipelineMap {
    * Remove pipeline from the data structures.
    *
    * @param pipelineID - PipelineID of the pipeline to be removed
+   * @return removed Pipeline
    * @throws IOException if the pipeline is not empty or does not exist
    */
   Pipeline removePipeline(PipelineID pipelineID) throws IOException;
