@@ -27,6 +27,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 
+/**
+ * Holds the data structures which maintain the information about pipeline and
+ * its state.
+ */
 public interface PipelineMap {
   /**
    * Adds provided pipeline in the data structures.

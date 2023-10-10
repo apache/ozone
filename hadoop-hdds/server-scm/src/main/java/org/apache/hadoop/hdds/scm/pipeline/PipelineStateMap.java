@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -37,6 +38,9 @@ import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
+/**
+ * This is a thread-safe implementation of {@link PipelineMap}.
+ */
 public class PipelineStateMap implements PipelineMap {
 
   private final Map<PipelineID, PipelineWithContainers> pipelines =
@@ -48,11 +52,12 @@ public class PipelineStateMap implements PipelineMap {
   @Override
   public void addPipeline(Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(pipeline, "Pipeline cannot be null");
-    Preconditions.checkArgument(pipeline.getNodes().size() ==
-            pipeline.getReplicationConfig().getRequiredNodes(),
+    Preconditions.checkArgument(
+        pipeline.getNodes().size() == pipeline.getReplicationConfig()
+            .getRequiredNodes(),
         "Nodes size=%s, replication factor=%s do not match ",
-        pipeline.getNodes().size(),
-        pipeline.getReplicationConfig().getRequiredNodes());
+        pipeline.getNodes().size(), pipeline.getReplicationConfig()
+            .getRequiredNodes());
 
     if (pipelines.putIfAbsent(pipeline.getId(),
         new PipelineWithContainers(pipeline)) != null) {
@@ -62,16 +67,14 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public void addContainerToPipeline(PipelineID pipelineID,
-                                     ContainerID containerID)
-      throws InvalidPipelineStateException, PipelineNotFoundException {
+  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+      throws IOException {
     addContainerToPipeline(pipelineID, containerID, true);
   }
 
   @Override
   public void addContainerToPipelineSCMStart(PipelineID pipelineID,
-                                             ContainerID containerID)
-      throws InvalidPipelineStateException, PipelineNotFoundException {
+         ContainerID containerID) throws IOException {
     addContainerToPipeline(pipelineID, containerID, false);
   }
 
@@ -79,8 +82,10 @@ public class PipelineStateMap implements PipelineMap {
                                       ContainerID containerID,
                                       boolean declineClosed)
       throws InvalidPipelineStateException, PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(containerID, "Container Id cannot be null");
+    Preconditions.checkNotNull(pipelineID,
+        "Pipeline Id cannot be null");
+    Preconditions.checkNotNull(containerID,
+        "Container Id cannot be null");
 
     // attempt to add container
     PipelineWithContainers newPipelineWithContainers =
@@ -108,13 +113,13 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public Pipeline getPipeline(PipelineID pipelineID)
-      throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-
+  public Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
+    Preconditions.checkNotNull(pipelineID,
+        "Pipeline Id cannot be null");
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
-      throw new PipelineNotFoundException(format("%s not found", pipelineID));
+      throw new PipelineNotFoundException(
+          format("%s not found", pipelineID));
     }
     return pipelineWithContainers.getPipeline();
   }
@@ -135,10 +140,9 @@ public class PipelineStateMap implements PipelineMap {
 
   @Override
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
-                                     Pipeline.PipelineState state) {
+                                     PipelineState state) {
     Preconditions.checkNotNull(replicationConfig,
         "ReplicationConfig cannot be null");
-    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
 
     return pipelines.values().stream().filter(pipelineWithContainers ->
             pipelineWithContainers.getPipeline().getReplicationConfig()
@@ -149,17 +153,16 @@ public class PipelineStateMap implements PipelineMap {
 
   @Override
   public int getPipelineCount(ReplicationConfig replicationConfig,
-                              Pipeline.PipelineState state) {
-    Preconditions.checkNotNull(replicationConfig,
-        "ReplicationConfig cannot be null");
+                              PipelineState state) {
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
     return getPipelines(replicationConfig, state).size();
   }
 
   @Override
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
-                                     Pipeline.PipelineState state,
-                                     Collection<DatanodeDetails> excludeDns,
+                                     PipelineState state, Collection<DatanodeDetails> excludeDns,
                                      Collection<PipelineID> excludePipelines) {
     Preconditions.checkNotNull(replicationConfig,
         "ReplicationConfig cannot be null");
@@ -178,8 +181,8 @@ public class PipelineStateMap implements PipelineMap {
   @Override
   public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-
+    Preconditions.checkNotNull(pipelineID,
+        "Pipeline Id cannot be null");
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
       throw new PipelineNotFoundException(format("%s not found", pipelineID));
@@ -190,8 +193,8 @@ public class PipelineStateMap implements PipelineMap {
   @Override
   public int getNumberOfContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-
+    Preconditions.checkNotNull(pipelineID,
+        "Pipeline Id cannot be null");
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
       throw new PipelineNotFoundException(format("%s not found", pipelineID));
@@ -232,10 +235,11 @@ public class PipelineStateMap implements PipelineMap {
 
   @Override
   public void removeContainerFromPipeline(PipelineID pipelineID,
-                                          ContainerID containerID)
-      throws IOException {
-    Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
-    Preconditions.checkNotNull(containerID, "container Id cannot be null");
+                                          ContainerID containerID) throws IOException {
+    Preconditions.checkNotNull(pipelineID,
+        "Pipeline Id cannot be null");
+    Preconditions.checkNotNull(containerID,
+        "container Id cannot be null");
 
     PipelineWithContainers pipelineWithContainers = pipelines.get(pipelineID);
     if (pipelineWithContainers == null) {
@@ -247,7 +251,7 @@ public class PipelineStateMap implements PipelineMap {
 
   @Override
   public Pipeline updatePipelineState(PipelineID pipelineID,
-                                      Pipeline.PipelineState state)
+                                      PipelineState state)
       throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
     Preconditions.checkNotNull(state, "Pipeline LifeCycleState cannot be null");
