@@ -56,8 +56,8 @@ public class PipelineStateMap implements PipelineMap {
         pipeline.getNodes().size() == pipeline.getReplicationConfig()
             .getRequiredNodes(),
         "Nodes size=%s, replication factor=%s do not match ",
-        pipeline.getNodes().size(), pipeline.getReplicationConfig()
-            .getRequiredNodes());
+            pipeline.getNodes().size(), pipeline.getReplicationConfig()
+                .getRequiredNodes());
 
     if (pipelines.putIfAbsent(pipeline.getId(),
         new PipelineWithContainers(pipeline)) != null) {
@@ -131,18 +131,19 @@ public class PipelineStateMap implements PipelineMap {
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
-    Preconditions.checkNotNull(replicationConfig,
-        "ReplicationConfig cannot be null");
+  public   List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
     return getPipelines(
         pipeline -> pipeline.getReplicationConfig().equals(replicationConfig));
   }
 
   @Override
-  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
-                                     PipelineState state) {
-    Preconditions.checkNotNull(replicationConfig,
-        "ReplicationConfig cannot be null");
+  public   List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+                                       PipelineState state) {
+    Preconditions
+        .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
+    Preconditions.checkNotNull(state, "Pipeline state cannot be null");
 
     return pipelines.values().stream().filter(pipelineWithContainers ->
             pipelineWithContainers.getPipeline().getReplicationConfig()
@@ -164,13 +165,14 @@ public class PipelineStateMap implements PipelineMap {
   public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
                                      PipelineState state, Collection<DatanodeDetails> excludeDns,
                                      Collection<PipelineID> excludePipelines) {
-    Preconditions.checkNotNull(replicationConfig,
+    Preconditions
+        .checkNotNull(replicationConfig,
         "ReplicationConfig cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
-    Preconditions.checkNotNull(excludeDns,
-        "Datanode exclude list cannot be null");
-    Preconditions.checkNotNull(excludePipelines,
-        "Pipeline exclude list cannot be null");
+    Preconditions
+        .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
+    Preconditions
+        .checkNotNull(excludePipelines, "Pipeline exclude list cannot be null");
 
     return getPipelines(pipeline -> pipeline.getPipelineState() == state &&
         pipeline.getReplicationConfig().equals(replicationConfig) &&
