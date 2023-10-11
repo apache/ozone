@@ -76,6 +76,21 @@ public final class NodeSchemaManager {
     }
   }
 
+  public void init(String schemaFile) {
+    NodeSchemaLoadResult result;
+    try {
+      result = NodeSchemaLoader.getInstance().loadSchemaFromFile(schemaFile);
+      allSchema = result.getSchemaList();
+      enforcePrefix = result.isEnforePrefix();
+      maxLevel = allSchema.size();
+    } catch (Throwable e) {
+      String msg = "Failed to load schema file:" + schemaFile
+          + ", error: " + e.getMessage();
+      LOG.error(msg, e);
+      throw new RuntimeException(msg, e);
+    }
+  }
+
   @VisibleForTesting
   public void init(NodeSchema[] schemas, boolean enforce) {
     allSchema = new ArrayList<>();

@@ -70,6 +70,16 @@ public class NetworkTopologyImpl implements NetworkTopology {
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
   }
 
+  public NetworkTopologyImpl(String schemaFile) {
+    schemaManager = NodeSchemaManager.getInstance();
+    schemaManager.init(schemaFile);
+    maxLevel = schemaManager.getMaxLevel();
+    factory = InnerNodeImpl.FACTORY;
+    clusterTree = factory.newInnerNode(ROOT, null, null,
+        NetConstants.ROOT_LEVEL,
+        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+  }
+
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager) {
     schemaManager = manager;
