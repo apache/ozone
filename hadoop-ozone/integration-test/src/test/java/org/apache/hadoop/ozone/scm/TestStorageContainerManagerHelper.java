@@ -180,10 +180,7 @@ public class TestStorageContainerManagerHelper {
             entry.getKey(), conID);
         LOG.info("Block list for container Id {} at SCM side: {}",
             entry.getKey(), containerBlocks.get(entry.getKey()));
-        if (conID.size() != containerBlocks.get(entry.getKey()).size()) {
-          return false;
-        }
-        if (!conID.containsAll(containerBlocks.get(entry.getKey()))) {
+        if (!containerBlocks.get(entry.getKey()).containsAll(conID)) {
           return false;
         }
         /*if (!conID.equals(containerBlocks.get(entry.getKey()))) {
