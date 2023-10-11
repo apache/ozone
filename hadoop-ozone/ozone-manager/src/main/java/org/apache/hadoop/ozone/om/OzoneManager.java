@@ -833,6 +833,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     s3SecretManager = new S3SecretLockedManager(
         new S3SecretManagerImpl(
+            this,
             store,
             secretCacheProvider.get(configuration)
         ),
