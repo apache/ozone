@@ -77,7 +77,7 @@ Storage Container Manager (SCM) decommissioning is the process in which you can 
 
 To decommission a SCM and remove the node from the SCM HA ring, the following steps need to be executed.
 ```shell
-ozone admin scm decommission [-hV] [-id=<scmServiceId>] [--scm=<scm>] -nodeid=<nodeId>
+ozone admin scm decommission [-hV] [-id=<scmServiceId>] -nodeid=<nodeId>
 ```
 You can obtain the 'nodeId' by executing this command, **"ozone admin scm roles"**
 
@@ -85,7 +85,7 @@ You can obtain the 'nodeId' by executing this command, **"ozone admin scm roles"
 
 To transfer the leader, we can excute below command,
 ```shell
-ozone admin scm transfer --service-id=scmservice -n ${nodeId}
+ozone admin scm transfer [-id=<scmServiceId>] -n=<nodeId>
 ```
 After successful leadership change we can follow the above decommissioning command to decommission the scm node.
 
