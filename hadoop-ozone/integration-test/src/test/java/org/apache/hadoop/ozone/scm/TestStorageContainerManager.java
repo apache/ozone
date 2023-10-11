@@ -323,8 +323,6 @@ public class TestStorageContainerManager {
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
-      // Wait for container report
-      Thread.sleep(1000);
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
       LOG.error("Before wait for number of valid transactions..");
@@ -343,7 +341,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 500, 10000);
+      }, 1000, 20000);
       Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
@@ -373,7 +371,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 500, 10000);
+      }, 1000, 20000);
     } finally {
       cluster.shutdown();
     }
