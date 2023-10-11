@@ -293,7 +293,7 @@ public class TestStorageContainerManager {
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-        1, TimeUnit.SECONDS);
+        2, TimeUnit.SECONDS);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     scmConfig.setBlockDeletionInterval(Duration.ofMillis(500));
     conf.setFromObject(scmConfig);
