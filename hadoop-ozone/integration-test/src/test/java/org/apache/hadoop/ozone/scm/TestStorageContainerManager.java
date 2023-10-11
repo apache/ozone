@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
-import org.apache.hadoop.hdds.scm.block.ScmBlockDeletingServiceMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
@@ -326,9 +325,6 @@ public class TestStorageContainerManager {
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
 
-      ScmBlockDeletingServiceMetrics metrics =
-          cluster.getStorageContainerManager().getScmBlockManager()
-              .getDeletedBlockLog().getMetrics();
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
       LOG.error("Before wait for number of valid transactions..");
@@ -343,11 +339,7 @@ public class TestStorageContainerManager {
             cluster.getStorageContainerManager().getScmHAManager()
                 .asSCMHADBTransactionBuffer().flush();
           }
-          int numOfValidTransactions = delLog.getNumOfValidTransactions();
-          LOG.error("Deleted Log Num Of Valid Transactions: {}",
-              numOfValidTransactions);
-          LOG.error("SCMBlockDeletingServiceMetrics: {}", metrics.toString());
-          return numOfValidTransactions == 0;
+          return delLog.getNumOfValidTransactions() == 0;
         } catch (IOException e) {
           return false;
         }

@@ -251,19 +251,16 @@ public class DeletedBlockLogImpl
           long txID = transactionResult.getTxID();
           // set of dns which have successfully committed transaction txId.
           dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
-          LOG.info("dnsWithCommittedTxn: {} for txID: {}", dnsWithCommittedTxn,
-              txID);
-
           final ContainerID containerId = ContainerID.valueOf(
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
             // Mostly likely it's a retried delete command response.
-            //if (LOG.isDebugEnabled()) {
-              LOG.info(
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(
                   "Transaction txId={} commit by dnId={} for containerID={}"
                       + " failed. Corresponding entry not found.", txID, dnID,
                   containerId);
-            //}
+            }
             continue;
           }
 
@@ -284,11 +281,9 @@ public class DeletedBlockLogImpl
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
               transactionToRetryCountMap.remove(txID);
-             // if (LOG.isDebugEnabled()) {
-              LOG.info(
-                  "Purging txId={} from block deletion log for DN list: {}",
-                  txID, dnsWithCommittedTxn);
-              //}
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Purging txId={} from block deletion log", txID);
+              }
               txIDsToBeDeleted.add(txID);
             }
           }
@@ -302,7 +297,6 @@ public class DeletedBlockLogImpl
         }
       }
       try {
-        LOG.info("txIDsToBeDeleted: {}", txIDsToBeDeleted);
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
         metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
       } catch (IOException e) {
@@ -508,10 +502,5 @@ public class DeletedBlockLogImpl
       LOG.error("Delete Block Command is not executed yet.");
       return;
     }
-  }
-
-  @Override
-  public ScmBlockDeletingServiceMetrics getMetrics() {
-    return metrics;
   }
 }

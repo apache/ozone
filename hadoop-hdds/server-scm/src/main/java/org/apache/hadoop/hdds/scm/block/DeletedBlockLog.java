@@ -127,6 +127,4 @@ public interface DeletedBlockLog extends Closeable {
    * @param deletedBlocksTXTable delete transaction table
    */
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable);
-
-  ScmBlockDeletingServiceMetrics getMetrics();
 }
