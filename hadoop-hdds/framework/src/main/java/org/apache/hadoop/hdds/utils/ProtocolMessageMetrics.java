@@ -100,8 +100,8 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
     });
     MetricsRecordBuilder builder = collector.addRecord(name);
-    builder.addCounter(new MetricName("concurrency", "Number of requests processed concurrently"),
-        concurrency.get());
+    builder.addCounter(new MetricName("concurrency",
+            "Number of requests processed concurrently"), concurrency.get());
   }
 
   /**
