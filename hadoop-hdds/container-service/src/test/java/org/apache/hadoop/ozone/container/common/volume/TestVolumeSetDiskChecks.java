@@ -69,7 +69,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +85,7 @@ public class TestVolumeSetDiskChecks {
       TestVolumeSetDiskChecks.class);
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();

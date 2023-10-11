@@ -71,7 +71,9 @@ import org.junit.Test;
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test Ozone Recon.
@@ -82,7 +84,7 @@ public class TestReconWithOzoneManager {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;

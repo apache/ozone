@@ -97,7 +97,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -129,7 +131,7 @@ public class TestContainerPersistence {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;

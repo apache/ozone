@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -60,7 +59,6 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -639,7 +637,6 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
-  @Disabled("The test is failing, enable after fixing it")
   public void testPipelinesNotCreatedUntilPreCheckPasses()
       throws Exception {
     int numOfDns = 5;
@@ -682,6 +679,10 @@ public class TestSCMSafeModeManager {
     // Assert SCM is in Safe mode.
     assertTrue(scmSafeModeManager.getInSafeMode());
 
+    // stop background pipeline creator as we manually create
+    // pipeline below
+    pipelineManager.getBackgroundPipelineCreator().stop();
+
     // Register all DataNodes except last one and assert SCM is in safe mode.
     for (int i = 0; i < numOfDns - 1; i++) {
       queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
@@ -700,20 +701,8 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getPreCheckComplete());
     assertTrue(scmSafeModeManager.getInSafeMode());
 
-    /* There is a race condition where the background pipeline creation
-     * task creates the pipeline before the following create call.
-     * So wrapping it with try..catch.
-     */
-    Pipeline pipeline;
-    try {
-      pipeline = pipelineManager.createPipeline(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
-    } catch (SCMException ex) {
-      pipeline = pipelineManager.getPipelines(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE)).get(0);
-    }
+    Pipeline pipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
     // Mark pipeline healthy
     pipeline = pipelineManager.getPipeline(pipeline.getId());

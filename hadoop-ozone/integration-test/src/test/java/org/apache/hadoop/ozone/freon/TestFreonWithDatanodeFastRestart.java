@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
@@ -28,10 +30,12 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import picocli.CommandLine;
 
 /**
@@ -43,7 +47,7 @@ public class TestFreonWithDatanodeFastRestart {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -76,7 +80,7 @@ public class TestFreonWithDatanodeFastRestart {
   }
 
   @Test
-  @Ignore("TODO:HDDS-1160")
+  @Category(UnhealthyTest.class) @Unhealthy("HDDS-1160")
   public void testRestart() throws Exception {
     startFreon();
     StateMachine sm = getStateMachine();

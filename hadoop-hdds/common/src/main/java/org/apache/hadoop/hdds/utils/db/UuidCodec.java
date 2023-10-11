@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.utils.db;
 import javax.annotation.Nonnull;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import java.util.function.IntFunction;
 
 /**
  * Codec to serialize/deserialize {@link UUID}.
@@ -48,7 +47,7 @@ public final class UuidCodec implements Codec<UUID> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull UUID id,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
     return allocator.apply(SERIALIZED_SIZE)
         .putLong(id.getMostSignificantBits())
         .putLong(id.getLeastSignificantBits());

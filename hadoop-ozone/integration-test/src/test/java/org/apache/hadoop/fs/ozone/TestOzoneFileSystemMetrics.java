@@ -38,7 +38,9 @@ import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.Assert;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 
@@ -52,7 +54,7 @@ public class TestOzoneFileSystemMetrics {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static FileSystem fs;

@@ -155,7 +155,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
-import org.junit.jupiter.api.Disabled;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -896,6 +896,48 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
         () -> volume.getBucket(bucketName)
     );
+  }
+
+  @Test
+  public void testDeleteLinkedBucket()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String linkedBucketName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    assertNotNull(bucket);
+
+    volume.createBucket(linkedBucketName,
+        BucketArgs.newBuilder()
+            .setSourceBucket(bucketName)
+            .setSourceVolume(volumeName)
+            .build());
+    OzoneBucket linkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(linkedBucket);
+
+    volume.deleteBucket(bucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(bucketName)
+    );
+    //now linkedBucketName has become a dangling one
+    //should still be possible to get its info
+    OzoneBucket danglingLinkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(danglingLinkedBucket);
+
+    //now delete the dangling linked bucket
+    volume.deleteBucket(linkedBucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(linkedBucketName)
+    );
+
+    store.deleteVolume(volumeName);
   }
 
   private void verifyReplication(String volumeName, String bucketName,
@@ -4109,7 +4151,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  @Disabled("HDDS-8752")
+  @Unhealthy("HDDS-8752")
   public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

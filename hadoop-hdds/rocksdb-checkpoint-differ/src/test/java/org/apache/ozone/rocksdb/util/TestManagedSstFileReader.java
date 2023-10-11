@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
@@ -154,6 +155,7 @@ class TestManagedSstFileReader {
   @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
+  @Disabled("HDDS-9274")
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
     Assumptions.assumeTrue(NativeLibraryLoader.getInstance()

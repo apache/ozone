@@ -448,6 +448,7 @@ Apache License 2.0
    org.yaml:snakeyaml
    software.amazon.ion:ion-java
    org.awaitility:awaitility
+   com.fasterxml.uuid:java-uuid-generator
 
 MIT
 =====================

@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
+
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +35,14 @@ import java.time.Duration;
 /**
  * Configuration class used for high level datanode configuration parameters.
  */
-@ConfigGroup(prefix = "hdds.datanode")
-public class DatanodeConfiguration {
+@ConfigGroup(prefix = CONFIG_PREFIX)
+public class DatanodeConfiguration extends ReconfigurableConfig {
+  public static final String CONFIG_PREFIX = "hdds.datanode";
+
+  private static final String BLOCK_DELETE_THREAD_MAX
+      = "block.delete.threads.max";
+  public static final String HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX =
+      CONFIG_PREFIX + "." + BLOCK_DELETE_THREAD_MAX;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeConfiguration.class);
@@ -153,7 +162,7 @@ public class DatanodeConfiguration {
    * missed. With max threads 5, optimistically DN can handle 1500 individual
    * container delete tx in 60s with RocksDB cache miss.
    */
-  @Config(key = "block.delete.threads.max",
+  @Config(key = BLOCK_DELETE_THREAD_MAX,
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
@@ -216,6 +225,23 @@ public class DatanodeConfiguration {
   private long recoveringContainerScrubInterval =
       Duration.ofMinutes(10).toMillis();
 
+  /**
+   * The maximum time to wait for acquiring the container lock when processing
+   * a delete block transaction.
+   * If a timeout occurs while attempting to get the lock, the delete block
+   * transaction won't be immediately discarded. Instead, it will be retried
+   * after all the current delete block transactions have been processed.
+   */
+  @Config(key = "block.delete.max.lock.wait.timeout",
+      defaultValue = "100ms",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION},
+      description = "Timeout for the thread used to process the delete" +
+          " block command to wait for the container lock."
+  )
+  private long blockDeleteMaxLockWaitTimeoutMs =
+      Duration.ofMillis(100).toMillis();
+
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
   }
@@ -236,6 +262,7 @@ public class DatanodeConfiguration {
 
   @Config(key = "block.deleting.limit.per.interval",
       defaultValue = "5000",
+      reconfigurable = true,
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
       description =
@@ -739,6 +766,10 @@ public class DatanodeConfiguration {
 
   public int getBlockDeleteQueueLimit() {
     return blockDeleteQueueLimit;
+  }
+
+  public long getBlockDeleteMaxLockWaitTimeoutMs() {
+    return blockDeleteMaxLockWaitTimeoutMs;
   }
 
   public void setBlockDeleteQueueLimit(int queueLimit) {

@@ -59,6 +59,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
 
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -84,7 +85,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public final TestRule timeout = Timeout.seconds(300);
+  public final TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
