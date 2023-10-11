@@ -233,7 +233,8 @@ public class TestReconContainerManager
     assertEquals(1, repHistMap.size());
     // Should only have 1 entry for this replica (on DN01)
     assertEquals(1, repHistMap.get(cIDlong1).size());
-    ContainerReplicaHistory repHist1 = repHistMap.get(cIDlong1).get(dn1);
+    ContainerReplicaHistory repHist1 = repHistMap.get(cIDlong1)
+        .get(dn1.getUuid());
     assertEquals(dn1.getUuid(), repHist1.getUuid());
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist1.getLastSeenTime(), repHist1.getFirstSeenTime());
@@ -266,7 +267,8 @@ public class TestReconContainerManager
     assertEquals(1, repHistMap.size());
     // Should have 2 entries for this replica (on DN01 and DN02)
     assertEquals(2, repHistMap.get(cIDlong1).size());
-    ContainerReplicaHistory repHist2 = repHistMap.get(cIDlong1).get(dn2);
+    ContainerReplicaHistory repHist2 = repHistMap.get(cIDlong1)
+        .get(dn2.getUuid());
     assertEquals(dn2.getUuid(), repHist2.getUuid());
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist2.getLastSeenTime(), repHist2.getFirstSeenTime());
@@ -279,7 +281,7 @@ public class TestReconContainerManager
     // Should have 1 entry for this replica
     assertEquals(1, repHistMap.get(cIDlong1).size());
     // And the only entry should match DN02
-    assertEquals(dn2,
+    assertEquals(dn2.getUuid(),
         repHistMap.get(cIDlong1).keySet().iterator().next());
   }
 }
