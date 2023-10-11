@@ -313,7 +313,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   private void processCmd(DeleteCmdInfo cmd) {
-    LOG.debug("Processing block deletion command.");
+    LOG.info("Processing block deletion command at DN: {}",
+        this.ozoneContainer.getDatanodeDetails().getUuid());
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
@@ -328,10 +329,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
       LOG.info("Start to delete container blocks, TXIDs={}, "
-              + "numOfContainers={}, numOfBlocks={}",
+              + "numOfContainers={}, numOfBlocks={} at DN: {}",
           summary.getTxIDSummary(),
           summary.getNumOfContainers(),
-          summary.getNumOfBlocks());
+          summary.getNumOfBlocks(),
+          this.ozoneContainer.getDatanodeDetails().getUuid());
       blockDeleteMetrics.incrReceivedContainerCount(
           summary.getNumOfContainers());
       blockDeleteMetrics.incrReceivedRetryTransactionCount(
@@ -350,13 +352,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending following block deletion ACK to SCM");
+        //if (LOG.isDebugEnabled()) {
+          LOG.info("Sending following block deletion ACK to SCM for DN: {}",
+              this.ozoneContainer.getDatanodeDetails().getUuid());
           for (DeleteBlockTransactionResult result : blockDeletionACK
               .getResultsList()) {
-            LOG.debug("{} : {}", result.getTxID(), result.getSuccess());
+            LOG.info("{} : {}", result.getTxID(), result.getSuccess());
           }
-        }
+       // }
       }
       cmdExecuted = true;
     } finally {
@@ -368,6 +371,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(deleteAck);
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
+      LOG.info("Sent block deletion ACK to SCM for DN: {}",
+          this.ozoneContainer.getDatanodeDetails().getUuid());
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;
       invocationCount++;
