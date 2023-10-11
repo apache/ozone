@@ -323,6 +323,7 @@ public class TestStorageContainerManager {
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
+      
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
       LOG.error("Before wait for number of valid transactions..");
