@@ -42,7 +42,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -53,6 +55,7 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.run
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -64,7 +67,7 @@ public class TestReconAsPassiveScm {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
@@ -112,10 +115,12 @@ public class TestReconAsPassiveScm {
     });
 
     // Verify we can never create a pipeline in Recon.
-    LambdaTestUtils.intercept(UnsupportedOperationException.class,
-        "Trying to create pipeline in Recon, which is prohibited!",
+    UnsupportedOperationException exception = assertThrows(
+        UnsupportedOperationException.class,
         () -> reconPipelineManager
             .createPipeline(RatisReplicationConfig.getInstance(ONE)));
+    assertTrue(exception.getMessage()
+        .contains("Trying to create pipeline in Recon, which is prohibited!"));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());

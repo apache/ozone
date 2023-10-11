@@ -69,7 +69,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +85,7 @@ public class TestVolumeSetDiskChecks {
       TestVolumeSetDiskChecks.class);
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -154,14 +156,19 @@ public class TestVolumeSetDiskChecks {
         StorageVolume.VolumeType.DB_VOLUME,
         dummyChecker);
 
+    volumeSet.checkAllVolumes();
     Assert.assertEquals(volumeSet.getFailedVolumesList().size(),
         numBadVolumes);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
+
+    metaVolumeSet.checkAllVolumes();
     Assert.assertEquals(metaVolumeSet.getFailedVolumesList().size(),
         numBadVolumes);
     Assert.assertEquals(metaVolumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
+
+    dbVolumeSet.checkAllVolumes();
     Assert.assertEquals(dbVolumeSet.getFailedVolumesList().size(),
         numBadVolumes);
     Assert.assertEquals(dbVolumeSet.getVolumesList().size(),
@@ -197,10 +204,13 @@ public class TestVolumeSetDiskChecks {
         StorageVolume.VolumeType.DB_VOLUME,
         dummyChecker);
 
+    volumeSet.checkAllVolumes();
     assertEquals(volumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(volumeSet.getVolumesList().size(), 0);
+    metaVolumeSet.checkAllVolumes();
     assertEquals(metaVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(metaVolumeSet.getVolumesList().size(), 0);
+    dbVolumeSet.checkAllVolumes();
     assertEquals(dbVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(dbVolumeSet.getVolumesList().size(), 0);
 

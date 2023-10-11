@@ -23,6 +23,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,9 +130,15 @@ public final class OnDemandContainerDataScanner {
     try {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
-      if (!container.scanData(instance.throttler, instance.canceler)) {
+
+      ScanResult result =
+          container.scanData(instance.throttler, instance.canceler);
+      if (!result.isHealthy()) {
+        LOG.error("Corruption detected in container [{}]." +
+                "Marking it UNHEALTHY.", containerId, result.getException());
         instance.metrics.incNumUnHealthyContainers();
-        instance.containerController.markContainerUnhealthy(containerId);
+        instance.containerController.markContainerUnhealthy(containerId,
+            result);
       }
 
       instance.metrics.incNumContainersScanned();

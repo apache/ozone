@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECMisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
@@ -181,6 +182,7 @@ public class ReplicationManager implements SCMService {
   private final Clock clock;
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
+  private final ECMisReplicationCheckHandler ecMisReplicationCheckHandler;
   private final RatisReplicationCheckHandler ratisReplicationCheckHandler;
   private final EventPublisher eventPublisher;
   private final AtomicReference<ReplicationQueue> replicationQueue
@@ -238,11 +240,13 @@ public class ReplicationManager implements SCMService {
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
-    this.ecReplicationCheckHandler =
-        new ECReplicationCheckHandler(ecContainerPlacement);
+    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
+    this.ecMisReplicationCheckHandler =
+        new ECMisReplicationCheckHandler(ecContainerPlacement);
     this.ratisReplicationCheckHandler =
         new RatisReplicationCheckHandler(ratisContainerPlacement);
     this.nodeManager = nodeManager;
+    this.metrics = ReplicationManagerMetrics.create(this);
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
@@ -273,6 +277,7 @@ public class ReplicationManager implements SCMService {
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
+        .addNext(ecMisReplicationCheckHandler)
         .addNext(new RatisUnhealthyReplicationCheckHandler());
     start();
   }
@@ -285,7 +290,6 @@ public class ReplicationManager implements SCMService {
     if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
-      metrics = ReplicationManagerMetrics.create(this);
       if (rmConf.isLegacyEnabled()) {
         legacyReplicationManager.setMetrics(metrics);
       }
@@ -801,7 +805,7 @@ public class ReplicationManager implements SCMService {
    * @param datanode The datanode for which the commands have been updated.
    */
   public void datanodeCommandCountUpdated(DatanodeDetails datanode) {
-    LOG.debug("Received a notification that the DN command count " +
+    LOG.trace("Received a notification that the DN command count " +
         "has been updated for {}", datanode);
     // If there is an existing mapping, we may need to remove it
     excludedNodes.computeIfPresent(datanode, (dn, v) -> {

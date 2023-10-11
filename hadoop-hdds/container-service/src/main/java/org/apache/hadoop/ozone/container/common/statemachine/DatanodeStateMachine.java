@@ -30,6 +30,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -42,6 +44,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
@@ -121,6 +124,7 @@ public class DatanodeStateMachine implements Closeable {
   private final MeasuredReplicator pullReplicatorWithMetrics;
   private final MeasuredReplicator pushReplicatorWithMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
+  private final NettyMetrics nettyMetrics;
   private final ECReconstructionMetrics ecReconstructionMetrics;
   // This is an instance variable as mockito needs to access it in a test
   @SuppressWarnings("FieldCanBeLocal")
@@ -128,6 +132,7 @@ public class DatanodeStateMachine implements Closeable {
       reconstructECContainersCommandHandler;
 
   private final DatanodeQueueMetrics queueMetrics;
+  private final ReconfigurationHandler reconfigurationHandler;
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -140,10 +145,13 @@ public class DatanodeStateMachine implements Closeable {
                               CertificateClient certClient,
                               SecretKeyClient secretKeyClient,
                               HddsDatanodeStopService hddsDatanodeStopService,
-                              DatanodeCRLStore crlStore) throws IOException {
+                              DatanodeCRLStore crlStore,
+                              ReconfigurationHandler reconfigurationHandler)
+      throws IOException {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
 
+    this.reconfigurationHandler = reconfigurationHandler;
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
@@ -223,10 +231,11 @@ public class DatanodeStateMachine implements Closeable {
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
-        .addHandler(new CloseContainerCommandHandler())
+        .addHandler(new CloseContainerCommandHandler(
+            dnConf.getContainerCloseThreads(),
+            dnConf.getCommandQueueLimit()))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
-            conf, dnConf.getBlockDeleteThreads(),
-            dnConf.getBlockDeleteQueueLimit()))
+            conf, dnConf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
             pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
@@ -256,12 +265,14 @@ public class DatanodeStateMachine implements Closeable {
         .build();
 
     queueMetrics = DatanodeQueueMetrics.create(this);
+    nettyMetrics = NettyMetrics.create();
   }
 
   @VisibleForTesting
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
                               ConfigurationSource conf) throws IOException {
-    this(datanodeDetails, conf, null, null, null, null);
+    this(datanodeDetails, conf, null, null, null, null,
+        new ReconfigurationHandler("DN", (OzoneConfiguration) conf, op -> { }));
   }
 
   private int getEndPointTaskThreadPoolSize() {
@@ -433,6 +444,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (queueMetrics != null) {
       DatanodeQueueMetrics.unRegister();
+    }
+
+    if (nettyMetrics != null) {
+      nettyMetrics.unregister();
     }
   }
 
@@ -738,5 +753,9 @@ public class DatanodeStateMachine implements Closeable {
 
   public DatanodeQueueMetrics getQueueMetrics() {
     return queueMetrics;
+  }
+
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return reconfigurationHandler;
   }
 }

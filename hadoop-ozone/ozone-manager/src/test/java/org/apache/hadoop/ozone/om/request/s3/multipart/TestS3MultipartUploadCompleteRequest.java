@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.Assert;
@@ -160,9 +161,13 @@ public class TestS3MultipartUploadCompleteRequest
         .get(multipartKey));
     Assert.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assert.assertNotNull(omMetadataManager
+    OmKeyInfo multipartKeyInfo = omMetadataManager
         .getKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
-        .get(getOzoneDBKey(volumeName, bucketName, keyName)));
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    Assert.assertNotNull(multipartKeyInfo);
+    Assert.assertNotNull(multipartKeyInfo.getLatestVersionLocations());
+    Assert.assertTrue(multipartKeyInfo.getLatestVersionLocations()
+        .isMultipartKey());
 
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
         .getCacheValue(new CacheKey<>(
@@ -317,7 +322,7 @@ public class TestS3MultipartUploadCompleteRequest
 
   protected void addKeyToTable(String volumeName, String bucketName,
                              String keyName, long clientID) throws Exception {
-    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(true, true, volumeName, bucketName,
             keyName, clientID, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, omMetadataManager);
   }

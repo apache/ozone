@@ -26,22 +26,25 @@ import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -85,6 +88,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
@@ -96,6 +101,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
@@ -115,6 +121,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
@@ -158,8 +166,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
-  private static final int MAX_SIZE_KB = 2097151;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -213,6 +219,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysResponse listKeysResponse = listKeys(
             request.getListKeysRequest(), request.getVersion());
         responseBuilder.setListKeysResponse(listKeysResponse);
+        break;
+      case ListKeysLight:
+        ListKeysLightResponse listKeysLightResponse = listKeysLight(
+            request.getListKeysRequest());
+        responseBuilder.setListKeysLightResponse(listKeysLightResponse);
         break;
       case ListTrash:
         ListTrashResponse listTrashResponse = listTrash(
@@ -333,6 +344,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case RefetchSecretKey:
         responseBuilder.setRefetchSecretKeyResponse(refetchSecretKey());
         break;
+      case SetSafeMode:
+        SetSafeModeResponse setSafeModeResponse =
+            setSafeMode(request.getSetSafeModeRequest());
+        responseBuilder.setSetSafeModeResponse(setSafeModeResponse);
+        break;
+      case PrintCompactionLogDag:
+        PrintCompactionLogDagResponse printCompactionLogDagResponse =
+            printCompactionLogDag(request.getPrintCompactionLogDagRequest());
+        responseBuilder
+            .setPrintCompactionLogDagResponse(printCompactionLogDagResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -369,7 +391,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private DBUpdatesResponse getOMDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
 
     DBUpdatesResponse.Builder builder = DBUpdatesResponse
         .newBuilder();
@@ -658,16 +680,34 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListKeysResponse.Builder resp =
         ListKeysResponse.newBuilder();
 
-    List<OmKeyInfo> keys = impl.listKeys(
+    ListKeysResult listKeysResult = impl.listKeys(
         request.getVolumeName(),
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
         request.getCount());
-    for (OmKeyInfo key : keys) {
+    for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
+    resp.setIsTruncated(listKeysResult.isTruncated());
+    return resp.build();
+  }
 
+  private ListKeysLightResponse listKeysLight(ListKeysRequest request)
+      throws IOException {
+    ListKeysLightResponse.Builder resp =
+        ListKeysLightResponse.newBuilder();
+
+    ListKeysLightResult listKeysLightResult = impl.listKeysLight(
+        request.getVolumeName(),
+        request.getBucketName(),
+        request.getStartKey(),
+        request.getPrefix(),
+        request.getCount());
+    for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
+      resp.addBasicKeyInfo(key.getProtobuf());
+    }
+    resp.setIsTruncated(listKeysLightResult.isTruncated());
     return resp.build();
   }
 
@@ -1261,7 +1301,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getToSnapshot(),
             snapshotDiffRequest.getToken(),
             snapshotDiffRequest.getPageSize(),
-            snapshotDiffRequest.getForceFullDiff());
+            snapshotDiffRequest.getForceFullDiff(),
+            snapshotDiffRequest.getDisableNativeDiff());
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())
@@ -1316,22 +1357,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  private PrintCompactionLogDagResponse printCompactionLogDag(
+      PrintCompactionLogDagRequest printCompactionLogDagRequest)
+      throws IOException {
+    String message = impl.printCompactionLogDag(
+        printCompactionLogDagRequest.getFileNamePrefix(),
+        printCompactionLogDagRequest.getGraphType());
+    return PrintCompactionLogDagResponse.newBuilder()
+        .setMessage(message)
+        .build();
+  }
 
   public OzoneManager getOzoneManager() {
     return impl;
   }
 
   private EchoRPCResponse echoRPC(EchoRPCRequest req) {
-    EchoRPCResponse.Builder builder =
-            EchoRPCResponse.newBuilder();
-
-    byte[] payloadBytes = new byte[0];
-    int payloadRespSize = Math.min(
-            req.getPayloadSizeResp()
-                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
-    if (payloadRespSize > 0) {
-      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
-    }
+    EchoRPCResponse.Builder builder = EchoRPCResponse.newBuilder();
+    byte[] payloadBytes =
+        PayloadUtils.generatePayloadBytes(req.getPayloadSizeResp());
     builder.setPayload(ByteString.copyFrom(payloadBytes));
     return builder.build();
   }
@@ -1355,5 +1399,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     String newLeaderId = req.getNewLeaderId();
     impl.transferLeadership(newLeaderId);
     return TransferLeadershipResponseProto.getDefaultInstance();
+  }
+
+  private SetSafeModeResponse setSafeMode(
+      SetSafeModeRequest req) throws IOException {
+    OzoneManagerProtocolProtos.SafeMode safeMode = req.getSafeMode();
+    boolean response = impl.setSafeMode(toSafeModeAction(safeMode), false);
+    return SetSafeModeResponse.newBuilder()
+        .setResponse(response)
+        .build();
+  }
+
+  private SafeModeAction toSafeModeAction(
+      OzoneManagerProtocolProtos.SafeMode safeMode) {
+    switch (safeMode) {
+    case ENTER:
+      return SafeModeAction.ENTER;
+    case LEAVE:
+      return SafeModeAction.LEAVE;
+    case FORCE_EXIT:
+      return SafeModeAction.FORCE_EXIT;
+    case GET:
+      return SafeModeAction.GET;
+    default:
+      throw new IllegalArgumentException("Unexpected safe mode action " +
+          safeMode);
+    }
   }
 }

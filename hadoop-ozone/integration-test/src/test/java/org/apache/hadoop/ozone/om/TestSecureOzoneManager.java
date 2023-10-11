@@ -28,14 +28,15 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -70,7 +71,7 @@ public class TestSecureOzoneManager {
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(25);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(25));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -224,9 +225,10 @@ public class TestSecureOzoneManager {
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
-    LambdaTestUtils.intercept(RuntimeException.class, "Can't get SCM signed" +
-            " certificate",
+    RuntimeException rte = Assert.assertThrows(RuntimeException.class,
         () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
+    Assert.assertEquals("Can't get SCM signed certificate. omRpcAdd:" +
+        " om-unknown:9862", rte.getMessage());
   }
 
 }

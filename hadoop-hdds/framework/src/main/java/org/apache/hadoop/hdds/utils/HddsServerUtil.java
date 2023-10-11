@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
@@ -108,6 +109,9 @@ public final class HddsServerUtil {
 
   private HddsServerUtil() {
   }
+
+  public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
+      "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);
@@ -486,6 +490,26 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Creates a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm}
+   * intended to be used by clients under the SCM identity.
+   *
+   * @param conf - Ozone configuration
+   * @return {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm}
+   * @throws IOException
+   */
+  public static SecretKeyProtocolScm getSecretKeyClientForSCM(
+      ConfigurationSource conf) throws IOException {
+    SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
+        new SecretKeyProtocolClientSideTranslatorPB(
+            new SecretKeyProtocolFailoverProxyProvider(conf,
+                UserGroupInformation.getCurrentUser(),
+                SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
+
+    return TracingUtil.createProxy(scmSecretClient,
+        SecretKeyProtocolScm.class, conf);
+  }
+
+  /**
    * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
    * datanode service, should be use only if user is the Datanode identity.
    */
@@ -590,6 +614,7 @@ public final class HddsServerUtil {
           }
         }
       }
+      includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
   }
 
@@ -603,6 +628,20 @@ public final class HddsServerUtil {
       IOUtils.copy(fis, archiveOutputStream);
     }
     archiveOutputStream.closeArchiveEntry();
+  }
+
+  // Mark tarball completed.
+  public static void includeRatisSnapshotCompleteFlag(
+      ArchiveOutputStream archiveOutput) throws IOException {
+    File file = File.createTempFile(
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, "");
+    String entryName = OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
+    includeFile(file, entryName, archiveOutput);
+  }
+
+  static boolean ratisSnapshotComplete(Path dir) {
+    return new File(dir.toString(),
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME).exists();
   }
 
   // optimize ugi lookup for RPC operations to avoid a trip through

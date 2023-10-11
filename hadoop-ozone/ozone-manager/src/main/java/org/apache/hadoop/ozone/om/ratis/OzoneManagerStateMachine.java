@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -266,8 +267,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext preAppendTransaction(TransactionContext trx)
       throws IOException {
-    OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
-        trx.getStateMachineLogEntry().getLogData());
+    final OMRequest request = (OMRequest) trx.getStateMachineContext();
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
 
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
@@ -313,7 +313,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     try {
-      OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
+      // For the Leader, the OMRequest is set in trx in startTransaction.
+      // For Followers, the OMRequest hast to be converted from the log entry.
+      final Object context = trx.getStateMachineContext();
+      final OMRequest request = context != null ? (OMRequest) context
+          : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       long trxLogIndex = trx.getLogEntry().getIndex();
       // In the current approach we have one single global thread executor.
@@ -553,6 +557,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setStateMachine(this)
         .setServerRole(RaftProtos.RaftPeerRole.LEADER)
         .setLogData(raftClientRequest.getMessage().getContent())
+        .setStateMachineContext(omRequest)
         .build();
   }
 
@@ -566,12 +571,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     try {
       return handler.handleWriteRequest(request,
           trxLogIndex).getOMResponse();
+    } catch (IOException e) {
+      LOG.warn("Failed to write, Exception occurred ", e);
+      return createErrorResponse(request, e);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     }
     return null;
+  }
+
+  private OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 
   /**

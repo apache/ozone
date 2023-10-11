@@ -35,7 +35,8 @@ public class QuotaRepairUpgradeAction implements OmUpgradeAction {
   @Override
   public void execute(OzoneManager arg) throws Exception {
     boolean enabled = arg.getConfiguration().getBoolean(
-        OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE, false);
+        OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE,
+        OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT);
     if (enabled) {
       QuotaRepairTask quotaRepairTask = new QuotaRepairTask(
           arg.getMetadataManager());

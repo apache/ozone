@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
@@ -77,9 +78,11 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
+import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
@@ -224,6 +227,8 @@ public final class OzoneManagerRatisUtils {
       return new OMSnapshotMoveDeletedKeysRequest(omRequest);
     case SnapshotPurge:
       return new OMSnapshotPurgeRequest(omRequest);
+    case SetSnapshotProperty:
+      return new OMSnapshotSetPropertyRequest(omRequest);
     case DeleteOpenKeys:
       BucketLayout bktLayout = BucketLayout.DEFAULT;
       if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {
@@ -319,6 +324,10 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case EchoRPC:
+      return new OMEchoRPCWriteRequest(omRequest);
+    case AbortExpiredMultiPartUploads:
+      return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);

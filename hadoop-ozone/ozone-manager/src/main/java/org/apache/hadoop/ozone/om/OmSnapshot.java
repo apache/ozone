@@ -23,12 +23,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -78,9 +83,12 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
                     String volumeName,
                     String bucketName,
                     String snapshotName) {
+    IAccessAuthorizer accessAuthorizer =
+        OzoneAuthorizerFactory.forSnapshot(ozoneManager,
+            keyManager, prefixManager);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         ozoneManager, LOG, AUDIT,
-        OmSnapshotMetrics.getInstance());
+        OmSnapshotMetrics.getInstance(), accessAuthorizer);
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
@@ -128,12 +136,29 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String vname, String bname,
-      String startKey, String keyPrefix, int maxKeys) throws IOException {
-    List<OmKeyInfo> l = omMetadataReader.listKeys(vname, bname,
+  public ListKeysResult listKeys(String vname, String bname,
+                                 String startKey, String keyPrefix, int maxKeys)
+      throws IOException {
+    ListKeysResult listKeysResult = omMetadataReader.listKeys(vname, bname,
         normalizeKeyName(startKey), normalizeKeyName(keyPrefix), maxKeys);
-    return l.stream().map(this::denormalizeOmKeyInfo)
-        .collect(Collectors.toList());
+    return new ListKeysResult(
+        listKeysResult.getKeys().stream().map(this::denormalizeOmKeyInfo)
+            .collect(Collectors.toList()), listKeysResult.isTruncated());
+  }
+
+  @Override
+  public ListKeysLightResult listKeysLight(String volName,
+                                            String buckName,
+                                            String startKey, String keyPrefix,
+                                            int maxKeys) throws IOException {
+    ListKeysResult listKeysResult =
+        listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+    List<OmKeyInfo> keys = listKeysResult.getKeys();
+    List<BasicOmKeyInfo> basicKeysList =
+        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+            .collect(Collectors.toList());
+
+    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
 
   @Override

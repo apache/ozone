@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -70,7 +71,7 @@ public class TestCloseContainerCommandHandler {
   private ContainerController controller;
   private ContainerSet containerSet;
   private CloseContainerCommandHandler subject =
-      new CloseContainerCommandHandler();
+      new CloseContainerCommandHandler(1, 1000);
 
   private final ContainerLayoutVersion layout;
 
@@ -120,19 +121,20 @@ public class TestCloseContainerCommandHandler {
   public void closeContainerWithPipeline() throws Exception {
     // close a container that's associated with an existing pipeline
     subject.handle(closeWithKnownPipeline(), ozoneContainer, context, null);
-
+    waitTillFinishExecution(subject);
     verify(containerHandler)
         .markContainerForClose(container);
     verify(writeChannel)
         .submitRequest(any(), eq(pipelineID.getProtobuf()));
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
   }
 
   @Test
-  public void closeContainerWithoutPipeline() throws IOException {
+  public void closeContainerWithoutPipeline() throws Exception {
     // close a container that's NOT associated with an open pipeline
     subject.handle(closeWithUnknownPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
 
     verify(containerHandler)
         .markContainerForClose(container);
@@ -141,13 +143,14 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
   }
 
   @Test
-  public void closeContainerWithForceFlagSet() throws IOException {
+  public void closeContainerWithForceFlagSet() throws Exception {
     // close a container that's associated with an existing pipeline
     subject.handle(forceCloseWithoutPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
 
     verify(containerHandler)
         .markContainerForClose(container);
@@ -162,6 +165,7 @@ public class TestCloseContainerCommandHandler {
         .setState(ContainerProtos.ContainerDataProto.State.QUASI_CLOSED);
 
     subject.handle(forceCloseWithoutPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
 
     verify(writeChannel, never())
         .submitRequest(any(), any());
@@ -173,6 +177,7 @@ public class TestCloseContainerCommandHandler {
   public void forceCloseOpenContainer() throws Exception {
     // force-close a container that's NOT associated with an open pipeline
     subject.handle(forceCloseWithoutPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
 
     verify(writeChannel, never())
         .submitRequest(any(), any());
@@ -186,13 +191,14 @@ public class TestCloseContainerCommandHandler {
   public void forceCloseOpenContainerWithPipeline() throws Exception {
     // force-close a container that's associated with an existing pipeline
     subject.handle(forceCloseWithPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
 
     verify(containerHandler)
         .markContainerForClose(container);
     verify(writeChannel)
         .submitRequest(any(), any());
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
     verify(containerHandler, never())
         .closeContainer(container);
   }
@@ -205,12 +211,14 @@ public class TestCloseContainerCommandHandler {
     // Since the container is already closed, these commands should do nothing,
     // neither should they fail
     subject.handle(closeWithUnknownPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
     subject.handle(closeWithKnownPipeline(), ozoneContainer, context, null);
+    waitTillFinishExecution(subject);
 
     verify(containerHandler, never())
         .markContainerForClose(container);
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
     verify(containerHandler, never())
         .closeContainer(container);
     verify(writeChannel, never())
@@ -278,5 +286,12 @@ public class TestCloseContainerCommandHandler {
         .addPort(ratisPort)
         .addPort(restPort);
     return builder.build();
+  }
+
+  private void waitTillFinishExecution(
+      CloseContainerCommandHandler closeHandler)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(()
+        -> closeHandler.getQueuedCount() <= 0, 10, 3000);
   }
 }

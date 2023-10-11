@@ -17,21 +17,31 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,14 +75,15 @@ public class TestSnapshotChain {
 
   private SnapshotInfo createSnapshotInfo(UUID snapshotID,
                                           UUID pathPrevID,
-                                          UUID globalPrevID) {
+                                          UUID globalPrevID,
+                                          long creationTime) {
     return new SnapshotInfo.Builder()
         .setSnapshotId(snapshotID)
         .setName("test")
         .setVolumeName("vol1")
         .setBucketName("bucket1")
         .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
-        .setCreationTime(Time.now())
+        .setCreationTime(creationTime)
         .setDeletionTime(-1L)
         .setPathPreviousSnapshotId(pathPrevID)
         .setGlobalPreviousSnapshotId(globalPrevID)
@@ -81,7 +92,7 @@ public class TestSnapshotChain {
         .build();
   }
 
-  private void deleteSnapshot(UUID snapshotID) throws IOException {
+  private void deleteSnapshot(UUID snapshotID) {
     SnapshotInfo sinfo = null;
     final String snapshotPath = "vol1/bucket1";
     // reset the next snapshotInfo.globalPreviousSnapshotID
@@ -141,13 +152,14 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID3);
 
     UUID prevSnapshotID = null;
-
+    List<Integer> times = Arrays.asList(1, 2, 0);
+    int timeIdx = 0;
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       chainManager.addSnapshot(createSnapshotInfo(
           snapshotID,
           prevSnapshotID,
-          prevSnapshotID));
+          prevSnapshotID, times.get(timeIdx++)));
       prevSnapshotID = snapshotID;
     }
 
@@ -203,14 +215,15 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID3);
 
     UUID prevSnapshotID = null;
-
+    List<Integer> times = Arrays.asList(1, 2, 0);
+    int timeIdx = 0;
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       snapshotIdToSnapshotInfoMap.put(snapshotID,
           createSnapshotInfo(
               snapshotID,
               prevSnapshotID,
-              prevSnapshotID));
+              prevSnapshotID, times.get(timeIdx++)));
 
       chainManager.addSnapshot(snapshotIdToSnapshotInfoMap.get(snapshotID));
       prevSnapshotID = snapshotID;
@@ -239,29 +252,33 @@ public class TestSnapshotChain {
     assertEquals(snapshotID3, chainManager.previousGlobalSnapshot(snapshotID2));
   }
 
-  @Test
-  public void testChainFromLoadFromTable() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testChainFromLoadFromTable(boolean increasingTIme)
+      throws Exception {
     Table<String, SnapshotInfo> snapshotInfo =
             omMetadataManager.getSnapshotInfoTable();
 
     // add two snapshots to the snapshotInfo
     UUID snapshotID1 = UUID.randomUUID();
     UUID snapshotID2 = UUID.randomUUID();
-
-    ArrayList<UUID> snapshotIDs = new ArrayList<>();
+    List<UUID> snapshotIDs = new ArrayList<>();
     snapshotIDs.add(snapshotID1);
     snapshotIDs.add(snapshotID2);
+    List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
 
     UUID prevSnapshotID = null;
-
-    // add 3 snapshots
+    long time = System.currentTimeMillis();
     for (UUID snapshotID : snapshotIDs) {
-      snapshotInfo.put(snapshotID.toString(),
-          createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID));
+      SnapshotInfo snapInfo = createSnapshotInfo(snapshotID, prevSnapshotID,
+          prevSnapshotID, increasingTIme ? time++ : time--);
+      snapshotInfo.put(snapshotID.toString(), snapInfo);
       prevSnapshotID = snapshotID;
+      snapshotInfoList.add(snapInfo);
     }
 
     chainManager = new SnapshotChainManager(omMetadataManager);
+    assertFalse(chainManager.isSnapshotChainCorrupted());
     // check if snapshots loaded correctly from snapshotInfoTable
     assertEquals(snapshotID2, chainManager.getLatestGlobalSnapshotId());
     assertEquals(snapshotID2, chainManager.nextGlobalSnapshot(snapshotID1));
@@ -272,5 +289,114 @@ public class TestSnapshotChain {
     assertThrows(NoSuchElementException.class,
         () -> chainManager.previousPathSnapshot(String
             .join("/", "vol1", "bucket1"), snapshotID1));
+
+    UUID snapshotID3 = UUID.randomUUID();
+    SnapshotInfo snapshotInfo3 = createSnapshotInfo(snapshotID3, prevSnapshotID,
+        prevSnapshotID, Time.now());
+    // Add and delete snapshot to make sure snapshot chain is correct.
+    chainManager.addSnapshot(snapshotInfo3);
+    chainManager.deleteSnapshot(snapshotInfoList.get(0));
+    assertEquals(snapshotID3, chainManager.getLatestGlobalSnapshotId());
+    assertThrows(NoSuchElementException.class,
+        () -> chainManager.nextGlobalSnapshot(snapshotID1));
+  }
+
+  private static Stream<? extends Arguments> invalidSnapshotChain() {
+    List<UUID> nodes = IntStream.range(0, 5)
+        .mapToObj(i -> UUID.randomUUID())
+        .collect(Collectors.toList());
+    return Stream.of(
+        Arguments.of(nodes, Named.of("Disconnected Snapshot Chain",
+            ImmutableMap.of(
+                nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(4), nodes.get(3)))),
+        Arguments.of(nodes, Named.of("Complete Cyclic Snapshot Chain",
+            ImmutableMap.of(
+                nodes.get(0), nodes.get(4),
+                nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(3), nodes.get(2),
+                nodes.get(4), nodes.get(3)))),
+        Arguments.of(nodes, Named.of("Partial Cyclic Snapshot Chain",
+            ImmutableMap.of(
+                nodes.get(0), nodes.get(3),
+                nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(3), nodes.get(2),
+                nodes.get(4), nodes.get(3)))),
+        Arguments.of(nodes, Named.of("Diverged Snapshot Chain",
+            ImmutableMap.of(nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(3), nodes.get(2),
+                nodes.get(4), nodes.get(2))))
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidSnapshotChain")
+  public void testInvalidGlobalChainFromLoadFromTable(
+      List<UUID> snapshotIDs, Map<UUID, UUID> snapshotChain) throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    for (UUID snapshotID : snapshotIDs) {
+      snapshotInfo.put(snapshotID.toString(),
+          createSnapshotInfo(snapshotID, snapshotChain.get(snapshotID),
+              snapshotChain.get(snapshotID), System.currentTimeMillis()));
+    }
+    chainManager = new SnapshotChainManager(omMetadataManager);
+
+    assertTrue(chainManager.isSnapshotChainCorrupted());
+
+    SnapshotInfo snapInfo = createSnapshotInfo(UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        System.currentTimeMillis());
+    IllegalStateException createException =
+        assertThrows(IllegalStateException.class,
+            () -> chainManager.addSnapshot(snapInfo));
+    assertEquals("Snapshot chain is corrupted.", createException.getMessage());
+    if (!snapshotIDs.isEmpty()) {
+      IllegalStateException deleteException =
+          assertThrows(IllegalStateException.class,
+              () -> chainManager.deleteSnapshot(
+                  snapshotInfo.get(snapshotIDs.get(0).toString())));
+      assertEquals("Snapshot chain is corrupted.",
+          deleteException.getMessage());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidSnapshotChain")
+  public void testInvalidChainFromLoadFromTable(List<UUID> snapshotIDs,
+      Map<UUID, UUID> snapshotChain) throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    UUID prevSnapshotId = null;
+    for (UUID snapshotID : snapshotIDs) {
+      snapshotInfo.put(snapshotID.toString(),
+          createSnapshotInfo(snapshotID, snapshotChain.get(snapshotID),
+              prevSnapshotId, System.currentTimeMillis()));
+      prevSnapshotId = snapshotID;
+    }
+    chainManager = new SnapshotChainManager(omMetadataManager);
+    assertTrue(chainManager.isSnapshotChainCorrupted());
+
+    SnapshotInfo snapInfo = createSnapshotInfo(UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        System.currentTimeMillis());
+    IllegalStateException createException =
+        assertThrows(IllegalStateException.class,
+            () -> chainManager.addSnapshot(snapInfo));
+    assertEquals("Snapshot chain is corrupted.", createException.getMessage());
+    if (!snapshotIDs.isEmpty()) {
+      IllegalStateException deleteException =
+          assertThrows(IllegalStateException.class,
+              () -> chainManager.deleteSnapshot(
+                  snapshotInfo.get(snapshotIDs.get(0).toString())));
+      assertEquals("Snapshot chain is corrupted.",
+          deleteException.getMessage());
+    }
   }
 }

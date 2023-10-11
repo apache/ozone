@@ -139,6 +139,18 @@ enum Type {
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
+  SetSafeMode = 124;
+  PrintCompactionLogDag = 125;
+  ListKeysLight = 126;
+  AbortExpiredMultiPartUploads = 127;
+  SetSnapshotProperty = 128;
+}
+
+enum SafeMode {
+    ENTER = 1;
+    LEAVE = 2;
+    FORCE_EXIT = 3;
+    GET = 4;
 }
 
 message OMRequest {
@@ -257,11 +269,15 @@ message OMRequest {
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
-  optional SetTimesRequest                   SetTimesRequest               = 120;
+  optional SetTimesRequest                  SetTimesRequest                = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
-
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
-  optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
+  optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
+  optional SetSafeModeRequest               SetSafeModeRequest             = 124;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+
+  optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
+  optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
 }
 
 message OMResponse {
@@ -370,13 +386,17 @@ message OMResponse {
   optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
-  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse        = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
-  optional SetTimesResponse                   SetTimesResponse             = 120;
+  optional SetTimesResponse                  SetTimesResponse              = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
-
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
-  optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
+  optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 124;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional ListKeysLightResponse             listKeysLightResponse         = 126;
+  optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
+  optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
 }
 
 enum Status {
@@ -492,6 +512,9 @@ enum Status {
     CONTAINS_SNAPSHOT = 88;
     SSL_CONNECTION_FAILURE = 89;
     RENAME_OPEN_FILE = 90;
+    UNAUTHORIZED = 91;
+
+    S3_SECRET_ALREADY_EXISTS = 92;
 }
 
 /**
@@ -808,7 +831,17 @@ message SnapshotInfo {
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
   optional bool deepClean = 13;
- }
+  optional bool sstFiltered = 14;
+  // snapshot reference size before any key replication or EC
+  optional uint64 referencedSize = 15;
+  // snapshot reference size after replication
+  optional uint64 referencedReplicatedSize = 16;
+  // snapshot exclusive size before any key replication or EC
+  optional uint64 exclusiveSize = 17;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSize = 18;
+  // note: shared sizes can be calculated from: referenced - exclusive
+}
 
 message SnapshotDiffJobProto {
   optional uint64 creationTime = 1;
@@ -821,6 +854,7 @@ message SnapshotDiffJobProto {
   optional bool forceFullDiff = 8;
   optional uint64 totalDiffEntries = 9;
   optional string message = 10;
+  optional bool disableNativeDiff = 11;
 }
 
 message OzoneObj {
@@ -1058,6 +1092,16 @@ message KeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
+}
+
+message BasicKeyInfo {
+    optional string keyName = 1;
+    optional uint64 dataSize = 2;
+    optional uint64 creationTime = 3;
+    optional uint64 modificationTime = 4;
+    optional hadoop.hdds.ReplicationType type = 5;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
 }
 
 message DirectoryInfo {
@@ -1333,6 +1377,12 @@ message ListKeysRequest {
 
 message ListKeysResponse {
     repeated KeyInfo keyInfo = 2;
+    optional bool isTruncated = 3;
+}
+
+message ListKeysLightResponse {
+    repeated BasicKeyInfo basicKeyInfo = 1;
+    optional bool isTruncated = 2;
 }
 
 message CommitKeyRequest {
@@ -1534,6 +1584,24 @@ message MultipartUploadAbortRequest {
 message MultipartUploadAbortResponse {
 
 }
+
+message MultipartUploadsExpiredAbortRequest {
+  repeated ExpiredMultipartUploadsBucket expiredMultipartUploadsPerBucket = 1;
+}
+
+message ExpiredMultipartUploadsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated ExpiredMultipartUploadInfo multipartUploads = 3;
+}
+
+message ExpiredMultipartUploadInfo {
+  required string name = 1;
+}
+
+message MultipartUploadsExpiredAbortResponse {
+}
+
 message MultipartUploadListPartsRequest {
     required string volume = 1;
     required string bucket = 2;
@@ -1587,6 +1655,7 @@ message PartInfo {
 message EchoRPCRequest {
     optional bytes payloadReq = 1;
     optional int32 payloadSizeResp = 2;
+    optional bool readOnly = 3 [default = true];
 }
 
 /**
@@ -1715,6 +1784,7 @@ message CreateTenantRequest {
     optional string volumeName = 2;
     optional string userRoleName = 3;
     optional string adminRoleName = 4;
+    optional bool forceCreationWhenVolumeExists = 5;
 }
 
 message SetRangerServiceVersionRequest {
@@ -1745,6 +1815,7 @@ message SnapshotDiffRequest {
   optional string token = 5;
   optional uint32 pageSize = 6;
   optional bool forceFullDiff = 7;
+  optional bool disableNativeDiff = 8;
 }
 
 message CancelSnapshotDiffRequest {
@@ -1768,6 +1839,11 @@ message DeleteSnapshotRequest {
   optional uint64 deletionTime = 4;
 }
 
+message PrintCompactionLogDagRequest {
+  optional string fileNamePrefix = 1;
+  optional string graphType = 2;
+}
+
 message SnapshotMoveDeletedKeysRequest {
   optional SnapshotInfo fromSnapshot = 1;
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
@@ -1784,6 +1860,16 @@ message SnapshotMoveKeyInfos {
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
   repeated string updatedSnapshotDBKey = 2;
+}
+
+message SetSnapshotPropertyRequest {
+  optional SnapshotProperty snapshotProperty = 1;
+}
+
+message SnapshotProperty {
+  optional string snapshotKey = 1;
+  optional uint64 exclusiveSize = 2;
+  optional uint64 exclusiveReplicatedSize = 3;
 }
 
 message DeleteTenantRequest {
@@ -1859,11 +1945,19 @@ message DeleteSnapshotResponse {
 
 }
 
+message PrintCompactionLogDagResponse {
+  optional string message = 1;
+}
+
 message SnapshotMoveDeletedKeysResponse {
 
 }
 
 message SnapshotPurgeResponse {
+
+}
+
+message SetSnapshotPropertyResponse {
 
 }
 
@@ -1952,6 +2046,14 @@ message SetTimesRequest {
 }
 
 message SetTimesResponse {
+}
+
+message SetSafeModeRequest {
+  required SafeMode safeMode    = 1;
+}
+
+message SetSafeModeResponse {
+  optional bool response = 1;
 }
 
 /**

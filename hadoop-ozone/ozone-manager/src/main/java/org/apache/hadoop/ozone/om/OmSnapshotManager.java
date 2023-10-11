@@ -57,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -392,7 +391,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
-    registry.addCodec(SnapshotDiffObject.class, SnapshotDiffObject.getCodec());
     return registry.build();
   }
 
@@ -462,28 +460,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else if (dbCheckpoint != null) {
       LOG.info("Created checkpoint : {} for snapshot {}",
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
-    }
-
-    final RocksDBCheckpointDiffer dbCpDiffer =
-        store.getRocksDBCheckpointDiffer();
-
-    if (dbCpDiffer != null) {
-      final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
-
-      Objects.requireNonNull(snapshotInfo.getSnapshotId(),
-          "SnapshotId is null for snapshot: " + snapshotInfo.getName());
-      // Write snapshot generation (latest sequence number) to compaction log.
-      // This will be used for DAG reconstruction as snapshotGeneration.
-      dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-          snapshotInfo.getSnapshotId().toString(),
-          snapshotInfo.getCreationTime());
-
-      // Set compaction log filename to the latest DB sequence number
-      // right after taking the RocksDB checkpoint for Ozone snapshot.
-      //
-      // Note it doesn't matter if sequence number hasn't increased (even though
-      // it shouldn't happen), since the writer always appends the file.
-      dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
     }
 
     return dbCheckpoint;
@@ -734,13 +710,15 @@ public final class OmSnapshotManager implements AutoCloseable {
         toSnapshot);
   }
 
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
                                                     final String toSnapshot,
                                                     final String token,
                                                     int pageSize,
-                                                    boolean forceFullDiff)
+                                                    boolean forceFullDiff,
+                                                    boolean disableNativeDiff)
       throws IOException {
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
@@ -760,7 +738,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SnapshotDiffResponse snapshotDiffReport =
         snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
-            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff);
+            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff,
+            disableNativeDiff);
 
     // Check again to make sure that from and to snapshots are still active and
     // were not deleted in between response generation.
@@ -818,12 +797,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
-
-    // Check snapshot creation time
-    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
-      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
-          " should be older than to toSnapshot:" + toSnapInfo.getName());
-    }
   }
 
   private int getIndexFromToken(final String token) throws IOException {

@@ -24,12 +24,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
@@ -71,6 +74,7 @@ import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -82,6 +86,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test Key Deleting Service.
@@ -95,6 +102,10 @@ import org.junit.rules.TemporaryFolder;
 public class TestKeyDeletingService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private static final Logger LOG =
@@ -138,7 +149,7 @@ public class TestKeyDeletingService {
    * @throws IOException - on Failure.
    */
 
-  @Test(timeout = 30000)
+  @Test
   public void checkIfDeleteServiceIsDeletingKeys()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -161,7 +172,7 @@ public class TestKeyDeletingService {
         .getKeyBlocksList().size());
   }
 
-  @Test(timeout = 40000)
+  @Test
   public void checkIfDeleteServiceWithFailingSCM()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -206,7 +217,7 @@ public class TestKeyDeletingService {
         .getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList().size());
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void checkDeletionForEmptyKey()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -253,7 +264,7 @@ public class TestKeyDeletingService {
     Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void checkDeletionForPartiallyCommitKey()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -325,7 +336,7 @@ public class TestKeyDeletingService {
     Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void checkDeletionForKeysWithMultipleVersions()
       throws IOException, TimeoutException, InterruptedException,
       AuthenticationException {
@@ -550,15 +561,126 @@ t
 
       // 5 keys can be deep cleaned as it was stuck previously
       assertTableRowCount(snap3deletedTable, 10, metadataManager);
-      checkSnapDeepCleanStatus(snapshotInfoTable, false);
 
       writeClient.deleteSnapshot(volumeName, bucketName, "snap2");
       assertTableRowCount(snapshotInfoTable, 2, metadataManager);
 
       assertTableRowCount(snap3deletedTable, 0, metadataManager);
       assertTableRowCount(deletedTable, 0, metadataManager);
+      checkSnapDeepCleanStatus(snapshotInfoTable, false);
     }
 
+  }
+
+  @Test
+  public void testSnapshotExclusiveSize() throws Exception {
+    OzoneConfiguration conf = createConfAndInitValues();
+    OmTestManagers omTestManagers
+        = new OmTestManagers(conf);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+    OMMetadataManager metadataManager = omTestManagers.getMetadataManager();
+    Table<String, SnapshotInfo> snapshotInfoTable =
+        om.getMetadataManager().getSnapshotInfoTable();
+    Table<String, RepeatedOmKeyInfo> deletedTable =
+        om.getMetadataManager().getDeletedTable();
+    Table<String, String> renamedTable =
+        om.getMetadataManager().getSnapshotRenamedTable();
+    Table<String, OmKeyInfo> keyTable =
+        om.getMetadataManager().getKeyTable(BucketLayout.DEFAULT);
+
+    KeyDeletingService keyDeletingService = keyManager.getDeletingService();
+    // Supspend KDS
+    keyDeletingService.suspend();
+
+    String volumeName = "volume1";
+    String bucketName = "bucket1";
+    String keyName = "key";
+
+    // Create Volume and Buckets
+    createVolumeAndBucket(keyManager, volumeName, bucketName, false);
+
+    // Create 3 keys
+    for (int i = 1; i <= 3; i++) {
+      createAndCommitKey(keyManager, volumeName, bucketName, keyName + i, 3);
+    }
+    assertTableRowCount(keyTable, 3, metadataManager);
+
+    // Create Snapshot1
+    writeClient.createSnapshot(volumeName, bucketName, "snap1");
+    assertTableRowCount(snapshotInfoTable, 1, metadataManager);
+    assertTableRowCount(deletedTable, 0, metadataManager);
+
+    // Create 2 keys
+    for (int i = 4; i <= 5; i++) {
+      createAndCommitKey(keyManager, volumeName, bucketName, keyName + i, 3);
+    }
+    // Delete a key, rename 2 keys. We will be using this to test
+    // how we handle renamed key for exclusive size calculation.
+    renameKey(volumeName, bucketName, keyName + 1, "renamedKey1");
+    renameKey(volumeName, bucketName, keyName + 2, "renamedKey2");
+    deleteKey(volumeName, bucketName, keyName + 3);
+    assertTableRowCount(deletedTable, 1, metadataManager);
+    assertTableRowCount(renamedTable, 2, metadataManager);
+
+    // Create Snapshot2
+    writeClient.createSnapshot(volumeName, bucketName, "snap2");
+    assertTableRowCount(snapshotInfoTable, 2, metadataManager);
+    assertTableRowCount(deletedTable, 0, metadataManager);
+
+    // Create 2 keys
+    for (int i = 6; i <= 7; i++) {
+      createAndCommitKey(keyManager, volumeName, bucketName, keyName + i, 3);
+    }
+
+    deleteKey(volumeName, bucketName, "renamedKey1");
+    deleteKey(volumeName, bucketName, "key4");
+    // Do a second rename of already renamedKey2
+    renameKey(volumeName, bucketName, "renamedKey2", "renamedKey22");
+    assertTableRowCount(deletedTable, 2, metadataManager);
+    assertTableRowCount(renamedTable, 1, metadataManager);
+
+    // Create Snapshot3
+    writeClient.createSnapshot(volumeName, bucketName, "snap3");
+    // Delete 4 keys
+    deleteKey(volumeName, bucketName, "renamedKey22");
+    for (int i = 5; i <= 7; i++) {
+      deleteKey(volumeName, bucketName, keyName + i);
+    }
+
+    // Create Snapshot4
+    writeClient.createSnapshot(volumeName, bucketName, "snap4");
+    createAndCommitKey(keyManager, volumeName, bucketName, "key8", 3);
+    keyDeletingService.resume();
+
+    Map<String, Long> expectedSize = new HashMap<String, Long>() {{
+        put("snap1", 1000L);
+        put("snap2", 1000L);
+        put("snap3", 2000L);
+        put("snap4", 0L);
+      }};
+
+    long prevKdsRunCount = keyDeletingService.getRunCount().get();
+
+    // Let KeyDeletingService to run for some iterations
+    GenericTestUtils.waitFor(
+        () -> (keyDeletingService.getRunCount().get() > prevKdsRunCount + 5),
+        100, 10000);
+
+    // Check if the exclusive size is set.
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+             iterator = snapshotInfoTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
+        String snapshotName = snapshotEntry.getValue().getName();
+        assertEquals(expectedSize.get(snapshotName), snapshotEntry.getValue().
+            getExclusiveSize());
+        // Since for the test we are using RATIS/THREE
+        assertEquals(expectedSize.get(snapshotName) * 3,
+            snapshotEntry.getValue().getExclusiveReplicatedSize());
+      }
+    }
   }
 
   private void checkSnapDeepCleanStatus(Table<String, SnapshotInfo>
@@ -613,6 +735,37 @@ t
             .build());
   }
 
+  private void deleteKey(String volumeName,
+                         String bucketName,
+                         String keyName) throws IOException {
+    OmKeyArgs keyArg =
+        new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE))
+            .build();
+    writeClient.deleteKey(keyArg);
+  }
+
+  private void renameKey(String volumeName,
+                         String bucketName,
+                         String keyName,
+                         String toKeyName) throws IOException {
+    OmKeyArgs keyArg =
+        new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE))
+            .build();
+    writeClient.renameKey(keyArg, toKeyName);
+  }
+
   private OmKeyArgs createAndCommitKey(KeyManager keyManager, String volumeName,
       String bucketName, String keyName, int numBlocks) throws IOException {
     return createAndCommitKey(keyManager, volumeName, bucketName, keyName,
@@ -630,8 +783,8 @@ t
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setAcls(Collections.emptyList())
-            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-                HddsProtos.ReplicationFactor.ONE))
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+            .setDataSize(1000L)
             .setLocationInfoList(new ArrayList<>())
             .build();
     //Open and Commit the Key in the Key Manager.

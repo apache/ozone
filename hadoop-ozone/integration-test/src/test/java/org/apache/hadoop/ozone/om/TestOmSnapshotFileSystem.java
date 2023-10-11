@@ -45,13 +45,14 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -73,7 +74,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -84,6 +84,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -109,7 +110,7 @@ public class TestOmSnapshotFileSystem {
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
   @Rule
-  public Timeout timeout = new Timeout(120, TimeUnit.SECONDS);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -193,9 +194,9 @@ public class TestOmSnapshotFileSystem {
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
   public void testListKeysAtDifferentLevels() throws Exception {
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(ozoneVolume.getName(), volumeName);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(ozoneBucket.getName(), bucketName);
 
     String keyc1 = "/a/b1/c1/c1.tx";
     String keyc2 = "/a/b1/c2/c2.tx";
@@ -352,7 +353,7 @@ public class TestOmSnapshotFileSystem {
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-            bucketName, volumeName, StandardCharsets.UTF_8);
+            bucketName, volumeName);
     OzoneFileSystem o3fsNew = (OzoneFileSystem) FileSystem
         .get(new URI(rootPath), conf);
     FSDataInputStream fsDataInputStream = o3fsNew.open(new Path(key));
@@ -410,19 +411,31 @@ public class TestOmSnapshotFileSystem {
 
     // Can't access keys in snapshot anymore with FS API. Should throw exception
     final String errorMsg1 = "no longer active";
-    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg1,
-        () -> o3fs.listStatus(snapshotRoot));
-    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg1,
-        () -> o3fs.listStatus(snapshotParent));
+    FileNotFoundException exception = assertThrows(
+        FileNotFoundException.class,
+        () -> o3fs.listStatus(snapshotRoot)
+    );
+    assertTrue(exception.getMessage().contains(errorMsg1));
+    exception = assertThrows(
+        FileNotFoundException.class,
+        () -> o3fs.listStatus(snapshotParent)
+    );
+    assertTrue(exception.getMessage().contains(errorMsg1));
 
     // Note: Different error message due to inconsistent FNFE client-side
     //  handling in BasicOzoneClientAdapterImpl#getFileStatus
     // TODO: Reconciliation?
     final String errorMsg2 = "No such file or directory";
-    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg2,
-        () -> o3fs.getFileStatus(snapshotKey1));
-    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg2,
-        () -> o3fs.getFileStatus(snapshotKey2));
+    exception = assertThrows(
+        FileNotFoundException.class,
+        () -> o3fs.getFileStatus(snapshotKey1)
+    );
+    assertTrue(exception.getMessage().contains(errorMsg2));
+    exception = assertThrows(
+        FileNotFoundException.class,
+        () -> o3fs.getFileStatus(snapshotKey2)
+    );
+    assertTrue(exception.getMessage().contains(errorMsg2));
   }
 
   @Test

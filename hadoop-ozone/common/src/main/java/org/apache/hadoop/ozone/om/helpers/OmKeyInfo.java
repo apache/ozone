@@ -425,6 +425,25 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileChecksum;
   }
 
+  @Override
+  public String toString() {
+    return "OmKeyInfo{" +
+        "volumeName='" + volumeName + '\'' +
+        ", bucketName='" + bucketName + '\'' +
+        ", keyName='" + keyName + '\'' +
+        ", dataSize=" + dataSize +
+        ", keyLocationVersions=" + keyLocationVersions +
+        ", creationTime=" + creationTime +
+        ", modificationTime=" + modificationTime +
+        ", replicationConfig=" + replicationConfig +
+        ", encInfo=" + (encInfo == null ? "null" : "<REDACTED>") +
+        ", fileChecksum=" + fileChecksum +
+        ", isFile=" + isFile +
+        ", fileName='" + fileName + '\'' +
+        ", acls=" + acls +
+        '}';
+  }
+
   /**
    * Builder of OmKeyInfo.
    */
@@ -741,6 +760,41 @@ public final class OmKeyInfo extends WithParentObjectId
         '}';
   }
 
+
+  public boolean isKeyInfoSame(OmKeyInfo omKeyInfo, boolean checkPath,
+                               boolean checkKeyLocationVersions,
+                               boolean checkModificationTime,
+                               boolean checkUpdateID) {
+    boolean isEqual = dataSize == omKeyInfo.dataSize &&
+        creationTime == omKeyInfo.creationTime &&
+        volumeName.equals(omKeyInfo.volumeName) &&
+        bucketName.equals(omKeyInfo.bucketName) &&
+        replicationConfig.equals(omKeyInfo.replicationConfig) &&
+        Objects.equals(metadata, omKeyInfo.metadata) &&
+        Objects.equals(acls, omKeyInfo.acls) &&
+        objectID == omKeyInfo.objectID;
+
+    if (isEqual && checkUpdateID) {
+      isEqual = updateID == omKeyInfo.updateID;
+    }
+
+    if (isEqual && checkModificationTime) {
+      isEqual = modificationTime == omKeyInfo.modificationTime;
+    }
+
+    if (isEqual && checkPath) {
+      isEqual = parentObjectID == omKeyInfo.parentObjectID &&
+          keyName.equals(omKeyInfo.keyName);
+    }
+
+    if (isEqual && checkKeyLocationVersions) {
+      isEqual = Objects
+          .equals(keyLocationVersions, omKeyInfo.keyLocationVersions);
+    }
+
+    return isEqual;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -749,21 +803,7 @@ public final class OmKeyInfo extends WithParentObjectId
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    OmKeyInfo omKeyInfo = (OmKeyInfo) o;
-    return dataSize == omKeyInfo.dataSize &&
-        creationTime == omKeyInfo.creationTime &&
-        modificationTime == omKeyInfo.modificationTime &&
-        volumeName.equals(omKeyInfo.volumeName) &&
-        bucketName.equals(omKeyInfo.bucketName) &&
-        keyName.equals(omKeyInfo.keyName) &&
-        Objects
-            .equals(keyLocationVersions, omKeyInfo.keyLocationVersions) &&
-        replicationConfig.equals(omKeyInfo.replicationConfig) &&
-        Objects.equals(metadata, omKeyInfo.metadata) &&
-        Objects.equals(acls, omKeyInfo.acls) &&
-        objectID == omKeyInfo.objectID &&
-        updateID == omKeyInfo.updateID &&
-        parentObjectID == omKeyInfo.parentObjectID;
+    return isKeyInfoSame((OmKeyInfo) o, true, true, true, true);
   }
 
   @Override

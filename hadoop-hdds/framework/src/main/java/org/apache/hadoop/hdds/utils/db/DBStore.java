@@ -182,22 +182,15 @@ public interface DBStore extends Closeable, BatchOperationHandler {
 
   /**
    * Get data written to DB since a specific sequence number.
-   * @param sequenceNumber
-   * @return
-   * @throws SequenceNumberNotFoundException
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws SequenceNumberNotFoundException;
+      throws IOException;
 
   /**
    * Get limited data written to DB since a specific sequence number.
-   * @param sequenceNumber
-   * @param limitCount
-   * @return
-   * @throws SequenceNumberNotFoundException
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws SequenceNumberNotFoundException;
+      throws IOException;
 
   /**
    * Return if the underlying DB is closed. This call is thread safe.

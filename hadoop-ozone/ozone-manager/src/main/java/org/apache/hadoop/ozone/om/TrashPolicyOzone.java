@@ -205,7 +205,11 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           }
 
           // move to current trash
-          fs.rename(path, trashPath);
+          boolean renamed = fs.rename(path, trashPath);
+          if (!renamed) {
+            LOG.error("Failed to move to trash: {}", path);
+            throw new IOException("Failed to move to trash: " + path);
+          }
           LOG.info("Moved: '" + path + "' to trash at: " + trashPath);
           return true;
         } catch (IOException e) {
@@ -318,17 +322,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                 continue;
               }
               TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
-              Runnable task = () -> {
-                try {
-                  om.getMetrics().incNumTrashRootsProcessed();
-                  trash.deleteCheckpoint(trashRoot.getPath(), false);
-                  trash.createCheckpoint(trashRoot.getPath(),
-                      new Date(Time.now()));
-                } catch (Exception e) {
-                  om.getMetrics().incNumTrashFails();
-                  LOG.error("Unable to checkpoint:" + trashRoot.getPath(), e);
-                }
-              };
+              Path trashRootPath = trashRoot.getPath();
+              Runnable task = getEmptierTask(trashRootPath, trash, false);
               om.getMetrics().incNumTrashRootsEnqueued();
               executor.submit(task);
             }
@@ -351,6 +346,21 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           Thread.currentThread().interrupt();
         }
       }
+    }
+
+    private Runnable getEmptierTask(Path trashRootPath, TrashPolicyOzone trash,
+        boolean deleteImmediately) {
+      Runnable task = () -> {
+        try {
+          om.getMetrics().incNumTrashRootsProcessed();
+          trash.deleteCheckpoint(trashRootPath, deleteImmediately);
+          trash.createCheckpoint(trashRootPath, new Date(Time.now()));
+        } catch (Exception e) {
+          om.getMetrics().incNumTrashFails();
+          LOG.error("Unable to checkpoint:" + trashRootPath, e);
+        }
+      };
+      return task;
     }
 
     private long ceiling(long time, long interval) {

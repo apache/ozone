@@ -19,8 +19,14 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -69,9 +75,13 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNotNull(omMetadataManager
+    OmKeyInfo openMPUKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
-        .get(multipartKey));
+        .get(multipartKey);
+    Assert.assertNotNull(openMPUKeyInfo);
+    Assert.assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
+    Assert.assertTrue(openMPUKeyInfo.getLatestVersionLocations()
+        .isMultipartKey());
     Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
 
@@ -82,14 +92,10 @@ public class TestS3InitiateMultipartUploadRequest
 
     Assert.assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
-            .getModificationTime(), omMetadataManager
-            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
-            .get(multipartKey).getModificationTime());
+            .getModificationTime(), openMPUKeyInfo.getModificationTime());
     Assert.assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
-            .getModificationTime(), omMetadataManager
-            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
-            .get(multipartKey).getCreationTime());
+            .getModificationTime(), openMPUKeyInfo.getCreationTime());
 
   }
 
@@ -161,4 +167,81 @@ public class TestS3InitiateMultipartUploadRequest
     return omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
   }
+
+  @Test
+  public void testMultipartUploadInheritParentDefaultAcls()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    List<OzoneAcl> acls = new ArrayList<>();
+    acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
+    acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
+
+    // create bucket with DEFAULT acls
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setAcls(acls));
+
+    // Verify bucket has DEFAULT acls.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
+        .get(bucketKey).getAcls();
+    Assert.assertEquals(acls, bucketAcls);
+
+    // create file with acls inherited from parent DEFAULT acls
+    OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(modifiedRequest);
+
+    OMClientResponse omClientResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            100L, ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
+        modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getMultipartUploadID());
+
+    OmKeyInfo omKeyInfo = omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
+        .get(multipartKey);
+
+    verifyKeyInheritAcls(omKeyInfo.getAcls(), bucketAcls);
+
+  }
+
+  /**
+   * Leaf key has ACCESS scope acls which inherited
+   * from parent DEFAULT acls.
+   */
+  private void verifyKeyInheritAcls(List<OzoneAcl> keyAcls,
+      List<OzoneAcl> bucketAcls) {
+
+    List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .collect(Collectors.toList());
+
+    OzoneAcl parentAccessAcl = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.ACCESS)
+        .findAny().orElse(null);
+
+    // Should inherit parent DEFAULT Acls
+    // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
+    Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
+        parentDefaultAcl.stream()
+            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+            .collect(Collectors.toList()), keyAcls);
+
+    // Should not inherit parent ACCESS Acls
+    Assert.assertFalse(keyAcls.contains(parentAccessAcl));
+  }
+
 }

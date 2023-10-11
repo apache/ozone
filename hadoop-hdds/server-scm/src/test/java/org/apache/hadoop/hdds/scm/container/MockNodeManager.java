@@ -309,6 +309,10 @@ public class MockNodeManager implements NodeManager {
       return deadNodes;
     }
 
+    if (nodestate == null) {
+      return new ArrayList<>(nodeMetricMap.keySet());
+    }
+
     return null;
   }
 

@@ -109,7 +109,7 @@ public class TestS3MultipartResponse {
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
         .build();
 
     OMResponse omResponse = OMResponse.newBuilder()
@@ -214,7 +214,7 @@ public class TestS3MultipartResponse {
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
             .setParentObjectID(parentID)
             .build();
 
@@ -279,7 +279,7 @@ public class TestS3MultipartResponse {
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
             .build();
 
     OMResponse omResponse = OMResponse.newBuilder()

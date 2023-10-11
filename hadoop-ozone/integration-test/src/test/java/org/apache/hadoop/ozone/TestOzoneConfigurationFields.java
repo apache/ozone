@@ -29,8 +29,12 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 
 import java.util.Arrays;
+
+import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
@@ -41,7 +45,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Override
   public void initializeMemberVariables() {
@@ -51,6 +55,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
+            S3SecretConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
             ScmConfig.ConfigStrings.class
@@ -134,6 +139,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
         HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT
     ));

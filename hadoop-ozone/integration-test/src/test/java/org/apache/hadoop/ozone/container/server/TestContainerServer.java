@@ -61,6 +61,8 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.rpc.RpcType;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
@@ -69,7 +71,6 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.apache.ozone.test.tag.Slow;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
@@ -179,7 +180,7 @@ public class TestContainerServer {
     }
   }
 
-  @Disabled("Fails with StatusRuntimeException: UNKNOWN")
+  @Unhealthy("Fails with StatusRuntimeException: UNKNOWN")
   @Test
   public void testClientServerWithContainerDispatcher() throws Exception {
     XceiverServerGrpc server = null;

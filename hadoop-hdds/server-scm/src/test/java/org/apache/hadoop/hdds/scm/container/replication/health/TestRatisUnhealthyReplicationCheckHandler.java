@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -31,11 +32,13 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -333,4 +336,59 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertEquals(1,
         report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
   }
+
+  @Test
+  public void testWithQuasiClosedReplica() {
+    final long sequenceID = 20;
+    final ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID);
+    replicas.add(quasiClosedReplica);
+
+    requestBuilder.setContainerReplicas(replicas).setContainerInfo(container);
+    assertFalse(handler.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+  
+  @Test
+  public void overReplicationCheckWithQuasiClosedReplica() {
+    final long sequenceID = 20;
+    final ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+
+    requestBuilder.setContainerReplicas(replicas).setContainerInfo(container);
+    assertTrue(handler.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1,
+        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+  }
+
+
+
 }

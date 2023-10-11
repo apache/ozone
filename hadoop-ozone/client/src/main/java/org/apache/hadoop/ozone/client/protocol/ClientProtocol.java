@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -624,7 +625,7 @@ public interface ClientProtocol {
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  @Nonnull S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
    * Returns S3 Secret given kerberos user.
@@ -999,6 +1000,10 @@ public interface ClientProtocol {
    */
   void clearThreadLocalS3Auth();
 
+  default ThreadLocal<S3Auth> getS3CredentialsProvider() {
+    return null;
+  }
+
   /**
    * Sets the owner of bucket.
    * @param volumeName Name of the Volume
@@ -1046,6 +1051,16 @@ public interface ClientProtocol {
       String bucketName, String snapshotName) throws IOException;
 
   /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
+   */
+  String printCompactionLogDag(String fileNamePrefix, String graphType)
+      throws IOException;
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name
@@ -1071,10 +1086,12 @@ public interface ClientProtocol {
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
-                                    boolean forceFullDiff)
+                                    boolean forceFullDiff,
+                                    boolean disableNativeDiff)
       throws IOException;
 
   /**

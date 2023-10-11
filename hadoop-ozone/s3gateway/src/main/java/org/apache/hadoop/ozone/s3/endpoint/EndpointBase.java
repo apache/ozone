@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -75,12 +76,14 @@ public abstract class EndpointBase implements Auditor {
   @Inject
   private OzoneClient client;
   @Inject
+  private SignatureInfo signatureInfo;
+
   private S3Auth s3Auth;
   @Context
   private ContainerRequestContext context;
 
   private Set<String> excludeMetadataFields =
-          new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
+      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -114,6 +117,11 @@ public abstract class EndpointBase implements Auditor {
    */
   @PostConstruct
   public void initialization() {
+    // Note: userPrincipal is initialized to be the same value as accessId,
+    //  could be updated later in RpcClient#getS3Volume
+    s3Auth = new S3Auth(signatureInfo.getStringToSign(),
+        signatureInfo.getSignature(),
+        signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
     getClient().getObjectStore()
         .getClientProxy()
@@ -173,9 +181,9 @@ public abstract class EndpointBase implements Auditor {
       } else if (ex.getResult() == ResultCodes.TIMEOUT ||
           ex.getResult() == ResultCodes.INTERNAL_ERROR) {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
-        // S3 does not return error for bucket already exists, it just
-        // returns the location.
+      } else if (ex.getResult() == ResultCodes.BUCKET_ALREADY_EXISTS) {
+        throw newError(S3ErrorTable.BUCKET_ALREADY_EXISTS, bucketName, ex);
+      } else {
         throw ex;
       }
     }
@@ -290,8 +298,7 @@ public abstract class EndpointBase implements Auditor {
 
         if (sizeInBytes >
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
-          throw new IllegalArgumentException("Illegal user defined metadata." +
-              " Combined size cannot exceed 2KB.");
+          throw newError(S3ErrorTable.METADATA_TOO_LARGE, key);
         }
         customMetadata.put(mapKey, value);
       }

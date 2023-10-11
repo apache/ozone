@@ -45,7 +45,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -90,7 +92,7 @@ public class TestOzoneTenantShell {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static File baseDir;
   private static File testFile;
@@ -500,7 +502,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
-            false);
+        false);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
@@ -1077,7 +1079,7 @@ public class TestOzoneTenantShell {
   }
 
   @Test
-  public void testCreateTenantOnExistingVolumeShouldFail() throws IOException {
+  public void testCreateTenantOnExistingVolume() throws IOException {
     final String testVolume = "existing-volume-1";
     int exitC = execute(ozoneSh, new String[] {"volume", "create", testVolume});
     // Volume create should succeed
@@ -1085,12 +1087,26 @@ public class TestOzoneTenantShell {
     checkOutput(out, "", true);
     checkOutput(err, "", true);
 
-    // Try to create tenant on the same volume, should fail
+    // Try to create tenant on the same volume, should fail by default
     executeHA(tenantShell, new String[] {"create", testVolume});
     checkOutput(out, "", true);
     checkOutput(err, "Volume already exists\n", true);
 
+    // Try to create tenant on the same volume with --force, should work
+    executeHA(tenantShell, new String[] {"create", testVolume, "--force"});
+    checkOutput(out, "", true);
+    checkOutput(err, "", true);
+
+    // Try to create the same tenant one more time, should fail even
+    // with --force because the tenant already exists.
+    executeHA(tenantShell, new String[] {"create", testVolume, "--force"});
+    checkOutput(out, "", true);
+    checkOutput(err, "Tenant '" + testVolume + "' already exists\n", true);
+
     // Clean up
+    executeHA(tenantShell, new String[] {"delete", testVolume});
+    checkOutput(out, "", true);
+    checkOutput(err, "Deleted tenant '" + testVolume + "'.\n", false);
     deleteVolume(testVolume);
   }
 }

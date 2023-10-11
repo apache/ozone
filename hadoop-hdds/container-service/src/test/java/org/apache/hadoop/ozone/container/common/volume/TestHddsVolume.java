@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -46,6 +47,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.Before;
@@ -79,6 +81,31 @@ public class TestHddsVolume {
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
     versionFile = StorageVolumeUtil.getVersionFile(rootDir);
+  }
+
+  @Test
+  public void testReadPropertiesFromVersionFile() throws Exception {
+    StorageVolume volume = volumeBuilder.build();
+
+    volume.format(CLUSTER_ID);
+
+    Properties properties = DatanodeVersionFile.readFrom(versionFile);
+
+    String storageID = StorageVolumeUtil.getStorageID(properties, versionFile);
+    String clusterID = StorageVolumeUtil.getClusterID(
+        properties, versionFile, CLUSTER_ID);
+    String datanodeUuid = StorageVolumeUtil.getDatanodeUUID(
+        properties, versionFile, DATANODE_UUID);
+    long cTime = StorageVolumeUtil.getCreationTime(
+        properties, versionFile);
+    int layoutVersion = StorageVolumeUtil.getLayOutVersion(
+        properties, versionFile);
+
+    assertEquals(volume.getStorageID(), storageID);
+    assertEquals(volume.getClusterID(), clusterID);
+    assertEquals(volume.getDatanodeUuid(), datanodeUuid);
+    assertEquals(volume.getCTime(), cTime);
+    assertEquals(volume.getLayoutVersion(), layoutVersion);
   }
 
   @Test

@@ -78,6 +78,18 @@ public interface SCMSecurityProtocol {
       String certSignReq) throws IOException;
 
   /**
+   * Get signed certificate for SCM.
+   *
+   * @param scmNodeDetails  - SCM Node Details.
+   * @param certSignReq     - Certificate signing request.
+   * @param isRenew         - if SCM is renewing certificate or not.
+   * @return String         - pem encoded SCM signed
+   *                          certificate.
+   */
+  String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq, boolean isRenew) throws IOException;
+
+  /**
    * Get SCM signed certificate for given certificate serial id if it exists.
    * Throws exception if it's not found.
    *
@@ -178,4 +190,11 @@ public interface SCMSecurityProtocol {
    */
   List<String> getAllRootCaCertificates() throws IOException;
 
+  /**
+   * Remove all expired certificates from the SCM metadata store.
+   *
+   * @return list of the removed certificates
+   * @throws IOException
+   */
+  List<String> removeExpiredCertificates() throws IOException;
 }

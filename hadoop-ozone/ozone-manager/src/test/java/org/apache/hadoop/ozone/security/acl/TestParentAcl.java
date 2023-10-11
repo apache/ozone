@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,11 +46,13 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import java.io.File;
 import java.io.IOException;
@@ -90,14 +93,15 @@ public class TestParentAcl {
   private static UserGroupInformation adminUgi;
   private static UserGroupInformation testUgi, testUgi1;
   private static OzoneManagerProtocol writeClient;
+  private static File testDir;
 
   @BeforeClass
   public static void setup() throws IOException, AuthenticationException {
     ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    ozConfig.set(OZONE_METADATA_DIRS, dir.toString());
+    testDir = GenericTestUtils.getRandomizedTestDir();
+    ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
     OmTestManagers omTestManagers =
@@ -119,8 +123,13 @@ public class TestParentAcl {
         new String[]{"test1"});
   }
 
+  @AfterClass
+  public static void cleanup() throws IOException {
+    FileUtils.deleteDirectory(testDir);
+  }
+
   @Test
-  @Flaky("HDDS-6335") @Ignore("HDDS-6335")
+  @Category(UnhealthyTest.class) @Unhealthy("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;

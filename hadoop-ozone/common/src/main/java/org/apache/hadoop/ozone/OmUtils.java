@@ -241,6 +241,7 @@ public final class OmUtils {
     case ListBuckets:
     case LookupKey:
     case ListKeys:
+    case ListKeysLight:
     case ListTrash:
     case ServiceList:
     case ListMultiPartUploadParts:
@@ -257,7 +258,6 @@ public final class OmUtils {
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
-    case EchoRPC:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -269,6 +269,8 @@ public final class OmUtils {
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
     case TransferLeadership:
+    case SetSafeMode:
+    case PrintCompactionLogDag:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -319,8 +321,12 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
     case UnknownCommand:
       return false;
+    case EchoRPC:
+      return omRequest.getEchoRPCRequest().getReadOnly();
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
