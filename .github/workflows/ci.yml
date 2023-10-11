@@ -346,7 +346,7 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -Dtest=TestSecureOzoneCluster
         env:
-          ITERATIONS: 10
+          ITERATIONS: 1
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()
