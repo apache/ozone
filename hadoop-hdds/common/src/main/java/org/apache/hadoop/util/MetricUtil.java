@@ -18,17 +18,16 @@
 package org.apache.hadoop.util;
 
 import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
-import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
 /**
  * Encloses helpers to deal with metrics.
@@ -36,14 +35,13 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
 public final class MetricUtil {
 
   private static final ExecutorService EXECUTOR =
-      Executors.newFixedThreadPool(10,
-          new ThreadFactoryBuilder().setDaemon(true)
-              .setNameFormat("metrics-mutable-rate-handler-%d").build());
-
-  static {
-    ShutdownHookManager.get().addShutdownHook(() -> EXECUTOR.shutdownNow(),
-        DEFAULT_SHUTDOWN_HOOK_PRIORITY);
-  }
+      new ThreadPoolExecutor(1, 10, 100, TimeUnit.MILLISECONDS,
+          new LinkedBlockingQueue<>(),
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("metric-mutable-rate-handler-%d")
+              .build(),
+          new ThreadPoolExecutor.CallerRunsPolicy());
 
   private MetricUtil() {
   }
@@ -83,9 +81,7 @@ public final class MetricUtil {
 
   public static void executeStatAddAction(Consumer<Long> metric,
                                           long statValue) {
-    if (!EXECUTOR.isTerminated() && !EXECUTOR.isShutdown()) {
-      EXECUTOR.submit(() -> metric.accept(statValue));
-    }
+    EXECUTOR.submit(() -> metric.accept(statValue));
   }
 
 }
