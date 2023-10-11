@@ -30,7 +30,7 @@ on:
         required: false
       iterations:
         description: Number of Iterations per split
-        default: 10
+        default: 100
         required: true
       splits:
         description: Number of splits
