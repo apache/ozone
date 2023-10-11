@@ -660,7 +660,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       }
     };
 
-    for (String invalidKeyName : invalidKeyScenarios.keySet()) {
+    for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
+      String invalidKeyName = entry.getKey();
+      String expectedErrorMessage = entry.getValue();
+
       KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
           .setVolumeName(volumeName).setBucketName(bucketName)
           .setKeyName(invalidKeyName);
@@ -676,8 +679,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       OMException ex = Assert.assertThrows(OMException.class,
           () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
       );
-      Assert.assertTrue(ex.getMessage().contains(
-          invalidKeyScenarios.get(invalidKeyName)));
+      Assert.assertTrue(ex.getMessage().contains(expectedErrorMessage));
     }
   }
 

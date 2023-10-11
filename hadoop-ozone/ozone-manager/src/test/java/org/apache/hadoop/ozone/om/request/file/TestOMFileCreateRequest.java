@@ -505,7 +505,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       }
     };
 
-    for (String invalidKeyName : invalidKeyScenarios.keySet()) {
+    for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
+      String invalidKeyName = entry.getKey();
+      String expectedErrorMessage = entry.getValue();
+
       OMRequest omRequest = createFileRequest(volumeName, bucketName,
           invalidKeyName, HddsProtos.ReplicationFactor.ONE,
           HddsProtos.ReplicationType.RATIS, false, false);
@@ -516,8 +519,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       OMException ex = Assert.assertThrows(OMException.class,
           () -> omFileCreateRequest.preExecute(ozoneManager));
 
-      Assert.assertTrue(ex.getMessage().contains(
-          invalidKeyScenarios.get(invalidKeyName)));
+      Assert.assertTrue(ex.getMessage().contains(expectedErrorMessage));
     }
   }
 
