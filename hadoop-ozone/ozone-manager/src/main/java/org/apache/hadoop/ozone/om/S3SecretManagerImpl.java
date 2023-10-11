@@ -38,16 +38,18 @@ public class S3SecretManagerImpl implements S3SecretManager {
 
   private final S3SecretStore s3SecretStore;
   private final S3SecretCache s3SecretCache;
+  private OzoneManager ozonemanager;
 
   /**
    * Constructs S3SecretManager.
    * @param s3SecretStore s3 secret store.
    * @param s3SecretCache s3 secret cache.
    */
-  public S3SecretManagerImpl(S3SecretStore s3SecretStore,
+  public S3SecretManagerImpl(OzoneManager om, S3SecretStore s3SecretStore,
                              S3SecretCache s3SecretCache) {
     this.s3SecretStore = s3SecretStore;
     this.s3SecretCache = s3SecretCache;
+    this.ozonemanager = om;
   }
 
   @Override
@@ -61,6 +63,11 @@ public class S3SecretManagerImpl implements S3SecretManager {
     if (cacheValue != null) {
       return new S3SecretValue(cacheValue.getKerberosID(),
           cacheValue.getAwsSecret());
+    }
+    try {
+      ozonemanager.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     }
     S3SecretValue result = s3SecretStore.getSecret(kerberosID);
     LOG.info("Get secret for kerberosID:{} from store:{}", kerberosID,

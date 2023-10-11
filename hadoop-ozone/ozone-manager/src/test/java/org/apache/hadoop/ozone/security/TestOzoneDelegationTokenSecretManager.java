@@ -111,7 +111,7 @@ public class TestOzoneDelegationTokenSecretManager {
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf, om);
     Mockito.when(om.getMetadataManager()).thenReturn(metadataManager);
     s3SecretManager = new S3SecretLockedManager(
-        new S3SecretManagerImpl(new S3SecretStoreMap(s3Secrets),
+        new S3SecretManagerImpl(mock(OzoneManager.class), new S3SecretStoreMap(s3Secrets),
             Mockito.mock(S3SecretCache.class)),
         metadataManager.getLock()
     );
