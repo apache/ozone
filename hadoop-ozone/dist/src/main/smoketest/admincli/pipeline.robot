@@ -41,7 +41,6 @@ List pipeline with json option
 
     Should be true      $output
 
-
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
                         Should contain   ${output}   STANDALONE/ONE
