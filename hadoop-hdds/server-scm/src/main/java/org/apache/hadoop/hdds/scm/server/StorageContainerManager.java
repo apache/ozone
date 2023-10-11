@@ -372,7 +372,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
-    threadNamePrefix = HddsUtils.threadNamePrefix(getScmId());
+    threadNamePrefix = getScmNodeDetails().threadNamePrefix();
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
 
     jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
