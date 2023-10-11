@@ -314,7 +314,8 @@ public class TestStorageContainerManager {
       TestStorageContainerManagerHelper helper =
           new TestStorageContainerManagerHelper(cluster, conf);
       Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
-
+      // Wait for container report
+      Thread.sleep(2000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
@@ -323,7 +324,7 @@ public class TestStorageContainerManager {
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
       // Wait for container report
-      Thread.sleep(3000);
+      Thread.sleep(1000);
       // Verify a few TX gets created in the TX log.
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
       LOG.error("Before wait for number of valid transactions..");
