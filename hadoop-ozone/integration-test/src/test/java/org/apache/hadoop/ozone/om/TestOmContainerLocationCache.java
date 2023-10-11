@@ -557,7 +557,8 @@ public class TestOmContainerLocationCache {
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
             any(ReplicationConfig.class),
             Mockito.anyString(),
-            any(ExcludeList.class)))
+            any(ExcludeList.class),
+            Mockito.anyString()))
         .thenReturn(Collections.singletonList(block));
   }
 
