@@ -54,13 +54,19 @@ public class S3SecretManagerImpl implements S3SecretManager {
   public S3SecretValue getSecret(String kerberosID) throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
+    LOG.info("Get secret for kerberosID:{}", kerberosID);
     S3SecretValue cacheValue = s3SecretCache.get(kerberosID);
+    LOG.info("Get secret for kerberosID:{} from cache:{}", kerberosID,
+        cacheValue);
     if (cacheValue != null) {
       return new S3SecretValue(cacheValue.getKerberosID(),
           cacheValue.getAwsSecret());
     }
     S3SecretValue result = s3SecretStore.getSecret(kerberosID);
+    LOG.info("Get secret for kerberosID:{} from store:{}", kerberosID,
+        result);
     if (result != null) {
+      LOG.info("Update cache for kerberosID:{}", kerberosID);
       updateCache(kerberosID, result);
     }
     return result;

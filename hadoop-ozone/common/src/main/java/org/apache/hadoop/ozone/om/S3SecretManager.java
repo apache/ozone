@@ -96,6 +96,7 @@ public interface S3SecretManager {
   default void updateCache(String accessId, S3SecretValue secret) {
     S3SecretCache cache = cache();
     if (cache != null) {
+      LOG.info("Updating cache for accessId/user: {}.", accessId);
       cache.put(accessId, secret);
     }
   }
