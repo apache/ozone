@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -82,6 +83,14 @@ public final class MetricUtil {
   public static void executeStatAddAction(Consumer<Long> metric,
                                           long statValue) {
     EXECUTOR.submit(() -> metric.accept(statValue));
+  }
+
+  @VisibleForTesting
+  public static void awaitExecutionOfStatsUpdateMethods()
+      throws InterruptedException {
+    while (((ThreadPoolExecutor)EXECUTOR).getActiveCount() > 0) {
+      Thread.sleep(500);
+    }
   }
 
 }
