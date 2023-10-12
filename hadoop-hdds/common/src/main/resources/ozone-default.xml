@@ -4228,4 +4228,20 @@
       to existing buckets till this operation is completed.
     </description>
   </property>
+  <property>
+    <name>recon.om.snapshot.full.update.interval.enable</name>
+    <value>false</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Whether to enable recon to fetch ozone manager rocks DB from ozone manager regularly
+    </description>
+  </property>
+  <property>
+    <name>recon.om.snapshot.full.update.interval.delay</name>
+    <value>12h</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Recon regularly fetches ozone manager rocks DB from ozone manager and updates recon rocks DB information
+    </description>
+  </property>
 </configuration>

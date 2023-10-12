@@ -65,20 +65,24 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_ENABLE;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_ENABLE_DEFAULT;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -96,6 +100,7 @@ public class OzoneManagerServiceProviderImpl
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
+  private long lastActivity = System.currentTimeMillis();
   private URLConnectionFactory connectionFactory;
 
   private File omSnapshotDBParentDir = null;
@@ -492,8 +497,21 @@ public class OzoneManagerServiceProviderImpl
         LOG.debug("Seq number of Recon's OM DB : {}", currentSequenceNumber);
         boolean fullSnapshot = false;
 
-        if (currentSequenceNumber <= 0) {
+        long fullUpdateinterval = configuration.getTimeDuration(
+                RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY,
+                configuration.get(
+                        RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY,
+                        RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY_DEFAULT),
+                TimeUnit.MILLISECONDS);
+        boolean enableFullUpdate = configuration.getBoolean(
+                RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_ENABLE,
+                RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_ENABLE_DEFAULT);
+        long timeInterval = System.currentTimeMillis() - lastActivity;
+
+        if (currentSequenceNumber <= 0 ||
+                (enableFullUpdate && timeInterval > fullUpdateinterval)) {
           fullSnapshot = true;
+          lastActivity = System.currentTimeMillis();
         } else {
           try (OMDBUpdatesHandler omdbUpdatesHandler =
               new OMDBUpdatesHandler(omMetadataManager)) {

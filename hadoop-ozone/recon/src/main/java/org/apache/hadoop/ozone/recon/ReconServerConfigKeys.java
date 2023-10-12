@@ -168,6 +168,18 @@ public final class  ReconServerConfigKeys {
 
   public static final String
       OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+
+  public static final String RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_ENABLE =
+          "recon.om.snapshot.full.update.interval.enable";
+
+  public static final boolean
+          RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_ENABLE_DEFAULT = false;
+
+  public static final String RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY =
+          "recon.om.snapshot.full.update.interval.delay";
+
+  public static final String
+          RECON_OM_SNAPSHOT_FULL_UPDATE_INTERVAL_DALAY_DEFAULT = "12h";
   /**
    * Private constructor for utility class.
    */
