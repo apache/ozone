@@ -288,7 +288,7 @@ public class TestStorageContainerManager {
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-        3000,
+        1000,
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
@@ -374,7 +374,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 1000, 20000);
+      }, 500, 20000);
     } finally {
       cluster.shutdown();
     }
