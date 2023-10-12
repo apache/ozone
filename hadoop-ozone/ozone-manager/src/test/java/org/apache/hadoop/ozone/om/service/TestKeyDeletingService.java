@@ -172,7 +172,7 @@ public class TestKeyDeletingService {
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
         //failCallsFrequency = 1 , means all calls fail.
-        new ScmBlockLocationTestingClient(null, null, 1);
+        new ScmBlockLocationTestingClient(null, null, 1, conf);
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, null);
     KeyManager keyManager = omTestManagers.getKeyManager();
@@ -217,7 +217,7 @@ public class TestKeyDeletingService {
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
         //failCallsFrequency = 1 , means all calls fail.
-        new ScmBlockLocationTestingClient(null, null, 1);
+        new ScmBlockLocationTestingClient(null, null, 1, conf);
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, null);
     KeyManager keyManager = omTestManagers.getKeyManager();
@@ -264,7 +264,7 @@ public class TestKeyDeletingService {
     OzoneConfiguration conf = createConfAndInitValues();
     ScmBlockLocationProtocol blockClient =
         //failCallsFrequency = 1 , means all calls fail.
-        new ScmBlockLocationTestingClient(null, null, 1);
+        new ScmBlockLocationTestingClient(null, null, 1, conf);
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, blockClient, null);
     KeyManager keyManager = omTestManagers.getKeyManager();

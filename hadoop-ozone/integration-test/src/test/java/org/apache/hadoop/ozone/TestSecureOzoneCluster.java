@@ -263,7 +263,7 @@ final class TestSecureOzoneCluster {
       clusterId = UUID.randomUUID().toString();
       scmId = UUID.randomUUID().toString();
       omId = UUID.randomUUID().toString();
-      scmBlockClient = new ScmBlockLocationTestingClient(null, null, 0);
+      scmBlockClient = new ScmBlockLocationTestingClient(null, null, 0, conf);
 
       startMiniKdc();
       setSecureConfig();

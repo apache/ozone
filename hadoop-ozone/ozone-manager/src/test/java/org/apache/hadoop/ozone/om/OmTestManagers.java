@@ -88,7 +88,7 @@ public final class OmTestManagers {
           Mockito.mock(StorageContainerLocationProtocol.class);
     }
     scmBlockClient = blockClient != null ? blockClient :
-        new ScmBlockLocationTestingClient(null, null, 0);
+        new ScmBlockLocationTestingClient(null, null, 0, conf);
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);

@@ -211,7 +211,7 @@ public class TestOzoneManagerListVolumesSecure {
 
     om = OzoneManager.createOm(conf);
     om.setScmBlockLocationClient(new ScmBlockLocationClient(
-        new ScmBlockLocationTestingClient(null, null, 0)));
+        new ScmBlockLocationTestingClient(null, null, 0, conf)));
     om.setCertClient(new CertificateClientTestImpl(conf));
     om.start();
 

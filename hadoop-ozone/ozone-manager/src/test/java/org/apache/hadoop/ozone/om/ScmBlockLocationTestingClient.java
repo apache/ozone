@@ -24,9 +24,11 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -78,6 +80,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
 
   // The number of blocks deleted by this client
   private int numBlocksDeleted = 0;
+  private OzoneConfiguration conf;
 
   /**
    * If ClusterID or SCMID is blank a per instance ID is generated.
@@ -88,12 +91,13 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
    * a positive number for that frequency of failure.
    */
   public ScmBlockLocationTestingClient(String clusterID, String scmId,
-      int failCallsFrequency) {
+      int failCallsFrequency, OzoneConfiguration conf) {
     this.clusterID = StringUtils.isNotBlank(clusterID) ? clusterID :
         UUID.randomUUID().toString();
     this.scmId = StringUtils.isNotBlank(scmId) ? scmId :
         UUID.randomUUID().toString();
     this.failCallsFrequency = Math.abs(failCallsFrequency);
+    this.conf = conf;
     switch (this.failCallsFrequency) {
     case 0:
       LOG.debug("Set to no failure mode, all delete block calls will " +
@@ -200,8 +204,11 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   }
 
   @Override
-  public String getTopologyInformation() throws IOException {
-    return null;
+  public String getTopologyInformation() {
+    String schemaFile = conf.get(
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
+        ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT);
+    return schemaFile;
   }
 
   /**

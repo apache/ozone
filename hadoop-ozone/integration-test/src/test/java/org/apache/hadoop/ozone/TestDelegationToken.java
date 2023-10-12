@@ -294,7 +294,7 @@ public final class TestDelegationToken {
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.setScmBlockLocationClient(new ScmBlockLocationClient(
-          new ScmBlockLocationTestingClient(null, null, 0)));
+          new ScmBlockLocationTestingClient(null, null, 0, conf)));
       om.start();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       String username = ugi.getUserName();
