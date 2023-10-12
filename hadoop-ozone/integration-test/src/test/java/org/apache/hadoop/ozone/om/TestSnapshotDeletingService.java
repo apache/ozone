@@ -147,6 +147,7 @@ public class TestSnapshotDeletingService {
   }
 
   @Test
+  @Flaky("HDDS-9288")
   public void testMultipleSnapshotKeyReclaim() throws Exception {
 
     Table<String, RepeatedOmKeyInfo> deletedTable =

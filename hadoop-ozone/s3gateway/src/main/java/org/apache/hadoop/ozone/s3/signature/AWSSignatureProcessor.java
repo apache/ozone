@@ -95,6 +95,8 @@ public class AWSSignatureProcessor implements SignatureProcessor {
           "", "", "", "", "", "", "", false
       );
     }
+    signatureInfo.setUnfilteredURI(
+        context.getUriInfo().getRequestUri().getPath());
     return signatureInfo;
   }
 

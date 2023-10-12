@@ -33,8 +33,11 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +48,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -56,6 +60,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -390,7 +396,7 @@ public class TestOmMetadataManager {
     // List all keys which have prefix "key-a"
     List<OmKeyInfo> omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            null, prefixKeyA, 100);
+            null, prefixKeyA, 100).getKeys();
 
     assertEquals(omKeyInfoList.size(),  50);
 
@@ -403,7 +409,7 @@ public class TestOmMetadataManager {
     String startKey = prefixKeyA + 10;
     omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            startKey, prefixKeyA, 100);
+            startKey, prefixKeyA, 100).getKeys();
 
     assertEquals(keysASet.tailSet(
         startKey).size() - 1, omKeyInfoList.size());
@@ -411,7 +417,7 @@ public class TestOmMetadataManager {
     startKey = prefixKeyA + 38;
     omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            startKey, prefixKeyA, 100);
+            startKey, prefixKeyA, 100).getKeys();
 
     assertEquals(keysASet.tailSet(
         startKey).size() - 1, omKeyInfoList.size());
@@ -426,7 +432,7 @@ public class TestOmMetadataManager {
 
 
     omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
-        null, prefixKeyB, 100);
+        null, prefixKeyB, 100).getKeys();
 
     assertEquals(omKeyInfoList.size(),  50);
 
@@ -442,7 +448,7 @@ public class TestOmMetadataManager {
     for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
-          startKey, prefixKeyB, 10);
+          startKey, prefixKeyB, 10).getKeys();
 
       assertEquals(10, omKeyInfoList.size());
 
@@ -460,13 +466,13 @@ public class TestOmMetadataManager {
     // As now we have iterated all 50 buckets, calling next time should
     // return empty list.
     omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
-        startKey, prefixKeyB, 10);
+        startKey, prefixKeyB, 10).getKeys();
 
     assertEquals(omKeyInfoList.size(), 0);
 
     // List all keys with empty prefix
     omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-        null, null, 100);
+        null, null, 100).getKeys();
     assertEquals(50, omKeyInfoList.size());
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       assertTrue(omKeyInfo.getKeyName().startsWith(
@@ -509,7 +515,7 @@ public class TestOmMetadataManager {
     // Now list keys which match with prefixKeyA.
     List<OmKeyInfo> omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            null, prefixKeyA, 100);
+            null, prefixKeyA, 100).getKeys();
 
     // As in total 100, 50 are marked for delete. It should list only 50 keys.
     assertEquals(50, omKeyInfoList.size());
@@ -530,7 +536,7 @@ public class TestOmMetadataManager {
     for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-          startKey, prefixKeyA, 10);
+          startKey, prefixKeyA, 10).getKeys();
 
       System.out.println(i);
       assertEquals(10, omKeyInfoList.size());
@@ -549,7 +555,7 @@ public class TestOmMetadataManager {
     // As now we have iterated all 50 buckets, calling next time should
     // return empty list.
     omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-        startKey, prefixKeyA, 10);
+        startKey, prefixKeyA, 10).getKeys();
 
     assertEquals(omKeyInfoList.size(), 0);
 
@@ -579,6 +585,11 @@ public class TestOmMetadataManager {
   @Test
   public void testGetExpiredOpenKeysExcludeMPUsFSO() throws Exception {
     testGetExpiredOpenKeysExcludeMPUKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Test
+  public void testGetExpiredMultipartUploads() throws Exception {
+    testGetExpiredMPUs();
   }
 
   private void testGetExpiredOpenKeys(BucketLayout bucketLayout)
@@ -747,12 +758,106 @@ public class TestOmMetadataManager {
         .isEmpty());
   }
 
+  private void testGetExpiredMPUs() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final int numExpiredMPUs = 4;
+    final int numUnexpiredMPUs = 1;
+    final int numPartsPerMPU = 5;
+    // To create expired keys, they will be assigned a creation time as
+    // old as the minimum expiration time.
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+
+    final long expiredMPUCreationTime =
+        Instant.now().minus(expireThreshold).toEpochMilli();
+
+    // Add expired MPUs to multipartInfoTable.
+    // The method under test does not check for expired open keys in the
+    // cache, since they will be picked up once the cache is flushed.
+    Set<String> expiredMPUs = new HashSet<>();
+    for (int i = 0; i < numExpiredMPUs + numUnexpiredMPUs; i++) {
+      final long creationTime = i < numExpiredMPUs ?
+          expiredMPUCreationTime : Instant.now().toEpochMilli();
+
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      final OmMultipartKeyInfo mpuKeyInfo = OMRequestTestUtils
+          .createOmMultipartKeyInfo(uploadId, creationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+
+      String keyName = "expired" + i;
+      // Key info to construct the MPU DB key
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+          bucketName, keyName, HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, 0L, creationTime);
+
+
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        PartKeyInfo partKeyInfo = OMRequestTestUtils
+            .createPartKeyInfo(volumeName, bucketName, keyName, uploadId, j);
+        OMRequestTestUtils.addPart(partKeyInfo, mpuKeyInfo);
+      }
+
+      final String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+
+      expiredMPUs.add(mpuDbKey);
+    }
+
+    // Test retrieving fewer expire MPU parts than actually exist (exact).
+    List<ExpiredMultipartUploadsBucket>
+        someExpiredMPUs = omMetadataManager.getExpiredMultipartUploads(
+        expireThreshold,
+        (numExpiredMPUs * numPartsPerMPU) - (numPartsPerMPU));
+    List<String> names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(numExpiredMPUs - 1, names.size());
+    assertTrue(expiredMPUs.containsAll(names));
+
+    // Test retrieving fewer expire MPU parts than actually exist (round up).
+    someExpiredMPUs = omMetadataManager.getExpiredMultipartUploads(
+        expireThreshold,
+        (numExpiredMPUs * numPartsPerMPU) - (numPartsPerMPU + 1));
+    names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(numExpiredMPUs - 1, names.size());
+    assertTrue(expiredMPUs.containsAll(names));
+
+    // Test attempting to retrieving more expire MPU parts than actually exist.
+    List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            (numExpiredMPUs * numPartsPerMPU) + numPartsPerMPU);
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(numExpiredMPUs, names.size());
+    assertTrue(expiredMPUs.containsAll(names));
+
+    // Test retrieving exact amount of MPU parts than actually exist.
+    allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            (numExpiredMPUs * numPartsPerMPU));
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(numExpiredMPUs, names.size());
+    assertTrue(expiredMPUs.containsAll(names));
+  }
+
   private List<String> getOpenKeyNames(
       Collection<OpenKeyBucket.Builder> openKeyBuckets) {
     return openKeyBuckets.stream()
         .map(OpenKeyBucket.Builder::getKeysList)
         .flatMap(List::stream)
         .map(OpenKey::getName)
+        .collect(Collectors.toList());
+  }
+
+  private List<String> getMultipartKeyNames(
+      List<ExpiredMultipartUploadsBucket> expiredMultipartUploadsBuckets) {
+    return expiredMultipartUploadsBuckets.stream()
+        .map(ExpiredMultipartUploadsBucket::getMultipartUploadsList)
+        .flatMap(List::stream)
+        .map(ExpiredMultipartUploadInfo::getName)
         .collect(Collectors.toList());
   }
 

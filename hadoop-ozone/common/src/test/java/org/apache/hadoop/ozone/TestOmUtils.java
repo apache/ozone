@@ -43,7 +43,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Unit tests for {@link OmUtils}.
@@ -54,7 +56,7 @@ public class TestOmUtils {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public Timeout timeout = Timeout.seconds(60);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(60));
 
 
   @Test

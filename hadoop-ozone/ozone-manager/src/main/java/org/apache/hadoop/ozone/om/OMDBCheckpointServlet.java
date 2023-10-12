@@ -594,9 +594,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     if (completed) {
       // Only create the hard link list for the last tarball.
       if (!hardLinkFiles.isEmpty()) {
-        Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-        includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
-            archiveOutputStream);
+        Path hardLinkFile = null;
+        try {
+          hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
+          includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
+              archiveOutputStream);
+        } finally {
+          if (Objects.nonNull(hardLinkFile)) {
+            try {
+              Files.delete(hardLinkFile);
+            } catch (Exception e) {
+              LOG.error("Exception during hard link file: {} deletion",
+                  hardLinkFile, e);
+            }
+          }
+        }
       }
       // Mark tarball completed.
       includeRatisSnapshotCompleteFlag(archiveOutputStream);

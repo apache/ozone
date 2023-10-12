@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -202,8 +204,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return a list of keys.
    * @throws IOException
    */
-  List<OmKeyInfo> listKeys(String volumeName,
-      String bucketName, String startKey, String keyPrefix, int maxKeys)
+  ListKeysResult listKeys(String volumeName,
+                          String bucketName, String startKey, String keyPrefix,
+                          int maxKeys)
       throws IOException;
 
   /**
@@ -278,6 +281,23 @@ public interface OMMetadataManager extends DBStoreHAManager {
       BucketLayout bucketLayout) throws IOException;
 
   /**
+   * Returns the names of up to {@code count} MPU key whose age is greater
+   * than or equal to {@code expireThreshold}.
+   *
+   * @param expireThreshold The threshold of MPU key expiration age.
+   * @param maxParts The threshold of number of MPU parts to return.
+   *                 This is a soft limit, which means if the last MPU has
+   *                 parts that exceed this limit, it will be included
+   *                 in the returned expired MPUs. This is to handle
+   *                 situation where MPU that has more parts than
+   *                 maxParts never get deleted.
+   * @return a {@link List} of {@link ExpiredMultipartUploadsBucket}, the
+   *         expired multipart uploads, grouped by volume and bucket.
+   */
+  List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
+      Duration expireThreshold, int maxParts) throws IOException;
+
+  /**
    * Retrieve RWLock for the table.
    * @param tableName table name.
    * @return ReentrantReadWriteLock
@@ -348,7 +368,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmPrefixInfo> getPrefixTable();
 
   /**
-   * Returns the DB key name of a multipart upload key in OM metadata store.
+   * Returns the DB key name of a multipart upload key in OM metadata store
+   * for LEGACY/OBS buckets.
    *
    * @param volume - volume name
    * @param bucket - bucket name
@@ -510,7 +531,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getRenameKey(String volume, String bucket, long objectID);
 
   /**
-   * Returns the DB key name of a multipart upload key in OM metadata store.
+   * Returns the DB key name of a multipart upload key in OM metadata store
+   * for FSO-enabled buckets.
    *
    * @param volumeId       - ID of the volume
    * @param bucketId       - ID of the bucket

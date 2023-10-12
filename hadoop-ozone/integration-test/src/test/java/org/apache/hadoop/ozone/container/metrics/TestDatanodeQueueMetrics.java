@@ -28,7 +28,9 @@ import org.junit.Rule;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +60,7 @@ public class TestDatanodeQueueMetrics {
       .getLogger(TestDatanodeQueueMetrics.class);
 
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300_000));
 
   /**
    * Create a MiniDFSCluster for testing.

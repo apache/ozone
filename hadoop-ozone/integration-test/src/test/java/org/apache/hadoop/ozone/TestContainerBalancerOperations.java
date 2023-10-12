@@ -24,12 +24,16 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.util.Optional;
 
@@ -46,7 +50,7 @@ public class TestContainerBalancerOperations {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static ScmClient containerBalancerClient;
   private static MiniOzoneCluster cluster;
@@ -74,8 +78,9 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
-  @Ignore("Since the cluster doesn't have unbalanced nodes, ContainerBalancer" +
-      " stops before the assertion checks whether balancer is running.")
+  @Category(UnhealthyTest.class) @Unhealthy("Since the cluster doesn't have " +
+      "unbalanced nodes, ContainerBalancer stops before the assertion checks " +
+      "whether balancer is running.")
   public void testContainerBalancerCLIOperations() throws Exception {
     // test normally start and stop
     boolean running = containerBalancerClient.getContainerBalancerStatus();

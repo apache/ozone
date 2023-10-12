@@ -64,9 +64,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -248,7 +248,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
    * 2. writeChunk
    * */
   @Test
-  @Disabled("Needs to be moved out of this class as  client setup is static")
+  @Unhealthy("Needs to be moved out of this class as  client setup is static")
   public void testKeyOpFailureWithoutBlockToken() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
