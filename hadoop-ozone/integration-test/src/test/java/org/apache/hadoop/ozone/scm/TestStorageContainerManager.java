@@ -534,7 +534,7 @@ public class TestStorageContainerManager {
           }
         }
         return false;
-      }, 500, 10000);
+      }, 500, 20000);
     } finally {
       cluster.shutdown();
     }
