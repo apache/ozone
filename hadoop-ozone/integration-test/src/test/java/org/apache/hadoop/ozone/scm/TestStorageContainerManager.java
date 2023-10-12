@@ -315,7 +315,7 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
       Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
       // Wait for container report
-      Thread.sleep(2000);
+      Thread.sleep(1000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
@@ -338,11 +338,13 @@ public class TestStorageContainerManager {
             cluster.getStorageContainerManager().getScmHAManager()
                 .asSCMHADBTransactionBuffer().flush();
           }
-          return delLog.getNumOfValidTransactions() == 0;
+          int numOfValidTransactions = delLog.getNumOfValidTransactions();
+          LOG.info("numOfValidTransactions: {}", numOfValidTransactions);
+          return numOfValidTransactions == 0;
         } catch (IOException e) {
           return false;
         }
-      }, 1000, 20000);
+      }, 500, 20000);
       Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.

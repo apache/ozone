@@ -185,14 +185,14 @@ public class SCMBlockDeletingService extends BackgroundService
                   new CommandForDatanode<>(dnId, command));
               metrics.incrBlockDeletionCommandSent();
               metrics.incrBlockDeletionTransactionSent(dnTXs.size());
-              if (LOG.isDebugEnabled()) {
-                LOG.debug(
+              //if (LOG.isDebugEnabled()) {
+                LOG.info(
                     "Added delete block command for datanode {} in the queue,"
                         + " number of delete block transactions: {}{}", dnId,
                     dnTXs.size(), LOG.isTraceEnabled() ?
                         ", TxID list: " + String.join(",",
                             transactions.getTransactionIDList(dnId)) : "");
-              }
+              //}
             }
           }
           LOG.info("Totally added {} blocks to be deleted for"
