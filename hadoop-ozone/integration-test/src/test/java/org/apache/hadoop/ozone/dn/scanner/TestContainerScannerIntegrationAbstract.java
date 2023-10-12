@@ -48,7 +48,9 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -83,7 +85,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;

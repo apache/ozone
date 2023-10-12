@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +67,6 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
-@Flaky("HDDS-2961")
 public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;

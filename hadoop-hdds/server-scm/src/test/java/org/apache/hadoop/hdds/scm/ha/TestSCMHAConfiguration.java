@@ -17,16 +17,22 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.TimeDuration;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -202,6 +208,18 @@ class TestSCMHAConfiguration {
         scmServiceId, "scm1"), 9999));
 
 
+    final ScmRatisServerConfig scmRatisConfig = conf.getObject(
+        ScmRatisServerConfig.class);
+    assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
+        "getLogAppenderWaitTimeMin");
+
+    final File testDir = GenericTestUtils.getRandomizedTestDir();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+
+    final RaftProperties p = RatisUtil.newRaftProperties(conf);
+    final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
+    assertEquals(TimeDuration.ZERO, t,
+        RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
 

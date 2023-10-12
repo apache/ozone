@@ -688,18 +688,18 @@ public class TestECContainerReplicaCount {
             1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertTrue(rcnt.isSufficientlyReplicatedForOffline(
-        offlineReplica.getDatanodeDetails()));
+        offlineReplica.getDatanodeDetails(), null));
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        offlineNotReplicated.getDatanodeDetails()));
+        offlineNotReplicated.getDatanodeDetails(), null));
 
     // A random DN not hosting a replica for this container should return false.
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        MockDatanodeDetails.randomDatanodeDetails()));
+        MockDatanodeDetails.randomDatanodeDetails(), null));
 
     // Passing the IN_SERVICE node should return false even though the
     // replica is on a healthy node
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        inServiceReplica.getDatanodeDetails()));
+        inServiceReplica.getDatanodeDetails(), null));
   }
 
   @Test

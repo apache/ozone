@@ -45,7 +45,9 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -79,7 +81,7 @@ public abstract class TestInputStreamBase {
   protected static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {

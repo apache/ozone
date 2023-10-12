@@ -47,7 +47,6 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -64,7 +63,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Test container closing.
  */
-@Flaky("HDDS-3263")
 public class TestCloseContainerByPipeline {
 
   private static MiniOzoneCluster cluster;

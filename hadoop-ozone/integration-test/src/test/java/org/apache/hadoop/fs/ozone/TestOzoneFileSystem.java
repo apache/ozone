@@ -66,7 +66,9 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -155,7 +157,7 @@ public class TestOzoneFileSystem {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(600);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);

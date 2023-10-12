@@ -606,4 +606,9 @@ public final class OzoneConsts {
    */
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
+  /**
+   * DB compaction log table name. Referenced in RDBStore.
+   */
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
 }

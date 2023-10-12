@@ -64,7 +64,9 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -97,7 +99,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private OzoneConfiguration ozoneConfig;
   private OzoneClient ozClient = null;

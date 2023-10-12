@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import javax.annotation.Nonnull;
-import java.util.function.IntFunction;
 
 /**
  * Codec to serialize/deserialize {@link Boolean}.
@@ -44,7 +43,7 @@ public final class BooleanCodec implements Codec<Boolean> {
 
   @Override
   public CodecBuffer toCodecBuffer(Boolean object,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
     return allocator.apply(1).put(TRUE);
   }
 
