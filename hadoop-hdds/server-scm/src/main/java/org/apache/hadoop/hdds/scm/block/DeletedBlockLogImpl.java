@@ -255,12 +255,12 @@ public class DeletedBlockLogImpl
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
             // Mostly likely it's a retried delete command response.
-            //if (LOG.isDebugEnabled()) {
-              LOG.info(
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(
                   "Transaction txId={} commit by dnId={} for containerID={}"
                       + " failed. Corresponding entry not found.", txID, dnID,
                   containerId);
-            //}
+            }
             continue;
           }
 
@@ -281,17 +281,16 @@ public class DeletedBlockLogImpl
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
               transactionToRetryCountMap.remove(txID);
-              //if (LOG.isDebugEnabled()) {
-                LOG.info("Purging txId={} from block deletion log by dnId={}",
-                    txID, dnID);
-              //}
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Purging txId={} from block deletion log", txID);
+              }
               txIDsToBeDeleted.add(txID);
             }
           }
-          //if (LOG.isDebugEnabled()) {
-            LOG.info("Datanode txId={} containerId={} committed by dnId={}",
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
                 txID, containerId, dnID);
-          //}
+          }
         } catch (IOException e) {
           LOG.warn("Could not commit delete block transaction: " +
               transactionResult.getTxID(), e);
@@ -299,8 +298,6 @@ public class DeletedBlockLogImpl
       }
       try {
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
-        LOG.info("Transactions deleted : {} by dnId={}", txIDsToBeDeleted,
-            dnID);
         metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
       } catch (IOException e) {
         LOG.warn("Could not commit delete block transactions: "

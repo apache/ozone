@@ -474,6 +474,7 @@ public class TestStorageContainerManager {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
@@ -504,6 +505,7 @@ public class TestStorageContainerManager {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
       }
+
       createDeleteTXLog(cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
       // Verify a few TX gets created in the TX log.
