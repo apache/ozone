@@ -41,7 +41,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 
 /**
  * Class tests OzoneManagerLock.
@@ -427,7 +426,7 @@ public class TestOzoneManagerLock {
                  Mockito.mockStatic(MetricUtil.class)) {
           metricUtilMock.when(() ->
                   MetricUtil.executeStatAddAction(any(Consumer.class),
-                      anyLong()))
+                      any()))
               .thenAnswer((invocation) -> {
                 ((Consumer) invocation.getArguments()[0])
                     .accept(invocation.getArguments()[1]);
@@ -474,7 +473,7 @@ public class TestOzoneManagerLock {
                  Mockito.mockStatic(MetricUtil.class)) {
           metricUtilMock.when(() ->
                   MetricUtil.executeStatAddAction(any(Consumer.class),
-                      anyLong()))
+                      any()))
               .thenAnswer((invocation) -> {
                 ((Consumer) invocation.getArguments()[0])
                     .accept(invocation.getArguments()[1]);
@@ -521,7 +520,7 @@ public class TestOzoneManagerLock {
         try (MockedStatic<MetricUtil> metricUtilMock =
                  Mockito.mockStatic(MetricUtil.class)) {
           metricUtilMock.when(() -> MetricUtil.executeStatAddAction(
-              any(Consumer.class), anyLong())).thenAnswer((invocation) -> {
+              any(Consumer.class), any())).thenAnswer((invocation) -> {
                 ((Consumer) invocation.getArguments()[0])
                     .accept(invocation.getArguments()[1]);
                 return null;
