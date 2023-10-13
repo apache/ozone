@@ -67,6 +67,8 @@ public abstract class SCMCommonPlacementPolicy implements
   private final Random rand = new Random();
   private final ConfigurationSource conf;
   private final boolean shouldRemovePeers;
+  private static boolean considerDatanodeStorage;
+  private static double datanodeStorageRateLimit;
 
   /**
    * Return for replication factor 1 containers where the placement policy
@@ -101,6 +103,8 @@ public abstract class SCMCommonPlacementPolicy implements
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.shouldRemovePeers = ScmUtils.shouldRemovePeers(conf);
+    this.considerDatanodeStorage = ScmUtils.shouldConsiderDatanodeStorage(conf);
+    this.datanodeStorageRateLimit = ScmUtils.getDatanodeStorageRateLimit(conf);
   }
 
   /**
@@ -305,6 +309,20 @@ public abstract class SCMCommonPlacementPolicy implements
     boolean enoughForMeta = false;
 
     DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
+
+    // consider datanode storage rate
+    if (considerDatanodeStorage) {
+      long totalCapacity = 0;
+      long used = 0;
+      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
+        totalCapacity += reportProto.getCapacity();
+        used += reportProto.getScmUsed();
+      }
+      double usedRate = (double)used / totalCapacity;
+      if (usedRate > datanodeStorageRateLimit) {
+        return false;
+      }
+    }
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {

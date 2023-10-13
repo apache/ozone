@@ -56,6 +56,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOS
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CREATE_PIPELINE_CONSIDER_DATANODE_STORAGE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CREATE_PIPELINE_CONSIDER_DATANODE_STORAGE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CREATE_PIPELINE_DATANODE_STORAGE_RATE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CREATE_PIPELINE_DATANODE_STORAGE_RATE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY;
@@ -247,5 +251,15 @@ public final class ScmUtils {
             SCMException.ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
       }
     }
+  }
+
+  public static boolean shouldConsiderDatanodeStorage(ConfigurationSource conf) {
+    return conf.getBoolean(OZONE_SCM_CREATE_PIPELINE_CONSIDER_DATANODE_STORAGE,
+        OZONE_SCM_CREATE_PIPELINE_CONSIDER_DATANODE_STORAGE_DEFAULT);
+  }
+
+  public static double getDatanodeStorageRateLimit(ConfigurationSource conf) {
+    return conf.getDouble(OZONE_SCM_CREATE_PIPELINE_DATANODE_STORAGE_RATE,
+        OZONE_SCM_CREATE_PIPELINE_DATANODE_STORAGE_RATE_DEFAULT);
   }
 }

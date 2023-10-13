@@ -608,6 +608,19 @@ public final class ScmConfigKeys {
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
       OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
+
+  public static final String OZONE_SCM_CREATE_PIPELINE_CONSIDER_DATANODE_STORAGE =
+      "ozone.scm.create.pipeline.consider.datanode.storage";
+
+  public static final boolean OZONE_SCM_CREATE_PIPELINE_CONSIDER_DATANODE_STORAGE_DEFAULT =
+      true;
+
+  public static final String OZONE_SCM_CREATE_PIPELINE_DATANODE_STORAGE_RATE =
+      "ozone.scm.create.pipeline.datanode.storage.rate";
+
+  public static final double OZONE_SCM_CREATE_PIPELINE_DATANODE_STORAGE_RATE_DEFAULT =
+      0.9;
+
   /**
    * Never constructed.
    */
