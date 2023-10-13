@@ -300,8 +300,9 @@ public class TestStorageContainerManager {
     // is created by default.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
+
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(500)
+        .setHbInterval(100)
         .build();
     cluster.waitForClusterToBeReady();
 
