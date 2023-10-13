@@ -40,10 +40,18 @@ public class S3SecretValue {
   // TODO: This field should be renamed to accessId for generalization.
   private String kerberosID;
   private String awsSecret;
+  private boolean isDeleted;
 
   public S3SecretValue(String kerberosID, String awsSecret) {
     this.kerberosID = kerberosID;
     this.awsSecret = awsSecret;
+    this.isDeleted = false;
+  }
+
+  public S3SecretValue(String kerberosID, String awsSecret, boolean isDeleted) {
+    this.kerberosID = kerberosID;
+    this.awsSecret = awsSecret;
+    this.isDeleted = isDeleted;
   }
 
   public String getKerberosID() {
@@ -60,6 +68,14 @@ public class S3SecretValue {
 
   public void setAwsSecret(String awsSecret) {
     this.awsSecret = awsSecret;
+  }
+
+  public boolean isDeleted() {
+    return isDeleted;
+  }
+
+  public void setDeleted(boolean isDeleted) {
+    this.isDeleted = isDeleted;
   }
 
   public String getAwsAccessKey() {
@@ -80,7 +96,8 @@ public class S3SecretValue {
 
   @Override
   public String toString() {
-    return "awsAccessKey=" + kerberosID + "\nawsSecret=" + awsSecret;
+    return "awsAccessKey=" + kerberosID + "\nawsSecret=" + awsSecret +
+        "\nisDeleted=" + isDeleted;
   }
 
   @Override
@@ -93,11 +110,12 @@ public class S3SecretValue {
     }
     S3SecretValue that = (S3SecretValue) o;
     return kerberosID.equals(that.kerberosID) &&
-        awsSecret.equals(that.awsSecret);
+        awsSecret.equals(that.awsSecret) &&
+        isDeleted == that.isDeleted;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(kerberosID, awsSecret);
+    return Objects.hash(kerberosID, awsSecret, isDeleted);
   }
 }
