@@ -52,7 +52,7 @@ Get OM Leader and One Follower Node
 *** Test Cases ***
 Transfer Leadership for OM with Valid ServiceID Specified
     # Find Leader OM and one Follower OM
-    ${leaderOM}  ${followerOM} = Get OM Leader and One Follower Node
+    ${leaderOM}  ${followerOM} =  Get OM Leader and One Follower Node
 
     # Transfer leadership to the Follower OM
     ${result} =             Execute                 ozone admin om transfer --service-id=omservice -n ${followerOM}
@@ -65,7 +65,7 @@ Transfer Leadership for OM with Valid ServiceID Specified
 
 Transfer Leadership for OM with Multiple ServiceIDs, Valid ServiceID Specified
     # Find Leader OM and one Follower OM
-    ${leaderOM}  ${followerOM} = Get OM Leader and One Follower Node
+    ${leaderOM}  ${followerOM} =  Get OM Leader and One Follower Node
 
     # Transfer leadership to the Follower OM
     ${result} =             Execute                 ozone admin --set=ozone.om.service.ids=omservice,omservice2 om transfer --service-id=omservice -n ${followerOM}
@@ -98,7 +98,7 @@ Transfer Leadership for OM with Multiple ServiceIDs, Invalid ServiceID Specified
 
 Transfer Leadership for OM without ServiceID specified
     # Find Leader OM and one Follower OM
-    ${leaderOM}  ${followerOM} = Get OM Leader and One Follower Node
+    ${leaderOM}  ${followerOM} =  Get OM Leader and One Follower Node
 
     # Transfer leadership to the Follower OM
     ${result} =             Execute                 ozone admin om transfer -n ${followerOM}
@@ -148,14 +148,14 @@ Transfer Leadership for OM randomly with Multiple ServiceIDs, Unconfigured Servi
     # Transfer leadership to the Follower OM
     ${result} =             Execute And Ignore Error                 ozone admin --set=ozone.om.service.ids=omservice,omservice2 om transfer --service-id=omservice3 -r
                             LOG                      ${result}
-                            Should Contain           ${result}                      Service ID specified does not match
+                            Should Contain           ${result}       Service ID specified does not match
 
 Transfer Leadership for OM randomly with Multiple ServiceIDs, Invalid ServiceID Specified
     # Transfer leadership to the Follower OM
 
     ${result} =             Execute And Ignore Error                 ozone admin --set=ozone.om.service.ids=omservice,omservice2 om transfer --service-id=omservice2 -r
                             LOG                      ${result}
-                            Should Contain           ${result}       Service ID specified does not match
+                            Should Contain           ${result}       Could not find any configured addresses for OM.
 
 Transfer Leadership for OM randomly without ServiceID specified
     # Find Leader OM and one Follower OM
@@ -170,7 +170,7 @@ Transfer Leadership for OM randomly without ServiceID specified
     ${newLeaderOM} =        Get OM Leader Node
                             Should Not be Equal     ${leaderOM}             ${newLeaderOM}
 
-Transfer Leadership for OM randomly without ServiceID specified
+Transfer Leadership for OM randomly with Multiple ServiceIDs, No ServiceID Specified
     # Transfer leadership to the Follower OM
 
     ${result} =             Execute And Ignore Error                  ozone admin --set=ozone.om.service.ids=omservice,ozone1 om transfer -r
