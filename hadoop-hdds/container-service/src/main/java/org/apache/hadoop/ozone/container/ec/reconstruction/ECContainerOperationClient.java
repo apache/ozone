@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
@@ -69,12 +71,14 @@ public class ECContainerOperationClient implements Closeable {
   private static XceiverClientManager createClientManager(
       ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {
+    CACertificateProvider localCaCerts =
+        () -> HAUtils.buildCAX509List(certificateClient, conf);
+    CACertificateProvider remoteCacerts =
+        () -> HAUtils.buildCAX509List(null, conf);
     return new XceiverClientManager(conf,
         new XceiverClientManager.XceiverClientManagerConfigBuilder()
             .setMaxCacheSize(256).setStaleThresholdMs(10 * 1000).build(),
-        certificateClient != null ?
-            HAUtils.buildCAX509List(certificateClient, conf) :
-            null);
+        new ClientTrustManager(remoteCacerts, localCaCerts));
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,
