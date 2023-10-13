@@ -18,8 +18,11 @@
 package org.apache.ozone.test;
 
 /**
- * Interface to mark test classes or methods that take too much time.
- * These are excluded from CI runs for each commit and run periodically.
+ * Interface to mark JUnit4 test classes or methods that take too much time.
+ * These are excluded from CI runs for each commit, but can be run manually or
+ * in scheduled runs.
+ *
+ * Usage: <code>@Category(SlowTest.class) @Slow("HDDS-123")</code>
  */
 public interface SlowTest {
   // category marker
