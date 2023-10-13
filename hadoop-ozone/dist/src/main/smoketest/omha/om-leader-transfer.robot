@@ -145,13 +145,13 @@ Transfer Leadership for OM randomly with Multiple ServiceIDs, Valid ServiceID Sp
                             Should Not be Equal     ${leaderOM}             ${newLeaderOM}
 
 Transfer Leadership for OM randomly with Multiple ServiceIDs, Unconfigured ServiceID Specified
-	# Transfer leadership to the Follower OM
+    # Transfer leadership to the Follower OM
     ${result} =             Execute And Ignore Error                 ozone admin --set=ozone.om.service.ids=omservice,omservice2 om transfer --service-id=omservice3 -r
                             LOG                      ${result}
                             Should Contain           ${result}                      Service ID specified does not match
 
 Transfer Leadership for OM randomly with Multiple ServiceIDs, Invalid ServiceID Specified
-	# Transfer leadership to the Follower OM
+    # Transfer leadership to the Follower OM
 
     ${result} =             Execute And Ignore Error                 ozone admin --set=ozone.om.service.ids=omservice,omservice2 om transfer --service-id=omservice2 -r
                             LOG                      ${result}
@@ -162,7 +162,7 @@ Transfer Leadership for OM randomly without ServiceID specified
     ${leaderOM} =           Get OM Leader Node
                             LOG                     Leader OM: ${leaderOM}
 
-	# Transfer leadership to the Follower OM
+    # Transfer leadership to the Follower OM
     ${result} =             Execute                 ozone admin om transfer -r
                             LOG                     ${result}
                             Should Contain          ${result}               Transfer leadership successfully
@@ -171,7 +171,7 @@ Transfer Leadership for OM randomly without ServiceID specified
                             Should Not be Equal     ${leaderOM}             ${newLeaderOM}
 
 Transfer Leadership for OM randomly without ServiceID specified
-	# Transfer leadership to the Follower OM
+    # Transfer leadership to the Follower OM
 
     ${result} =             Execute And Ignore Error                  ozone admin --set=ozone.om.service.ids=omservice,ozone1 om transfer -r
                             LOG                     ${result}
