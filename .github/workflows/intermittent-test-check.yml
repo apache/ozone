@@ -46,6 +46,7 @@ env:
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]', inputs.test-class, inputs.test-name, inputs.ref) || '' }}
 jobs:
   prepare-job:
     runs-on: ubuntu-20.04
