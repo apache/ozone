@@ -29,23 +29,24 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Metrics to count all the subtypes of a specific message.
  */
 public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
-  private String name;
+  private final String name;
 
-  private String description;
+  private final String description;
 
-  private Map<KEY, AtomicLong> counters =
+  private final Map<KEY, AtomicLong> counters =
       new ConcurrentHashMap<>();
 
-  private Map<KEY, AtomicLong> elapsedTimes =
+  private final Map<KEY, AtomicLong> elapsedTimes =
       new ConcurrentHashMap<>();
 
-  private AtomicInteger concurrency = new AtomicInteger(0);
+  private final AtomicInteger concurrency = new AtomicInteger(0);
 
   public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
       String description, KEY[] types) {
@@ -65,6 +66,16 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   public void increment(KEY key, long duration) {
     counters.get(key).incrementAndGet();
     elapsedTimes.get(key).addAndGet(duration);
+  }
+
+  public UncheckedAutoCloseable measure(KEY key) {
+    final long startTime = System.currentTimeMillis();
+    concurrency.incrementAndGet();
+    return () -> {
+      concurrency.decrementAndGet();
+      counters.get(key).incrementAndGet();
+      elapsedTimes.get(key).addAndGet(System.currentTimeMillis() - startTime);
+    };
   }
 
   public void increaseConcurrency() {
@@ -108,8 +119,8 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
    * Simple metrics info implementation.
    */
   public static class MetricName implements MetricsInfo {
-    private String name;
-    private String description;
+    private final String name;
+    private final String description;
 
     public MetricName(String name, String description) {
       this.name = name;
