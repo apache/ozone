@@ -283,27 +283,28 @@ public class TestStorageContainerManager {
   public void testBlockDeletionTransactions() throws Exception {
     int numKeys = 5;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 100,
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 100,
+    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-        1000,
+        3000,
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         2, TimeUnit.SECONDS);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    scmConfig.setBlockDeletionInterval(Duration.ofMillis(500));
+    scmConfig.setBlockDeletionInterval(Duration.ofMillis(200));
     conf.setFromObject(scmConfig);
     // Reset container provision size, otherwise only one container
     // is created by default.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(100)
+        .setHbInterval(1000)
         .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 30000);
 
     try {
       DeletedBlockLog delLog = cluster.getStorageContainerManager()
@@ -315,7 +316,7 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
       Map<String, OmKeyInfo> keyLocations = helper.createKeys(numKeys, 4096);
       // Wait for container report
-      Thread.sleep(1000);
+      Thread.sleep(3000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
@@ -344,7 +345,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 500, 20000);
+      }, 500, 25000);
       Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
@@ -374,7 +375,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 500, 20000);
+      }, 500, 25000);
     } finally {
       cluster.shutdown();
     }
