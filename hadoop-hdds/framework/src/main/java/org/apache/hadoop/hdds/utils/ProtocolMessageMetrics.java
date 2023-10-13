@@ -78,14 +78,6 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
     };
   }
 
-  public void increaseConcurrency() {
-    concurrency.incrementAndGet();
-  }
-
-  public void decreaseConcurrency() {
-    concurrency.decrementAndGet();
-  }
-
   public void register() {
     DefaultMetricsSystem.instance()
         .register(name, description, this);
