@@ -287,7 +287,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <K, V> Table<K, V> getTable(String name,
+  public <K, V> TypedTable<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType);
