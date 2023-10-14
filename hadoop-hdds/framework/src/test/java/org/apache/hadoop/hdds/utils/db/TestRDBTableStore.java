@@ -600,7 +600,7 @@ public class TestRDBTableStore {
       TypedTable<String, String> table) throws Exception {
     try (Table.KeyValueIterator<String, String> i = table.iterator(prefix)) {
       int keyCount = 0;
-      for(; i.hasNext(); keyCount++) {
+      for (; i.hasNext(); keyCount++) {
         Assertions.assertEquals(prefix,
             i.next().getKey().substring(0, PREFIX_LENGTH));
       }
@@ -619,14 +619,15 @@ public class TestRDBTableStore {
 
   @Test
   public void testStringPrefixedIteratorCloseDb() throws Exception {
-    try (Table<String, String> testTable = rdbStore.getTable("PrefixFirst", String.class, String.class)) {
+    try (Table<String, String> testTable = rdbStore.getTable(
+        "PrefixFirst", String.class, String.class)) {
       // iterator should seek to right pos in the middle
       rdbStore.close();
       try {
         testTable.iterator("abc");
         Assertions.fail();
       } catch (IOException ioe) {
-        LOG.info("Great!", ioe);ioe.printStackTrace(System.out);
+        LOG.info("Great!", ioe);
       }
     }
   }
