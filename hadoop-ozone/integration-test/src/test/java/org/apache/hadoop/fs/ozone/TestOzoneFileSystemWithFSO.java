@@ -36,7 +36,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -89,27 +88,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystemWithFSO.class);
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testGetDirectoryModificationTime() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
 
   @Test
   public void testListStatusWithoutRecursiveSearch() throws Exception {
@@ -447,18 +425,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
       assertEquals(bucketBeforeMTime, bucketAfterMTime);
     }
     assertEquals(fileBeforeMTime, fileAfterMTime);
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
-  public void testListStatusWithIntermediateDir() throws Exception {
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-5012")
-  public void testListStatusOnLargeDirectory() throws Exception {
   }
 
   @Test
