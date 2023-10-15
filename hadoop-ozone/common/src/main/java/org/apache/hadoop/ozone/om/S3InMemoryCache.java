@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.sun.tools.javac.util.Log;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
 import java.time.Duration;
@@ -50,11 +49,12 @@ public class S3InMemoryCache implements S3SecretCache {
   @Override
   public void invalidate(String id) {
     S3SecretValue secret = cache.getIfPresent(id);
-    if (secret != null) {
-      secret.setDeleted(true);
-      secret.setAwsSecret(null);
-      cache.put(id, secret);
+    if (secret == null) {
+      return;
     }
+    secret.setDeleted(true);
+    secret.setAwsSecret(null);
+    cache.put(id, secret);
   }
 
   @Override
