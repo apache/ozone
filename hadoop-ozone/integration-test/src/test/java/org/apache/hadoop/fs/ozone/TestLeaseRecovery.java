@@ -30,14 +30,18 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 
@@ -58,13 +62,26 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestLeaseRecovery {
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneBucket bucket;
 
   private OzoneClient client;
   private final OzoneConfiguration conf = new OzoneConfiguration();
+
+  /**
+   * Closing the output stream after lease recovery throws because the key
+   * is no longer open in OM.  This is currently expected (see HDDS-9358).
+   */
+  public static void closeIgnoringKeyNotFound(OutputStream stream)
+      throws IOException {
+    try {
+      stream.close();
+    } catch (OMException e) {
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, e.getResult());
+    }
+  }
 
   @Before
   public void init() throws IOException, InterruptedException,
@@ -117,21 +134,27 @@ public class TestLeaseRecovery {
     final Path file = new Path(dir, "file");
 
     RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-    final FSDataOutputStream stream = fs.create(file, true);
 
     final byte[] data = new byte[1 << 20];
     ThreadLocalRandom.current().nextBytes(data);
-    stream.write(data);
-    stream.hsync();
-    assertFalse(fs.isFileClosed(file));
 
-    int count = 0;
-    while (count++ < 15 && !fs.recoverLease(file)) {
-      Thread.sleep(1000);
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      stream.write(data);
+      stream.hsync();
+      assertFalse(fs.isFileClosed(file));
+
+      int count = 0;
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue("File should be closed", fs.recoverLease(file));
+      assertTrue(fs.isFileClosed(file));
+    } finally {
+      closeIgnoringKeyNotFound(stream);
     }
-    // The lease should have been recovered.
-    assertTrue("File should be closed", fs.recoverLease(file));
-    assertTrue(fs.isFileClosed(file));
+
     // open it again, make sure the data is correct
     byte[] readData = new byte[1 << 20];
     try (FSDataInputStream fdis = fs.open(file)) {

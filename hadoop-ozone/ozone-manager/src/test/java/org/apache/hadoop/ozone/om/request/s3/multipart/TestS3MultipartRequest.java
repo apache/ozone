@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.junit.After;
 import org.junit.Assert;
@@ -55,6 +56,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,7 +81,7 @@ public class TestS3MultipartRequest {
 
   @Before
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -88,12 +90,12 @@ public class TestS3MultipartRequest {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    auditLogger = Mockito.mock(AuditLogger.class);
+    auditLogger = mock(AuditLogger.class);
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
-        Mockito.mock(ReferenceCounted.class);
+        mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass
-    OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
+    OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
     when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
     when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
     when(ozoneManager.getAccessAuthorizer())
@@ -110,6 +112,10 @@ public class TestS3MultipartRequest {
               Pair.of(args.getVolumeName(), args.getBucketName()),
               Pair.of(args.getVolumeName(), args.getBucketName()));
         });
+    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
+    when(lvm.getMetadataLayoutVersion()).thenReturn(0);
+    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    when(ozoneManager.isRatisEnabled()).thenReturn(true);
   }
 
 

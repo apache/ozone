@@ -40,7 +40,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +91,7 @@ public final class TestSecretKeysApi {
       .getLogger(TestSecretKeysApi.class);
 
   @Rule
-  public Timeout timeout = Timeout.seconds(500);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(500));
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -342,6 +343,7 @@ public class TestOzoneSnapshotRestore {
 
   @ParameterizedTest
   @MethodSource("bucketTypes")
+  @Flaky("HDDS-9436")
   public void testUnorderedDeletion(BucketLayout bucketLayoutTest)
           throws Exception {
     String volume = "vol-" + counter.incrementAndGet();

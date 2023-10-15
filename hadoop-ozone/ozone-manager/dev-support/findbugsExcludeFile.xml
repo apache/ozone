@@ -46,6 +46,10 @@
     <Bug pattern="URF_UNREAD_FIELD" />
   </Match>
   <Match>
+    <Class name="org.apache.hadoop.ozone.om.ratis.TestOzoneManagerDoubleBufferWithDummyResponse"/>
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.om.request.TestNormalizePaths"/>
     <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
   </Match>

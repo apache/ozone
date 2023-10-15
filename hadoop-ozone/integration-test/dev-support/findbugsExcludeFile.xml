@@ -134,7 +134,7 @@
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.client.rpc.TestDeleteWithSlowFollower"/>
+    <Class name="org.apache.hadoop.ozone.client.rpc.TestDeleteWithInAdequateDN"/>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>
   <Match>

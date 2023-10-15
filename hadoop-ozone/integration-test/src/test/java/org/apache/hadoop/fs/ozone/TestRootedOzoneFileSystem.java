@@ -78,7 +78,9 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -182,7 +184,7 @@ public class TestRootedOzoneFileSystem {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
+    IOUtils.closeQuietly(fs, userOfs);
   }
 
   @Before
@@ -211,7 +213,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(300);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;

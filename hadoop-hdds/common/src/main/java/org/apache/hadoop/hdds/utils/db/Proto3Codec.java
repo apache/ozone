@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
 /**
@@ -82,7 +81,7 @@ public final class Proto3Codec<M extends MessageLite>
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull M message,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
     final int size = message.getSerializedSize();
     return allocator.apply(size).put(writeTo(message, size));
   }

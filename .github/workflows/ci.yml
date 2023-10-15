@@ -73,7 +73,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
@@ -172,7 +172,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 90
+    timeout-minutes: 30
     if: needs.build-info.outputs.needs-basic-check == 'true'
     strategy:
       matrix:
@@ -226,7 +226,7 @@ jobs:
       - build-info
       - basic
     runs-on: ubuntu-20.04
-    timeout-minutes: 90
+    timeout-minutes: 150
     if: needs.build-info.outputs.needs-unit-check == 'true'
     strategy:
       matrix:
@@ -255,6 +255,19 @@ jobs:
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ matrix.check }}
+          path: target/${{ matrix.check }}
+        continue-on-error: true
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
   dependency:
     needs:
       - build-info
@@ -307,6 +320,7 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |

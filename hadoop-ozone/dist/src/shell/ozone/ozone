@@ -93,6 +93,9 @@ function ozonecmd_case
   if [[ "${JAVA_MAJOR_VERSION}" == "17" ]]; then
       OZONE_MODULE_ACCESS_ARGS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
   fi
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.nio=ALL-UNNAMED"
+  fi
 
   case ${subcmd} in
     auditparser)
@@ -157,6 +160,7 @@ function ozonecmd_case
     sh | shell)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
+      OZONE_SH_OPTS="${OZONE_SH_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     s3)
@@ -201,6 +205,7 @@ function ozonecmd_case
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
+      OZONE_FS_OPTS="${OZONE_FS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     daemonlog)
@@ -229,6 +234,7 @@ function ozonecmd_case
     ;;
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
+      OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     checknative)
