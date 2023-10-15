@@ -43,9 +43,7 @@ public class S3SecretValue {
   private boolean isDeleted;
 
   public S3SecretValue(String kerberosID, String awsSecret) {
-    this.kerberosID = kerberosID;
-    this.awsSecret = awsSecret;
-    this.isDeleted = false;
+    this(kerberosID, awsSecret, false);
   }
 
   public S3SecretValue(String kerberosID, String awsSecret, boolean isDeleted) {
