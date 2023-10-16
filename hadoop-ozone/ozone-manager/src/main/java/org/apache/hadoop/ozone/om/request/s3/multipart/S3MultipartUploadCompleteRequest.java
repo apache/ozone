@@ -22,6 +22,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -268,9 +269,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_REQUEST);
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = getOmClientResponse(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

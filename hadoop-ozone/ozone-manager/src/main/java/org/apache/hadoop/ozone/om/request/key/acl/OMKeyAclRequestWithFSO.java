@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -134,10 +135,12 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

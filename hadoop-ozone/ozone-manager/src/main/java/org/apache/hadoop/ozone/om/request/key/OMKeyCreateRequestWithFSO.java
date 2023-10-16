@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -217,9 +218,11 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(

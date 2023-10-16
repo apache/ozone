@@ -51,6 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -155,14 +156,16 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omMetrics.incNumRecoverLease();
       LOG.debug("Key recovered. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Fail for recovering lease. Volume:{}, Bucket:{}, Key:{}",
           volumeName, bucketName, keyName, ex);
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omMetrics.incNumRecoverLeaseFails();
       omResponse.setCmdType(RecoverLease);
       omClientResponse = new OMRecoverLeaseResponse(
-          createErrorOMResponse(omResponse, ex), getBucketLayout());
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

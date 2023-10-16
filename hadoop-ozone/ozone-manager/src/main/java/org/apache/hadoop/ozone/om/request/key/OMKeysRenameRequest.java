@@ -54,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -223,10 +224,12 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           newOmRenameKeys);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
-      createErrorOMResponse(omResponse, ex);
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
+      createErrorOMResponse(omResponse, exception);
 
       omResponse.setRenameKeysResponse(RenameKeysResponse.newBuilder()
           .setStatus(renameStatus).addAllUnRenamedKeys(unRenamedKeys).build());

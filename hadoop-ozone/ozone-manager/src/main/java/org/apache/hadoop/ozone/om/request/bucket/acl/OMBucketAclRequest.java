@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiPredicate;
@@ -134,9 +135,11 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
 
-    } catch (IOException ex) {
-      exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

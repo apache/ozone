@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -168,8 +169,10 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       }
 
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -184,10 +185,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
-      createErrorOMResponse(omResponse, ex);
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
+      createErrorOMResponse(omResponse, exception);
 
       // reset deleteKeys as request failed.
       deleteKeys = new ArrayList<>();

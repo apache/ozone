@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -326,9 +327,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           oldKeyVersionsToDeleteMap, isHSync);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {

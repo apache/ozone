@@ -50,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -327,12 +328,14 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           omResponse.build(), s3SecretValue, userPrincipal,
           accessId, omDBAccessIdInfo, principalInfo,
           ozoneManager.getS3SecretManager());
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder().build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

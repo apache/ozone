@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -331,9 +332,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(

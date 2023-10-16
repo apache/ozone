@@ -50,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -174,9 +175,11 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
               openKeyInfo, omBucketInfo.copyObject(), volumeId);
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
               volumeName, bucketName, openKeyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMAllocateBlockResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +

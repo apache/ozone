@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -349,10 +350,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantCreateResponse(omResponse.build(),
           omVolumeArgs, volumeList, omDBTenantState);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMTenantCreateResponse(
-          createErrorOMResponse(omResponse, ex));
-      exception = ex;
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

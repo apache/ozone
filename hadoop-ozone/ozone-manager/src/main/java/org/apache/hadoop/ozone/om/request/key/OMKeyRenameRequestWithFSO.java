@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
@@ -222,9 +223,11 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
         result = Result.SUCCESS;
       }
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMKeyRenameResponseWithFSO(createErrorOMResponse(
               omResponse, exception), getBucketLayout());
     } finally {

@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -166,9 +167,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMBucketSetOwnerResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMBucketSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -244,13 +245,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
-            "Exception:{}", volumeName, bucketName, openKeyName, exception);
+          "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

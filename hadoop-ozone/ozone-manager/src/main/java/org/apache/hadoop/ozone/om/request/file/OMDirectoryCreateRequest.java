@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -227,8 +228,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             result);
       }
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMDirectoryCreateResponse(
           createErrorOMResponse(omResponse, exception), result);
     } finally {

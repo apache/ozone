@@ -19,11 +19,13 @@
 package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -174,12 +176,14 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
               omResponse.setRenewDelegationTokenResponse(
                   updateRenewDelegationTokenRequest
                       .getRenewDelegationTokenResponse()).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in Updating Renew DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
