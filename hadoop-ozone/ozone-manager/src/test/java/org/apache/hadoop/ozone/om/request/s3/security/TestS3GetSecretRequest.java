@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import io.grpc.Status;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -39,14 +40,17 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
+import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSecretResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
@@ -88,6 +92,7 @@ public class TestS3GetSecretRequest {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private AuditLogger auditLogger;
+  private OmMetadataManagerImpl omMetadataManager;
   // Set ozoneManagerDoubleBuffer to do nothing.
   private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
       ((response, transactionIndex) -> null);
@@ -133,7 +138,7 @@ public class TestS3GetSecretRequest {
         folder.newFolder().getAbsolutePath());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
-    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(conf,
+    omMetadataManager = new OmMetadataManagerImpl(conf,
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -214,8 +219,73 @@ public class TestS3GetSecretRequest {
         .setGetS3SecretRequest(
             GetS3SecretRequest.newBuilder()
                 .setKerberosID(userPrincipalStr)
+                .setCreateIfNotExist(true)
                 .build()
         ).build();
+  }
+
+
+  @Test
+  public void testFetchSecretForRevokedUser() throws IOException {
+    // Create a secret for "alice".
+    // This effectively makes alice an S3 admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+
+    String userPrincipalId = USER_ALICE;
+
+    // Request the creation of a secret.
+    S3Secret originalS3Secret =
+        processSuccessSecretRequest(userPrincipalId, 1, true);
+
+    // Revoke the secret.
+    String kerberosID = originalS3Secret.getKerberosID();
+    OzoneManagerProtocolProtos.RevokeS3SecretRequest revokeS3SecretRequest =
+        OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(kerberosID)
+            .build();
+    OMRequest revokeRequest = OMRequest.newBuilder()
+        .setRevokeS3SecretRequest(revokeS3SecretRequest)
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .build();
+    OMClientRequest omRevokeRequest = new S3RevokeSecretRequest(revokeRequest);
+
+    // Pre-execute the revoke request.
+    omRevokeRequest.preExecute(ozoneManager);
+
+    // Validate and update cache to revoke the secret.
+    OMClientResponse omRevokeResponse = omRevokeRequest.validateAndUpdateCache(
+        ozoneManager, 2, ozoneManagerDoubleBufferHelper);
+
+    // Verify that the revoke operation was successful.
+    Assert.assertTrue(omRevokeResponse instanceof S3RevokeSecretResponse);
+    S3RevokeSecretResponse s3RevokeSecretResponse =
+        (S3RevokeSecretResponse) omRevokeResponse;
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK.getNumber(),
+        s3RevokeSecretResponse.getOMResponse().getStatus().getNumber());
+
+    // Fetch the revoked secret and verify its value is null.
+    S3GetSecretRequest s3GetSecretRequest = new S3GetSecretRequest(
+        new S3GetSecretRequest(s3GetSecretRequest(userPrincipalId)).preExecute(
+            ozoneManager)
+    );
+    S3SecretValue s3SecretValue = omMetadataManager.getSecret(kerberosID);
+    Assert.assertNull(s3SecretValue);
+
+    // Verify that the secret for revoked user will be set to a new one upon
+    // calling getSecret request.
+    OMClientResponse omClientResponse =
+        s3GetSecretRequest.validateAndUpdateCache(
+            ozoneManager, 3, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    S3GetSecretResponse s3GetSecretResponse =
+        (S3GetSecretResponse) omClientResponse;
+
+    // Compare the old secret value and new secret value after revoking;
+    // they should not be the same.
+    Assert.assertNotEquals(originalS3Secret,
+        s3GetSecretResponse.getS3SecretValue().getAwsSecret());
   }
 
   @Test
