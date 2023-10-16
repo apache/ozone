@@ -101,6 +101,7 @@ import static com.google.common.collect.Sets.newHashSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -161,6 +162,8 @@ public class TestOmContainerLocationCache {
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     mockScmContainerClient =
         Mockito.mock(StorageContainerLocationProtocol.class);
+    when(mockScmBlockLocationProtocol.getTopologyInformation()).thenReturn(
+        conf.get(OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE));
 
     OmTestManagers omTestManagers = new OmTestManagers(conf,
         mockScmBlockLocationProtocol, mockScmContainerClient);

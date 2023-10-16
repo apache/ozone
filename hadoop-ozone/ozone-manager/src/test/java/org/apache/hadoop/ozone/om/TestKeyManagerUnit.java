@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -118,6 +119,9 @@ public class TestKeyManagerUnit {
         testDir.toString());
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
+    when(blockClient.getTopologyInformation()).thenReturn(
+        configuration.get(
+            ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE));
 
     OmTestManagers omTestManagers
         = new OmTestManagers(configuration, blockClient, containerClient);
