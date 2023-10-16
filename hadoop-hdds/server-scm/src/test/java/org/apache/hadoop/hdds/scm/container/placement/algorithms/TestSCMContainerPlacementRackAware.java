@@ -818,9 +818,9 @@ public class TestSCMContainerPlacementRackAware {
 
     Assertions.assertEquals(nodeNum, datanodeDetails.size());
     // Favoured node should not be returned,
-    // as favoured node is in the same rack as both used nodes.
-    Assertions.assertFalse(favouredNodes.get(0).getUuid() ==
-        datanodeDetails.get(0).getUuid());
+    // Returned node should be on the different rack than the favoured node.
+    Assertions.assertFalse(cluster.isSameParent(
+        favouredNodes.get(0), datanodeDetails.get(0)));
 
     favouredNodes.clear();
     // 1 favoured node
