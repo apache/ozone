@@ -63,7 +63,7 @@ public class LeaseManager<T> {
    *        Default timeout in milliseconds to be used for lease creation.
    */
   public LeaseManager(String name, long defaultTimeout) {
-    this.name = name;
+    this.name = name + "LeaseManager";
     this.defaultTimeout = defaultTimeout;
   }
 
@@ -71,11 +71,11 @@ public class LeaseManager<T> {
    * Starts the lease manager service.
    */
   public void start() {
-    LOG.debug("Starting {} LeaseManager service", name);
+    LOG.debug("Starting {} service", name);
     activeLeases = new ConcurrentHashMap<>();
     leaseMonitor = new LeaseMonitor();
     leaseMonitorThread = new Thread(leaseMonitor);
-    leaseMonitorThread.setName(name + "-LeaseManager#LeaseMonitor");
+    leaseMonitorThread.setName(name + "#LeaseMonitor");
     leaseMonitorThread.setDaemon(true);
     leaseMonitorThread.setUncaughtExceptionHandler((thread, throwable) -> {
       // Let us just restart this thread after logging an error.
@@ -84,7 +84,7 @@ public class LeaseManager<T> {
           thread.toString(), throwable);
       leaseMonitorThread.start();
     });
-    LOG.debug("Starting {}-LeaseManager#LeaseMonitor Thread", name);
+    LOG.debug("Starting {} Thread", leaseMonitorThread.getName());
     leaseMonitorThread.start();
     isRunning = true;
   }
