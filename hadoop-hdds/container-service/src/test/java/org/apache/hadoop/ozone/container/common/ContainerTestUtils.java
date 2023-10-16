@@ -113,7 +113,7 @@ public final class ContainerTestUtils {
         new LegacyHadoopConfigurationSource(conf));
   }
 
-  public static OzoneContainer getOzoneContainerWithMockContext(
+  public static OzoneContainer getOzoneContainer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);

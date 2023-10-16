@@ -166,7 +166,7 @@ public class TestOzoneContainer {
     }
     BlockUtils.shutdownCache(conf);
     OzoneContainer ozoneContainer = ContainerTestUtils
-        .getOzoneContainerWithMockContext(datanodeDetails, conf);
+        .getOzoneContainer(datanodeDetails, conf);
 
     ContainerSet containerset = ozoneContainer.getContainerSet();
     assertEquals(numTestContainers, containerset.containerCount());
@@ -192,7 +192,7 @@ public class TestOzoneContainer {
         dbDirString.toString());
     ContainerTestUtils.enableSchemaV3(conf);
     OzoneContainer ozoneContainer = ContainerTestUtils
-        .getOzoneContainerWithMockContext(datanodeDetails, conf);
+        .getOzoneContainer(datanodeDetails, conf);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
             ozoneContainer.getNodeReport().getStorageReportList().size());
     Assert.assertEquals(3,
@@ -205,7 +205,7 @@ public class TestOzoneContainer {
   @Test
   public void testBuildNodeReportWithDefaultRatisLogDir() throws Exception {
     OzoneContainer ozoneContainer = ContainerTestUtils
-        .getOzoneContainerWithMockContext(datanodeDetails, conf);
+        .getOzoneContainer(datanodeDetails, conf);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
             ozoneContainer.getNodeReport().getStorageReportList().size());
     Assert.assertEquals(1,

@@ -75,7 +75,7 @@ public class TestOzoneContainer {
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
-          .getOzoneContainerWithMockContext(datanodeDetails, conf);
+          .getOzoneContainer(datanodeDetails, conf);
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -105,7 +105,7 @@ public class TestOzoneContainer {
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
-          .getOzoneContainerWithMockContext(datanodeDetails, conf);
+          .getOzoneContainer(datanodeDetails, conf);
 
       String clusterId = UUID.randomUUID().toString();
       container.start(clusterId);
