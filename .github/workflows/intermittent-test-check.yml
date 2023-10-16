@@ -121,9 +121,9 @@ jobs:
       - name: Execute tests
         run: |
           test_type=${{ needs.prepare-job.outputs.test_type }}
-          args=""
+          args="-DexcludedGroups=unhealthy,org.apache.ozone.test.UnhealthyTest"
           if [ "$test_type" = "integration" ]; then
-              args="-pl :ozone-integration-test,:mini-chaos-tests"
+              args="$args -pl :ozone-integration-test,:mini-chaos-tests"
           fi
           if [ "$TEST_METHOD" = "ALL" ]; then
               echo "Running all tests from $TEST_CLASS"

@@ -1820,6 +1820,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Disable with @Unhealthy or @Slow instead (see HDDS-9276)</reason>
+                    <bannedImports>
+                      <bannedImport>org.junit.Ignore</bannedImport>
+                      <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
