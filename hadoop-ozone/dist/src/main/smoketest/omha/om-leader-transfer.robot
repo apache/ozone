@@ -23,7 +23,7 @@ Test Timeout        5 minutes
 
 *** Keywords ***
 Get OM Nodes
-	${result} =        Execute                 ozone admin om roles --service-id=omservice --json | jq -r '[.[] | .[] | select(.serverRole == "LEADER") | .hostname], [.[] | .[] | select(.serverRole == "FOLLOWER") | .hostname] | .[]'
+    ${result} =        Execute                 ozone admin om roles --service-id=omservice --json | jq -r '[.[] | .[] | select(.serverRole == "LEADER") | .hostname], [.[] | .[] | select(.serverRole == "FOLLOWER") | .hostname] | .[]'
     ${leader}=         Get Line                ${result}    0
     ${follower1}=      Get Line                ${result}    1
     ${follower2}=      Get Line                ${result}    2
@@ -42,8 +42,8 @@ Get OM Leader and One Follower Node
     [Return]           ${result}[0]      ${result}[1]
 
 Assert OM leader Role Transitions
-	[arguments]             ${leaderOM}     ${followerOM}     ${isEqualCheck}
-	${newLeaderOM} =        Get OM Leader Node
+    [arguments]             ${leaderOM}     ${followerOM}     ${isEqualCheck}
+    ${newLeaderOM} =        Get OM Leader Node
                             Should not be Equal     ${leaderOM}             ${newLeaderOM}
     Run Keyword If          '${isEqualCheck}' == 'true'         Should be Equal    ${followerOM}    ${newLeaderOM}
 
