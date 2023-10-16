@@ -102,13 +102,13 @@ public class OMPerformanceMetrics {
   private MutableRate preExecuteLatencyNs;
 
   @Metric(about = "Ratis latency in nano seconds")
-  private MutableRate ratisLatencyNs;
+  private MutableRate submitToRatisLatencyNs;
 
   @Metric(about = "Convert om request to ratis request nano seconds")
-  private MutableRate convertRatisRequestLatencyNs;
+  private MutableRate createRatisRequestLatencyNs;
 
   @Metric(about = "Convert ratis response to om response nano seconds")
-  private MutableRate convertRatisResponseLatencyNs;
+  private MutableRate createOmResoonseLatencyNs;
 
   @Metric(about = "Ratis local command execution latency in nano seconds")
   private MutableRate ratisLocalExecutionLatencyNs;
@@ -195,16 +195,16 @@ public class OMPerformanceMetrics {
     return preExecuteLatencyNs;
   }
 
-  public MutableRate getRatisLatencyNs() {
-    return ratisLatencyNs;
+  public MutableRate getSubmitToRatisLatencyNs() {
+    return submitToRatisLatencyNs;
   }
 
-  public MutableRate getConvertRatisRequestLatencyNs() {
-    return convertRatisRequestLatencyNs;
+  public MutableRate getCreateRatisRequestLatencyNs() {
+    return createRatisRequestLatencyNs;
   }
 
-  public MutableRate getConvertRatisResponseLatencyNs() {
-    return convertRatisResponseLatencyNs;
+  public MutableRate getCreateOmResponseLatencyNs() {
+    return createOmResoonseLatencyNs;
   }
 
   public MutableRate getRatisLocalExecutionLatencyNs() {

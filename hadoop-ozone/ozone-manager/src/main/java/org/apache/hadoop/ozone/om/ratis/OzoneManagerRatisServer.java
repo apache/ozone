@@ -251,15 +251,15 @@ public final class OzoneManagerRatisServer {
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
       RaftClientRequest raftClientRequest = captureLatencyNs(
-          perfMetrics.getConvertRatisRequestLatencyNs(),
-          () -> createWriteRaftClientRequest(omRequest));
+          perfMetrics.getCreateRatisRequestLatencyNs(),
+          () -> createRaftRequest(omRequest));
       RaftClientReply raftClientReply = captureLatencyNs(
-          perfMetrics.getRatisLatencyNs(),
+          perfMetrics.getSubmitToRatisLatencyNs(),
           () -> submitRequestToRatis(raftClientRequest));
 
       return captureLatencyNs(
-          perfMetrics.getConvertRatisResponseLatencyNs(),
-          () -> processReply(omRequest, raftClientReply));
+          perfMetrics.getCreateOmResponseLatencyNs(),
+          () -> createOmResponse(omRequest, raftClientReply));
     } else {
       LOG.info("Rejecting write request on OM {} because it is in prepare " +
           "mode: {}", ozoneManager.getOMNodeId(),
@@ -288,7 +288,7 @@ public final class OzoneManagerRatisServer {
   public OMResponse submitRequest(OMRequest omRequest,
       RaftClientRequest raftClientRequest) throws ServiceException {
     RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-    return processReply(omRequest, raftClientReply);
+    return createOmResponse(omRequest, raftClientReply);
   }
 
   private RaftClientReply submitRequestToRatis(
@@ -429,7 +429,7 @@ public final class OzoneManagerRatisServer {
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
-  private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
     if (!ozoneManager.isTestSecureOmFlag()) {
       Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
       Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
@@ -454,7 +454,7 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response which is returned to client.
    * @throws ServiceException
    */
-  private OMResponse processReply(OMRequest omRequest, RaftClientReply reply)
+  private OMResponse createOmResponse(OMRequest omRequest, RaftClientReply reply)
       throws ServiceException {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. This can happen first time
