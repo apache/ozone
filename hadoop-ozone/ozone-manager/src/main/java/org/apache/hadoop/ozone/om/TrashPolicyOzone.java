@@ -119,7 +119,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   @Override
   public Runnable getEmptier() throws IOException {
     return new TrashPolicyOzone.Emptier((OzoneConfiguration)configuration,
-        emptierInterval);
+        emptierInterval,om.getNodeDetails().threadNamePrefix());
   }
 
   @Override
@@ -265,7 +265,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
     private ThreadPoolExecutor executor;
 
-    Emptier(OzoneConfiguration conf, long emptierInterval) throws IOException {
+    Emptier(OzoneConfiguration conf, long emptierInterval,
+            String threadNamePrefix) throws IOException {
       this.conf = conf;
       this.emptierInterval = emptierInterval;
       if (emptierInterval > deletionInterval || emptierInterval <= 0) {
@@ -286,6 +287,10 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           trashEmptierCorePoolSize, 1,
           TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
           new ThreadPoolExecutor.CallerRunsPolicy());
+
+      // Set a custom thread name with the provided prefix
+      Thread.currentThread()
+          .setName(threadNamePrefix + "-" + Thread.currentThread().getName());
     }
 
     @Override
