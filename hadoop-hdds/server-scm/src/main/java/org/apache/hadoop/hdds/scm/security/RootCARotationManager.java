@@ -83,6 +83,9 @@ public class RootCARotationManager extends StatefulService {
   public static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
 
+  private static final String SERVICE_NAME =
+      RootCARotationManager.class.getSimpleName();
+
   private final StorageContainerManager scm;
   private final OzoneConfiguration ozoneConf;
   private final SecurityConfig secConf;
@@ -99,7 +102,7 @@ public class RootCARotationManager extends StatefulService {
   private final AtomicReference<Long> processStartTime =
       new AtomicReference<>();
   private final AtomicBoolean isPostProcessing = new AtomicBoolean(false);
-  private final String threadName = this.getClass().getSimpleName();
+  private final String threadName;
   private final String newCAComponent = SCM_ROOT_CA_COMPONENT_NAME +
       HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
       HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
@@ -150,6 +153,7 @@ public class RootCARotationManager extends StatefulService {
         .atZone(ZoneId.systemDefault()).toInstant());
     rootCertPollInterval = secConf.getRootCaCertificatePollingInterval();
 
+    threadName = scm.threadNamePrefix() + SERVICE_NAME;
     executorService = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadName)
             .setDaemon(true).build());
