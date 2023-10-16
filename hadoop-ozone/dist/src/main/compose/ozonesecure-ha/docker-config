@@ -54,7 +54,7 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.block.token.enabled=true
 OZONE-SITE.XML_hdds.container.token.enabled=true
 OZONE-SITE.XML_hdds.grpc.tls.enabled=true
-OZONE-SITE.XML_ozone.replication=3
+OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
@@ -71,6 +71,7 @@ OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
 OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 CORE-SITE.XML_dfs.data.transfer.protection=authentication

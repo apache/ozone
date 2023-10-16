@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -49,7 +50,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -95,7 +98,7 @@ public class TestOzoneContainerWithTLS {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -376,6 +379,8 @@ public class TestOzoneContainerWithTLS {
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);
+    Mockito.when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
     return context;

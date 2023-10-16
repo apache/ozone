@@ -78,7 +78,9 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -182,7 +184,7 @@ public class TestRootedOzoneFileSystem {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
+    IOUtils.closeQuietly(fs, userOfs);
   }
 
   @Before
@@ -198,7 +200,8 @@ public class TestRootedOzoneFileSystem {
 
   @After
   public void cleanup() throws IOException {
-    fs.delete(volumePath, true);
+    fs.delete(bucketPath, true);
+    fs.delete(volumePath, false);
   }
 
   public static FileSystem getFs() {
@@ -210,7 +213,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(300);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
@@ -546,9 +549,9 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testListStatusIteratorWithPathNotFound() throws Exception {
-    Path root = new Path("/test");
+    Path path = new Path("/test/test1/test2");
     try {
-      ofs.listStatusIterator(root);
+      ofs.listStatusIterator(path);
       Assert.fail("Should have thrown OMException");
     } catch (OMException omEx) {
       Assert.assertEquals("Volume test is not found",
@@ -1514,14 +1517,6 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(fs.delete(volumePath3, false));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
-
-    // Test recursively delete volume
-    // Create test volume, bucket and key
-    fs.mkdirs(dirPath3);
-    // Delete volume recursively
-    Assert.assertTrue(fs.delete(volumePath3, true));
-    // Verify the volume is deleted
-    Assert.assertFalse(volumeExist(volumeStr3));
   }
 
   private void createSymlinkSrcDestPaths(String srcVol,
@@ -1561,7 +1556,7 @@ public class TestRootedOzoneFileSystem {
       try (GenericTestUtils.SystemOutCapturer capture =
                new GenericTestUtils.SystemOutCapturer()) {
         String linkPathStr = rootPath + destVolume;
-        ToolRunner.run(shell, new String[]{"-ls", "-R", linkPathStr});
+        ToolRunner.run(shell, new String[]{"-ls", linkPathStr});
         Assert.assertTrue(capture.getOutput().contains("drwxrwxrwx"));
         Assert.assertTrue(capture.getOutput().contains(linkPathStr +
             OZONE_URI_DELIMITER + srcBucket));
@@ -1599,8 +1594,10 @@ public class TestRootedOzoneFileSystem {
       // due to bug - HDDS-7884
       fs.delete(new Path(OZONE_URI_DELIMITER + destVolume +
           OZONE_URI_DELIMITER + srcBucket));
-      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume), true);
-      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume), true);
+      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume +
+          OZONE_URI_DELIMITER + srcBucket));
+      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume), false);
+      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume), false);
     }
   }
 
@@ -1707,8 +1704,10 @@ public class TestRootedOzoneFileSystem {
       // due to bug - HDDS-7884
       fs.delete(new Path(OZONE_URI_DELIMITER + destVolume + OZONE_URI_DELIMITER
           + srcBucket));
-      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume), true);
-      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume), true);
+      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume + OZONE_URI_DELIMITER
+          + srcBucket));
+      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume), false);
+      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume), false);
     }
   }
 
@@ -1741,8 +1740,8 @@ public class TestRootedOzoneFileSystem {
     // confirm non recursive delete of volume with link fails
     deleteNonRecursivelyAndFail(linkVolumePath);
 
-    // confirm recursive delete of volume with link works
-    fs.delete(linkVolumePath, true);
+    fs.delete(linkPath, true);
+    fs.delete(linkVolumePath, false);
 
     // confirm vol1 data is unaffected
     Assert.assertTrue(dir1Status.equals(fs.getFileStatus(dirPath1)));
@@ -1753,7 +1752,8 @@ public class TestRootedOzoneFileSystem {
     assertTrue(exception.getMessage().contains("File not found."));
 
     // Cleanup
-    fs.delete(volumePath1, true);
+    fs.delete(bucketPath1, true);
+    fs.delete(volumePath1, false);
 
   }
 
@@ -2289,7 +2289,7 @@ public class TestRootedOzoneFileSystem {
     assertThrows(OMException.class,
         () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
     // Cleanup
-    ofs.delete(volume, true);
+    ofs.delete(volume, false);
   }
 
   @Test

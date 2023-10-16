@@ -105,7 +105,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
 
-    UserGroupInformation ugi = createUGI();
+    UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
     if (!ozoneManager.isAdmin(ugi) &&
@@ -298,7 +298,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   ) {
     try {
       snapshotChainManager.deleteSnapshot(info);
-    } catch (IOException exception) {
+    } catch (IllegalStateException exception) {
       LOG.error("Failed to remove snapshot: {} from SnapshotChainManager.",
           info, exception);
     }

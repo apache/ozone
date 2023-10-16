@@ -129,7 +129,7 @@ public class TestRootedDDSWithFSO {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
       for (FileStatus fileStatus : fileStatuses) {
-        fs.delete(fileStatus.getPath(), true);
+        fs.delete(fileStatus.getPath(), false);
       }
     } catch (IOException ex) {
       fail("Failed to cleanup files.");
@@ -191,7 +191,8 @@ public class TestRootedDDSWithFSO {
 
     OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
     long prevDeletes = omMetrics.getNumKeyDeletes();
-    Assert.assertTrue(fs.delete(volumePath, true));
+    Assert.assertTrue(fs.delete(bucketPath, true));
+    Assert.assertTrue(fs.delete(volumePath, false));
     long deletes = omMetrics.getNumKeyDeletes();
     Assert.assertEquals(prevDeletes + 1, deletes);
 

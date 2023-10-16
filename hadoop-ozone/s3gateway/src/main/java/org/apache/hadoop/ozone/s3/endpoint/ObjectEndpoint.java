@@ -1010,11 +1010,18 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationConfig replication,
             Map<String, String> metadata) throws IOException {
     long copyLength;
-    try (OzoneOutputStream dest =
-                 getClientProtocol().createKey(
-        volume.getName(), destBucket, destKey, srcKeyLen,
-        replication, metadata)) {
-      copyLength = IOUtils.copyLarge(src, dest);
+    if (datastreamEnabled && !(replication != null &&
+        replication.getReplicationType() == EC) &&
+        srcKeyLen > datastreamMinLength) {
+      copyLength = ObjectEndpointStreaming
+          .putKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
+              chunkSize, replication, metadata, src);
+    } else {
+      try (OzoneOutputStream dest = getClientProtocol()
+          .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
+              replication, metadata)) {
+        copyLength = IOUtils.copyLarge(src, dest);
+      }
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
   }

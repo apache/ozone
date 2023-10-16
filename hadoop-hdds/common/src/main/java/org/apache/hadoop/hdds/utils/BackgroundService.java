@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -43,7 +43,7 @@ public abstract class BackgroundService {
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
-  private final ScheduledExecutorService exec;
+  private final ScheduledThreadPoolExecutor exec;
   private final ThreadGroup threadGroup;
   private final String serviceName;
   private final long interval;
@@ -64,12 +64,25 @@ public abstract class BackgroundService {
         .setDaemon(true)
         .setNameFormat(serviceName + "#%d")
         .build();
-    exec = Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
+    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(
+        threadPoolSize, threadFactory);
     service = new PeriodicalTask();
   }
 
-  protected ExecutorService getExecutorService() {
+  @VisibleForTesting
+  public ExecutorService getExecutorService() {
     return this.exec;
+  }
+
+  public void setPoolSize(int size) {
+    if (size <= 0) {
+      throw new IllegalArgumentException("Pool size must be positive.");
+    }
+
+    // In ScheduledThreadPoolExecutor, maximumPoolSize is Integer.MAX_VALUE
+    // the corePoolSize will always less maximumPoolSize.
+    // So we can directly set the corePoolSize
+    exec.setCorePoolSize(size);
   }
 
   @VisibleForTesting

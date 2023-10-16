@@ -30,10 +30,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -71,6 +75,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
@@ -95,6 +100,8 @@ public class TestDeletedBlockLog {
   private static final int THREE = ReplicationFactor.THREE_VALUE;
   private static final int ONE = ReplicationFactor.ONE_VALUE;
 
+  private ReplicationManager replicationManager;
+
   @BeforeEach
   public void setup() throws Exception {
     testDir = GenericTestUtils.getTestDir(
@@ -103,7 +110,11 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    scm = HddsTestUtils.getScm(conf);
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
+    configurator.setReplicationManager(replicationManager);
+    scm = HddsTestUtils.getScm(conf, configurator);
     containerManager = Mockito.mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
@@ -326,6 +337,7 @@ public class TestDeletedBlockLog {
     scmHADBTransactionBuffer.flush();
     // After flush there should be 30 transactions in deleteTable
     // All containers should have positive deleteTransactionId
+    mockContainerHealthResult(true);
     Assertions.assertEquals(30 * THREE, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       Assertions.assertTrue(containerInfo.getDeleteTransactionId() > 0);
@@ -338,6 +350,7 @@ public class TestDeletedBlockLog {
 
     // Create 30 TXs in the log.
     addTransactions(generateData(30), true);
+    mockContainerHealthResult(true);
 
     // This will return all TXs, total num 30.
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
@@ -370,12 +383,24 @@ public class TestDeletedBlockLog {
     Assertions.assertEquals(0, blocks.size());
   }
 
+  private void mockContainerHealthResult(Boolean healthy) {
+    ContainerInfo containerInfo = Mockito.mock(ContainerInfo.class);
+    ContainerHealthResult healthResult =
+        new ContainerHealthResult.HealthyResult(containerInfo);
+    if (!healthy) {
+      healthResult = new ContainerHealthResult.UnHealthyResult(containerInfo);
+    }
+    Mockito.doReturn(healthResult).when(replicationManager)
+        .getContainerReplicationHealth(any(), any());
+  }
+
   @Test
   public void testResetCount() throws Exception {
     int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
     // Create 30 TXs in the log.
     addTransactions(generateData(30), true);
+    mockContainerHealthResult(true);
 
     // This will return all TXs, total num 30.
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
@@ -418,6 +443,7 @@ public class TestDeletedBlockLog {
   @Test
   public void testCommitTransactions() throws Exception {
     addTransactions(generateData(50), true);
+    mockContainerHealthResult(true);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(20 * BLOCKS_PER_TXN * THREE);
     // Add an invalid txn.
@@ -445,11 +471,12 @@ public class TestDeletedBlockLog {
   public void testDNOnlyOneNodeHealthy() throws Exception {
     Map<Long, List<Long>> deletedBlocks = generateData(50);
     addTransactions(deletedBlocks, true);
+    mockContainerHealthResult(false);
     DatanodeDeletedBlockTransactions transactions
         = deletedBlockLog.getTransactions(
         30 * BLOCKS_PER_TXN * THREE,
         dnList.subList(0, 1).stream().collect(Collectors.toSet()));
-    Assertions.assertEquals(1, transactions.getDatanodeTransactionMap().size());
+    Assertions.assertEquals(0, transactions.getDatanodeTransactionMap().size());
   }
 
   @Test
@@ -458,14 +485,11 @@ public class TestDeletedBlockLog {
     addTransactions(deletedBlocks, true);
     long containerID;
     // let the first 30 container only consisting of only two unhealthy replicas
-    int count = 30;
-    for (Map.Entry<Long, List<Long>> entry :deletedBlocks.entrySet()) {
-      if (count <= 0) {
-        break;
-      }
+    int count = 0;
+    for (Map.Entry<Long, List<Long>> entry : deletedBlocks.entrySet()) {
       containerID = entry.getKey();
-      mockInadequateReplicaUnhealthyContainerInfo(containerID);
-      count -= 1;
+      mockInadequateReplicaUnhealthyContainerInfo(containerID, count);
+      count += 1;
     }
     // getTransactions will get existing container replicas then add transaction
     // to DN.
@@ -478,11 +502,16 @@ public class TestDeletedBlockLog {
 
     // The rest txn shall be: 41-50. 41-50. 41-50
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
-    Assertions.assertEquals(30, blocks.size());
+    // First 30 txns aren't considered for deletion as they don't have required
+    // container replica's so getAllTransactions() won't be able to fetch them
+    // and rest 20 txns are already committed and removed so in total
+    // getAllTransactions() will fetch 0 txns.
+    Assertions.assertEquals(0, blocks.size());
   }
 
   @Test
   public void testRandomOperateTransactions() throws Exception {
+    mockContainerHealthResult(true);
     Random random = new Random();
     int added = 0, committed = 0;
     List<DeletedBlocksTransaction> blocks = new ArrayList<>();
@@ -522,6 +551,7 @@ public class TestDeletedBlockLog {
   @Test
   public void testPersistence() throws Exception {
     addTransactions(generateData(50), true);
+    mockContainerHealthResult(true);
     // close db and reopen it again to make sure
     // transactions are stored persistently.
     deletedBlockLog.close();
@@ -560,6 +590,7 @@ public class TestDeletedBlockLog {
   @Test
   public void testDeletedBlockTransactions()
       throws IOException, TimeoutException {
+    mockContainerHealthResult(true);
     int txNum = 10;
     List<DeletedBlocksTransaction> blocks;
     DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);
@@ -647,8 +678,8 @@ public class TestDeletedBlockLog {
         .thenReturn(replicaSet);
   }
 
-  private void mockInadequateReplicaUnhealthyContainerInfo(long containerID)
-      throws IOException {
+  private void mockInadequateReplicaUnhealthyContainerInfo(long containerID,
+      int count) throws IOException {
     List<DatanodeDetails> dns = dnList.subList(0, 2);
     Pipeline pipeline = Pipeline.newBuilder()
         .setReplicationConfig(
@@ -674,6 +705,14 @@ public class TestDeletedBlockLog {
             .setDatanodeDetails(datanodeDetails)
             .build())
         .collect(Collectors.toSet());
+    ContainerHealthResult healthResult;
+    if (count < 30) {
+      healthResult = new ContainerHealthResult.UnHealthyResult(containerInfo);
+    } else {
+      healthResult = new ContainerHealthResult.HealthyResult(containerInfo);
+    }
+    Mockito.doReturn(healthResult).when(replicationManager)
+        .getContainerReplicationHealth(containerInfo, replicaSet);
     when(containerManager.getContainerReplicas(
         ContainerID.valueOf(containerID)))
         .thenReturn(replicaSet);

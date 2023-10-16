@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.server.leader.FollowerInfo;
 import org.junit.Assert;
@@ -174,7 +173,6 @@ public class TestAddRemoveOzoneManager {
    * OM.
    */
   @Test
-  @Flaky("HDDS-7880")
   public void testBootstrap() throws Exception {
     setupCluster(1);
     OzoneManager oldOM = cluster.getOzoneManager();
@@ -215,7 +213,6 @@ public class TestAddRemoveOzoneManager {
    * 2. Force bootstrap without upating config on any OM -> fail
    */
   @Test
-  @Flaky("HDDS-6077")
   public void testBootstrapWithoutConfigUpdate() throws Exception {
     // Setup 1 node cluster
     setupCluster(1);

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -78,6 +79,8 @@ public class TestOzoneContainer {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       StateContext context = Mockito.mock(StateContext.class);
       DatanodeStateMachine dsm = Mockito.mock(DatanodeStateMachine.class);
+      Mockito.when(dsm.getReconfigurationHandler())
+          .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
       Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
       Mockito.when(context.getParent()).thenReturn(dsm);
       container = new OzoneContainer(datanodeDetails, conf, context);
@@ -111,6 +114,8 @@ public class TestOzoneContainer {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       StateContext context = Mockito.mock(StateContext.class);
       DatanodeStateMachine dsm = Mockito.mock(DatanodeStateMachine.class);
+      Mockito.when(dsm.getReconfigurationHandler())
+          .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
       Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
       Mockito.when(context.getParent()).thenReturn(dsm);
       container = new OzoneContainer(datanodeDetails, conf, context);

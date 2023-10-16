@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
+import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -60,13 +61,14 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -155,7 +157,7 @@ public class TestOzoneFileSystem {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(600);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
@@ -1515,7 +1517,7 @@ public class TestOzoneFileSystem {
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
     Path outPath1 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath1 = new Path(TRASH_ROOT, username);
+    Path expectedOutPath1 = o3fs.makeQualified(new Path(TRASH_ROOT, username));
     Assert.assertEquals(expectedOutPath1, outPath1);
   }
 
@@ -1615,12 +1617,25 @@ public class TestOzoneFileSystem {
     Assert.assertEquals(6, res.size());
   }
 
+  @Test
+  public void testDeleteRootWithTrash() throws IOException {
+    // Try to delete root
+    Path root = new Path(OZONE_URI_DELIMITER);
+    Assert.assertThrows(IOException.class, () -> trash.moveToTrash(root));
+    // Also try with TrashPolicyDefault
+    OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
+    conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
+        TrashPolicy.class);
+    Trash trashPolicyDefault = new Trash(conf2);
+    Assert.assertThrows(IOException.class,
+        () -> trashPolicyDefault.moveToTrash(root));
+  }
+
   /**
    * 1.Move a Key to Trash
    * 2.Verify that the key gets deleted by the trash emptier.
    */
   @Test
-  @Flaky("HDDS-6645")
   public void testTrash() throws Exception {
     String testKeyName = "testKey2";
     Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
@@ -1640,12 +1655,10 @@ public class TestOzoneFileSystem {
 
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
-    // Added this assertion here and will be tested as part of testTrash
-    // test case which needs to be tested with separate mini cluster having
-    // emptier thread started with close match of timings of relevant
-    // assertion statements and corresponding trash and checkpoint interval.
+
     Assert.assertTrue(o3fs.exists(userTrash));
-    Assert.assertTrue(o3fs.exists(userTrashCurrent));
+    Assert.assertTrue(o3fs.exists(trashPath) || o3fs.listStatus(
+        o3fs.listStatus(userTrash)[0].getPath()).length > 0);
 
     // Wait until the TrashEmptier purges the key
     GenericTestUtils.waitFor(() -> {
@@ -1657,10 +1670,6 @@ public class TestOzoneFileSystem {
         return false;
       }
     }, 100, 120000);
-
-    // userTrash path will contain the checkpoint folder
-    FileStatus[] statusList = fs.listStatus(userTrash);
-    Assert.assertNotEquals(Arrays.toString(statusList), 0, statusList.length);
 
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(() -> {

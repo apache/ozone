@@ -1288,9 +1288,9 @@ function ozone_add_ldlibpath
 ## @replaceable  yes
 function ozone_add_to_classpath_userpath
 {
-  # Add the user-specified OZONE_CLASSPATH to the
-  # official CLASSPATH env var if OZONE_USE_CLIENT_CLASSLOADER
-  # is not set.
+  # Add the classpath definition from argument (or OZONE_CLASSPATH if no
+  # argument specified) to the official CLASSPATH env var if
+  # OZONE_USE_CLIENT_CLASSLOADER is not set.
   # Add it first or last depending on if user has
   # set env-var OZONE_USER_CLASSPATH_FIRST
   # we'll also dedupe it, because we're cool like that.
@@ -1300,10 +1300,11 @@ function ozone_add_to_classpath_userpath
   declare -i j
   declare -i i
   declare idx
+  local userpath="${1:-${OZONE_CLASSPATH}}"
 
-  if [[ -n "${OZONE_CLASSPATH}" ]]; then
+  if [[ -n "${userpath}" ]]; then
     # I wonder if Java runs on VMS.
-    for idx in $(echo "${OZONE_CLASSPATH}" | tr : '\n'); do
+    for idx in $(echo "${userpath}" | tr : '\n'); do
       array[${c}]=${idx}
       ((c=c+1))
     done

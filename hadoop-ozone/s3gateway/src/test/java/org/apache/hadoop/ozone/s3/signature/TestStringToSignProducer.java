@@ -95,6 +95,7 @@ public class TestStringToSignProducer {
             //NOOP
           }
         }.parseSignature();
+    signatureInfo.setUnfilteredURI("/buckets");
 
     headers.fixContentType();
 
@@ -103,7 +104,6 @@ public class TestStringToSignProducer {
             signatureInfo,
             "http",
             "GET",
-            "/buckets",
             headers,
             queryParameters);
 
@@ -203,6 +203,7 @@ public class TestStringToSignProducer {
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
         headerMap.getFirst("Authorization"),
         headerMap.getFirst("X-Amz-Date")).parseSignature();
+    signatureInfo.setUnfilteredURI("/");
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);
     } catch (OS3Exception e) {
@@ -260,6 +261,7 @@ public class TestStringToSignProducer {
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
         headerMap.getFirst("Authorization"),
         headerMap.getFirst("x-amz-date")).parseSignature();
+    signatureInfo.setUnfilteredURI("/");
 
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);

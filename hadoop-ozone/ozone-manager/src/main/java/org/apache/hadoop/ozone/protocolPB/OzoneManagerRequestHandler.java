@@ -43,6 +43,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -100,6 +103,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
@@ -217,6 +221,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysResponse listKeysResponse = listKeys(
             request.getListKeysRequest(), request.getVersion());
         responseBuilder.setListKeysResponse(listKeysResponse);
+        break;
+      case ListKeysLight:
+        ListKeysLightResponse listKeysLightResponse = listKeysLight(
+            request.getListKeysRequest());
+        responseBuilder.setListKeysLightResponse(listKeysLightResponse);
         break;
       case ListTrash:
         ListTrashResponse listTrashResponse = listTrash(
@@ -691,16 +700,34 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListKeysResponse.Builder resp =
         ListKeysResponse.newBuilder();
 
-    List<OmKeyInfo> keys = impl.listKeys(
+    ListKeysResult listKeysResult = impl.listKeys(
         request.getVolumeName(),
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
         request.getCount());
-    for (OmKeyInfo key : keys) {
+    for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
+    resp.setIsTruncated(listKeysResult.isTruncated());
+    return resp.build();
+  }
 
+  private ListKeysLightResponse listKeysLight(ListKeysRequest request)
+      throws IOException {
+    ListKeysLightResponse.Builder resp =
+        ListKeysLightResponse.newBuilder();
+
+    ListKeysLightResult listKeysLightResult = impl.listKeysLight(
+        request.getVolumeName(),
+        request.getBucketName(),
+        request.getStartKey(),
+        request.getPrefix(),
+        request.getCount());
+    for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
+      resp.addBasicKeyInfo(key.getProtobuf());
+    }
+    resp.setIsTruncated(listKeysLightResult.isTruncated());
     return resp.build();
   }
 

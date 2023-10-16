@@ -350,7 +350,19 @@ public class BasicOzoneFileSystem extends FileSystem {
       // TODO RenameKey needs to be changed to batch operation
       for (String key : keyList) {
         String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-        adapter.renameKey(key, newKeyName);
+        try {
+          adapter.renameKey(key, newKeyName);
+        } catch (OMException ome) {
+          LOG.error("Key rename failed for source key: {} to " +
+              "destination key: {}.", key, newKeyName, ome);
+          if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+              OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+              OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+            return false;
+          } else {
+            throw ome;
+          }
+        }
       }
       return true;
     }
@@ -744,7 +756,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public Path getTrashRoot(Path path) {
     final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    return new Path(pathToTrash, getUsername());
+    return this.makeQualified(new Path(pathToTrash, getUsername()));
   }
 
   /**

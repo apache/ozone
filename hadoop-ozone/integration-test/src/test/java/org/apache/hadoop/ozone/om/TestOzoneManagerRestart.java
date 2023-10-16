@@ -54,7 +54,9 @@ import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
@@ -69,7 +71,7 @@ public class TestOzoneManagerRestart {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(240);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(240));
 
   /**
    * Create a MiniDFSCluster for testing.

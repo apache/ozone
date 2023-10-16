@@ -43,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -69,13 +70,13 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -200,6 +201,7 @@ public class TestSnapshotDiffManager {
   private final List<String> snapshotNames = new ArrayList<>();
   private final List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
   private final List<SnapshotDiffJob> snapDiffJobs = new ArrayList<>();
+  private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
   @Mock
@@ -368,6 +370,7 @@ public class TestSnapshotDiffManager {
     when(omMetadataManager.getBucketKey(VOLUME_NAME, BUCKET_NAME))
         .thenReturn(bucketTableKey);
     when(omMetadataManager.getKeyTable(LEGACY)).thenReturn(keyInfoTable);
+    when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
@@ -648,9 +651,9 @@ public class TestSnapshotDiffManager {
     try (MockedConstruction<ManagedSstFileReader> mockedSSTFileReader =
              Mockito.mockConstruction(ManagedSstFileReader.class,
                  (mock, context) -> {
-                   when(mock.getKeyStreamWithTombstone(any()))
+                   when(mock.getKeyStreamWithTombstone(any(), any(), any()))
                        .thenReturn(keysIncludingTombstones.stream());
-                   when(mock.getKeyStream())
+                   when(mock.getKeyStream(any(), any()))
                        .thenReturn(keysExcludingTombstones.stream());
                  });
          MockedConstruction<ManagedSSTDumpTool> mockedSSTDumpTool =
@@ -811,14 +814,25 @@ public class TestSnapshotDiffManager {
           .thenAnswer(i -> {
             int keyVal = Integer.parseInt(((OmKeyInfo)i.getArgument(0))
                 .getKeyName().substring(3));
-            return !(keyVal % 4 == 2 && keyVal >= 0 && keyVal <= 25);
+            return !(keyVal % 4 == 2 && keyVal >= 0 && keyVal <= 25
+                && keyVal % 8 == 0);
           });
+
 
       Table<String, OmKeyInfo> fromSnapTable = mock(Table.class);
       Table<String, OmKeyInfo> toSnapTable = mock(Table.class);
       when(fromSnapTable.get(anyString())).thenAnswer(i -> {
         OmKeyInfo keyInfo = mock(OmKeyInfo.class);
         Mockito.when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
+        Mockito.when(keyInfo.isKeyInfoSame(Mockito.any(OmKeyInfo.class),
+            Mockito.eq(false), Mockito.eq(false),
+            Mockito.eq(false), Mockito.eq(false)))
+            .thenAnswer(k -> {
+              int keyVal = Integer.parseInt(((String)i.getArgument(0))
+                  .substring(3));
+              return !(keyVal % 4 == 2 && keyVal >= 0 && keyVal <= 25 &&
+                  keyVal % 8 != 0);
+            });
         return keyInfo;
       });
       when(toSnapTable.get(anyString())).thenAnswer(i -> {
@@ -1544,7 +1558,7 @@ public class TestSnapshotDiffManager {
    * Tests that only QUEUED jobs are submitted to the executor and rest are
    * short-circuited based on previous one.
    */
-  @Disabled
+  @Unhealthy
   @Test
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {

@@ -267,8 +267,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext preAppendTransaction(TransactionContext trx)
       throws IOException {
-    OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
-        trx.getStateMachineLogEntry().getLogData());
+    final OMRequest request = (OMRequest) trx.getStateMachineContext();
     OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
 
     OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
@@ -314,7 +313,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     try {
-      OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
+      // For the Leader, the OMRequest is set in trx in startTransaction.
+      // For Followers, the OMRequest hast to be converted from the log entry.
+      final Object context = trx.getStateMachineContext();
+      final OMRequest request = context != null ? (OMRequest) context
+          : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       long trxLogIndex = trx.getLogEntry().getIndex();
       // In the current approach we have one single global thread executor.
@@ -554,6 +557,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setStateMachine(this)
         .setServerRole(RaftProtos.RaftPeerRole.LEADER)
         .setLogData(raftClientRequest.getMessage().getContent())
+        .setStateMachineContext(omRequest)
         .build();
   }
 

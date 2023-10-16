@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -171,6 +172,8 @@ public class TestOzoneContainer {
 
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
+    Mockito.when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
@@ -206,6 +209,8 @@ public class TestOzoneContainer {
 
     DatanodeStateMachine stateMachine = Mockito.mock(
             DatanodeStateMachine.class);
+    Mockito.when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
@@ -227,6 +232,8 @@ public class TestOzoneContainer {
   public void testBuildNodeReportWithDefaultRatisLogDir() throws Exception {
     DatanodeStateMachine stateMachine = Mockito.mock(
             DatanodeStateMachine.class);
+    Mockito.when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
