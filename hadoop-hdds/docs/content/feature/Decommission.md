@@ -85,7 +85,7 @@ You can obtain the 'nodeId' by executing this command, **"ozone admin scm roles"
 
 To transfer the leader, we can excute below command,
 ```shell
-ozone admin scm transfer [-id=<scmServiceId>] -n=<nodeId>
+ozone admin scm transfer [--service-id=<scmServiceId>] -n=<nodeId>
 ```
 After successful leadership change we can follow the above decommissioning command to decommission the scm node.
 
