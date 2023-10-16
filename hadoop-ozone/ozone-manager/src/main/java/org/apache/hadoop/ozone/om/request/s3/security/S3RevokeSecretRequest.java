@@ -95,14 +95,17 @@ public class S3RevokeSecretRequest extends OMClientRequest {
           .doUnderLock(kerberosID, s3SecretManager -> {
             // Remove if entry exists in table
             if (s3SecretManager.hasS3Secret(kerberosID)) {
-              LOG.info("Secret for {} exists in table, removing it.", kerberosID);
+              LOG.info("Secret for {} exists in table, removing it.",
+                  kerberosID);
               // Invalid entry in table cache immediately
               s3SecretManager.invalidateCacheEntry(kerberosID);
               return new S3RevokeSecretResponse(kerberosID,
                   s3SecretManager,
                   omResponse.setStatus(Status.OK).build());
             } else {
-              LOG.info("Secret for {} doesn't exist in table hence cannot invalidate it.", kerberosID);
+              LOG.info(
+                  "Secret for {} doesn't exist in table hence cannot invalidate it.",
+                  kerberosID);
               return new S3RevokeSecretResponse(null,
                   s3SecretManager,
                   omResponse.setStatus(Status.S3_SECRET_NOT_FOUND).build());
@@ -114,8 +117,6 @@ public class S3RevokeSecretRequest extends OMClientRequest {
           ozoneManager.getS3SecretManager(),
           createErrorOMResponse(omResponse, ex));
     } finally {
-      LOG.info("Added Response to the buffer for RevokeS3SecretRequest for " +
-          "kerberosID: {}.", kerberosID);
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
     }

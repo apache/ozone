@@ -55,11 +55,8 @@ public class S3SecretManagerImpl implements S3SecretManager {
     Preconditions.checkArgument(StringUtils.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
     S3SecretValue cacheValue = s3SecretCache.get(kerberosID);
-    LOG.info("Get secret for kerberosID:{} from cache:{}", kerberosID,
-        cacheValue);
     if (cacheValue != null) {
       if(cacheValue.isDeleted()) {
-        LOG.info("Secret for kerberosID:{} is marked as deleted in cache hence not checking the DB.", kerberosID);
         // The cache entry is marked as deleted which means the user has
         // purposely deleted the secret. Hence, we do not have to check the DB.
         return null;
@@ -68,10 +65,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
           cacheValue.getAwsSecret());
     }
     S3SecretValue result = s3SecretStore.getSecret(kerberosID);
-    LOG.info("Get secret for kerberosID:{} from store:{}", kerberosID,
-        result);
     if (result != null) {
-      LOG.info("Update cache for kerberosID:{}", kerberosID);
       updateCache(kerberosID, result);
     }
     return result;
