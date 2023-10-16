@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -111,8 +111,8 @@ public class TestS3GetSecretRequest {
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
     KerberosName.setRules(
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
-            "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
-            "DEFAULT");
+        "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
+        "DEFAULT");
     ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
     Assert.assertEquals("alice", ugiAlice.getShortUserName());
 
@@ -122,7 +122,7 @@ public class TestS3GetSecretRequest {
     ozoneManager = mock(OzoneManager.class);
 
     Call call = spy(new Call(1, 1, null, null,
-        RPC.RpcKind.RPC_BUILTIN, new byte[]{1, 2, 3}));
+        RPC.RpcKind.RPC_BUILTIN, new byte[] {1, 2, 3}));
     // Run as alice, so that Server.getRemoteUser() won't return null.
     when(call.getRemoteUser()).thenReturn(ugiAlice);
     Server.getCurCall().set(call);
@@ -139,12 +139,11 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
     S3SecretLockedManager secretManager = new S3SecretLockedManager(
-        new S3SecretManagerImpl(
-            ozoneManager,
-            omMetadataManager,
-            S3SecretCacheProvider.IN_MEMORY.get(conf)
-        ),
-        omMetadataManager.getLock()
+            new S3SecretManagerImpl(
+                    omMetadataManager,
+                    S3SecretCacheProvider.IN_MEMORY.get(conf)
+            ),
+            omMetadataManager.getLock()
     );
     when(ozoneManager.getS3SecretManager()).thenReturn(secretManager);
 
