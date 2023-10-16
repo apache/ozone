@@ -157,15 +157,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     connectToDatanode(dn);
   }
 
-  /**
-   * Token based auth is not currently supported, so this method works the same
-   * way as {@link #connect()}.
-   */
-  @Override
-  public void connect(String encodedToken) throws Exception {
-    connect();
-  }
-
   private synchronized void connectToDatanode(DatanodeDetails dn)
       throws IOException {
     if (isConnected(dn)) {
