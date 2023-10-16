@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
-import org.apache.hadoop.hdds.utils.ResourceLimitCache;
+import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -204,11 +204,11 @@ public class ContainerStateMachine extends BaseStateMachine {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    int pendingRequestsMegaBytesLimit =
-        HddsUtils.roundupMb(pendingRequestsBytesLimit);
-    stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] {1, HddsUtils.roundupMb(data.size())},
-        numPendingRequests, pendingRequestsMegaBytesLimit);
+    // cache with FIFO eviction, and if element not found, this needs
+    // to be obtained from disk for slow follower
+    stateMachineDataCache = new ResourceCache<>(
+        (index, data) -> new long[] {1, data.size()},
+        numPendingRequests, pendingRequestsBytesLimit);
 
     this.chunkExecutors = chunkExecutors;
 
