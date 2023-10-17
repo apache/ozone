@@ -72,9 +72,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    CertificateSignRequest.Builder builder = super.getCSRBuilder()
-        .setDigitalEncryption(true)
-        .setDigitalSignature(true);
+    CertificateSignRequest.Builder builder = super.getCSRBuilder();
 
     try {
       String hostname = InetAddress.getLocalHost().getCanonicalHostName();

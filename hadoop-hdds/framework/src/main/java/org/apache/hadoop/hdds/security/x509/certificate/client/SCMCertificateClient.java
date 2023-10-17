@@ -120,8 +120,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         .setSubject(subject)
         .setScmID(scmId)
         .setClusterID(cId)
-        .setDigitalEncryption(true)
-        .setDigitalSignature(true)
         // Set CA to true, as this will be used to sign certs for OM/DN.
         .setCA(true)
         .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
