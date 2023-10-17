@@ -189,8 +189,9 @@ public class ContainerAttribute<T> {
   public NavigableSet<ContainerID> getCollection(T key) {
     Preconditions.checkNotNull(key);
 
-    if (this.attributeMap.containsKey(key)) {
-      return ImmutableSortedSet.copyOf(this.attributeMap.get(key));
+    final NavigableSet<ContainerID> set = attributeMap.get(key);
+    if (set != null) {
+      return ImmutableSortedSet.copyOf(set);
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("No such Key. Key {}", key);
