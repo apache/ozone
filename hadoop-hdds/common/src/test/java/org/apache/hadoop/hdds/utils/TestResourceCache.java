@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -30,11 +30,17 @@ public class TestResourceCache {
   private static final String ANY_VALUE = "asdf";
 
   @Test
-  public void testResourceCache()
-      throws InterruptedException, TimeoutException {
+  public void testResourceCache() throws InterruptedException {
+    AtomicLong count = new AtomicLong(0);
     Cache<Integer, String> resourceCache =
         new ResourceCache<>(
-            (k, v) -> new long[] {k}, 10);
+            (k, v) -> (int) k, 10,
+            (P, Q) -> {
+              if (Q) {
+                count.incrementAndGet();
+              }
+              return null;
+            });
     resourceCache.put(6, "a");
     resourceCache.put(4, "a");
 
@@ -44,6 +50,7 @@ public class TestResourceCache {
     // put to cache with removing old element "6" as eviction FIFO
     resourceCache.put(1, "a");
     Assertions.assertNull(resourceCache.get(6));
+    Assertions.assertTrue(count.get() == 1);
 
     // add 5 should be success with no removal
     resourceCache.put(5, "a");
@@ -52,6 +59,7 @@ public class TestResourceCache {
     // remove and check queue
     resourceCache.remove(4);
     Assertions.assertNull(resourceCache.get(4));
+    Assertions.assertTrue(count.get() == 1);
   }
 
   @Test
@@ -79,7 +87,7 @@ public class TestResourceCache {
     final int maxSize = 3;
     Cache<Integer, String> resourceCache =
         new ResourceCache<>(
-            (k, v) -> new long[] {1}, maxSize);
+            (k, v) -> 1, maxSize, null);
     for (int i = 1; i <= maxSize; ++i) {
       resourceCache.put(i, ANY_VALUE);
     }

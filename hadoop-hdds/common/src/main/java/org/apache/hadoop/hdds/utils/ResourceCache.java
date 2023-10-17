@@ -17,16 +17,13 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.Weigher;
 import java.util.Objects;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Cache with FIFO functionality with limit. If resource usages crosses the
@@ -34,79 +31,53 @@ import java.util.function.Predicate;
  * as first entry removal may not meet the limit.
  */
 public class ResourceCache<K, V> implements Cache<K, V> {
-  private final Map<K, V> map;
-  private final Queue<K> queue;
-  private final BiFunction<K, V, long[]> permitsSupplier;
-  private final List<Long> resources;
-  private List<AtomicLong> usages;
+  private final com.google.common.cache.Cache<K, V> cache;
 
   public ResourceCache(
-      BiFunction<K, V, long[]> permitsSupplier, long... limits) {
-    Objects.requireNonNull(permitsSupplier);
+      Weigher weigher, int limits,
+      BiFunction<Pair<K, V>, Boolean, Void> evictNotifier) {
+    Objects.requireNonNull(weigher);
     Objects.requireNonNull(limits);
-    this.map = new ConcurrentHashMap<>();
-    this.queue = new ConcurrentLinkedQueue<>();
-    this.permitsSupplier = permitsSupplier;
-    this.resources = new ArrayList<>();
-    this.usages = new ArrayList<>();
-    for (long limit : limits) {
-      resources.add(limit);
-      usages.add(new AtomicLong(0));
-    }
+    RemovalListener<K, V> listener = ele -> {
+      if (null != evictNotifier) {
+        evictNotifier.apply(Pair.of(ele.getKey(), ele.getValue()),
+            ele.wasEvicted());
+      }
+    };
+    cache = CacheBuilder.newBuilder()
+        .maximumWeight(limits)
+        .weigher(weigher)
+        .removalListener(listener)
+        .build();
   }
 
   @Override
   public V get(K key) {
     Objects.requireNonNull(key);
-    return map.get(key);
+    return cache.getIfPresent(key);
   }
 
   @Override
   public V put(K key, V value) throws InterruptedException {
     Objects.requireNonNull(key);
     Objects.requireNonNull(value);
-
-    // remove the old key to release the permits
-    V oldVal = remove(key);
-    map.put(key, value);
-    queue.add(key);
-
-    boolean isPermitCrosses = false;
-    long[] permits = permitsSupplier.apply(key, value);
-    for (int i = 0; i < permits.length; ++i) {
-      if (usages.get(i).addAndGet(permits[i]) > resources.get(i)) {
-        isPermitCrosses = true;
-      }
-    }
-
-    if (isPermitCrosses) {
-      // remove first element
-      K keyToRemove = queue.poll();
-      if (null != keyToRemove) {
-        remove(keyToRemove);
-      }
-    }
-    return oldVal;
+    V oldValue = cache.getIfPresent(key);
+    cache.put(key, value);
+    return oldValue;
   }
 
   @Override
   public V remove(K key) {
     Objects.requireNonNull(key);
-    V val = map.remove(key);
-    if (val != null) {
-      long[] permits = permitsSupplier.apply(key, val);
-      for (int i = 0; i < permits.length; ++i) {
-        usages.get(i).addAndGet(-permits[i]);
-      }
-    }
-    queue.remove(key);
-    return val;
+    V value = cache.getIfPresent(key);
+    cache.invalidate(key);
+    return value;
   }
 
   @Override
   public void removeIf(Predicate<K> predicate) {
     Objects.requireNonNull(predicate);
-    for (K key : map.keySet()) {
+    for (K key : cache.asMap().keySet()) {
       if (predicate.test(key)) {
         remove(key);
       }
@@ -115,8 +86,6 @@ public class ResourceCache<K, V> implements Cache<K, V> {
 
   @Override
   public void clear() {
-    for (K key : map.keySet()) {
-      remove(key);
-    }
+    cache.invalidateAll();
   }
 }

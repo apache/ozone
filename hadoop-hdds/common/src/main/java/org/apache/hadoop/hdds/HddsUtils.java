@@ -121,6 +121,8 @@ public final class HddsUtils {
 
   private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
+  private static final int ONE_KB = SizeInBytes.valueOf("1k").getSizeInt();
+
   private static final int NO_PORT = -1;
 
   private HddsUtils() {
@@ -701,6 +703,13 @@ public final class HddsUtils {
    */
   public static int roundupMb(long bytes) {
     return (int)Math.ceil((double) bytes / (double) ONE_MB);
+  }
+
+  /**
+   * Utility method to round up bytes into the nearest KB.
+   */
+  public static int roundupKb(long bytes) {
+    return (int)Math.ceil((double) bytes / (double) ONE_KB);
   }
 
   /**
