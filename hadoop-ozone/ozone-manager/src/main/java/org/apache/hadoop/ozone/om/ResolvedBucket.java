@@ -45,9 +45,19 @@ public class ResolvedBucket {
 
   public ResolvedBucket(String requestedVolume, String requestedBucket,
       OmBucketInfo resolved) {
-    this(requestedVolume, requestedBucket,
-        resolved.getVolumeName(), resolved.getBucketName(),
-        resolved.getOwner(), resolved.getBucketLayout());
+    this.requestedVolume = requestedVolume;
+    this.requestedBucket = requestedBucket;
+    if (resolved != null) {
+      this.realVolume = resolved.getVolumeName();
+      this.realBucket = resolved.getBucketName();
+      this.bucketOwner = resolved.getOwner();
+      this.bucketLayout = resolved.getBucketLayout();
+    } else {
+      this.realVolume = null;
+      this.realBucket = null;
+      this.bucketOwner = null;
+      this.bucketLayout = null;
+    }
   }
 
   public ResolvedBucket(String requestedVolume, String requestedBucket,
@@ -61,7 +71,8 @@ public class ResolvedBucket {
     this.bucketLayout = bucketLayout;
   }
 
-  public ResolvedBucket(Pair<String, String> requested, Pair<String, String> real, String owner, BucketLayout bucketLayout) {
+  public ResolvedBucket(Pair<String, String> requested,
+      Pair<String, String> real, String owner, BucketLayout bucketLayout) {
     this(requested.getLeft(), requested.getRight(),
         real.getLeft(), real.getRight(),
         owner, bucketLayout);
@@ -115,7 +126,7 @@ public class ResolvedBucket {
   }
 
   public boolean isDangling() {
-    return resolved == null;
+    return realVolume == null || realBucket == null;
   }
 
 

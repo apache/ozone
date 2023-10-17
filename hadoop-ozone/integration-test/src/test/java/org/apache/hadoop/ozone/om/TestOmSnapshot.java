@@ -639,8 +639,11 @@ public class TestOmSnapshot {
   private OmKeyInfo getOmKeyInfo(String volume, String bucket,
                                  String key) throws IOException {
     return cluster.getOzoneManager().getKeyManager()
-            .getKeyInfo(new OmKeyArgs.Builder().setVolumeName(volume)
-            .setBucketName(bucket).setKeyName(key).build(), BucketLayout.DEFAULT, null);
+            .getKeyInfo(new OmKeyArgs.Builder()
+                .setVolumeName(volume)
+                .setBucketName(bucket)
+                .setKeyName(key).build(),
+                BucketLayout.DEFAULT, null);
   }
 
   /**

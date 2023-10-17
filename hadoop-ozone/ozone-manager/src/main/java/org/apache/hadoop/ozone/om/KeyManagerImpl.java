@@ -406,7 +406,8 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
-  private OmKeyInfo readKeyInfo(OmKeyArgs args, BucketLayout bucketLayout) throws IOException {
+  private OmKeyInfo readKeyInfo(OmKeyArgs args, BucketLayout bucketLayout)
+      throws IOException {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -1968,8 +1969,8 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public OmKeyInfo getKeyInfo(OmKeyArgs args, BucketLayout bucketLayout, String clientAddress)
-      throws IOException {
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, BucketLayout bucketLayout,
+      String clientAddress) throws IOException {
     Preconditions.checkNotNull(args);
 
     OmKeyInfo value = captureLatencyNs(

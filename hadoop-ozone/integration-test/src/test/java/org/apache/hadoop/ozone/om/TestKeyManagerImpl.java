@@ -829,17 +829,20 @@ public class TestKeyManagerImpl {
     assertNotEquals(follower1, follower2);
 
     // lookup key, leader as client
-    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT, leader.getIpAddress());
+    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT,
+        leader.getIpAddress());
     assertEquals(leader, key1.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower1 as client
-    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT, follower1.getIpAddress());
+    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT,
+        follower1.getIpAddress());
     assertEquals(follower1, key2.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower2 as client
-    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT, follower2.getIpAddress());
+    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT,
+        follower2.getIpAddress());
     assertEquals(follower2, key3.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
@@ -860,7 +863,7 @@ public class TestKeyManagerImpl {
 
     // lookup for a non-existent key
     try {
-      keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT,null);
+      keyManager.lookupKey(keyArgs, BucketLayout.DEFAULT, null);
       fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
