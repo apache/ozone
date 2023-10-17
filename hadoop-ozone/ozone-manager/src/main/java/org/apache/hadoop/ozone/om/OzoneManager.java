@@ -1419,10 +1419,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     case FAILURE:
       LOG.error("OM security initialization failed.");
       throw new RuntimeException("OM security initialization failed.");
-    case RECOVER:
-      LOG.error("OM security initialization failed. OM certificate is " +
-          "missing.");
-      throw new RuntimeException("OM security initialization failed.");
     default:
       LOG.error("OM security initialization failed. Init response: {}",
           response);
