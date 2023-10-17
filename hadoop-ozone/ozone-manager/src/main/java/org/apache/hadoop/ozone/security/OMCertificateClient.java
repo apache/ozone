@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.security;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -65,7 +66,8 @@ public class OMCertificateClient extends CommonCertificateClient {
       Runnable shutdownCallback
   ) {
     super(secConfig, scmSecurityClient, LOG, omStorage.getOmCertSerialId(),
-        COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
+        COMPONENT_NAME, HddsUtils.threadNamePrefix(omStorage.getOmNodeId()),
+        saveCertIdCallback, shutdownCallback);
     this.serviceId = serviceId;
     this.scmID = scmID;
     this.clusterID = omStorage.getClusterID();

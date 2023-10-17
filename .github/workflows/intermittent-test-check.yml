@@ -46,6 +46,7 @@ env:
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]', inputs.test-class, inputs.test-name, inputs.ref) || '' }}
 jobs:
   prepare-job:
     runs-on: ubuntu-20.04
@@ -120,9 +121,9 @@ jobs:
       - name: Execute tests
         run: |
           test_type=${{ needs.prepare-job.outputs.test_type }}
-          args=""
+          args="-DexcludedGroups=unhealthy,org.apache.ozone.test.UnhealthyTest"
           if [ "$test_type" = "integration" ]; then
-              args="-pl :ozone-integration-test,:mini-chaos-tests"
+              args="$args -pl :ozone-integration-test,:mini-chaos-tests"
           fi
           if [ "$TEST_METHOD" = "ALL" ]; then
               echo "Running all tests from $TEST_CLASS"

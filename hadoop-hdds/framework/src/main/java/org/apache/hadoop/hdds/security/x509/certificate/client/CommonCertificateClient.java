@@ -37,17 +37,19 @@ public abstract class CommonCertificateClient extends DefaultCertificateClient {
 
   private final Logger log;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public CommonCertificateClient(
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
       Logger log,
       String certSerialId,
       String component,
+      String threadNamePrefix,
       Consumer<String> saveCertIdCallback,
       Runnable shutdownCallback
   ) {
     super(securityConfig, scmSecurityClient, log, certSerialId, component,
-        saveCertIdCallback, shutdownCallback);
+        threadNamePrefix, saveCertIdCallback, shutdownCallback);
     this.log = log;
   }
 

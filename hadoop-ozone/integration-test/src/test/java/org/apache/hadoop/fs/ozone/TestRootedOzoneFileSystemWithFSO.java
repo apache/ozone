@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -71,49 +70,6 @@ public class TestRootedOzoneFileSystemWithFSO
   public static void init()
       throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testTempMount() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testDeleteEmptyVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  /**
-   * OFS: Test recursive listStatus on root and volume.
-   */
-  @Override
-  @Ignore("TODO:HDDS-4360")
-  public void testListStatusRootAndVolumeRecursive() throws IOException {
   }
 
   /**

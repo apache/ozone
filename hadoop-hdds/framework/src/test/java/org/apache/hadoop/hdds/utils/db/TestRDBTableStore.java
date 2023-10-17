@@ -46,11 +46,16 @@ import org.junit.Rule;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests for RocksDBTable Store.
  */
 public class TestRDBTableStore {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestRDBTableStore.class);
+
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
@@ -75,6 +80,7 @@ public class TestRDBTableStore {
 
   @BeforeAll
   public static void initConstants() {
+    CodecBuffer.enableLeakDetection();
     bytesOf = new byte[4][];
     for (int i = 1; i <= 3; i++) {
       bytesOf[i] = Integer.toString(i).getBytes(StandardCharsets.UTF_8);
@@ -123,6 +129,10 @@ public class TestRDBTableStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    if (options != null) {
+      options.close();
+    }
+    CodecTestUtil.gc();
   }
 
   @Test
@@ -526,6 +536,7 @@ public class TestRDBTableStore {
     }
   }
 
+
   @Test
   public void testPrefixedIterator() throws Exception {
     int containerCount = 3;
@@ -564,6 +575,63 @@ public class TestRDBTableStore {
       }
     }
   }
+
+  @Test
+  public void testStringPrefixedIterator() throws Exception {
+    final int prefixCount = 3;
+    final int keyCount = 5;
+    final List<String> prefixes = generatePrefixes(prefixCount);
+    final List<Map<String, String>> data = generateKVs(prefixes, keyCount);
+
+    try (TypedTable<String, String> table = rdbStore.getTable(
+        "PrefixFirst", String.class, String.class)) {
+      populateTable(table, data);
+      for (String prefix : prefixes) {
+        assertIterator(keyCount, prefix, table);
+      }
+
+      final String nonExistingPrefix = RandomStringUtils.random(
+          PREFIX_LENGTH + 2, false, false);
+      assertIterator(0, nonExistingPrefix, table);
+    }
+  }
+
+  static void assertIterator(int expectedCount, String prefix,
+      TypedTable<String, String> table) throws Exception {
+    try (Table.KeyValueIterator<String, String> i = table.iterator(prefix)) {
+      int keyCount = 0;
+      for (; i.hasNext(); keyCount++) {
+        Assertions.assertEquals(prefix,
+            i.next().getKey().substring(0, PREFIX_LENGTH));
+      }
+      Assertions.assertEquals(expectedCount, keyCount);
+
+      // test seekToFirst
+      i.seekToFirst();
+      if (expectedCount > 0) {
+        // iterator should be able to seekToFirst
+        Assertions.assertTrue(i.hasNext());
+        Assertions.assertEquals(prefix,
+            i.next().getKey().substring(0, PREFIX_LENGTH));
+      }
+    }
+  }
+
+  @Test
+  public void testStringPrefixedIteratorCloseDb() throws Exception {
+    try (Table<String, String> testTable = rdbStore.getTable(
+        "PrefixFirst", String.class, String.class)) {
+      // iterator should seek to right pos in the middle
+      rdbStore.close();
+      try {
+        testTable.iterator("abc");
+        Assertions.fail();
+      } catch (IOException ioe) {
+        LOG.info("Great!", ioe);
+      }
+    }
+  }
+
 
   @Test
   public void testPrefixedRangeKVs() throws Exception {
@@ -728,6 +796,16 @@ public class TestRDBTableStore {
       for (Map.Entry<String, String> entry : segment.entrySet()) {
         table.put(entry.getKey().getBytes(StandardCharsets.UTF_8),
             entry.getValue().getBytes(StandardCharsets.UTF_8));
+      }
+    }
+  }
+
+  private void populateTable(Table<String, String> table,
+      List<Map<String, String>> testData) throws IOException {
+    for (Map<String, String> segment : testData) {
+      for (Map.Entry<String, String> entry : segment.entrySet()) {
+        table.put(entry.getKey(), entry.getValue());
+        LOG.info("put {}", entry);
       }
     }
   }

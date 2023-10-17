@@ -58,7 +58,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
       Runnable shutdown
   ) {
     super(securityConfig, scmSecurityClient, LOG, certSerialId, COMPONENT_NAME,
-        saveCertId, shutdown);
+        datanodeDetails.threadNamePrefix(), saveCertId, shutdown);
     this.dn = datanodeDetails;
   }
 

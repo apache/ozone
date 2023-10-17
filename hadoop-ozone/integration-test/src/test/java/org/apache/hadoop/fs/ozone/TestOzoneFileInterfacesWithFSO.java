@@ -19,12 +19,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Ignore;
-import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-
-import java.io.IOException;
 
 /**
  * Test OzoneFileSystem Interfaces - prefix layout.
@@ -39,41 +35,6 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
       boolean useAbsolutePath, boolean enabledFileSystemPaths)
       throws Exception {
     super(setDefaultFs, useAbsolutePath, enabledFileSystemPaths);
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testReplication() throws IOException {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testPathToKey() throws Exception {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testFileSystemInit() throws IOException {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
-  public void testDirectory() {
-
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
-  public void testOzFsReadWrite() {
-
   }
 
   @Override

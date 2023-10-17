@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -71,8 +72,16 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String scmId, String clusterId, String scmCertId, String hostname) {
-    super(securityConfig, scmClient, LOG, scmCertId,
-        COMPONENT_NAME, null, null);
+    this(securityConfig, scmClient, scmId, clusterId, scmCertId, hostname,
+        COMPONENT_NAME);
+  }
+
+  private SCMCertificateClient(SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String scmId, String clusterId, String scmCertId, String hostname,
+      String component) {
+    super(securityConfig, scmClient, LOG, scmCertId, component,
+        HddsUtils.threadNamePrefix(scmId), null, null);
     this.scmId = scmId;
     this.cId = clusterId;
     this.scmHostname = hostname;
@@ -82,16 +91,18 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String certSerialId) {
-    super(securityConfig, scmClient, LOG, certSerialId,
-        COMPONENT_NAME, null, null);
+    this(securityConfig, scmClient, null, null, certSerialId, null,
+        COMPONENT_NAME);
   }
 
   public SCMCertificateClient(
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String certSerialId,
+      String scmId,
       String component) {
-    super(securityConfig, scmClient, LOG, certSerialId, component, null, null);
+    this(securityConfig, scmClient, scmId, null, certSerialId, null,
+        component);
   }
 
   @Override
@@ -239,8 +250,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   public void refreshCACertificates() throws IOException {
     if (executorService == null) {
       executorService = Executors.newSingleThreadExecutor(
-          new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-refreshCACertificates")
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix() + getComponentName()
+                  + "-refreshCACertificates")
               .setDaemon(true).build());
     }
     executorService.execute(new RefreshCACertificates(getScmSecureClient()));
