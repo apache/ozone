@@ -111,7 +111,7 @@ public class OMPerformanceMetrics {
   private MutableRate createOmResoonseLatencyNs;
 
   @Metric(about = "Ratis local command execution latency in nano seconds")
-  private MutableRate ratisLocalExecutionLatencyNs;
+  private MutableRate validateAndUpdateCacneLatencyNs;
 
 
   public void addLookupLatency(long latencyInNs) {
@@ -207,7 +207,7 @@ public class OMPerformanceMetrics {
     return createOmResoonseLatencyNs;
   }
 
-  public MutableRate getRatisLocalExecutionLatencyNs() {
-    return ratisLocalExecutionLatencyNs;
+  public MutableRate getValidateAndUpdateCacneLatencyNs() {
+    return validateAndUpdateCacneLatencyNs;
   }
 }

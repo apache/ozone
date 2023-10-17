@@ -454,8 +454,8 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response which is returned to client.
    * @throws ServiceException
    */
-  private OMResponse createOmResponse(OMRequest omRequest, RaftClientReply reply)
-      throws ServiceException {
+  private OMResponse createOmResponse(OMRequest omRequest,
+      RaftClientReply reply) throws ServiceException {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. This can happen first time
     // when client is submitting request to OM.
