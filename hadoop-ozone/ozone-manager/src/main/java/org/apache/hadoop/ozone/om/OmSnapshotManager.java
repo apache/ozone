@@ -478,12 +478,12 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    final String beginKey = getOzonePathKeyWithVolumeBucketNames(
+    final String keyPrefix = getOzonePathKeyWithVolumeBucketNames(
         omMetadataManager, volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-         iter = omMetadataManager.getDeletedDirTable().iterator(beginKey)) {
-      performOperationGivenPrefix(iter, beginKey,
+         iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
+      performOperationGivenPrefix(iter, keyPrefix,
           entry -> {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
@@ -531,16 +531,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to locate the end key with the given prefix and iterator.
+   * Helper method to perform operation on keys with a given prefix and iterator
    * @param keyIter TableIterator
    * @param keyPrefix DB key prefix String
    * @return endKey String, or null if no keys with such prefix is found
    */
-  private static String performOperationGivenPrefix(
+  private static void performOperationGivenPrefix(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
       String keyPrefix, ThrowableFunction<Table.KeyValue<String, ?>,
       Void, IOException> operationFunction) throws IOException {
-    String endKey = null;
     keyIter.seek(keyPrefix);
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place
@@ -554,7 +553,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       String dbKey = entry.getKey();
       if (dbKey.startsWith(keyPrefix)) {
         operationFunction.apply(entry);
-        endKey = dbKey;
       } else {
         break;
       }
@@ -567,7 +565,6 @@ public final class OmSnapshotManager implements AutoCloseable {
           new Throwable().fillInStackTrace().getStackTrace()[1]
               .getMethodName());
     }
-    return endKey;
   }
 
   /**
@@ -600,13 +597,13 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    final String beginKey =
+    final String keyPrefix =
         omMetadataManager.getOzoneKey(volumeName, bucketName, "");
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             iter = omMetadataManager.getDeletedTable().iterator(beginKey)) {
-      performOperationGivenPrefix(iter, beginKey, entry -> {
+             iter = omMetadataManager.getDeletedTable().iterator(keyPrefix)) {
+      performOperationGivenPrefix(iter, keyPrefix, entry -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Removing key {} from DeletedTable", entry.getKey());
         }
