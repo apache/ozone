@@ -189,6 +189,7 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,

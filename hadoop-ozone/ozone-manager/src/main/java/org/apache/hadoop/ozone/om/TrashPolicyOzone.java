@@ -25,7 +25,6 @@ import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -120,8 +119,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   @Override
   public Runnable getEmptier() throws IOException {
-    return new TrashPolicyOzone.Emptier((OzoneConfiguration)configuration,
-        emptierInterval,om.getNodeDetails().threadNamePrefix());
+    return new TrashPolicyOzone.Emptier((OzoneConfiguration) configuration,
+        emptierInterval, om.getNodeDetails().threadNamePrefix());
   }
 
   @Override
