@@ -53,9 +53,7 @@ public class ScmOption {
   private String scmServiceId;
 
   public ScmClient createScmClient() throws IOException {
-    GenericParentCommand parent = (GenericParentCommand)
-        spec.root().userObject();
-    OzoneConfiguration conf = parent.createOzoneConfiguration();
+    OzoneConfiguration conf = getConfiguration();
     checkAndSetSCMAddressArg(conf);
 
     return new ContainerOperationClient(conf);
@@ -91,13 +89,17 @@ public class ScmOption {
 
   public SCMSecurityProtocol createScmSecurityClient() {
     try {
-      GenericParentCommand parent = (GenericParentCommand)
-          spec.root().userObject();
-      return getScmSecurityClient(parent.createOzoneConfiguration());
+      return getScmSecurityClient(getConfiguration());
     } catch (IOException ex) {
       throw new IllegalArgumentException(
           "Can't create SCM Security client", ex);
     }
+  }
+
+  public OzoneConfiguration getConfiguration() {
+    GenericParentCommand parent = (GenericParentCommand)
+        spec.root().userObject();
+    return parent.createOzoneConfiguration();
   }
 
 }

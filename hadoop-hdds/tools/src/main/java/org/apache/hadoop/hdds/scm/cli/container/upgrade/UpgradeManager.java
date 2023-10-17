@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.scm.cli.container.upgrade;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -69,9 +71,10 @@ public class UpgradeManager {
     for (StorageVolume storageVolume : dataVolumeSet.getVolumesList()) {
       final HddsVolume volume = (HddsVolume) storageVolume;
       final File containerDBPath = getContainerDBPath(volume);
-      final DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree =
-          new DatanodeStoreSchemaThreeImpl(configuration,
-              containerDBPath.getAbsolutePath(), false);
+      RawDB db = DatanodeStoreCache.getInstance()
+          .getDB(containerDBPath.getAbsolutePath(), configuration);
+      DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree =
+          (DatanodeStoreSchemaThreeImpl) db.getStore();
       volumeStoreMap.put(volume.getStorageDir().getAbsolutePath(),
           datanodeStoreSchemaThree);
     }

@@ -64,6 +64,9 @@ public class UpgradeTask {
   private final DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree;
 
   private static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
+  public static final String MIGRATE_FLAG_FILE_NAME = "migrate";
+  public static final String UPGRADE_LOCK_FILE_NAME = "upgrade.lock";
+
   private static final Set<String> COLUMN_FAMILIES_NAME =
       (new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration()))
           .getMap().keySet();
@@ -77,6 +80,9 @@ public class UpgradeTask {
   }
 
   public CompletableFuture<UpgradeManager.Result> getUpgradeFutureByVolume() {
+    final File volumeUpgradeLockFile =
+        UpgradeUtils.getVolumeUpgradeLockFile(hddsVolume);
+
     return CompletableFuture.supplyAsync(() -> {
 
       final UpgradeManager.Result result =
@@ -87,6 +93,26 @@ public class UpgradeTask {
 
       Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
           "cannot be null");
+
+      if (volumeUpgradeLockFile.exists()) {
+        result.fail(new Exception(
+            "Upgrading in progress for the volume " + hddsVolumeRootDir +
+                ", skipped upgrade."));
+        return result;
+      }
+
+      try {
+        boolean touchSuccess = UpgradeUtils.touchFile(volumeUpgradeLockFile);
+        if (!touchSuccess) {
+          result.fail(new Exception("Create upgrade lock file, " +
+              volumeUpgradeLockFile.getAbsolutePath() + " fail."));
+          return result;
+        }
+      } catch (IOException e) {
+        result.fail(new Exception("Create upgrade lock file, " +
+            volumeUpgradeLockFile.getAbsolutePath() + " fail.", e));
+        return result;
+      }
 
       //filtering storage directory
       File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
@@ -145,6 +171,21 @@ public class UpgradeTask {
       result.setResultList(resultList);
       result.success();
       return result;
+    }).whenComplete((r, e) -> {
+      // touch a flag file
+      if (e == null) {
+        final File hddsRootDir = r.getHddsVolume().getHddsRootDir();
+        final File file = UpgradeUtils.getVolumeMigrateFile(r.getHddsVolume());
+        try {
+          UpgradeUtils.touchFile(file);
+        } catch (IOException ioe) {
+          LOG.warn("Touch upgrade finish file {} on volume {} fail.", file,
+              hddsRootDir, ioe);
+        }
+      }
+      if (volumeUpgradeLockFile.exists()) {
+        volumeUpgradeLockFile.delete();
+      }
     });
   }
 
