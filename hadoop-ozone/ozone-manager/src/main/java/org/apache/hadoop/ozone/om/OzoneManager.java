@@ -2116,7 +2116,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           (PrivilegedExceptionAction<FileSystem>)
               () -> new TrashOzoneFileSystem(i));
       this.emptier = new Thread(new OzoneTrash(fs, conf, this).
-          getEmptier(), threadPrefix + "Trash Emptier");
+          getEmptier(), threadPrefix + "TrashEmptier");
       this.emptier.setDaemon(true);
       this.emptier.start();
     }
@@ -3246,7 +3246,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Trigger Ranger BG Sync
     if (noWait) {
       final Thread t = new Thread(bgSync::triggerRangerSyncOnce,
-          threadPrefix + "Trigger RangerSync");
+          threadPrefix + "Trigger_RangerSync");
       t.start();
       LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync "
           + "in a new thread, tid={}", ugi, t.getId());

@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -284,13 +285,14 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           + " minutes, Emptier interval = "
           + (this.emptierInterval / MSECS_PER_MINUTE) + " minutes.");
       executor = new ThreadPoolExecutor(trashEmptierCorePoolSize,
-          trashEmptierCorePoolSize, 1,
-          TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
+          trashEmptierCorePoolSize, 1, TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1024), new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+              return new Thread(r, threadNamePrefix + "TrashEmptier");
+            }
+          },
           new ThreadPoolExecutor.CallerRunsPolicy());
-
-      // Set a custom thread name with the provided prefix
-      Thread.currentThread()
-          .setName(threadNamePrefix + "-" + Thread.currentThread().getName());
     }
 
     @Override
