@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -115,6 +116,7 @@ public class OzoneManagerServiceProviderImpl
   private int deltaUpdateLoopLimit;
 
   private AtomicBoolean isSyncDataFromOMRunning;
+  private final String threadNamePrefix;
 
   /**
    * OM Snapshot related task names.
@@ -196,6 +198,8 @@ public class OzoneManagerServiceProviderImpl
     this.deltaUpdateLimit = deltaUpdateLimits;
     this.deltaUpdateLoopLimit = deltaUpdateLoopLimits;
     this.isSyncDataFromOMRunning = new AtomicBoolean();
+    this.threadNamePrefix =
+        reconUtils.getReconNodeDetails(configuration).threadNamePrefix();
   }
 
   public void registerOMDBTasks() {
@@ -228,7 +232,9 @@ public class OzoneManagerServiceProviderImpl
   @Override
   public void start() {
     LOG.info("Starting Ozone Manager Service Provider.");
-    scheduler = Executors.newScheduledThreadPool(1);
+    scheduler = Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix)
+            .build());
     registerOMDBTasks();
     try {
       omMetadataManager.start(configuration);
@@ -280,7 +286,9 @@ public class OzoneManagerServiceProviderImpl
       // setting the initialDelay to 0, which triggers an OM DB sync
       // immediately.
       stopSyncDataFromOMThread();
-      scheduler = Executors.newScheduledThreadPool(1);
+      scheduler = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder().setNameFormat(threadNamePrefix)
+              .build());
       startSyncDataFromOM(0L);
       return true;
     } else {
