@@ -450,9 +450,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     String openKey = getOpenKey(id);
 
-    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
-        omMetadataManager);
-    OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
+    // Add volume and bucket entries to DB.
+    addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     // Before calling
     OmKeyInfo omKeyInfo =
