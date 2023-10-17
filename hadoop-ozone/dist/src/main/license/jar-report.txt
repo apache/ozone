@@ -272,3 +272,4 @@ share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zookeeper.jar
 share/ozone/lib/zookeeper-jute.jar
 share/ozone/lib/zstd-jni.jar
+share/ozone/lib/java-uuid-generator.jar
