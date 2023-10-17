@@ -1393,6 +1393,22 @@ public class SCMNodeManager implements NodeManager {
     return clusterMap;
   }
 
+  /**
+   * For the given node, retried the last heartbeat time.
+   * @param datanodeDetails DatanodeDetails of the node.
+   * @return The last heartbeat time in milliseconds or -1 if the node does not
+   *         exist.
+   */
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    try {
+      DatanodeInfo node = nodeStateManager.getNode(datanodeDetails);
+      return node.getLastHeartbeatTime();
+    } catch (NodeNotFoundException e) {
+      return -1;
+    }
+  }
+
   private String nodeResolve(String hostname) {
     List<String> hosts = new ArrayList<>(1);
     hosts.add(hostname);
