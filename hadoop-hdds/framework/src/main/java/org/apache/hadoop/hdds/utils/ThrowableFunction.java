@@ -17,8 +17,10 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import java.util.function.Function;
-
+/**
+ * Utility interface for function which throws exceptions.
+ * Similar to java.util.Function.
+ */
 public interface ThrowableFunction<T, R, E extends Throwable> {
   R apply(T t) throws E;
 }
