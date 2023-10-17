@@ -29,6 +29,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -284,15 +285,17 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           + (deletionInterval / MSECS_PER_MINUTE)
           + " minutes, Emptier interval = "
           + (this.emptierInterval / MSECS_PER_MINUTE) + " minutes.");
-      executor = new ThreadPoolExecutor(trashEmptierCorePoolSize,
-          trashEmptierCorePoolSize, 1, TimeUnit.SECONDS,
-          new ArrayBlockingQueue<>(1024), new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-              return new Thread(r, threadNamePrefix + "TrashEmptier");
-            }
-          },
-          new ThreadPoolExecutor.CallerRunsPolicy());
+      executor = new ThreadPoolExecutor(
+          trashEmptierCorePoolSize,
+          trashEmptierCorePoolSize,
+          1,
+          TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1024),
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix + "TrashEmptier-%d")
+              .build(),
+          new ThreadPoolExecutor.CallerRunsPolicy()
+      );
     }
 
     @Override

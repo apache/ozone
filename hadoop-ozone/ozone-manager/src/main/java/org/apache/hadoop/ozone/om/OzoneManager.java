@@ -3246,7 +3246,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Trigger Ranger BG Sync
     if (noWait) {
       final Thread t = new Thread(bgSync::triggerRangerSyncOnce,
-          threadPrefix + "Trigger_RangerSync");
+          threadPrefix + "TriggerRangerSync");
       t.start();
       LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync "
           + "in a new thread, tid={}", ugi, t.getId());

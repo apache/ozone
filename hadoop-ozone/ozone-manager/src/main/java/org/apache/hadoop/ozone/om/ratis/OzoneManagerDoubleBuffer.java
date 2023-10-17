@@ -108,7 +108,7 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
   private final FlushNotifier flushNotifier;
-  private String threadPrefix = "";
+  private final String threadPrefix;
   /**
    * function which will get term associated with the transaction index.
    */
@@ -125,7 +125,7 @@ public final class OzoneManagerDoubleBuffer {
     private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
-    private String threadPrefix;
+    private String threadPrefix = "";
 
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
@@ -209,6 +209,7 @@ public final class OzoneManagerDoubleBuffer {
         OzoneManagerDoubleBufferMetrics.create();
     this.indexToTerm = indexToTerm;
     this.flushNotifier = flushNotifier;
+    this.threadPrefix = threadPrefix;
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
     daemon = new Daemon(this::flushTransactions);
