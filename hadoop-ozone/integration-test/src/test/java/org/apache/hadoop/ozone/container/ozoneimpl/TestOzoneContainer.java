@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -30,15 +29,13 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -77,13 +74,8 @@ public class TestOzoneContainer {
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      StateContext context = Mockito.mock(StateContext.class);
-      DatanodeStateMachine dsm = Mockito.mock(DatanodeStateMachine.class);
-      Mockito.when(dsm.getReconfigurationHandler())
-          .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
-      Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(dsm);
-      container = new OzoneContainer(datanodeDetails, conf, context);
+      container = ContainerTestUtils
+          .getOzoneContainer(datanodeDetails, conf);
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -112,13 +104,8 @@ public class TestOzoneContainer {
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      StateContext context = Mockito.mock(StateContext.class);
-      DatanodeStateMachine dsm = Mockito.mock(DatanodeStateMachine.class);
-      Mockito.when(dsm.getReconfigurationHandler())
-          .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
-      Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(dsm);
-      container = new OzoneContainer(datanodeDetails, conf, context);
+      container = ContainerTestUtils
+          .getOzoneContainer(datanodeDetails, conf);
 
       String clusterId = UUID.randomUUID().toString();
       container.start(clusterId);

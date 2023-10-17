@@ -74,7 +74,9 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.SlowTest;
 import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Slow;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -2122,6 +2124,7 @@ public class TestOmSnapshot {
   }
 
   @Test
+  @Category(SlowTest.class) @Slow("HDDS-9299")
   public void testDayWeekMonthSnapshotCreationAndExpiration() throws Exception {
     String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
     String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);

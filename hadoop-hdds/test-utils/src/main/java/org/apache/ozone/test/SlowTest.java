@@ -15,24 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test.tag;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-import org.junit.jupiter.api.Tag;
+package org.apache.ozone.test;
 
 /**
- * Annotation to mark JUnit5 test classes that require native libraries.
+ * Interface to mark JUnit4 test classes or methods that take too much time.
+ * These are excluded from CI runs for each commit, but can be run manually or
+ * in scheduled runs.
+ *
+ * Usage: <code>@Category(SlowTest.class) @Slow("HDDS-123")</code>
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
-@Retention(RetentionPolicy.RUNTIME)
-@Tag("native")
-public @interface Native {
-  /**
-   * Native Library being used.
-   */
-  String value();
+public interface SlowTest {
+  // category marker
 }
