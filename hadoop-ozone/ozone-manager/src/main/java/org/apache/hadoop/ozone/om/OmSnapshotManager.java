@@ -483,7 +483,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         omMetadataManager, volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-         iter = omMetadataManager.getDeletedDirTable().iterator()) {
+         iter = omMetadataManager.getDeletedDirTable().iterator(beginKey)) {
       performOperationGivenPrefix(iter, beginKey,
           entry -> {
             if (LOG.isDebugEnabled()) {
@@ -606,7 +606,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             iter = omMetadataManager.getDeletedTable().iterator()) {
+             iter = omMetadataManager.getDeletedTable().iterator(beginKey)) {
       performOperationGivenPrefix(iter, beginKey, entry -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Removing key {} from DeletedTable", entry.getKey());
