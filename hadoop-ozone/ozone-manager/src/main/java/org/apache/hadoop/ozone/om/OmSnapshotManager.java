@@ -34,12 +34,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.ThrowableFunction;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -473,24 +475,24 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param bucketName bucket name
    */
   private static void deleteKeysFromDelDirTableInSnapshotScope(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
+      OMMetadataManager omMetadataManager, String volumeName,
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
     final String beginKey = getOzonePathKeyWithVolumeBucketNames(
         omMetadataManager, volumeName, bucketName);
-    // Range delete end key (exclusive). To be calculated
-    String endKey;
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator()) {
-      endKey = findEndKeyGivenPrefix(iter, beginKey);
+      performOperationGivenPrefix(iter, beginKey,
+          entry -> {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
+            }
+            omMetadataManager.getDeletedDirTable().delete(entry.getKey());
+            return null;
+          });
     }
-
-    // Clean up deletedDirectoryTable
-    deleteRangeInclusive(omMetadataManager.getDeletedDirTable(),
-        beginKey, endKey);
   }
 
   /**
@@ -535,41 +537,36 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param keyPrefix DB key prefix String
    * @return endKey String, or null if no keys with such prefix is found
    */
-  private static String findEndKeyGivenPrefix(
+  private static String performOperationGivenPrefix(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
-      String keyPrefix) throws IOException {
-
-    String endKey;
+      String keyPrefix, ThrowableFunction<Table.KeyValue<String, ?>,
+      Void, IOException> operationFunction) throws IOException {
+    String endKey = null;
     keyIter.seek(keyPrefix);
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place
-    if (!keyIter.hasNext()) {
-      // No key matching keyPrefix. No need to do delete or deleteRange at all.
-      endKey = null;
-    } else {
-      // Remember the last key with a matching prefix
-      endKey = keyIter.next().getKey();
-
-      // Loop until prefix mismatches.
-      // TODO: [SNAPSHOT] Try to seek to next predicted bucket name instead of
-      //  the while-loop for a potential speed up?
-      // Start performance tracking timer
-      long startTime = System.nanoTime();
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, ?> entry = keyIter.next();
-        String dbKey = entry.getKey();
-        if (dbKey.startsWith(keyPrefix)) {
-          endKey = dbKey;
-        }
+    // Loop until prefix matches.
+    // TODO: [SNAPSHOT] Try to seek to next predicted bucket name instead of
+    //  the while-loop for a potential speed up?
+    // Start performance tracking timer
+    long startTime = System.nanoTime();
+    while (keyIter.hasNext()) {
+      Table.KeyValue<String, ?> entry = keyIter.next();
+      String dbKey = entry.getKey();
+      if (dbKey.startsWith(keyPrefix)) {
+        operationFunction.apply(entry);
+        endKey = dbKey;
+      } else {
+        break;
       }
-      // Time took for the iterator to finish (in ns)
-      long timeElapsed = System.nanoTime() - startTime;
-      if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
-        // Print time elapsed
-        LOG.warn("Took {} ns to find endKey. Caller is {}", timeElapsed,
-            new Throwable().fillInStackTrace().getStackTrace()[1]
-                .getMethodName());
-      }
+    }
+    // Time took for the iterator to finish (in ns)
+    long timeElapsed = System.nanoTime() - startTime;
+    if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
+      // Print time elapsed
+      LOG.warn("Took {} ns to find endKey. Caller is {}", timeElapsed,
+          new Throwable().fillInStackTrace().getStackTrace()[1]
+              .getMethodName());
     }
     return endKey;
   }
@@ -600,24 +597,24 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param bucketName bucket name
    */
   private static void deleteKeysFromDelKeyTableInSnapshotScope(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
+      OMMetadataManager omMetadataManager, String volumeName,
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
     final String beginKey =
         omMetadataManager.getOzoneKey(volumeName, bucketName, "");
-    // Range delete end key (exclusive). To be found
-    String endKey;
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              iter = omMetadataManager.getDeletedTable().iterator()) {
-      endKey = findEndKeyGivenPrefix(iter, beginKey);
+      performOperationGivenPrefix(iter, beginKey, entry -> {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Removing key {} from DeletedTable", entry.getKey());
+        }
+        omMetadataManager.getDeletedTable().delete(entry.getKey());
+        return null;
+      });
     }
-
-    // Clean up deletedTable
-    deleteRangeInclusive(omMetadataManager.getDeletedTable(), beginKey, endKey);
 
     // No need to invalidate deletedTable (or deletedDirectoryTable) table
     // cache since entries are not added to its table cache in the first place.
