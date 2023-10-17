@@ -363,7 +363,8 @@ public class ReconStorageContainerManagerFacade
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
     scheduler = Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix)
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
+                "SyncSCMContainerInfo-%d")
             .build());
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,

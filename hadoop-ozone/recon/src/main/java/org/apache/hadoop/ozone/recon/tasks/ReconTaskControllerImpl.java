@@ -221,7 +221,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
     executorService = Executors.newFixedThreadPool(threadCount,
-        new ThreadFactoryBuilder().setNameFormat("Recon Task Thread - %d")
+        new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
             .build());
   }
 
