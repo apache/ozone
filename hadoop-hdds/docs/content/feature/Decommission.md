@@ -77,16 +77,24 @@ Storage Container Manager (SCM) decommissioning is the process in which you can 
 
 To decommission a SCM and remove the node from the SCM HA ring, the following steps need to be executed.
 ```shell
-ozone admin scm decommission [-hV] [-id=<scmServiceId>] -nodeid=<nodeId>
+ozone admin scm decommission [-hV] [--service-id=<scmServiceId>] -nodeid=<nodeId>
 ```
 You can obtain the 'nodeId' by executing this command, **"ozone admin scm roles"**
 
-**Note -** If you want to decommission the **leader** scm, you must first transfer the leadership to a different scm and then decommission the node.
+### Leader SCM
+If you want to decommission the **leader** scm, you must first transfer the leadership to a different scm and then decommission the node.
 
 To transfer the leader, we can excute below command,
 ```shell
 ozone admin scm transfer [--service-id=<scmServiceId>] -n=<nodeId>
 ```
-After successful leadership change we can follow the above decommissioning command to decommission the scm node.
+After successful leadership change you can proceed with decommissioning.
 
-Note: During SCM decommissioning the private key of the decommissioned SCM should be manually deleted. The private keys can be found inside _hdds.metadata.dir_. Manual deletion is needed until we have certificate revocation support (HDDS-8399)
+### Primordial SCM
+If you want to decommission the **primordial** scm, you have to change the _ozone.scm.primordial.node.id_ property to point to a different SCM and then proceed with decommissioning.
+
+
+### Note
+During SCM decommissioning the private key of the decommissioned SCM should be manually deleted. The private keys can be found inside _hdds.metadata.dir_.
+
+Manual deletion is needed until we have certificate revocation support (HDDS-8399)
