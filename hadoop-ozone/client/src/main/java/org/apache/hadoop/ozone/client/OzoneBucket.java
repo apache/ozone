@@ -1230,7 +1230,7 @@ public class OzoneBucket extends WithMetadata {
       // which means they come after the keyPrefix.
       List<OzoneFileStatusLight> statuses =
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
-              startKey, listCacheSize);
+              startKey, listCacheSize, false);
 
       if (addedKeyPrefix) {
         // previous round already include the startKey, so remove it

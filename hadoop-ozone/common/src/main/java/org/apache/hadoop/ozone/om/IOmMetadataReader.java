@@ -89,14 +89,6 @@ public interface IOmMetadataReader {
     return listStatus(args, recursive, startKey, numEntries, false);
   }
 
-  default List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
-                                                     boolean recursive,
-                                                     String startKey,
-                                                     long numEntries)
-      throws IOException {
-    return listStatusLight(args, recursive, startKey, numEntries, false);
-  }
-
   /**
    * OzoneFS api to get file status for an entry.
    *

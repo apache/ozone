@@ -2269,12 +2269,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
-      boolean recursive, String startKey, long numEntries) throws IOException {
-    return listStatusLight(args, recursive, startKey, numEntries, false);
-  }
-
-  @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException {
