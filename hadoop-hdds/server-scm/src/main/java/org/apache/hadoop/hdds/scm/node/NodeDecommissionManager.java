@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -37,11 +38,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Class used to manage datanodes scheduled for maintenance or decommission.
@@ -125,11 +128,10 @@ public class NodeDecommissionManager {
         dnsName = addr.getHostAddress();
       }
       List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
-      if (found.size() == 0) {
+      if (found.isEmpty()) {
         throw new InvalidHostStringException("Host " + host.getRawHostname()
             + " (" + dnsName + ") is not running any datanodes registered"
-            + " with SCM."
-            + " Please check the host name.");
+            + " with SCM. Please check the host name.");
       } else if (found.size() == 1) {
         if (host.getPort() != -1 &&
             !validateDNPortMatch(host.getPort(), found.get(0))) {
@@ -139,24 +141,85 @@ public class NodeDecommissionManager {
               + " Please check the port number.");
         }
         results.add(found.get(0));
-      } else if (found.size() > 1) {
-        DatanodeDetails match = null;
-        for (DatanodeDetails dn : found) {
-          if (validateDNPortMatch(host.getPort(), dn)) {
-            match = dn;
-            break;
-          }
+      } else {
+        // Here we either have multiple DNs on the same host / IP, and they
+        // should have different ports. Or, we have a case where a DN was
+        // registered from a host, then stopped and formatted, changing its
+        // UUID and registered again. In that case, the ports of all hosts
+        // should be the same, and we should just use the one with the most
+        // recent heartbeat.
+        if (host.getPort() != -1) {
+          found.removeIf(dn -> !validateDNPortMatch(host.getPort(), dn));
         }
-        if (match == null) {
+        if (found.isEmpty()) {
+          throw new InvalidHostStringException("Host " + host.getRawHostname()
+              + " is running multiple datanodes registered with SCM,"
+              + " but no port numbers match."
+              + " Please check the port number.");
+        } else if (found.size() == 1) {
+          results.add(found.get(0));
+          continue;
+        }
+        // Here we have at least 2 DNs matching the passed in port, or no port
+        // was passed so we may have all the same ports in SCM or a mix of
+        // ports.
+        if (allPortsMatch(found)) {
+          // All ports match, so just use the most recent heartbeat as it is
+          // not possible for a host to have 2 DNs coming from the same port.
+          DatanodeDetails mostRecent = findDnWithMostRecentHeartbeat(found);
+          if (mostRecent == null) {
+            throw new InvalidHostStringException("Host " + host.getRawHostname()
+                + " has multiple datanodes registered with SCM."
+                + " All have identical ports, but none have a newest"
+                + " heartbeat.");
+          }
+          results.add(mostRecent);
+        } else {
+          // We have no passed in port or the ports in SCM do not all match, so
+          // we cannot decide which DN to use.
           throw new InvalidHostStringException("Host " + host.getRawHostname()
               + " is running multiple datanodes registered with SCM,"
               + " but no port numbers match."
               + " Please check the port number.");
         }
-        results.add(match);
       }
     }
     return results;
+  }
+
+  private boolean allPortsMatch(List<DatanodeDetails> dns) {
+    if (dns.size() < 2) {
+      return true;
+    }
+    int port = dns.get(0).getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+    for (int i = 1; i < dns.size(); i++) {
+      if (dns.get(i).getPort(DatanodeDetails.Port.Name.RATIS).getValue()
+          != port) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private DatanodeDetails findDnWithMostRecentHeartbeat(
+      List<DatanodeDetails> dns) {
+    if (dns.size() < 2) {
+      return dns.isEmpty() ? null : dns.get(0);
+    }
+    List<Pair<DatanodeDetails, Long>> dnsWithHeartbeat = dns.stream()
+        .map(dn -> Pair.of(dn, nodeManager.getLastHeartbeat(dn)))
+        .sorted(Comparator.comparingLong(Pair::getRight))
+        .collect(Collectors.toList());
+    // The last element should have the largest (newest) heartbeat. But also
+    // check it is not identical to the last but 1 element, as then we cannot
+    // determine which node to decommission.
+    Pair<DatanodeDetails, Long> last = dnsWithHeartbeat.get(
+        dnsWithHeartbeat.size() - 1);
+    if (last.getRight() > dnsWithHeartbeat.get(
+        dnsWithHeartbeat.size() - 2).getRight()) {
+      return last.getLeft();
+    }
+    return null;
   }
 
   /**
