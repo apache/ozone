@@ -120,7 +120,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   @Override
   public Runnable getEmptier() throws IOException {
     return new TrashPolicyOzone.Emptier((OzoneConfiguration) configuration,
-        emptierInterval, om.getNodeDetails().threadNamePrefix());
+        emptierInterval, om.getThreadNamePrefix());
   }
 
   @Override

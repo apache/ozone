@@ -502,7 +502,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
-    this.threadNamePrefix = omNodeDetails.threadNamePrefix();
     omStorage = new OMStorage(conf);
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
