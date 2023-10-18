@@ -534,7 +534,6 @@ public final class OmSnapshotManager implements AutoCloseable {
    * Helper method to perform operation on keys with a given iterator.
    * @param keyIter TableIterator
    * @param operationFunction operation to be performed for each key.
-   * @return endKey String, or null if no keys with such prefix is found
    */
   private static void performOperationOnKeys(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
@@ -543,8 +542,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place
     // Loop until prefix matches.
-    // TODO: [SNAPSHOT] Try to seek to next predicted bucket name instead of
-    //  the while-loop for a potential speed up?
     // Start performance tracking timer
     long startTime = System.nanoTime();
     while (keyIter.hasNext()) {
