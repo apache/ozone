@@ -158,7 +158,7 @@ public class TestHddsSecureDatanodeInit {
         securityConfig.getCertificateFileName()).toFile());
     dnLogs.clearOutput();
     client = new DNCertificateClient(securityConfig, scmClient, datanodeDetails,
-        certHolder.getSerialNumber().toString(), id -> {}, null);
+        certHolder.getSerialNumber().toString(), id -> { }, null);
   }
 
   @AfterEach
