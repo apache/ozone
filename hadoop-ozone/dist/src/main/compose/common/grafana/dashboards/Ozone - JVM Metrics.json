@@ -1,4 +1,35 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.1.5"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -24,12 +55,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 10,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -37,103 +68,194 @@
         "y": 0
       },
       "id": 44,
-      "panels": [
+      "panels": [],
+      "title": "OM GC  Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "time (ms)",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "time (ms)",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 10,
-            "w": 12,
-            "x": 0,
-            "y": 1
-          },
-          "id": 10,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "igU0coMVz"
-              },
-              "editorMode": "code",
-              "expr": "increase(jvm_metrics_gc_time_millis{processname=\"OzoneManager\"}[1m]) / 60",
-              "legendFormat": "{{instance}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "GC Time - jvm_metrics_gc_time_millis (OM)",
-          "type": "timeseries"
+          "editorMode": "code",
+          "expr": "increase(jvm_metrics_gc_time_millis{processname=\"OzoneManager\"}[1m]) / 60",
+          "legendFormat": "{{instance}}",
+          "range": true,
+          "refId": "A"
         }
       ],
-      "title": "OM GC Time Metrics",
-      "type": "row"
+      "title": "GC Time - jvm_metrics_gc_time_millis (OM)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "no. of gc events",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 111,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "builder",
+          "expr": "jvm_metrics_gc_count{processname=\"OzoneManager\"}",
+          "legendFormat": "{{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "GC Count - jvm_metrics_gc_count (OM)",
+      "type": "timeseries"
     },
     {
       "collapsed": true,
@@ -141,14 +263,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 1
+        "y": 11
       },
       "id": 42,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -190,8 +312,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -207,7 +328,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 2
+            "y": 12
           },
           "id": 29,
           "options": {
@@ -226,7 +347,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9875\"}",
@@ -248,14 +369,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 2
+        "y": 12
       },
       "id": 18,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -297,8 +418,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -332,7 +452,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_runnable{processname=\"OzoneManager\"}",
@@ -347,7 +467,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -389,8 +509,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -407,7 +526,7 @@
                   "options": {
                     "mode": "exclude",
                     "names": [
-                      "rhelnn01.cdip.cisco.local:9875"
+                      "rhelnn02.cdip.cisco.local:9875"
                     ],
                     "prefix": "All except:",
                     "readOnly": true
@@ -449,7 +568,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_blocked{processname=\"OzoneManager\"}",
@@ -464,7 +583,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -506,8 +625,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -541,7 +659,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_waiting{processname=\"OzoneManager\"}",
@@ -563,14 +681,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 3
+        "y": 13
       },
       "id": 80,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -612,8 +730,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -631,7 +748,7 @@
                   "options": {
                     "mode": "exclude",
                     "names": [
-                      "rhelnn01.cdip.cisco.local:9875"
+                      "rhelnn02.cdip.cisco.local:9875"
                     ],
                     "prefix": "All except:",
                     "readOnly": true
@@ -673,7 +790,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_heap_used_m{processname=\"OzoneManager\"}",
@@ -688,7 +805,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -730,8 +847,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -766,7 +882,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_non_heap_used_m{processname=\"OzoneManager\"}",
@@ -788,14 +904,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 14
       },
       "id": 22,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -878,7 +994,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 5
+            "y": 15
           },
           "id": 11,
           "options": {
@@ -897,7 +1013,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "exemplar": false,
@@ -911,6 +1027,97 @@
           ],
           "title": "GC Time - jvm_metrics_gc_time_millis (Recon)",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "no. of gc events",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 15
+          },
+          "id": 114,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "jvm_metrics_gc_count{processname=\"Recon\"}",
+              "legendFormat": "{{instance}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "GC Count - jvm_metrics_gc_count (Recon)",
+          "type": "timeseries"
         }
       ],
       "title": "Recon GC Time Metrics",
@@ -922,14 +1129,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 15
       },
       "id": 46,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1006,7 +1213,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9889\"}",
@@ -1028,14 +1235,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 16
       },
       "id": 48,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1111,7 +1318,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_runnable{processname=\"Recon\"}",
@@ -1126,7 +1333,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1202,7 +1409,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_blocked{processname=\"Recon\"}",
@@ -1217,7 +1424,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1293,7 +1500,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_waiting{processname=\"Recon\"}",
@@ -1315,14 +1522,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 17
       },
       "id": 95,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1424,7 +1631,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_heap_used_m{processname=\"Recon\"}",
@@ -1439,7 +1646,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1541,7 +1748,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_non_heap_used_m{processname=\"Recon\"}",
@@ -1563,14 +1770,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 18
       },
       "id": 20,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1653,7 +1860,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 9
+            "y": 19
           },
           "id": 12,
           "options": {
@@ -1672,7 +1879,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "increase(jvm_metrics_gc_time_millis{processname=\"HddsDatanode\"}[1m]) / 60",
@@ -1683,9 +1890,100 @@
           ],
           "title": "GC Time - jvm_metrics_gc_time_millis (Datanode)",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "no. of gc events",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 19
+          },
+          "id": 112,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "jvm_metrics_gc_count{processname=\"HddsDatanode\"}",
+              "legendFormat": "{{instance}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "GC Count - jvm_metrics_gc_count (Datanode)",
+          "type": "timeseries"
         }
       ],
-      "title": "Datanode GC Time Metrics",
+      "title": "Datanode GC Metrics",
       "type": "row"
     },
     {
@@ -1694,14 +1992,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 19
       },
       "id": 50,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1778,7 +2076,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9883\"}",
@@ -1800,14 +2098,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 20
       },
       "id": 56,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1883,7 +2181,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_runnable{processname=\"HddsDatanode\"}",
@@ -1898,7 +2196,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1999,7 +2297,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_blocked{processname=\"HddsDatanode\"}",
@@ -2014,7 +2312,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2090,7 +2388,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_waiting{processname=\"HddsDatanode\"}",
@@ -2112,14 +2410,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 21
       },
       "id": 97,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2221,7 +2519,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_heap_used_m{processname=\"HddsDatanode\"}",
@@ -2236,7 +2534,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2338,7 +2636,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_non_heap_used_m{processname=\"HddsDatanode\"}",
@@ -2360,14 +2658,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 22
       },
       "id": 14,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2425,7 +2723,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 11
+            "y": 23
           },
           "id": 8,
           "options": {
@@ -2444,7 +2742,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "increase(jvm_metrics_gc_time_millis{processname=\"StorageContainerManager\"}[1m]) / 60",
@@ -2455,9 +2753,100 @@
           ],
           "title": "GC Time - jvm_metrics_gc_time_millis (SCM)",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "no. of gc events",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 23
+          },
+          "id": 113,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "jvm_metrics_gc_count{processname=\"StorageContainerManager\"}",
+              "legendFormat": "{{instance}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "GC Count - jvm_metrics_gc_count (SCM)",
+          "type": "timeseries"
         }
       ],
-      "title": "SCM GC Time Metrics",
+      "title": "SCM GC Metrics",
       "type": "row"
     },
     {
@@ -2466,14 +2855,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 23
       },
       "id": 54,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2550,7 +2939,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9877\"}",
@@ -2572,14 +2961,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 24
       },
       "id": 52,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2655,7 +3044,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_runnable{processname=\"StorageContainerManager\"}",
@@ -2670,7 +3059,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2746,7 +3135,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_blocked{processname=\"StorageContainerManager\"}",
@@ -2761,7 +3150,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2837,7 +3226,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_waiting{processname=\"StorageContainerManager\"}",
@@ -2859,14 +3248,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 25
       },
       "id": 91,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2968,7 +3357,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_heap_used_m{processname=\"StorageContainerManager\"}",
@@ -2983,7 +3372,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3085,7 +3474,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_non_heap_used_m{processname=\"StorageContainerManager\"}",
@@ -3107,14 +3496,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 26
       },
       "id": 24,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3197,7 +3586,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 14
+            "y": 37
           },
           "id": 6,
           "options": {
@@ -3216,7 +3605,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "exemplar": false,
@@ -3229,7 +3618,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "hide": false,
               "refId": "B"
@@ -3237,9 +3626,100 @@
           ],
           "title": "GC Time - jvm_metrics_gc_time_millis (S3Gateway)",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "no. of gc events",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 37
+          },
+          "id": 116,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "jvm_metrics_gc_count{processname=\"S3Gateway\"}",
+              "legendFormat": "{{instance}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "GC Count - jvm_metrics_gc_count (S3 Gateway)",
+          "type": "timeseries"
         }
       ],
-      "title": "S3 Gateway GC Time Metrics",
+      "title": "S3 Gateway GC Metrics",
       "type": "row"
     },
     {
@@ -3248,14 +3728,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 27
       },
       "id": 58,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3338,7 +3818,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 2
+            "y": 48
           },
           "id": 31,
           "options": {
@@ -3357,7 +3837,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
               "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9879\"}",
@@ -3379,14 +3859,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 28
       },
       "id": 60,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3462,7 +3942,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_runnable{processname=\"S3Gateway\"}",
@@ -3477,7 +3957,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3553,7 +4033,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_blocked{processname=\"S3Gateway\"}",
@@ -3568,7 +4048,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3644,7 +4124,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_waiting{processname=\"S3Gateway\"}",
@@ -3666,14 +4146,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 29
       },
       "id": 93,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3756,7 +4236,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 20
+            "y": 50
           },
           "id": 89,
           "options": {
@@ -3775,7 +4255,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_heap_used_m{processname=\"S3Gateway\"}",
@@ -3790,7 +4270,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3873,7 +4353,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 20
+            "y": 50
           },
           "id": 109,
           "options": {
@@ -3892,7 +4372,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_non_heap_used_m{processname=\"S3Gateway\"}",
@@ -3914,14 +4394,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 30
       },
       "id": 62,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3979,7 +4459,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 16
+            "y": 51
           },
           "id": 4,
           "options": {
@@ -3998,7 +4478,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "increase(jvm_metrics_gc_time_millis[1m]) / 60",
@@ -4009,9 +4489,100 @@
           ],
           "title": "GC Time - jvm_metrics_gc_time_millis ",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "no. of gc events",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 51
+          },
+          "id": 115,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "builder",
+              "expr": "jvm_metrics_gc_count",
+              "legendFormat": "{{instance}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "GC Count - jvm_metrics_gc_count ",
+          "type": "timeseries"
         }
       ],
-      "title": "All Services GC Time Metrics",
+      "title": "All Services GC Metrics",
       "type": "row"
     },
     {
@@ -4020,14 +4591,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 31
       },
       "id": 64,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4085,7 +4656,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 1
+            "y": 38
           },
           "id": 32,
           "options": {
@@ -4104,7 +4675,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_cpu_jvm_load",
@@ -4126,14 +4697,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 32
       },
       "id": 26,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4190,7 +4761,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 18
+            "y": 39
           },
           "id": 40,
           "options": {
@@ -4209,7 +4780,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_runnable",
@@ -4224,7 +4795,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4275,38 +4846,13 @@
                 ]
               }
             },
-            "overrides": [
-              {
-                "__systemRef": "hideSeriesFrom",
-                "matcher": {
-                  "id": "byNames",
-                  "options": {
-                    "mode": "exclude",
-                    "names": [
-                      "rhel01.cdip.cisco.local:9879"
-                    ],
-                    "prefix": "All except:",
-                    "readOnly": true
-                  }
-                },
-                "properties": [
-                  {
-                    "id": "custom.hideFrom",
-                    "value": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": true
-                    }
-                  }
-                ]
-              }
-            ]
+            "overrides": []
           },
           "gridPos": {
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 18
+            "y": 39
           },
           "id": 70,
           "options": {
@@ -4325,7 +4871,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_blocked",
@@ -4340,7 +4886,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4397,7 +4943,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 28
+            "y": 49
           },
           "id": 78,
           "options": {
@@ -4416,7 +4962,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_threads_waiting",
@@ -4438,14 +4984,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 33
       },
       "id": 103,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4528,7 +5074,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 24
+            "y": 73
           },
           "id": 101,
           "options": {
@@ -4547,7 +5093,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_heap_used_m",
@@ -4562,7 +5108,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "igU0coMVz"
+            "uid": "${DS_PROMETHEUS}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4645,7 +5191,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 24
+            "y": 73
           },
           "id": 106,
           "options": {
@@ -4664,7 +5210,7 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "igU0coMVz"
+                "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "builder",
               "expr": "jvm_metrics_mem_non_heap_used_m",
@@ -4691,13 +5237,13 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "JVM Metrics",
   "uid": "DtIgEEmSz",
-  "version": 14,
+  "version": 16,
   "weekStart": ""
 }
