@@ -563,6 +563,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Helper method to do deleteRange on a table, including endKey.
+   * TODO: Do remove this method, it is not used anywhere. Need to check if
+   *       deleteRange causes RocksDB corruption.
    * TODO: Move this into {@link Table} ?
    * @param table Table
    * @param beginKey begin key
