@@ -86,7 +86,7 @@ public class OpenKeyCleanupService extends BackgroundService {
                                ConfigurationSource conf) {
     super("OpenKeyCleanupService", interval, unit,
         OPEN_KEY_DELETING_CORE_POOL_SIZE, timeout,
-        ozoneManager.getNodeDetails().threadNamePrefix());
+        ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.keyManager = ozoneManager.getKeyManager();
 

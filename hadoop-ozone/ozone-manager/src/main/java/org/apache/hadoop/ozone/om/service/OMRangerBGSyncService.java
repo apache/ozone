@@ -209,7 +209,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       long interval, TimeUnit unit, long serviceTimeout) {
 
     super("OMRangerBGSyncService", interval, unit, 1, serviceTimeout,
-        ozoneManager.getNodeDetails().threadNamePrefix());
+        ozoneManager.getThreadNamePrefix());
 
     this.ozoneManager = ozoneManager;
     this.metadataManager = ozoneManager.getMetadataManager();

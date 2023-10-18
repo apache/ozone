@@ -124,7 +124,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
-    this.threadPrefix = ozoneManager.getNodeDetails().threadNamePrefix();
+    this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadPrefix +

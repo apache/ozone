@@ -565,7 +565,7 @@ public class OzoneDelegationTokenSecretManager
     super.start(certClient);
     tokenRemoverThread = new Daemon(new ExpiredTokenRemover());
     tokenRemoverThread.setName(
-        ozoneManager.getNodeDetails().threadNamePrefix() +
+        ozoneManager.getThreadNamePrefix() +
             "ExpiredTokenRemover");
     tokenRemoverThread.start();
   }

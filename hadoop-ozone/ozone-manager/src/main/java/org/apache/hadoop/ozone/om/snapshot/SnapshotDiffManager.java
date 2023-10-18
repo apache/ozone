@@ -256,7 +256,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         TimeUnit.MILLISECONDS,
         new ArrayBlockingQueue<>(threadPoolSize),
         new ThreadFactoryBuilder()
-            .setNameFormat(ozoneManager.getNodeDetails().threadNamePrefix() +
+            .setNameFormat(ozoneManager.getThreadNamePrefix() +
                 "snapshot-diff-job-thread-id-%d")
             .build()
     );
@@ -305,7 +305,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
               threadPoolSize, 60, TimeUnit.SECONDS,
               new SynchronousQueue<>(), new ThreadFactoryBuilder()
-          .setNameFormat(ozoneManager.getNodeDetails().threadNamePrefix() +
+          .setNameFormat(ozoneManager.getThreadNamePrefix() +
               "snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
               new ThreadPoolExecutor.DiscardPolicy()));

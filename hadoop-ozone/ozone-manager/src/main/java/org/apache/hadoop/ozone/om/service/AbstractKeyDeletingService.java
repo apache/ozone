@@ -87,7 +87,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient) {
     super(serviceName, interval, unit, threadPoolSize, serviceTimeout,
-        ozoneManager.getNodeDetails().threadNamePrefix());
+        ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.scmClient = scmClient;
     this.deletedDirsCount = new AtomicLong(0);
