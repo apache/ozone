@@ -483,7 +483,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
-      performOperationGivenPrefix(iter, keyPrefix,
+      performOperationOnKeys(iter,
           entry -> {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
@@ -531,16 +531,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to perform operation on keys with a given prefix and iterator
+   * Helper method to perform operation on keys with a given iterator
    * @param keyIter TableIterator
-   * @param keyPrefix DB key prefix String
+   * @param operationFunction operation to be performed for each key.
    * @return endKey String, or null if no keys with such prefix is found
    */
-  private static void performOperationGivenPrefix(
+  private static void performOperationOnKeys(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
-      String keyPrefix, ThrowableFunction<Table.KeyValue<String, ?>,
+      ThrowableFunction<Table.KeyValue<String, ?>,
       Void, IOException> operationFunction) throws IOException {
-    keyIter.seek(keyPrefix);
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place
     // Loop until prefix matches.
@@ -550,12 +549,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     long startTime = System.nanoTime();
     while (keyIter.hasNext()) {
       Table.KeyValue<String, ?> entry = keyIter.next();
-      String dbKey = entry.getKey();
-      if (dbKey.startsWith(keyPrefix)) {
-        operationFunction.apply(entry);
-      } else {
-        break;
-      }
+      operationFunction.apply(entry);
     }
     // Time took for the iterator to finish (in ns)
     long timeElapsed = System.nanoTime() - startTime;
@@ -603,7 +597,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
              iter = omMetadataManager.getDeletedTable().iterator(keyPrefix)) {
-      performOperationGivenPrefix(iter, keyPrefix, entry -> {
+      performOperationOnKeys(iter, entry -> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Removing key {} from DeletedTable", entry.getKey());
         }
