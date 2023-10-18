@@ -135,7 +135,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, exception);
+      omClientResponse = onFailure(omResponse, ex);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

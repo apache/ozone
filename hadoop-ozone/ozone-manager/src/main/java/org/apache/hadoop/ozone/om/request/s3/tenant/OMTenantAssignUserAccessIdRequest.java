@@ -332,7 +332,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder().build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

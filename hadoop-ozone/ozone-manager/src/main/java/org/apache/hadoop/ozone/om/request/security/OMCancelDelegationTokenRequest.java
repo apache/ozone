@@ -122,7 +122,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       LOG.error("Error in cancel DelegationToken {}", ozoneTokenIdentifier, ex);
       exception = ex;
       omClientResponse = new OMCancelDelegationTokenResponse(null,
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
