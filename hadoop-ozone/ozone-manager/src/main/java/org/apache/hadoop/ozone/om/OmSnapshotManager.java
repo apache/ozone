@@ -531,7 +531,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to perform operation on keys with a given iterator
+   * Helper method to perform operation on keys with a given iterator.
    * @param keyIter TableIterator
    * @param operationFunction operation to be performed for each key.
    * @return endKey String, or null if no keys with such prefix is found
