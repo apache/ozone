@@ -203,8 +203,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), false, config,
         "getDataNodeCertificate");
 
-    return getEncodedCertToString(certSignReq, NodeType.DATANODE,
-        getNextCertificateId());
+    return getEncodedCertToString(certSignReq, NodeType.DATANODE);
   }
 
   @Override
@@ -220,8 +219,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), false, config,
         "getCertificate");
 
-    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType(),
-        getNextCertificateId());
+    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
   }
 
   @Override
@@ -300,8 +298,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), false, config,
         "getOMCertificate");
 
-    return getEncodedCertToString(certSignReq, NodeType.OM,
-        getNextCertificateId());
+    return getEncodedCertToString(certSignReq, NodeType.OM);
   }
 
   /**
@@ -344,8 +341,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
-    return getEncodedCertToString(certSignReq, NodeType.SCM,
-        getNextCertificateId());
+    return getEncodedCertToString(certSignReq, NodeType.SCM);
   }
 
   /**
@@ -356,15 +352,15 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @throws IOException
    */
   private synchronized String getEncodedCertToString(String certSignReq,
-      NodeType nodeType, String certSerialId) throws IOException {
+      NodeType nodeType) throws IOException {
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(csr,
-          KERBEROS_TRUSTED, nodeType, certSerialId);
+          KERBEROS_TRUSTED, nodeType, getNextCertificateId());
     } else {
       future = scmCertificateServer.requestCertificate(csr,
-          KERBEROS_TRUSTED, nodeType, certSerialId);
+          KERBEROS_TRUSTED, nodeType, getNextCertificateId());
     }
     try {
       return getPEMEncodedString(future.get());

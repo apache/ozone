@@ -73,7 +73,7 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
  * PKCS10CertificationRequest to CertificateServer.
  */
 public final class CertificateSignRequest {
-  // Ozone Certificate distinguished format:
+  // Ozone final certificate distinguished format:
   // (CN=Subject,OU=ScmID,O=ClusterID,SERIALNUMBER=SerialID).
   private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
   private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT =
@@ -110,6 +110,10 @@ public final class CertificateSignRequest {
 
   public static String getDistinguishedNameFormat() {
     return DISTINGUISHED_NAME_FORMAT;
+  }
+
+  public static String getDistinguishedNameFormatWithSN() {
+    return DISTINGUISHED_NAME_WITH_SN_FORMAT;
   }
 
   // used by server side DN regeneration

@@ -70,11 +70,11 @@ public class SequenceIdGenerator {
   public static final String DEL_TXN_ID = "delTxnId";
   public static final String CONTAINER_ID = "containerId";
 
-  @Deprecated
-  public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
   // Certificate ID for all services, including root certificates, whose ID
   // were using "rootCertificateId" before.
   public static final String CERTIFICATE_ID = "CertificateId";
+  @Deprecated
+  public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
@@ -443,6 +443,12 @@ public class SequenceIdGenerator {
       sequenceIdTable.put(CERTIFICATE_ID, largestCertId);
       LOG.info("upgrade {} to {}", CERTIFICATE_ID,
           sequenceIdTable.get(CERTIFICATE_ID));
+    }
+
+    // delete the ROOT_CERTIFICATE_ID record if exists
+    // ROOT_CERTIFICATE_ID is replaced with CERTIFICATE_ID now
+    if (sequenceIdTable.get(ROOT_CERTIFICATE_ID) != null) {
+      sequenceIdTable.delete(ROOT_CERTIFICATE_ID);
     }
   }
 }

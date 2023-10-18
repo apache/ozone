@@ -159,6 +159,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setRemoveExpiredCertificatesResponseProto(
                 removeExpiredCertificates())
             .build();
+
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());

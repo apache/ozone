@@ -70,7 +70,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
  * provided.
  */
 public final class SelfSignedCertificate {
-  private static final String NAME_FORMAT = "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
   private String subject;
   private String clusterID;
   private String scmID;
@@ -101,7 +100,7 @@ public final class SelfSignedCertificate {
 
   @VisibleForTesting
   public static String getNameFormat() {
-    return NAME_FORMAT;
+    return CertificateSignRequest.getDistinguishedNameFormatWithSN();
   }
 
   public static Builder newBuilder() {

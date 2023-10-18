@@ -87,8 +87,7 @@ public interface SCMSecurityProtocol {
    *                          certificate.
    */
   String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq, boolean isRenew)
-      throws IOException;
+      String certSignReq, boolean isRenew) throws IOException;
 
   /**
    * Get SCM signed certificate for given certificate serial id if it exists.
