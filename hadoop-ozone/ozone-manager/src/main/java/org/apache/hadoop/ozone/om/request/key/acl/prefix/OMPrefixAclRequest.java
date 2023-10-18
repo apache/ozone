@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
-import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.audit.AuditLogger;

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
-import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import com.google.common.base.Preconditions;

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
-import java.nio.file.InvalidPathException;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;

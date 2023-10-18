@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
-import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;

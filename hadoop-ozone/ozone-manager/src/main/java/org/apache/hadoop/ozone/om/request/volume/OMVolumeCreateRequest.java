@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
-import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
