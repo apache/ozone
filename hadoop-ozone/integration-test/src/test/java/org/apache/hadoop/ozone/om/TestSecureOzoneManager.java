@@ -151,9 +151,9 @@ public class TestSecureOzoneManager {
             securityConfig, null, omStorage, omInfo, "", null, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
-    Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
+    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNull(client.getPublicKey());
+    Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
     client.close();
 
@@ -162,7 +162,6 @@ public class TestSecureOzoneManager {
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", null, null, null);
     KeyCodec keyCodec = new KeyCodec(securityConfig, COMPONENT);
-    keyCodec.writePublicKey(publicKey);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPrivateKeyFileName()).toFile());
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());

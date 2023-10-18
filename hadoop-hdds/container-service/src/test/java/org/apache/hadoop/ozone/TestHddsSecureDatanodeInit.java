@@ -234,17 +234,31 @@ public class TestHddsSecureDatanodeInit {
   public void testSecureDnStartupCase4() throws Exception {
     // Case 4: When public key as well as certificate is missing.
     keyCodec.writePrivateKey(privateKey);
-    RuntimeException rteException = Assertions.assertThrows(
-        RuntimeException.class,
-        () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
+    // provide a new valid SCMGetCertResponseProto
+    X509CertificateHolder newCertHolder = generateX509CertHolder(null, null,
+        Duration.ofSeconds(CERT_LIFETIME));
+    String pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
+    // provide an invalid SCMGetCertResponseProto. Without
+    // setX509CACertificate(pemCert), signAndStoreCert will throw exception.
+    SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
+        SCMSecurityProtocolProtos.SCMGetCertResponseProto
+            .newBuilder().setResponseCode(SCMSecurityProtocolProtos
+                .SCMGetCertResponseProto.ResponseCode.success)
+            .setX509Certificate(pemCert)
+            .setX509CACertificate(pemCert)
+            .build();
+    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+        .thenReturn(responseProto);
+    service.initializeCertificateClient(client);
     Assertions.assertNotNull(client.getPrivateKey());
-    Assertions.assertNull(client.getPublicKey());
-    Assertions.assertNull(client.getCertificate());
+    Assertions.assertNotNull(client.getPublicKey());
+    Assertions.assertNotNull(client.getCertificate());
     Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+        .contains("Init response: GETCERT"));
     dnLogs.clearOutput();
+    // reset scmClient behavior
+    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+        .thenReturn(null);
   }
 
   @Test

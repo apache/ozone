@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -38,7 +39,9 @@ import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPublicKeySpec;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -328,7 +331,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return public key or Null if there is no data.
    */
   @Override
-  public PublicKey getPublicKey() {
+  public synchronized PublicKey getPublicKey() {
     if (publicKey != null) {
       return publicKey;
     }
@@ -737,9 +740,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     case PRIVATE_KEY:
       getLogger().info("Found private key but public key and certificate " +
           "is missing.");
-      // TODO: Recovering public key from private might be possible in some
-      //  cases.
-      return FAILURE;
+      if (recoverPublicKeyFromPrivateKey()) {
+        return GETCERT;
+      } else {
+        return FAILURE;
+      }
     case PUBLICKEY_CERT:
       getLogger().error("Found public key and certificate but private " +
           "key is missing.");
@@ -823,6 +828,39 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
+   * Tries to recover public key from private key. Also validates recovered
+   * public key.
+   * */
+  protected boolean recoverPublicKeyFromPrivateKey()
+      throws CertificateException {
+    PrivateKey priKey = getPrivateKey();
+    try {
+      if (priKey != null && priKey instanceof RSAPrivateCrtKey) {
+        // if it's RSA private key
+        RSAPrivateCrtKey rsaCrtKey = (RSAPrivateCrtKey) priKey;
+        RSAPublicKeySpec rsaPublicKeySpec = new RSAPublicKeySpec(
+            rsaCrtKey.getModulus(), rsaCrtKey.getPublicExponent());
+        PublicKey pubKey = KeyFactory.getInstance(securityConfig.getKeyAlgo())
+            .generatePublic(rsaPublicKeySpec);
+        if (validateKeyPair(pubKey)) {
+          keyCodec.writePublicKey(pubKey);
+          publicKey = pubKey;
+          getLogger().info("Public key is recovered from the private key.");
+          return true;
+        }
+      }
+    } catch (InvalidKeySpecException | NoSuchAlgorithmException |
+             IOException e) {
+      throw new CertificateException("Error while trying to recover " +
+          "public key.", e, BOOTSTRAP_ERROR);
+    }
+
+    getLogger().error("Can't recover public key " +
+        "corresponding to private key.");
+    return false;
+  }
+
+  /**
    * Validates public and private key of certificate client.
    *
    * @param pubKey
@@ -831,7 +869,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws CertificateException {
     byte[] challenge =
         RandomStringUtils.random(1000, 0, 0, false, false, null,
-                new SecureRandom()).getBytes(StandardCharsets.UTF_8);
+            new SecureRandom()).getBytes(StandardCharsets.UTF_8);
     return verifySignature(challenge, signData(challenge), pubKey);
   }
 

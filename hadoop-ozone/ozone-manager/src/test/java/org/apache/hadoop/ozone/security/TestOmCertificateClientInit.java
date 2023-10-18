@@ -78,7 +78,7 @@ public class TestOmCertificateClientInit {
         arguments(false, false, false, GETCERT),
         arguments(false, false, true, FAILURE),
         arguments(false, true, false, FAILURE),
-        arguments(true, false, false, FAILURE),
+        arguments(true, false, false, GETCERT),
         arguments(false, true, true, FAILURE),
         arguments(true, true, false, GETCERT),
         arguments(true, false, true, SUCCESS),
