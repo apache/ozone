@@ -455,7 +455,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OMPerformanceMetrics perfMetrics;
 
   private boolean fsSnapshotEnabled;
-  private String threadNamePrefix;
 
   /**
    * OM Startup mode.
@@ -739,7 +738,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /** Returns the ThreadName prefix for the current OM. */
   public String getThreadNamePrefix() {
-    return threadNamePrefix;
+    return threadPrefix;
   }
 
   /**
