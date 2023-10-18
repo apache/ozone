@@ -121,8 +121,6 @@ public final class HASecurityUtils {
         LOG.info("Successfully stored SCM signed certificate.");
         break;
       case FAILURE:
-        LOG.error("SCM security initialization failed.");
-        throw new RuntimeException("OM security initialization failed.");
       default:
         LOG.error("SCM security initialization failed. Init response: {}",
             response);

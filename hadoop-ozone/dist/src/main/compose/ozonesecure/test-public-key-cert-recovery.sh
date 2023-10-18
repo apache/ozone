@@ -29,9 +29,27 @@ export SECURITY_ENABLED=true
 
 start_docker_env
 
+#test recon
 wait_for_port recon 9888 120
 wait_for_execute_command recon 60 "find /data/metadata/recon/keys/public.pem -delete && find /data/metadata/recon/certs/*.crt -delete"
 docker-compose stop recon
 docker-compose start recon
 wait_for_port recon 9888 120
 wait_for_execute_command recon 60 "find /data/metadata/recon/keys/public.pem && find /data/metadata/recon/certs/ROOTCA*.crt"
+
+#test OM
+wait_for_port om 9862 120
+wait_for_execute_command om 60 "find /data/metadata/om/keys/public.pem -delete && find /data/metadata/om/certs/*.crt -delete"
+docker-compose stop om
+docker-compose start om
+wait_for_port om 9862 120
+wait_for_execute_command om 60 "find /data/metadata/om/keys/public.pem && find /data/metadata/om/certs/ROOTCA*.crt"
+
+#test DN
+wait_for_port datanode 9864 120
+wait_for_execute_command datanode 60 "find /data/metadata/dn/keys/public.pem -delete && find /data/metadata/dn/certs/*.crt -delete"
+docker-compose stop datanode
+docker-compose start datanode
+wait_for_port datanode 9864 120
+wait_for_execute_command datanode 60 "find /data/metadata/dn/keys/public.pem && find /data/metadata/dn/certs/ROOTCA*.crt"
+

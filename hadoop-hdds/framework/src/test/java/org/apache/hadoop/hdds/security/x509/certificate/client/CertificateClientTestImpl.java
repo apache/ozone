@@ -265,6 +265,10 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public void recoverStateIfNeeded(InitResponse state) throws IOException {
+  }
+
+  @Override
   public String getComponentName() {
     return this.getClass().getSimpleName();
   }
