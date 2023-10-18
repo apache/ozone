@@ -2233,8 +2233,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
-        .setSortDatanodes(args.getSortDatanodes())
-        .setLatestVersionLocation(args.getLatestVersionLocation())
+        .setSortDatanodes(false)
+        .setLatestVersionLocation(true)
         .build();
     ListStatusRequest.Builder listStatusRequestBuilder =
         ListStatusRequest.newBuilder()

@@ -1194,7 +1194,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setSortDatanodesInPipeline(false)
+        .setLatestVersionLocation(true)
         .setHeadOp(keyArgs.getHeadOp())
         .build();
     boolean allowPartialPrefixes =
