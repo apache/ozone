@@ -3439,7 +3439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return getS3VolumeContext(false);
   }
 
-  S3VolumeContext getS3VolumeContext(boolean internal) throws IOException {
+  S3VolumeContext getS3VolumeContext(boolean skipChecks) throws IOException {
     long start = Time.monotonicNowNanos();
     // Unless the OM request contains S3 authentication info with an access
     // ID that corresponds to a tenant volume, the request will be directed
@@ -3521,11 +3521,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
     final OmVolumeArgs volumeInfo;
-    if (internal) {
-      // if internal, skip acl checks and metrics.
+    if (skipChecks) {
+      // for internal usages, skip acl checks and metrics.
       volumeInfo = volumeManager.getVolumeInfo(s3Volume);
     } else {
-      // if external, getVolumeInfo() performs acl checks and update metrics.
+      // if external usages, getVolumeInfo() performs acl checks
+      // and update metrics.
       volumeInfo = getVolumeInfo(s3Volume);
     }
 
