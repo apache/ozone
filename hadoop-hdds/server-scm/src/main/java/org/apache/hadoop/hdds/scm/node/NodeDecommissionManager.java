@@ -197,6 +197,9 @@ public class NodeDecommissionManager {
 
   public DatanodeDetails findDnWithMostRecentHeartbeat(
       List<DatanodeDetails> dns) {
+    if (dns.size() < 2) {
+      return dns.isEmpty() ? null : dns.get(0);
+    }
     List<Pair<DatanodeDetails, Long>> dnsWithHeartbeat = dns.stream()
         .map(dn -> Pair.of(dn, nodeManager.getLastHeartbeat(dn)))
         .sorted(Comparator.comparingLong(Pair::getRight))
