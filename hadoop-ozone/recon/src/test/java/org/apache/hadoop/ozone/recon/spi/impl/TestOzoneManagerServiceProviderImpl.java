@@ -52,11 +52,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -154,14 +152,6 @@ public class TestOzoneManagerServiceProviderImpl {
         .get("/sampleVol/bucketOne/key_two"));
   }
 
-  private static SCMNodeDetails getReconNodeDetails() {
-    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
-    builder.setSCMNodeId("Recon");
-    builder.setDatanodeProtocolServerAddress(
-        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
-    return builder.build();
-  }
-
   @Test
   public void testReconOmDBCloseAndOpenNewSnapshotDb() throws Exception {
     OMMetadataManager omMetadataManager =
@@ -184,9 +174,9 @@ public class TestOzoneManagerServiceProviderImpl {
     when(httpURLConnectionMock1.getInputStream()).thenReturn(inputStream1);
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock1);
-    SCMNodeDetails reconNodeDetails = getReconNodeDetails();
     when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
     ReconTaskController reconTaskController = getMockTaskController();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider1 =
@@ -248,9 +238,9 @@ public class TestOzoneManagerServiceProviderImpl {
     when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock);
-    SCMNodeDetails reconNodeDetails = getReconNodeDetails();
     when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
     ReconOMMetadataManager reconOMMetadataManager =
         mock(ReconOMMetadataManager.class);
     ReconTaskController reconTaskController = getMockTaskController();
