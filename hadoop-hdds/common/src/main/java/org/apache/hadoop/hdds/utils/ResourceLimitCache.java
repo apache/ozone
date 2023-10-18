@@ -49,12 +49,12 @@ public class ResourceLimitCache<K, V> implements Cache<K, V> {
   }
 
   @Override
-  public V put(K key, V value) throws InterruptedException {
+  public void put(K key, V value) throws InterruptedException {
     Objects.requireNonNull(key);
     Objects.requireNonNull(value);
 
     // remove the old key to release the permits
-    V oldVal = remove(key);
+    remove(key);
     int[] permits = permitsSupplier.apply(key, value);
     group.acquire(permits);
     try {
@@ -62,7 +62,6 @@ public class ResourceLimitCache<K, V> implements Cache<K, V> {
     } catch (Throwable t) {
       group.release(permits);
     }
-    return oldVal;
   }
 
   @Override

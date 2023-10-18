@@ -35,11 +35,10 @@ public class TestResourceCache {
     Cache<Integer, String> resourceCache =
         new ResourceCache<>(
             (k, v) -> (int) k, 10,
-            (P, Q) -> {
-              if (Q) {
+            (P) -> {
+              if (P.wasEvicted()) {
                 count.incrementAndGet();
               }
-              return null;
             });
     resourceCache.put(6, "a");
     resourceCache.put(4, "a");

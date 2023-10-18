@@ -51,7 +51,7 @@ public class TestResourceLimitCache {
     // permits out of 10
     CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
       try {
-        return resourceCache.put(1, "a");
+        resourceCache.put(1, "a");
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
@@ -76,10 +76,11 @@ public class TestResourceLimitCache {
     ExecutorService pool = Executors.newCachedThreadPool();
     future = CompletableFuture.supplyAsync(() -> {
       try {
-        return resourceCache.put(4, "a");
+        resourceCache.put(4, "a");
       } catch (InterruptedException e) {
         return null;
       }
+      return null;
     }, pool);
     Assertions.assertFalse(future.isDone());
     Thread.sleep(100);

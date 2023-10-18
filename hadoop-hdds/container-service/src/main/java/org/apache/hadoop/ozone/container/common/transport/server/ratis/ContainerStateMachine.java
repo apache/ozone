@@ -205,11 +205,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache = new ResourceCache<>(
         (index, data) -> HddsUtils.roundupKb(((ByteString)data).size()),
         HddsUtils.roundupKb(pendingRequestsBytesLimit),
-        (P, Q) -> {
-          if (Q) {
+        (P) -> {
+          if (P.wasEvicted()) {
             metrics.incNumEvictedCacheCount();
           }
-          return null;
         });
 
     this.chunkExecutors = chunkExecutors;

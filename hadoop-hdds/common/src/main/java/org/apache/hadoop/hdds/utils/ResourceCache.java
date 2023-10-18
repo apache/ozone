@@ -35,20 +35,16 @@ public class ResourceCache<K, V> implements Cache<K, V> {
 
   public ResourceCache(
       Weigher weigher, int limits,
-      BiFunction<Pair<K, V>, Boolean, Void> evictNotifier) {
+      RemovalListener<K, V> listener) {
     Objects.requireNonNull(weigher);
-    Objects.requireNonNull(limits);
-    RemovalListener<K, V> listener = ele -> {
-      if (null != evictNotifier) {
-        evictNotifier.apply(Pair.of(ele.getKey(), ele.getValue()),
-            ele.wasEvicted());
-      }
-    };
-    cache = CacheBuilder.newBuilder()
-        .maximumWeight(limits)
-        .weigher(weigher)
-        .removalListener(listener)
-        .build();
+    if (listener == null) {
+      cache = CacheBuilder.newBuilder()
+          .maximumWeight(limits).weigher(weigher).build();
+    } else {
+      cache = CacheBuilder.newBuilder()
+          .maximumWeight(limits).weigher(weigher)
+          .removalListener(listener).build();
+    }
   }
 
   @Override
@@ -58,12 +54,10 @@ public class ResourceCache<K, V> implements Cache<K, V> {
   }
 
   @Override
-  public V put(K key, V value) throws InterruptedException {
+  public void put(K key, V value) throws InterruptedException {
     Objects.requireNonNull(key);
     Objects.requireNonNull(value);
-    V oldValue = cache.getIfPresent(key);
     cache.put(key, value);
-    return oldValue;
   }
 
   @Override
