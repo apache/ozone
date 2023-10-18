@@ -21,9 +21,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.Weigher;
 import java.util.Objects;
-import java.util.function.BiFunction;
 import java.util.function.Predicate;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Cache with FIFO functionality with limit. If resource usages crosses the
