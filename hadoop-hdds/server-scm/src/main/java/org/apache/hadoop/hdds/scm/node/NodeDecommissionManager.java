@@ -187,7 +187,7 @@ public class NodeDecommissionManager {
     return results;
   }
 
-  public boolean allPortsMatch(List<DatanodeDetails> dns) {
+  private boolean allPortsMatch(List<DatanodeDetails> dns) {
     if (dns.size() < 2) {
       return true;
     }
@@ -201,7 +201,7 @@ public class NodeDecommissionManager {
     return true;
   }
 
-  public DatanodeDetails findDnWithMostRecentHeartbeat(
+  private DatanodeDetails findDnWithMostRecentHeartbeat(
       List<DatanodeDetails> dns) {
     if (dns.size() < 2) {
       return dns.isEmpty() ? null : dns.get(0);
