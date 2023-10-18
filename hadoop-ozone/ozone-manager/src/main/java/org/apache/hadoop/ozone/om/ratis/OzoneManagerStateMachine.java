@@ -130,7 +130,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix +
             "OMStateMachineApplyTransactionThread - %d").build();
     this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
-    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
+
+    ThreadFactory installSnapshotThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
+    this.installSnapshotExecutor =
+        HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
   }
 
   /**
