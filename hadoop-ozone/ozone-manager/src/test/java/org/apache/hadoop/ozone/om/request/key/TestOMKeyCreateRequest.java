@@ -70,7 +70,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
-import static org.slf4j.MDC.put;
 
 /**
  * Tests OMCreateKeyRequest class.
@@ -464,7 +463,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR,
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH,
         omKeyCreateResponse.getOMResponse().getStatus());
 
 
