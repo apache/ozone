@@ -156,12 +156,10 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omMetrics.incNumRecoverLease();
       LOG.debug("Key recovered. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       LOG.error("Fail for recovering lease. Volume:{}, Bucket:{}, Key:{}",
           volumeName, bucketName, keyName, ex);
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumRecoverLeaseFails();
       omResponse.setCmdType(RecoverLease);
       omClientResponse = new OMRecoverLeaseResponse(

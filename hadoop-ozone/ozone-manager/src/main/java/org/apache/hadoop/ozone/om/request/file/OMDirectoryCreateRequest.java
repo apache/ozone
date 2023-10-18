@@ -228,10 +228,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             result);
       }
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       omClientResponse = new OMDirectoryCreateResponse(
           createErrorOMResponse(omResponse, exception), result);
     } finally {

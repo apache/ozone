@@ -223,11 +223,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

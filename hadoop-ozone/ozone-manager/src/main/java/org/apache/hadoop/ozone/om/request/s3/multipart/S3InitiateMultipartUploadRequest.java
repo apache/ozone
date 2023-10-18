@@ -239,11 +239,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   .build(), multipartKeyInfo, omKeyInfo, getBucketLayout());
 
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {

@@ -167,11 +167,9 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMBucketSetOwnerResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       success = false;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMBucketSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

@@ -183,11 +183,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName, omVolumeArgs.copyObject());
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       success = false;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

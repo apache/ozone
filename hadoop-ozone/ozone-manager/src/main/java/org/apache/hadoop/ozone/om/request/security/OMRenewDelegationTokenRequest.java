@@ -176,12 +176,10 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
               omResponse.setRenewDelegationTokenResponse(
                   updateRenewDelegationTokenRequest
                       .getRenewDelegationTokenResponse()).build());
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       LOG.error("Error in Updating Renew DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, exception));
     } finally {

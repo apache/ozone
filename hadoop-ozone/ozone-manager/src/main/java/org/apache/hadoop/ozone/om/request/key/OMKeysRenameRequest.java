@@ -224,11 +224,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           newOmRenameKeys);
 
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       createErrorOMResponse(omResponse, exception);
 
       omResponse.setRenameKeysResponse(RenameKeysResponse.newBuilder()

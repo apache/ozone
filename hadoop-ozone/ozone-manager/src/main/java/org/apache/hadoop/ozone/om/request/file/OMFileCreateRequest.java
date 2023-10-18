@@ -304,11 +304,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
           omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(createErrorOMResponse(

@@ -169,10 +169,8 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       }
 
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

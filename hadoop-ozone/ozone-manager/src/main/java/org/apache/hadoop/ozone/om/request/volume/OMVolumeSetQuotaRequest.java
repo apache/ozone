@@ -157,10 +157,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
           SetVolumePropertyResponse.newBuilder().build());
       omClientResponse = new OMVolumeSetQuotaResponse(omResponse.build(),
           omVolumeArgs);
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

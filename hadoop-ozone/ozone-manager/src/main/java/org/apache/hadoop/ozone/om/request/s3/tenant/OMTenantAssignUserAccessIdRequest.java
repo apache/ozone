@@ -328,10 +328,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           omResponse.build(), s3SecretValue, userPrincipal,
           accessId, omDBAccessIdInfo, principalInfo,
           ozoneManager.getS3SecretManager());
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder().build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(

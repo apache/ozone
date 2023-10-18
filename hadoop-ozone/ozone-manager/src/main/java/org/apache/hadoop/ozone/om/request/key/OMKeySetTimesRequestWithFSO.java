@@ -124,11 +124,9 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

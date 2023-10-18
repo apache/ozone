@@ -245,11 +245,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       omMetrics.incNumBlockAllocateCallFails();
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +

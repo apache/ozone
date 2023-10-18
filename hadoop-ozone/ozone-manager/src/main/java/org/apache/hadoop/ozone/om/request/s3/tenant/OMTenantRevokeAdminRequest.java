@@ -207,10 +207,8 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       omClientResponse = new OMTenantRevokeAdminResponse(omResponse.build(),
           accessId, newOmDBAccessIdInfo);
 
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeAdminResponse(
           createErrorOMResponse(omResponse, exception));

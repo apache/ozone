@@ -120,11 +120,9 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
                   CancelDelegationTokenResponseProto.newBuilder().setResponse(
                       SecurityProtos.CancelDelegationTokenResponseProto
                           .newBuilder())).build());
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       LOG.error("Error in cancel DelegationToken {}", ozoneTokenIdentifier, ex);
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMCancelDelegationTokenResponse(null,
           createErrorOMResponse(omResponse, exception));
     } finally {

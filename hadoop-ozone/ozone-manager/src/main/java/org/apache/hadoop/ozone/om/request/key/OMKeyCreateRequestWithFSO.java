@@ -218,11 +218,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(

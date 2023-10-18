@@ -207,10 +207,8 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           omResponse.setDeleteTenantResponse(deleteTenantResponse).build(),
           volumeName, omVolumeArgs, tenantId);
 
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       omClientResponse = new OMTenantDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

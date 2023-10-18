@@ -171,11 +171,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
           omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId);
 
       result = Result.SUCCESS;
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMKeyDeleteResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {

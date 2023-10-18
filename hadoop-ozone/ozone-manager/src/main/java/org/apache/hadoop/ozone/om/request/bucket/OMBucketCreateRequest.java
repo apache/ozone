@@ -246,10 +246,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
           omBucketInfo, omVolumeArgs.copyObject());
-    } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+    } catch (IOException ex) {
+      exception = ex;
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
