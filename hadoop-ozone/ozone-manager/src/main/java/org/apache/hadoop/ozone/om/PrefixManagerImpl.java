@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PREFIX_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
@@ -145,6 +146,8 @@ public class PrefixManagerImpl implements PrefixManager {
           return hasAccess;
         }
       }
+    } catch (IOException e) {
+      throw new OMException(e, INTERNAL_ERROR);
     } finally {
       metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }
@@ -152,7 +155,8 @@ public class PrefixManagerImpl implements PrefixManager {
   }
 
   @Override
-  public List<OmPrefixInfo> getLongestPrefixPath(String path) {
+  public List<OmPrefixInfo> getLongestPrefixPath(String path)
+      throws IOException {
     String prefixPath = prefixTree.getLongestPrefix(path);
     metadataManager.getLock().acquireReadLock(PREFIX_LOCK, prefixPath);
     try {
@@ -167,7 +171,8 @@ public class PrefixManagerImpl implements PrefixManager {
    * @param prefixPath
    * @return list of prefix info.
    */
-  private List<OmPrefixInfo> getLongestPrefixPathHelper(String prefixPath) {
+  private List<OmPrefixInfo> getLongestPrefixPathHelper(String prefixPath)
+      throws IOException {
     return prefixTree.getLongestPrefixPath(prefixPath).stream()
           .map(c -> c.getValue()).collect(Collectors.toList());
   }

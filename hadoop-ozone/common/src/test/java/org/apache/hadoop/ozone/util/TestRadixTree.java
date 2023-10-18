@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.util;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -33,7 +34,7 @@ public class TestRadixTree {
   static final RadixTree<Integer> ROOT = new RadixTree<>();
 
   @BeforeClass
-  public static void setupRadixTree() {
+  public static void setupRadixTree() throws IOException {
     // Test prefix paths with an empty tree
     assertEquals(true, ROOT.isEmpty());
     assertEquals("/", ROOT.getLongestPrefix("/a/b/c"));
@@ -63,7 +64,7 @@ public class TestRadixTree {
    * Tests if insert and build prefix tree is correct.
    */
   @Test
-  public  void testGetLongestPrefix() {
+  public  void testGetLongestPrefix() throws IOException {
     assertEquals("/a/b/c", ROOT.getLongestPrefix("/a/b/c"));
     assertEquals("/a/b", ROOT.getLongestPrefix("/a/b"));
     assertEquals("/a", ROOT.getLongestPrefix("/a"));
@@ -77,7 +78,7 @@ public class TestRadixTree {
   }
 
   @Test
-  public void testGetLongestPrefixPath() {
+  public void testGetLongestPrefixPath() throws IOException {
     List<RadixNode<Integer>> lpp =
         ROOT.getLongestPrefixPath("/a/b/c/d/g/p");
     RadixNode<Integer> lpn = lpp.get(lpp.size() - 1);
@@ -98,14 +99,14 @@ public class TestRadixTree {
   }
 
   @Test
-  public void testGetLastNoeInPrefixPath() {
+  public void testGetLastNoeInPrefixPath() throws IOException {
     assertEquals(null, ROOT.getLastNodeInPrefixPath("/a/g"));
     RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath("/a/b/e/dir1");
     assertEquals("dir1", ln.getName());
   }
 
   @Test
-  public void testRemovePrefixPath() {
+  public void testRemovePrefixPath() throws IOException {
 
     // Remove, test and restore
     // Remove partially overlapped path

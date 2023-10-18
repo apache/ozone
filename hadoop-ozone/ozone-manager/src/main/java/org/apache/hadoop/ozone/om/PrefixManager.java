@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -41,5 +42,5 @@ public interface PrefixManager extends IOzoneAcl {
    * @param path ozone object path
    * @return list of longest path components that matches obj's path.
    */
-  List<OmPrefixInfo> getLongestPrefixPath(String path);
+  List<OmPrefixInfo> getLongestPrefixPath(String path) throws IOException;
 }
