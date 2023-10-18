@@ -135,14 +135,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Test for Recon API endpoints.
  */
 public class TestEndpoints extends AbstractReconSqlDBTest {
-  private org.apache.hadoop.ozone.recon.api.NodeEndpoint nodeEndpoint;
-  private org.apache.hadoop.ozone.recon.api.PipelineEndpoint pipelineEndpoint;
-  private org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint
-      clusterStateEndpoint;
-  private org.apache.hadoop.ozone.recon.api.UtilizationEndpoint
-      utilizationEndpoint;
-  private org.apache.hadoop.ozone.recon.api.MetricsProxyEndpoint
-      metricsProxyEndpoint;
+  private NodeEndpoint nodeEndpoint;
+  private PipelineEndpoint pipelineEndpoint;
+  private ClusterStateEndpoint clusterStateEndpoint;
+  private UtilizationEndpoint utilizationEndpoint;
+  private MetricsProxyEndpoint metricsProxyEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
   private ContainerSizeCountTask containerSizeCountTask;
@@ -238,23 +235,19 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addBinding(OzoneStorageContainerManager.class,
                 ReconStorageContainerManagerFacade.class)
             .withContainerDB()
-            .addBinding(
-                org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint.class)
-            .addBinding(org.apache.hadoop.ozone.recon.api.NodeEndpoint.class)
+            .addBinding(ClusterStateEndpoint.class)
+            .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
             .addBinding(ContainerHealthSchemaManager.class)
-            .addBinding(
-                org.apache.hadoop.ozone.recon.api.UtilizationEndpoint.class)
+            .addBinding(UtilizationEndpoint.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
             .build();
 
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    nodeEndpoint = reconTestInjector.getInstance(
-        org.apache.hadoop.ozone.recon.api.NodeEndpoint.class);
-    pipelineEndpoint = reconTestInjector.getInstance(
-        org.apache.hadoop.ozone.recon.api.PipelineEndpoint.class);
+    nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
+    pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
@@ -262,11 +255,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     Configuration sqlConfiguration =
         reconTestInjector.getInstance(Configuration.class);
-    utilizationEndpoint =
-        new org.apache.hadoop.ozone.recon.api.UtilizationEndpoint(
-            fileCountBySizeDao,
-            containerCountBySizeDao,
-            utilizationSchemaDefinition);
+    utilizationEndpoint = new UtilizationEndpoint(
+        fileCountBySizeDao,
+        containerCountBySizeDao,
+        utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
     omTableInsightTask = new OmTableInsightTask(
@@ -274,15 +266,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
-        new org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint(reconScm,
-            globalStatsDao,
+        new ClusterStateEndpoint(reconScm, globalStatsDao,
             containerHealthSchemaManager);
     containerSizeCountTask = reconScm.getContainerSizeCountTask();
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
     metricsProxyEndpoint =
-        new org.apache.hadoop.ozone.recon.api.MetricsProxyEndpoint(
-            metricsServiceProviderFactory);
+        new MetricsProxyEndpoint(metricsServiceProviderFactory);
     dslContext = getDslContext();
   }
 
