@@ -34,14 +34,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.Time;
-import org.junit.Rule;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junit.rules.TemporaryFolder;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -62,8 +60,8 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
  */
 public class TestOMSnapshotCreateResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private File folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
@@ -72,7 +70,7 @@ public class TestOMSnapshotCreateResponse {
   @BeforeEach
   public void setup() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
-    String fsPath = folder.newFolder().getAbsolutePath();
+    String fsPath = folder.getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
@@ -199,8 +197,10 @@ public class TestOMSnapshotCreateResponse {
    * @param bucketName bucket name
    * @return A set of DB keys
    */
-  private Set<String> addTestKeysToDeletedDirTable(
-      String volumeName, String bucketName, int numberOfKeys) throws IOException {
+  private Set<String> addTestKeysToDeletedDirTable(String volumeName,
+                                                   String bucketName,
+                                                   int numberOfKeys)
+      throws IOException {
 
     OMSnapshotResponseTestUtil.addVolumeBucketInfoToTable(
         omMetadataManager, volumeName, bucketName);
