@@ -189,6 +189,74 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
+  public void testNodesCanBeDecommissionedAndRecommissionedMixedPorts()
+      throws InvalidHostStringException, NodeNotFoundException {
+    List<DatanodeDetails> dns = generateDatanodes();
+
+    // From the generateDatanodes method we have DNs at index 9 and 11 with the
+    // same IP and port. We can add another DN with a different port on the
+    // same IP so we have 3 registered from the same host and 2 distinct ports.
+    DatanodeDetails sourceDN = dns.get(9);
+    int ratisPort = sourceDN
+        .getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
+    builder.setUuid(UUID.randomUUID())
+        .setHostName(sourceDN.getHostName())
+        .setIpAddress(sourceDN.getIpAddress())
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE,
+            sourceDN.getPort(DatanodeDetails.Port.Name.STANDALONE)
+                .getValue() + 1))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS,
+            ratisPort + 1))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.REST,
+            sourceDN.getPort(DatanodeDetails.Port.Name.REST).getValue() + 1))
+        .setNetworkLocation(sourceDN.getNetworkLocation());
+    DatanodeDetails extraDN = builder.build();
+    dns.add(extraDN);
+    nodeManager.register(extraDN, null, null);
+
+    // Attempt to decommission with just the IP, which should fail.
+    try {
+      decom.decommissionNodes(Arrays.asList(extraDN.getIpAddress()));
+      fail("InvalidHostStringException expected");
+    } catch (InvalidHostStringException e) {
+    }
+    // Now try the one with the unique port
+    decom.decommissionNodes(Arrays.asList(
+        extraDN.getIpAddress() + ":" + ratisPort + 1));
+
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(extraDN).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(
+        extraDN.getIpAddress() + ":" + ratisPort + 1));
+    decom.getMonitor().run();
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(extraDN).getOperationalState());
+
+    // Now decommission one of the DNs with the duplicate port
+    DatanodeDetails expectedDN = dns.get(9);
+    nodeManager.processHeartbeat(expectedDN, defaultLayoutVersionProto());
+
+    decom.decommissionNodes(Arrays.asList(
+        expectedDN.getIpAddress() + ":" + ratisPort));
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(expectedDN).getOperationalState());
+    // The other duplicate is still in service
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(11)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(
+        expectedDN.getIpAddress() + ":" + ratisPort));
+    decom.getMonitor().run();
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(expectedDN).getOperationalState());
+  }
+
+  @Test
   public void testNodesCanBePutIntoMaintenanceAndRecommissioned()
       throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();

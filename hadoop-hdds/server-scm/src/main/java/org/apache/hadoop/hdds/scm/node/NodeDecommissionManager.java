@@ -131,8 +131,7 @@ public class NodeDecommissionManager {
       if (found.isEmpty()) {
         throw new InvalidHostStringException("Host " + host.getRawHostname()
             + " (" + dnsName + ") is not running any datanodes registered"
-            + " with SCM."
-            + " Please check the host name.");
+            + " with SCM. Please check the host name.");
       } else if (found.size() == 1) {
         if (host.getPort() != -1 &&
             !validateDNPortMatch(host.getPort(), found.get(0))) {
@@ -149,6 +148,21 @@ public class NodeDecommissionManager {
         // UUID and registered again. In that case, the ports of all hosts
         // should be the same, and we should just use the one with the most
         // recent heartbeat.
+        if (host.getPort() != -1) {
+          found.removeIf(dn -> !validateDNPortMatch(host.getPort(), dn));
+        }
+        if (found.isEmpty()) {
+          throw new InvalidHostStringException("Host " + host.getRawHostname()
+              + " is running multiple datanodes registered with SCM,"
+              + " but no port numbers match."
+              + " Please check the port number.");
+        } else if (found.size() == 1) {
+          results.add(found.get(0));
+          continue;
+        }
+        // Here we have at least 2 DNs matching the passed in port, or no port
+        // was passed so we may have all the same ports in SCM or a mix of
+        // ports.
         if (allPortsMatch(found)) {
           // All ports match, so just use the most recent heartbeat as it is
           // not possible for a host to have 2 DNs coming from the same port.
@@ -161,20 +175,12 @@ public class NodeDecommissionManager {
           }
           results.add(mostRecent);
         } else {
-          DatanodeDetails match = null;
-          for (DatanodeDetails dn : found) {
-            if (validateDNPortMatch(host.getPort(), dn)) {
-              match = dn;
-              break;
-            }
-          }
-          if (match == null) {
-            throw new InvalidHostStringException("Host " + host.getRawHostname()
-                + " is running multiple datanodes registered with SCM,"
-                + " but no port numbers match."
-                + " Please check the port number.");
-          }
-          results.add(match);
+          // We have no passed in port or the ports in SCM do not all match, so
+          // we cannot decide which DN to use.
+          throw new InvalidHostStringException("Host " + host.getRawHostname()
+              + " is running multiple datanodes registered with SCM,"
+              + " but no port numbers match."
+              + " Please check the port number.");
         }
       }
     }
