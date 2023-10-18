@@ -2859,11 +2859,21 @@
   </property>
   <property>
     <name>ozone.om.transport.class</name>
-    <value>org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory</value>
+    <value>org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory</value>
     <tag>OM, MANAGEMENT</tag>
     <description>
-      Enable Ozone Manager S3G Grpc channel.
+      Property to determine the transport protocol for the client to Ozone Manager channel.
+      If GRPC (Hadoop3OmTransportFactory) is used, please make sure ozone.om.s3.grpc.server_enabled is enabled
+      in Ozone Manager.
     </description>
+  </property>
+  <property>
+    <name>ozone.om.s3.grpc.server_enabled</name>
+    <value>false</value>
+    <description>
+      Determine if GRPC should be supported by Ozone Manager as a client transport protocol.
+    </description>
+    <tag>OM, MANAGEMENT</tag>
   </property>
   <property>
     <name>ozone.recon.http.enabled</name>
