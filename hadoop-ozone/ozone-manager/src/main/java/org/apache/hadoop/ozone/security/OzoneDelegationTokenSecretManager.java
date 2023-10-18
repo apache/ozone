@@ -570,7 +570,7 @@ public class OzoneDelegationTokenSecretManager
     tokenRemoverThread.start();
   }
 
-  public void stopThreads() {
+  private synchronized void stopThreads() {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stopping expired delegation token remover thread");
     }
