@@ -789,29 +789,29 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public void recoverStateIfNeeded(InitResponse state) throws IOException {
     getLogger().info("{} init response: {}", component, state);
     switch (state) {
-      case SUCCESS:
-        getLogger().info("{} initialization successful, case:{}.",
-            component, state);
-        break;
-      case GETCERT:
-        String certId = signAndStoreCertificate(getCSRBuilder().build());
-        if (certIdSaveCallback != null) {
-          certIdSaveCallback.accept(certId);
-        } else {
-          throw new IOException(component + " doesn't have " +
-              "the certIdSaveCallback set. The new " +
-              "certificate ID " + certId + " cannot be persisted to " +
-              "the VERSION file");
-        }
-        getLogger().info("Successfully stored {} signed certificate, case:{}.",
-            component, state);
-        break;
-      case FAILURE:
-      default:
-        getLogger().error("{} security initialization failed. " +
-            "Init response: {}", component, state);
-        throw new RuntimeException(component +
-            " security initialization failed.");
+    case SUCCESS:
+      getLogger().info("{} initialization successful, case:{}.",
+          component, state);
+      break;
+    case GETCERT:
+      String certId = signAndStoreCertificate(getCSRBuilder().build());
+      if (certIdSaveCallback != null) {
+        certIdSaveCallback.accept(certId);
+      } else {
+        throw new IOException(component + " doesn't have " +
+            "the certIdSaveCallback set. The new " +
+            "certificate ID " + certId + " cannot be persisted to " +
+            "the VERSION file");
+      }
+      getLogger().info("Successfully stored {} signed certificate, case:{}.",
+          component, state);
+      break;
+    case FAILURE:
+    default:
+      getLogger().error("{} security initialization failed. " +
+          "Init response: {}", component, state);
+      throw new RuntimeException(component +
+          " security initialization failed.");
     }
   }
 

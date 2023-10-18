@@ -1417,21 +1417,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     CertificateClient.InitResponse response = certClient.init();
     LOG.info("Init response: {}", response);
     switch (response) {
-      case SUCCESS:
-        LOG.info("Initialization successful.");
-        break;
-      case GETCERT:
-        // Sign and persist OM cert.
-        CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
-        omStore.setOmCertSerialId(
-            certClient.signAndStoreCertificate(builder.build()));
-        LOG.info("Successfully stored SCM signed certificate.");
-        break;
-      case FAILURE:
-      default:
-        LOG.error("OM security initialization failed. Init response: {}",
-            response);
-        throw new RuntimeException("OM security initialization failed.");
+    case SUCCESS:
+      LOG.info("Initialization successful.");
+      break;
+    case GETCERT:
+      // Sign and persist OM cert.
+      CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
+      omStore.setOmCertSerialId(
+          certClient.signAndStoreCertificate(builder.build()));
+      LOG.info("Successfully stored SCM signed certificate.");
+      break;
+    case FAILURE:
+    default:
+      LOG.error("OM security initialization failed. Init response: {}",
+          response);
+      throw new RuntimeException("OM security initialization failed.");
     }
   }
 
