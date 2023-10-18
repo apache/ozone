@@ -197,8 +197,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         //  Added the assertion.
         assert (omClientRequest != null);
         OMClientRequest finalOmClientRequest = omClientRequest;
-        requestToSubmit = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
-            () -> finalOmClientRequest.preExecute(ozoneManager));
+        requestToSubmit = preExecute(finalOmClientRequest);
       } catch (IOException ex) {
         if (omClientRequest != null) {
           omClientRequest.handleRequestFailure(ozoneManager);
@@ -214,6 +213,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     } finally {
       OzoneManager.setS3Auth(null);
     }
+  }
+
+  private OMRequest preExecute(OMClientRequest finalOmClientRequest)
+      throws IOException {
+    return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+        () -> finalOmClientRequest.preExecute(ozoneManager));
   }
 
   /**

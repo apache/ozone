@@ -250,16 +250,9 @@ public final class OzoneManagerRatisServer {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest = captureLatencyNs(
-          perfMetrics.getCreateRatisRequestLatencyNs(),
-          () -> createRaftRequest(omRequest));
-      RaftClientReply raftClientReply = captureLatencyNs(
-          perfMetrics.getSubmitToRatisLatencyNs(),
-          () -> submitRequestToRatis(raftClientRequest));
-
-      return captureLatencyNs(
-          perfMetrics.getCreateOmResponseLatencyNs(),
-          () -> createOmResponse(omRequest, raftClientReply));
+      RaftClientRequest raftClientRequest = createRaftRequest(omRequest);
+      RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+      return createOmResponse(omRequest, raftClientReply);
     } else {
       LOG.info("Rejecting write request on OM {} because it is in prepare " +
           "mode: {}", ozoneManager.getOMNodeId(),
@@ -277,6 +270,27 @@ public final class OzoneManagerRatisServer {
     }
   }
 
+  private OMResponse createOmResponse(OMRequest omRequest,
+      RaftClientReply raftClientReply) throws ServiceException {
+    return captureLatencyNs(
+        perfMetrics.getCreateOmResponseLatencyNs(),
+        () -> createOmResponseImpl(omRequest, raftClientReply));
+  }
+
+  private RaftClientReply submitRequestToRatis(
+      RaftClientRequest raftClientRequest) throws ServiceException {
+    return captureLatencyNs(
+        perfMetrics.getSubmitToRatisLatencyNs(),
+        () -> submitRequestToRatisImpl(raftClientRequest));
+  }
+
+  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
+    RaftClientRequest raftClientRequest = captureLatencyNs(
+        perfMetrics.getCreateRatisRequestLatencyNs(),
+        () -> createRaftRequestImpl(omRequest));
+    return raftClientRequest;
+  }
+
   /**
    * API used internally from OzoneManager Server when requests needs to be
    * submitted to ratis, where the crafted RaftClientRequest is passed along.
@@ -287,11 +301,11 @@ public final class OzoneManagerRatisServer {
    */
   public OMResponse submitRequest(OMRequest omRequest,
       RaftClientRequest raftClientRequest) throws ServiceException {
-    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-    return createOmResponse(omRequest, raftClientReply);
+    RaftClientReply raftClientReply = submitRequestToRatisImpl(raftClientRequest);
+    return createOmResponseImpl(omRequest, raftClientReply);
   }
 
-  private RaftClientReply submitRequestToRatis(
+  private RaftClientReply submitRequestToRatisImpl(
       RaftClientRequest raftClientRequest) throws ServiceException {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
@@ -429,7 +443,7 @@ public final class OzoneManagerRatisServer {
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
-  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
     if (!ozoneManager.isTestSecureOmFlag()) {
       Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
       Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
@@ -454,7 +468,7 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response which is returned to client.
    * @throws ServiceException
    */
-  private OMResponse createOmResponse(OMRequest omRequest,
+  private OMResponse createOmResponseImpl(OMRequest omRequest,
       RaftClientReply reply) throws ServiceException {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. This can happen first time
