@@ -787,30 +787,30 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Recover the state if needed.
    * */
   public void recoverStateIfNeeded(InitResponse state) throws IOException {
-    getLogger().info("{} init response: {}", component, state);
+    String upperCaseComponent = component.toUpperCase();
+    getLogger().info("Init response: {}", state);
     switch (state) {
     case SUCCESS:
-      getLogger().info("{} initialization successful, case:{}.",
-          component, state);
+      getLogger().info("Initialization successful, case:{}.", state);
       break;
     case GETCERT:
       String certId = signAndStoreCertificate(getCSRBuilder().build());
       if (certIdSaveCallback != null) {
         certIdSaveCallback.accept(certId);
       } else {
-        throw new IOException(component + " doesn't have " +
+        throw new IOException(upperCaseComponent + " doesn't have " +
             "the certIdSaveCallback set. The new " +
             "certificate ID " + certId + " cannot be persisted to " +
             "the VERSION file");
       }
       getLogger().info("Successfully stored {} signed certificate, case:{}.",
-          component, state);
+          upperCaseComponent, state);
       break;
     case FAILURE:
     default:
       getLogger().error("{} security initialization failed. " +
-          "Init response: {}", component, state);
-      throw new RuntimeException(component +
+          "Init response: {}", upperCaseComponent, state);
+      throw new RuntimeException(upperCaseComponent +
           " security initialization failed.");
     }
   }

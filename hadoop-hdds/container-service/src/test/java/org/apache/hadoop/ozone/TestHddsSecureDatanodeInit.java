@@ -52,7 +52,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
-import static org.apache.hadoop.ozone.HddsDatanodeService.getLogger;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -117,7 +116,6 @@ public class TestHddsSecureDatanodeInit {
         return mock(SCMSecurityProtocolClientSideTranslatorPB.class);
       }
     };
-    dnLogs = GenericTestUtils.LogCapturer.captureLogs(getLogger());
     callQuietly(() -> {
       service.start(conf);
       return null;
@@ -126,6 +124,8 @@ public class TestHddsSecureDatanodeInit {
       service.initializeCertificateClient(service.getCertificateClient());
       return null;
     });
+    dnLogs = GenericTestUtils.LogCapturer.captureLogs(
+        ((DNCertificateClient)service.getCertificateClient()).getLogger());
     certCodec = new CertificateCodec(securityConfig, DN_COMPONENT);
     keyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
     dnLogs.clearOutput();
@@ -158,7 +158,7 @@ public class TestHddsSecureDatanodeInit {
         securityConfig.getCertificateFileName()).toFile());
     dnLogs.clearOutput();
     client = new DNCertificateClient(securityConfig, scmClient, datanodeDetails,
-        certHolder.getSerialNumber().toString(), null, null);
+        certHolder.getSerialNumber().toString(), id -> {}, null);
   }
 
   @AfterEach
