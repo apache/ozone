@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -49,6 +48,7 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -79,7 +79,6 @@ import javax.ws.rs.core.Response;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -115,6 +114,7 @@ public class TestOpenContainerCount {
   private List<Long> containerIDs;
 
   private List<ContainerWithPipeline> cpw;
+  private CommonUtils commonUtils;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -157,6 +157,7 @@ public class TestOpenContainerCount {
               .thenReturn(containerWithPipeline);
       containerIDs.add(i);
       cpw.add(containerWithPipeline);
+      commonUtils = new CommonUtils();
     }
 
     // Open 5 containers on pipeline 2
@@ -182,11 +183,7 @@ public class TestOpenContainerCount {
             .thenReturn(cpw);
 
     reconUtilsMock = mock(ReconUtils.class);
-    SCMNodeDetails.Builder nodeDetailBuilder = new SCMNodeDetails.Builder();
-    nodeDetailBuilder.setSCMNodeId("Recon");
-    nodeDetailBuilder.setDatanodeProtocolServerAddress(
-        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
-    SCMNodeDetails reconNodeDetails = nodeDetailBuilder.build();
+
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
             .thenReturn(HttpServletResponse.SC_OK);
@@ -195,7 +192,8 @@ public class TestOpenContainerCount {
     when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
         anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
     when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
 
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(temporaryFolder)

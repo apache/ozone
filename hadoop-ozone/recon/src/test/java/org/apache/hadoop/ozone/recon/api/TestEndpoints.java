@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -68,6 +67,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -121,7 +121,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -165,6 +164,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ReconUtils reconUtilsMock;
 
   private ContainerHealthSchemaManager containerHealthSchemaManager;
+  private CommonUtils commonUtils;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -206,11 +206,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(mockScmServiceProvider
         .getExistContainerWithPipelinesInBatch(containerIDs))
         .thenReturn(cpw);
-    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
-    builder.setSCMNodeId("Recon");
-    builder.setDatanodeProtocolServerAddress(
-        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
-    SCMNodeDetails reconNodeDetails = builder.build();
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(
             PROMETHEUS_TEST_RESPONSE_FILE);
@@ -224,7 +219,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
         anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
     when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
             .withReconSqlDb()
@@ -281,6 +277,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
+      commonUtils = new CommonUtils();
       initializeInjector();
       isSetupDone = true;
     }

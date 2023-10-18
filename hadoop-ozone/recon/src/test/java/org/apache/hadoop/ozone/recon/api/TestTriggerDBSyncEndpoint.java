@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -30,6 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -51,7 +51,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -73,6 +72,7 @@ public class TestTriggerDBSyncEndpoint {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private ReconTestInjector reconTestInjector;
+  private CommonUtils commonUtils;
 
   @Before
   public void setUp() throws IOException, AuthenticationException {
@@ -82,7 +82,7 @@ public class TestTriggerDBSyncEndpoint {
     configuration.set(OZONE_RECON_DB_DIR,
         temporaryFolder.newFolder().getAbsolutePath());
     configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
-
+    commonUtils = new CommonUtils();
     OzoneManagerProtocol ozoneManagerProtocol
         = mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocol.getDBUpdates(any(OzoneManagerProtocolProtos
@@ -94,11 +94,7 @@ public class TestTriggerDBSyncEndpoint {
         = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.newFolder());
 
-    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
-    builder.setSCMNodeId("Recon");
-    builder.setDatanodeProtocolServerAddress(
-        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
-    SCMNodeDetails reconNodeDetails = builder.build();
+
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
@@ -110,7 +106,8 @@ public class TestTriggerDBSyncEndpoint {
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock);
     when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
 
     ReconTaskController reconTaskController = mock(ReconTaskController.class);
     when(reconTaskController.getReconTaskStatusDao())
