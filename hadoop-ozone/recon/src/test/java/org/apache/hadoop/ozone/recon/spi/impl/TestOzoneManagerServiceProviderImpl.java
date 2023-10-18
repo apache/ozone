@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
@@ -95,6 +96,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
   private OzoneConfiguration configuration;
   private OzoneManagerProtocol ozoneManagerProtocol;
+  private CommonUtils commonUtils;
 
   @Before
   public void setUp() throws Exception {
@@ -105,6 +107,7 @@ public class TestOzoneManagerServiceProviderImpl {
         temporaryFolder.newFolder().getAbsolutePath());
     configuration.set("ozone.om.address", "localhost:9862");
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
+    commonUtils = new CommonUtils();
   }
 
   @Test
@@ -128,9 +131,9 @@ public class TestOzoneManagerServiceProviderImpl {
     when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock);
-    SCMNodeDetails reconNodeDetails = getReconNodeDetails();
     when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
     ReconTaskController reconTaskController = getMockTaskController();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
