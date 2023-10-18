@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -50,6 +51,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -92,6 +94,11 @@ public class TestTriggerDBSyncEndpoint {
         = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.newFolder());
 
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
+    SCMNodeDetails reconNodeDetails = builder.build();
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
@@ -102,6 +109,8 @@ public class TestTriggerDBSyncEndpoint {
     }
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(httpURLConnectionMock);
+    when(reconUtilsMock.getReconNodeDetails(
+        any(OzoneConfiguration.class))).thenReturn(reconNodeDetails);
 
     ReconTaskController reconTaskController = mock(ReconTaskController.class);
     when(reconTaskController.getReconTaskStatusDao())
