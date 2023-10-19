@@ -1552,14 +1552,15 @@ public class KeyManagerImpl implements KeyManager {
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
-    String volName = args.getVolumeName();
-    String buckName = args.getBucketName();
+    String volumeName = args.getVolumeName();
+    String bucketName = args.getBucketName();
+    String keyName = args.getKeyName();
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
     if (numEntries <= 0) {
       return fileStatusList;
     }
 
-    if (isBucketFSOptimized(volName, buckName)) {
+    if (isBucketFSOptimized(volumeName, bucketName)) {
       Preconditions.checkArgument(!recursive);
       OzoneListStatusHelper statusHelper =
           new OzoneListStatusHelper(metadataManager, scmBlockSize,
@@ -1571,9 +1572,6 @@ public class KeyManagerImpl implements KeyManager {
       return buildFinalStatusList(statuses, args, clientAddress);
     }
 
-    String volumeName = args.getVolumeName();
-    String bucketName = args.getBucketName();
-    String keyName = args.getKeyName();
     // A map sorted by OmKey to combine results from TableCache and DB.
     TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
 
@@ -1595,8 +1593,8 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      keyTable = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
+      keyTable = metadataManager.getKeyTable(
+          getBucketLayout(metadataManager, volumeName, bucketName));
       iterator = getIteratorForKeyInTableCache(recursive, startKey,
           volumeName, bucketName, cacheKeyMap, keyArgs, keyTable);
     } finally {
