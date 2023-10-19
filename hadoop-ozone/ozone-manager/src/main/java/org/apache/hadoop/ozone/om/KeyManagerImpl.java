@@ -1444,6 +1444,10 @@ public class KeyManagerImpl implements KeyManager {
       TreeMap<String, OzoneFileStatus> cacheKeyMap) throws IOException {
 
     Map<String, OmKeyInfo> remainingKeys = new HashMap<>();
+    // extract the /volume/buck/ prefix from the startCacheKey
+    int volBuckEndIndex = StringUtils.ordinalIndexOf(
+        startCacheKey, OZONE_URI_DELIMITER, 3);
+    String volumeBuckPrefix = startCacheKey.substring(0, volBuckEndIndex + 1);
 
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
@@ -1492,9 +1496,6 @@ public class KeyManagerImpl implements KeyManager {
             OzoneFSUtils.getImmediateChild(remainingKey, keyArgs);
         if (!cacheKeyMap.containsKey(immediateChild)) {
           // immediateChild contains volume/bucket prefix remove it.
-          String volumeBuckPrefix = OZONE_URI_DELIMITER + entry.getValue()
-              .getVolumeName() + OZONE_URI_DELIMITER + entry.getValue()
-              .getBucketName() + OZONE_URI_DELIMITER;
           String immediateChildKeyName =
               immediateChild.replaceAll(volumeBuckPrefix, "");
           OmKeyInfo fakeDirEntry =
