@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -163,6 +164,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ReconUtils reconUtilsMock;
 
   private ContainerHealthSchemaManager containerHealthSchemaManager;
+  private CommonUtils commonUtils;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -204,7 +206,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(mockScmServiceProvider
         .getExistContainerWithPipelinesInBatch(containerIDs))
         .thenReturn(cpw);
-
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(
             PROMETHEUS_TEST_RESPONSE_FILE);
@@ -217,7 +218,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         anyString(), anyBoolean())).thenReturn(urlConnectionMock);
     when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
         anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
-
+    when(reconUtilsMock.getReconNodeDetails(
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
             .withReconSqlDb()
@@ -274,6 +277,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
+      commonUtils = new CommonUtils();
       initializeInjector();
       isSetupDone = true;
     }

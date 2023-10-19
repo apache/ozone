@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Arrays;
 import java.util.ArrayList;
+
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.assertj.core.api.Fail.fail;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -163,9 +165,18 @@ public class TestNodeDecommissionManager {
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
 
+    // Attempt to decommission on dn(9) which has another instance at
+    // dn(11) with identical ports.
+    nodeManager.processHeartbeat(dns.get(9), defaultLayoutVersionProto());
+    DatanodeDetails duplicatePorts = dns.get(9);
+    decom.decommissionNodes(Arrays.asList(duplicatePorts.getIpAddress()));
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
+
     // Recommission all 3 hosts
     decom.recommissionNodes(Arrays.asList(
-        multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+        multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress(),
+        duplicatePorts.getIpAddress()));
     decom.getMonitor().run();
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
@@ -173,6 +184,76 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(10)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
+  }
+
+  @Test
+  public void testNodesCanBeDecommissionedAndRecommissionedMixedPorts()
+      throws InvalidHostStringException, NodeNotFoundException {
+    List<DatanodeDetails> dns = generateDatanodes();
+
+    // From the generateDatanodes method we have DNs at index 9 and 11 with the
+    // same IP and port. We can add another DN with a different port on the
+    // same IP so we have 3 registered from the same host and 2 distinct ports.
+    DatanodeDetails sourceDN = dns.get(9);
+    int ratisPort = sourceDN
+        .getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
+    builder.setUuid(UUID.randomUUID())
+        .setHostName(sourceDN.getHostName())
+        .setIpAddress(sourceDN.getIpAddress())
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE,
+            sourceDN.getPort(DatanodeDetails.Port.Name.STANDALONE)
+                .getValue() + 1))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS,
+            ratisPort + 1))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.REST,
+            sourceDN.getPort(DatanodeDetails.Port.Name.REST).getValue() + 1))
+        .setNetworkLocation(sourceDN.getNetworkLocation());
+    DatanodeDetails extraDN = builder.build();
+    dns.add(extraDN);
+    nodeManager.register(extraDN, null, null);
+
+    // Attempt to decommission with just the IP, which should fail.
+    try {
+      decom.decommissionNodes(Arrays.asList(extraDN.getIpAddress()));
+      fail("InvalidHostStringException expected");
+    } catch (InvalidHostStringException e) {
+    }
+    // Now try the one with the unique port
+    decom.decommissionNodes(Arrays.asList(
+        extraDN.getIpAddress() + ":" + ratisPort + 1));
+
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(extraDN).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(
+        extraDN.getIpAddress() + ":" + ratisPort + 1));
+    decom.getMonitor().run();
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(extraDN).getOperationalState());
+
+    // Now decommission one of the DNs with the duplicate port
+    DatanodeDetails expectedDN = dns.get(9);
+    nodeManager.processHeartbeat(expectedDN, defaultLayoutVersionProto());
+
+    decom.decommissionNodes(Arrays.asList(
+        expectedDN.getIpAddress() + ":" + ratisPort));
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(expectedDN).getOperationalState());
+    // The other duplicate is still in service
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dns.get(11)).getOperationalState());
+
+    decom.recommissionNodes(Arrays.asList(
+        expectedDN.getIpAddress() + ":" + ratisPort));
+    decom.getMonitor().run();
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(expectedDN).getOperationalState());
   }
 
   @Test
@@ -206,9 +287,19 @@ public class TestNodeDecommissionManager {
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(multiDn).getOperationalState());
 
+    // Attempt to enable maintenance on dn(9) which has another instance at
+    // dn(11) with identical ports.
+    nodeManager.processHeartbeat(dns.get(9), defaultLayoutVersionProto());
+    DatanodeDetails duplicatePorts = dns.get(9);
+    decom.startMaintenanceNodes(Arrays.asList(duplicatePorts.getIpAddress()),
+        100);
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
+
     // Recommission all 3 hosts
     decom.recommissionNodes(Arrays.asList(
-        multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+        multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress(),
+        duplicatePorts.getIpAddress()));
     decom.getMonitor().run();
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
@@ -216,6 +307,8 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(10)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(duplicatePorts).getOperationalState());
   }
 
   @Test
@@ -301,7 +394,7 @@ public class TestNodeDecommissionManager {
       nodeManager.register(dn, null, null);
     }
     // We have 10 random DNs, we want to create another one that is on the same
-    // host as some of the others.
+    // host as some of the others, but with a different port
     DatanodeDetails multiDn = dns.get(0);
 
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
@@ -317,8 +410,31 @@ public class TestNodeDecommissionManager {
         .setNetworkLocation(multiDn.getNetworkLocation());
 
     DatanodeDetails dn = builder.build();
-    nodeManager.register(dn, null, null);
     dns.add(dn);
+    nodeManager.register(dn, null, null);
+
+    // Now add another DN with the same host and IP as dns(9), and with the
+    // same port.
+    DatanodeDetails duplicatePorts = dns.get(9);
+    builder = DatanodeDetails.newBuilder();
+    builder.setUuid(UUID.randomUUID())
+        .setHostName(duplicatePorts.getHostName())
+        .setIpAddress(duplicatePorts.getIpAddress())
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE,
+            duplicatePorts.getPort(DatanodeDetails.Port.Name.STANDALONE)
+                .getValue()))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS,
+            duplicatePorts.getPort(DatanodeDetails.Port.Name.RATIS).getValue()))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.REST,
+            duplicatePorts.getPort(DatanodeDetails.Port.Name.REST).getValue()))
+        .setNetworkLocation(multiDn.getNetworkLocation());
+    dn = builder.build();
+    dns.add(dn);
+    nodeManager.register(dn, null, null);
+
     return dns;
   }
 
