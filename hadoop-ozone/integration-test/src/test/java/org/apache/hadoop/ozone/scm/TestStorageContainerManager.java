@@ -96,8 +96,10 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.ozone.test.FlakyTest;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -107,6 +109,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -986,6 +989,7 @@ public class TestStorageContainerManager {
   }
 
   @Test
+  @Category(FlakyTest.class) @Flaky("HDDS-8470")
   public void testContainerReportQueueTakingMoreTime() throws Exception {
     EventQueue eventQueue = new EventQueue();
     List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
