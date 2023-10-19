@@ -301,8 +301,9 @@ public final class OzoneManagerRatisServer {
    */
   public OMResponse submitRequest(OMRequest omRequest,
       RaftClientRequest raftClientRequest) throws ServiceException {
-    RaftClientReply raftClientReply = submitRequestToRatisImpl(raftClientRequest);
-    return createOmResponseImpl(omRequest, raftClientReply);
+    RaftClientReply raftClientReply =
+        submitRequestToRatisImpl(raftClientRequest);
+    return createOmResponse(omRequest, raftClientReply);
   }
 
   private RaftClientReply submitRequestToRatisImpl(
