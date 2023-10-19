@@ -3525,8 +3525,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // for internal usages, skip acl checks and metrics.
       volumeInfo = volumeManager.getVolumeInfo(s3Volume);
     } else {
-      // if external usages, getVolumeInfo() performs acl checks
-      // and update metrics.
+      // for external usages, getVolumeInfo() performs acl checks
+      // and metric updates.
       volumeInfo = getVolumeInfo(s3Volume);
     }
 
