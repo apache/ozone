@@ -1864,11 +1864,12 @@ message SnapshotPurgeRequest {
 }
 
 message SetSnapshotPropertyRequest {
-  optional SnapshotProperty snapshotProperty = 1;
+  optional string snapshotKey = 1;
+  optional SnapshotSize snapshotSize = 2;
+  optional bool expandedDeletedDir = 3;
 }
 
-message SnapshotProperty {
-  optional string snapshotKey = 1;
+message SnapshotSize {
   optional uint64 exclusiveSize = 2;
   optional uint64 exclusiveReplicatedSize = 3;
 }

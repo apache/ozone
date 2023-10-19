@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -32,15 +33,22 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +84,6 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
 public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public static final Logger LOG =
       LoggerFactory.getLogger(DirectoryDeletingService.class);
-
-  private static ClientId clientId = ClientId.randomId();
 
   // Use only a single thread for DirDeletion. Multiple threads would read
   // or write to same tables and can send deletion requests for same key
@@ -298,8 +304,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 currOmSnapshot.getMetadataManager().getDeletedDirTable();
 
             if (snapDeletedDirTable.isEmpty()) {
-              // TODO: [SNAPSHOT] Update Snapshot state using
-              //  SetSnapshotProperty from HDDS-7743 (YET TO BE MERGED)
+              updateExpandedSnapshotDir(currSnapInfo.getTableKey());
               continue;
             }
 
@@ -373,6 +378,48 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
     }
 
+    private void updateExpandedSnapshotDir(String snapshotKeyTable) {
+      ClientId clientId = ClientId.randomId();
+      SetSnapshotPropertyRequest setSnapshotPropertyRequest =
+          SetSnapshotPropertyRequest.newBuilder()
+              .setSnapshotKey(snapshotKeyTable)
+              .setExpandedDeletedDir(true)
+              .build();
+
+      OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(Type.SetSnapshotProperty)
+          .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
+          .setClientId(clientId.toString())
+          .build();
+
+      submitRequest(omRequest, clientId);
+    }
+
+    public void submitRequest(OMRequest omRequest, ClientId clientId) {
+      try {
+        if (isRatisEnabled()) {
+          OzoneManagerRatisServer server = getOzoneManager().getOmRatisServer();
+
+          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+              .setClientId(clientId)
+              .setServerId(server.getRaftPeerId())
+              .setGroupId(server.getRaftGroupId())
+              .setCallId(getRunCount().get())
+              .setMessage(Message.valueOf(
+                  OMRatisHelper.convertRequestToByteString(omRequest)))
+              .setType(RaftClientRequest.writeRequestType())
+              .build();
+
+          server.submitRequest(omRequest, raftClientRequest);
+        } else {
+          getOzoneManager().getOmServerProtocol()
+              .submitRequest(null, omRequest);
+        }
+      } catch (ServiceException e) {
+        LOG.error("Snapshot deep cleaning request failed. " +
+            "Will retry at next run.", e);
+      }
+    }
 
     private boolean previousSnapshotHasDir(
         KeyValue<String, OmKeyInfo> pendingDeletedDirInfo) throws IOException {

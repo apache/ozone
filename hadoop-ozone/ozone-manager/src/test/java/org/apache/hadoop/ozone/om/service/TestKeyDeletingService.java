@@ -592,7 +592,7 @@ t
 
     KeyDeletingService keyDeletingService = keyManager.getDeletingService();
     // Supspend KDS
-    keyDeletingService.suspend();
+    // keyDeletingService.suspend();
 
     String volumeName = "volume1";
     String bucketName = "bucket1";

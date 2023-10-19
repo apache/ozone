@@ -331,9 +331,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
     }
 
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
+    KeyDeletingService keyDeletingService =  cluster.getOzoneManager()
+        .getKeyManager().getDeletingService();
 
     // Before delete
     assertTableRowCount(deletedDirTable, 0);
@@ -519,40 +518,46 @@ public class TestDirectoryDeletingServiceWithFSO {
      */
 
     for (int i = 1; i <= 5; i++) {
-      createSnapshotForDirectoryDeletingServiceTest("snap" + i, i);
+      createSnapshotForDirectoryDeletingServiceTest("snap" + i, i, 11 - i);
     }
 
     dirDeletingService.resume();
     long prevDDSRunCount = dirDeletingService.getRunCount().get();
 
     GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
-        prevDDSRunCount + 10, 100, 10000);
+        prevDDSRunCount + 25, 100, 10000);
 
     try (TableIterator<String, ? extends Table.KeyValue
         <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
-      SnapshotInfo currSnapInfo = iterator.next().getValue();
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-               rcCurrOmSnapshot = cluster.getOzoneManager()
-          .getOmSnapshotManager().checkForSnapshot(
-          currSnapInfo.getVolumeName(),
-          currSnapInfo.getBucketName(),
-          getSnapshotPrefix(currSnapInfo.getName()),
-          true)) {
+      int fileCountMultiplier = 10;
+      while (iterator.hasNext()) {
+        SnapshotInfo currSnapInfo = iterator.next().getValue();
+        assertTrue(currSnapInfo.getExpandedDeletedDir());
+        try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                 rcCurrOmSnapshot = cluster.getOzoneManager()
+            .getOmSnapshotManager().checkForSnapshot(
+                currSnapInfo.getVolumeName(),
+                currSnapInfo.getBucketName(),
+                getSnapshotPrefix(currSnapInfo.getName()),
+                true)) {
 
-        OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
-        Table<String, OmKeyInfo> snapDeletedDirTable =
-            currOmSnapshot.getMetadataManager().getDeletedDirTable();
-        Table<String, RepeatedOmKeyInfo> deletedTable =
-            currOmSnapshot.getMetadataManager().getDeletedTable();
-        assertTrue(snapDeletedDirTable.isEmpty());
-        assertTableRowCount(deletedTable, 15);
+          OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
+          Table<String, OmKeyInfo> snapDeletedDirTable =
+              currOmSnapshot.getMetadataManager().getDeletedDirTable();
+          Table<String, RepeatedOmKeyInfo> deletedTable =
+              currOmSnapshot.getMetadataManager().getDeletedTable();
+          assertTrue(snapDeletedDirTable.isEmpty());
+          // Created 5 files. And two subdirectories with fileCountMultiplier.
+          assertTableRowCount(deletedTable, fileCountMultiplier * 2 + 5);
+          fileCountMultiplier--;
+        }
       }
     }
     cleanupTables();
   }
 
   private void createSnapshotForDirectoryDeletingServiceTest(
-      String rootPath, int count) throws Exception {
+      String rootPath, int count, int fileCount) throws Exception {
 
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
@@ -574,7 +579,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     // Add 2*5 more sub files in different level
     for (int i = 0; i < 2; i++) {
       Path parent = new Path(appRoot, "parentDir" + i);
-      for (int j = 1; j <= 5; j++) {
+      for (int j = 1; j <= fileCount; j++) {
         Path child = new Path(parent, "file" + j);
         ContractTestUtils.touch(fs, child);
       }
@@ -582,7 +587,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     // Delete dir
     fs.delete(root, true);
-    // For 1st snapshot deletedDiTable will be expanded, as DeletedDirService
+    // For 1st snapshot deletedDirTable will be expanded, as DeletedDirService
     // runs every 100ms for this test
     if (count != 1) {
       assertTableRowCount(deletedDirTable, 1);

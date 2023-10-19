@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -98,6 +98,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveSizeMap;
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Set<String> completedExclusiveSizeSet;
+  private final Map<String, String> snapshotSeekMap;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
@@ -116,6 +117,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.completedExclusiveSizeSet = new HashSet<>();
+    this.snapshotSeekMap = new HashMap<>();
   }
 
   /**
@@ -341,11 +343,22 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 RepeatedOmKeyInfo>> deletedIterator = snapDeletedTable
                 .iterator()) {
 
-              deletedIterator.seek(snapshotBucketKey);
+              String lastKeyInCurrentRun = null;
+              String deletedTableSeek = snapshotSeekMap.getOrDefault(
+                  currSnapInfo.getTableKey(), snapshotBucketKey);
+              deletedIterator.seek(deletedTableSeek);
+              // To avoid processing the last key from the previous
+              // run again.
+              if (!deletedTableSeek.equals(snapshotBucketKey) &&
+                  deletedIterator.hasNext()) {
+                deletedIterator.next();
+              }
+
               while (deletedIterator.hasNext() && delCount < keyLimitPerTask) {
                 Table.KeyValue<String, RepeatedOmKeyInfo>
                     deletedKeyValue = deletedIterator.next();
                 String deletedKey = deletedKeyValue.getKey();
+                lastKeyInCurrentRun = deletedKey;
 
                 // Exit if it is out of the bucket scope.
                 if (!deletedKey.startsWith(snapshotBucketKey)) {
@@ -404,6 +417,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                     .containsKey(previousSnapshot.getTableKey())) {
                   completedExclusiveSizeSet.add(
                       previousSnapshot.getTableKey());
+                }
+
+                snapshotSeekMap.remove(currSnapInfo.getTableKey());
+              } else {
+                // There are keys that still needs processing
+                // we can continue from it in the next iteration
+                if (lastKeyInCurrentRun != null) {
+                  snapshotSeekMap.put(currSnapInfo.getTableKey(),
+                      lastKeyInCurrentRun);
                 }
               }
 
@@ -524,15 +546,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       while (completedSnapshotIterator.hasNext()) {
         ClientId clientId = ClientId.randomId();
         String dbKey = completedSnapshotIterator.next();
-        SnapshotProperty snapshotProperty = SnapshotProperty.newBuilder()
-                .setSnapshotKey(dbKey)
+        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
                 .setExclusiveSize(exclusiveSizeMap.get(dbKey))
                 .setExclusiveReplicatedSize(
                     exclusiveReplicatedSizeMap.get(dbKey))
                 .build();
         SetSnapshotPropertyRequest setSnapshotPropertyRequest =
             SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotProperty(snapshotProperty)
+                .setSnapshotKey(dbKey)
+                .setSnapshotSize(snapshotSize)
                 .build();
 
         OMRequest omRequest = OMRequest.newBuilder()

@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyRespons
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +52,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -137,6 +138,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
             getExclusiveSize());
         assertEquals(exclusiveSizeAfterRepl, snapshotEntry.getValue()
             .getExclusiveReplicatedSize());
+        assertTrue(snapshotEntry.getValue().getExpandedDeletedDir());
       }
     }
   }
@@ -148,6 +150,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
     assertEquals(exclusiveSize, cacheValue.getCacheValue().getExclusiveSize());
     assertEquals(exclusiveSizeAfterRepl, cacheValue.getCacheValue()
         .getExclusiveReplicatedSize());
+    assertTrue(cacheValue.getCacheValue().getExpandedDeletedDir());
   }
 
   private List<OMRequest> createSnapshotUpdateSizeRequest()
@@ -157,14 +160,15 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
              iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         String snapDbKey = iterator.next().getKey();
-        SnapshotProperty snapshotSize = SnapshotProperty.newBuilder()
-            .setSnapshotKey(snapDbKey)
+        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveSizeAfterRepl)
             .build();
         SetSnapshotPropertyRequest snapshotUpdateSizeRequest =
             SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotProperty(snapshotSize)
+                .setSnapshotKey(snapDbKey)
+                .setSnapshotSize(snapshotSize)
+                .setExpandedDeletedDir(true)
                 .build();
 
         OMRequest omRequest = OMRequest.newBuilder()
