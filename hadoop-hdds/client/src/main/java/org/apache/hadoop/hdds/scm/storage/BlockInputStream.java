@@ -238,8 +238,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     try {
       acquireClient();
     } catch (IOException ioe) {
-      LOG.warn("Failed to acquire client for pipeline " + pipeline +
-          ", block=" + blockID);
+      LOG.warn("Failed to acquire client for pipeline {}, block {}",
+          pipeline, blockID);
       throw ioe;
     }
     try {
