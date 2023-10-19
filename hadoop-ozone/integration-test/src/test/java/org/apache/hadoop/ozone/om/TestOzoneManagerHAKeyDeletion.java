@@ -23,6 +23,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.TimeDuration;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -34,6 +38,17 @@ import static org.junit.Assert.fail;
  * Tests key deletion in OM HA setup.
  */
 public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
+  @Test
+  public void testConf() {
+    final RaftProperties p = getCluster()
+        .getOzoneManager()
+        .getOmRatisServer()
+        .getServer()
+        .getProperties();
+    final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
+    Assertions.assertEquals(TimeDuration.ZERO, t,
+        RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+  }
 
   @Test
   public void testKeyDeletion() throws Exception {
