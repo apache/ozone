@@ -43,11 +43,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
-import org.apache.ozone.test.tag.Flaky;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -64,7 +63,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Test container closing.
  */
-@Flaky("HDDS-3263")
 public class TestCloseContainerByPipeline {
 
   private static MiniOzoneCluster cluster;
@@ -286,7 +284,7 @@ public class TestCloseContainerByPipeline {
     }
   }
 
-  @Disabled("Failing with timeout")
+  @Unhealthy("Failing with timeout")
   @Test
   public void testQuasiCloseTransitionViaRatis()
       throws IOException, TimeoutException, InterruptedException {

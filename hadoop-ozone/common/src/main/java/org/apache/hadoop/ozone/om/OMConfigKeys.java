@@ -142,6 +142,26 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
       1000;
 
+  public static final String OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.open.mpu.cleanup.service.interval";
+  public static final String
+      OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT = "24h";
+
+  public static final String OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT =
+      "ozone.om.open.mpu.cleanup.service.timeout";
+  public static final String OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "300s";
+
+  public static final String OZONE_OM_MPU_EXPIRE_THRESHOLD =
+      "ozone.om.open.mpu.expire.threshold";
+  public static final String OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT =
+      "30d";
+
+  public static final String OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.open.mpu.parts.cleanup.limit.per.task";
+  public static final int OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      0;
+
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
@@ -563,4 +583,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
+
+  public static final boolean OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT
+      = true;
 }

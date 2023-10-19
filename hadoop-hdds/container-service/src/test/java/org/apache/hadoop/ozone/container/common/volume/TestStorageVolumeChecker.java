@@ -46,7 +46,9 @@ import org.junit.Before;
 import org.junit.rules.TemporaryFolder;
 import org.junit.Test;
 import org.junit.rules.TestName;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -95,7 +97,7 @@ public class TestStorageVolumeChecker {
   public TestName testName = new TestName();
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 

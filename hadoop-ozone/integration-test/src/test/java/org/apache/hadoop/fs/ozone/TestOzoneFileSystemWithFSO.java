@@ -36,7 +36,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -89,27 +88,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystemWithFSO.class);
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testGetDirectoryModificationTime() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
 
   @Test
   public void testListStatusWithoutRecursiveSearch() throws Exception {
@@ -449,18 +427,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     assertEquals(fileBeforeMTime, fileAfterMTime);
   }
 
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
-  public void testListStatusWithIntermediateDir() throws Exception {
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-5012")
-  public void testListStatusOnLargeDirectory() throws Exception {
-  }
-
   @Test
   public void testMultiLevelDirs() throws Exception {
     // reset metrics
@@ -578,15 +544,30 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
     FSDataOutputStream stream = getFs().create(source);
-    // file not visible yet
-    assertThrows(OMException.class, () -> fs.isFileClosed(source));
-    stream.write(1);
-    stream.hsync();
-    // file is visible and open
-    assertFalse(fs.isFileClosed(source));
-    assertTrue(fs.recoverLease(source));
-    // file is closed after lease recovery
-    assertTrue(fs.isFileClosed(source));
+    try {
+      // file not visible yet
+      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      stream.write(1);
+      stream.hsync();
+      // file is visible and open
+      assertFalse(fs.isFileClosed(source));
+      assertTrue(fs.recoverLease(source));
+      // file is closed after lease recovery
+      assertTrue(fs.isFileClosed(source));
+    } finally {
+      TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
+    }
+  }
+
+  @Test
+  public void testFSDeleteLogWarnNoExist() throws Exception {
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(BasicOzoneClientAdapterImpl.LOG);
+    getFs().delete(new Path("/d1/d3/noexist/"), true);
+    assertTrue(logCapture.getOutput().contains(
+        "delete key failed Unable to get file status"));
+    assertTrue(logCapture.getOutput().contains(
+        "WARN  ozone.BasicOzoneClientAdapterImpl"));
   }
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,

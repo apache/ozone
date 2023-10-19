@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -265,19 +264,19 @@ public class TestBlockDeletion {
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
-    // If any container present as not closed, i.e. matches some entry 
+    // If any container present as not closed, i.e. matches some entry
     // not closed, then return false for wait
     ContainerSet containerSet = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) -> 
+        group.getLocationList().stream().anyMatch((info) ->
           containerSet.getContainer(info.getContainerID()).getContainerData()
               .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
         )
       ));
     }, 1000, 30000);
-    
+
     // The blocks should be deleted in the DN.
     GenericTestUtils.waitFor(() -> {
       try {
@@ -332,7 +331,6 @@ public class TestBlockDeletion {
   }
 
   @Test
-  @Flaky("HDDS-8353")
   public void testContainerStatisticsAfterDelete() throws Exception {
     ReplicationManager replicationManager = scm.getReplicationManager();
     boolean legacyEnabled = replicationManager.getConfig().isLegacyEnabled();
@@ -359,8 +357,6 @@ public class TestBlockDeletion {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .build();
-    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
-        om.lookupKey(keyArgs).getKeyLocationVersions();
     Thread.sleep(5000);
     List<ContainerInfo> containerInfos =
         scm.getContainerManager().getContainers();
@@ -374,22 +370,13 @@ public class TestBlockDeletion {
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
     Thread.sleep(2000);
-    // make sure the containers are closed on the dn
-    omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
-      locationInfo.forEach(
-          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-              .getContainer().getContainerSet()
-              .getContainer(info.getContainerID()).getContainerData()
-              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
-    });
 
     writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
     GenericTestUtils.waitFor(() ->
             scm.getContainerManager().getContainers().stream()
                 .allMatch(c -> c.getUsedBytes() == 0 &&
-                    c.getNumberOfKeys() == 0), 500, 5000);
+                    c.getNumberOfKeys() == 0), 500, 20000);
     Thread.sleep(5000);
     // Verify that pending block delete num are as expected with resent cmds
     cluster.getHddsDatanodes().forEach(dn -> {

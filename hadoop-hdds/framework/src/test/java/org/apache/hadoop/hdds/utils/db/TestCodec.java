@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
+import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -42,6 +43,10 @@ import static org.apache.hadoop.hdds.utils.db.CodecTestUtil.gc;
 public final class TestCodec {
   static final Logger LOG = LoggerFactory.getLogger(TestCodec.class);
   static final int NUM_LOOPS = 10;
+
+  static {
+    CodecBuffer.enableLeakDetection();
+  }
 
   @Test
   public void testShortCodec() throws Exception {
@@ -201,6 +206,50 @@ public final class TestCodec {
     gc();
   }
 
+  @Test
+  public void testByteStringCodec() throws Exception {
+    for (int i = 0; i < 2; i++) {
+      try (CodecBuffer empty = CodecBuffer.getEmptyBuffer()) {
+        Assertions.assertTrue(empty.isDirect());
+      }
+    }
+
+    runTestByteStringCodec(ByteString.EMPTY);
+
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = "test" + ThreadLocalRandom.current().nextLong();
+      runTestByteStringCodec(ByteString.copyFromUtf8(original));
+    }
+
+    final String alphabets = "AbcdEfghIjklmnOpqrstUvwxyz";
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = i == 0 ? alphabets : alphabets.substring(0, i);
+      runTestByteStringCodec(ByteString.copyFromUtf8(original));
+    }
+
+    final String[] docs = {
+        "Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。",
+        "Ozone 不仅能存储数十亿个不同大小的对象，还支持在容器化环境（比如 Kubernetes）中运行。",
+        "Apache Spark、Hive 和 YARN 等应用无需任何修改即可使用 Ozone。"
+    };
+    for (String original : docs) {
+      runTestByteStringCodec(ByteString.copyFromUtf8(original));
+    }
+
+    final String multiByteChars = "官方发行包包括了源代码包和二进制代码包";
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = i == 0 ? multiByteChars
+          : multiByteChars.substring(0, i);
+      runTestByteStringCodec(ByteString.copyFromUtf8(original));
+    }
+
+    gc();
+  }
+
+  static void runTestByteStringCodec(ByteString original) throws Exception {
+    runTest(ByteStringCodec.get(), original, original.size());
+  }
+
   static Executable tryCatch(Executable executable) {
     return tryCatch(executable, t -> LOG.info("Good!", t));
   }
@@ -245,7 +294,7 @@ public final class TestCodec {
     final Bytes fromArray = new Bytes(array);
 
     try (CodecBuffer buffer = codec.toCodecBuffer(object,
-        CodecBuffer::allocateHeap)) {
+        CodecBuffer.Allocator.HEAP)) {
       final Bytes fromBuffer = new Bytes(buffer);
 
       Assertions.assertEquals(fromArray.hashCode(), fromBuffer.hashCode());

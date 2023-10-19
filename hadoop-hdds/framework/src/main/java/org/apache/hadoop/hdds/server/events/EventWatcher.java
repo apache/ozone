@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.lease.Lease;
 import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
 import org.apache.hadoop.ozone.lease.LeaseExpiredException;
 import org.apache.hadoop.ozone.lease.LeaseManager;
@@ -124,20 +123,10 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     trackedEventsByID.put(identifier, payload);
     trackedEvents.add(payload);
     try {
-      Lease<Long> lease = leaseManager.acquire(identifier);
-      listenForTimeout(lease, publisher, identifier);
+      leaseManager.acquire(identifier,
+          () -> handleTimeout(publisher, identifier));
     } catch (LeaseAlreadyExistException e) {
       //No problem at all. But timer is not reset.
-    }
-  }
-
-  private void listenForTimeout(Lease<Long> lease, EventPublisher publisher,
-                                long identifier) {
-    try {
-      lease.registerCallBack(() -> {
-        handleTimeout(publisher, identifier);
-        return null;
-      });
     } catch (LeaseExpiredException e) {
       handleTimeout(publisher, identifier);
     }
@@ -157,13 +146,14 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     }
   }
 
-  private synchronized void handleTimeout(EventPublisher publisher,
+  private synchronized Void handleTimeout(EventPublisher publisher,
       long identifier) {
     metrics.incrementTimedOutEvents();
     TIMEOUT_PAYLOAD payload = trackedEventsByID.remove(identifier);
     trackedEvents.remove(payload);
     startTrackingTimes.remove(payload.getId());
     onTimeout(publisher, payload);
+    return null;
   }
 
 

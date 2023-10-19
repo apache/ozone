@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -39,6 +38,7 @@ import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -70,49 +70,6 @@ public class TestRootedOzoneFileSystemWithFSO
   public static void init()
       throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testTempMount() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testDeleteEmptyVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  /**
-   * OFS: Test recursive listStatus on root and volume.
-   */
-  @Override
-  @Ignore("TODO:HDDS-4360")
-  public void testListStatusRootAndVolumeRecursive() throws IOException {
   }
 
   /**
@@ -268,7 +225,7 @@ public class TestRootedOzoneFileSystemWithFSO
 
     FileStatus[] fileStatuses = getFs().listStatus(
         new Path(getBucketPath() + "/testListStatusFSO"));
-    Assert.assertEquals(valueGreaterBatchSize, fileStatuses.length);
+    assertEquals(valueGreaterBatchSize, fileStatuses.length);
   }
 
   @Test
@@ -280,11 +237,16 @@ public class TestRootedOzoneFileSystemWithFSO
 
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
     FSDataOutputStream stream = getFs().create(source);
-    assertThrows(OMException.class, () -> fs.isFileClosed(source));
-    stream.write(1);
-    stream.hsync();
-    assertFalse(fs.isFileClosed(source));
-    assertTrue(fs.recoverLease(source));
-    assertTrue(fs.isFileClosed(source));
+    try {
+      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      stream.write(1);
+      stream.hsync();
+      assertFalse(fs.isFileClosed(source));
+      assertTrue(fs.recoverLease(source));
+      assertTrue(fs.isFileClosed(source));
+    } finally {
+      TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
+    }
   }
+
 }

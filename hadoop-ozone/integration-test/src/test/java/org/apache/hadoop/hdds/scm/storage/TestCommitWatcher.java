@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.client.rpc;
+package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.CommitWatcher;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -71,7 +69,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Class to test CommitWatcher functionality.
@@ -82,7 +82,7 @@ public class TestCommitWatcher {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -230,19 +230,19 @@ public class TestCommitWatcher {
         future2.get();
         assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.
-            getCommitIndex2flushedDataMap().size());
+            getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
-        assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertFalse(watcher.getCommitIndexMap()
             .containsKey(replies.get(0).getLogIndex()));
         assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
         assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
         watcher.watchOnLastIndex();
-        assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertFalse(watcher.getCommitIndexMap()
             .containsKey(replies.get(1).getLogIndex()));
         assertFalse(watcher.getFutureMap().containsKey((long) 2 * chunkSize));
         assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
         assertTrue(watcher.getFutureMap().isEmpty());
-        assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+        assertTrue(watcher.getCommitIndexMap().isEmpty());
       }
     }
   }
@@ -303,9 +303,9 @@ public class TestCommitWatcher {
         // wait on 2nd putBlock to complete
         future2.get();
         assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
-        assertEquals(2, watcher.getCommitIndex2flushedDataMap().size());
+        assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
-        assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertFalse(watcher.getCommitIndexMap()
             .containsKey(replies.get(0).getLogIndex()));
         assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
         assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
@@ -333,12 +333,12 @@ public class TestCommitWatcher {
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());
-          assertEquals(1, watcher.getCommitIndex2flushedDataMap().size());
+          assertEquals(1, watcher.getCommitIndexMap().size());
           assertEquals(1, watcher.getFutureMap().size());
         } else {
           assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
           assertTrue(watcher.getFutureMap().isEmpty());
-          assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+          assertTrue(watcher.getCommitIndexMap().isEmpty());
         }
       }
     }

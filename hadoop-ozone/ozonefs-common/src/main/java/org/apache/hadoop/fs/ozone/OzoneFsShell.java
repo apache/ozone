@@ -81,7 +81,8 @@ public class OzoneFsShell extends FsShell {
     TracingUtil.initTracing("FsShell", conf);
     conf.setQuietMode(false);
     shell.setConf(conf);
-    int res = TracingUtil.executeInNewSpan("main",
+    String spanName = "ozone fs " + String.join(" ", argv);
+    int res = TracingUtil.executeInNewSpan(spanName,
         () -> shell.execute(argv));
     System.exit(res);
   }

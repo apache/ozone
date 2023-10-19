@@ -37,14 +37,17 @@ ozone admin reconfig --address=<ip:port> start|status|properties
     - **status**:     查看最近一次动态加载的状态
     - **properties**: 列出支持动态加载的配置项
 
+## 获取可动态加载的属性列表
+要获取 Ozone 中指定组件的可动态加载属性列表, 可以使用命令 `ozone admin reconfig --address=<ip:port> properties`。
+这个命令将会列出所有可以在运行时动态加载的属性。
+
+> 例如, 获取 Ozone OM 可动态加载属性列表
+>
+>$ `ozone admin reconfig --address=hadoop1:9862 properties`<br>
+OM: Node [hadoop1:9862] Reconfigurable properties:<br>
+ozone.administrators
+
 ## OM动态配置
-
-**支持动态加载的属性**
-配置项 | 描述
------------------------------------|-----------------------------------------
-ozone.administrators | OM启动用户将默认成为一个管理员
-
-
 >例如, 在`ozone-site.xml`文件中修改`ozone.administrators`的值并执行:
 >
 > $ `ozone admin reconfig --address=hadoop1:9862 start`<br>
@@ -61,14 +64,6 @@ OM: Node [hadoop1:9862] Reconfigurable properties:<br>
 ozone.administrators
 
 ## SCM动态配置
-
-
-**支持动态加载的属性**
-配置项 | 描述
------------------------------------|-----------------------------------------
-ozone.administrators | SCM启动用户将默认成为一个管理员
-
-
 >例如, 在`ozone-site.xml`文件中修改`ozone.administrators`的值并执行:
 >
 > $ `ozone admin reconfig --address=hadoop1:9860 start`<br>
@@ -86,13 +81,6 @@ ozone.administrators
 
 
 ## Datanode 动态配置
-
-
-**支持动态加载的属性**
-配置项 | 描述
------------------------------------|-----------------------------------------
-
-
 >例如, 在`ozone-site.xml`文件中修改`ozone.example.config`的值并执行:
 >
 > $ `ozone admin reconfig --address=hadoop1:9864 start`<br>

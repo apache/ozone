@@ -102,7 +102,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <failIfNoTests>false</failIfNoTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.52.v20230823</jetty.version>
+    <jetty.version>9.4.53.v20231009</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <curator.version>4.2.0</curator.version>
     <test.exclude>_</test.exclude>
@@ -226,7 +226,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <junit4.version>4.13.1</junit4.version>
     <junit.jupiter.version>5.8.2</junit.jupiter.version>
     <junit.platform.version>1.8.2</junit.platform.version>
-    <zookeeper.version>3.5.6</zookeeper.version>
+    <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
@@ -309,6 +309,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jgrapht.version>1.0.1</jgrapht.version>
 
     <vault.driver.version>5.1.0</vault.driver.version>
+    <java.uuid.generator.version>4.3.0</java.uuid.generator.version>
     <native.lib.tmp.dir></native.lib.tmp.dir>
   </properties>
 
@@ -1577,6 +1578,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${mockito2.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>com.fasterxml.uuid</groupId>
+        <artifactId>java-uuid-generator</artifactId>
+        <version>${java.uuid.generator.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -1812,6 +1818,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <reason>Use directly from Guava</reason>
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Disable with @Unhealthy or @Slow instead (see HDDS-9276)</reason>
+                    <bannedImports>
+                      <bannedImport>org.junit.Ignore</bannedImport>
+                      <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>
@@ -2202,7 +2216,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.client.**</include>
               </includes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2219,7 +2233,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.om.**</include>
               </includes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2236,7 +2250,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.scm.**</include>
               </includes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2253,7 +2267,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.fs.ozone.contract.**</include>
               </includes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2273,7 +2287,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <excludes>
                 <exclude>org.apache.hadoop.fs.ozone.contract.**</exclude>
               </excludes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2290,7 +2304,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.hdds.**</include>
               </includes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2315,7 +2329,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <exclude>org.apache.hadoop.ozone.scm.**</exclude>
                 <exclude>org.apache.hadoop.ozone.shell.**</exclude>
               </excludes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2334,7 +2348,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <include>org.apache.hadoop.ozone.freon.**</include>
                 <include>org.apache.hadoop.ozone.shell.**</include>
               </includes>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2348,7 +2362,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <excludedGroups>flaky | slow</excludedGroups>
+              <excludedGroups>flaky | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2363,7 +2377,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>flaky</groups>
-              <excludedGroups>slow</excludedGroups>
+              <excludedGroups>slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</excludedGroups>
             </configuration>
           </plugin>
         </plugins>

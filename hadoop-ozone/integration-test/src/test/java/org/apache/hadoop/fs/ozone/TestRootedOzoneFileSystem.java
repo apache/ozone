@@ -78,7 +78,9 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -133,6 +135,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -182,7 +185,7 @@ public class TestRootedOzoneFileSystem {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
+    IOUtils.closeQuietly(fs, userOfs);
   }
 
   @Before
@@ -211,7 +214,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(300);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static boolean enabledFileSystemPaths;
   private static boolean omRatisEnabled;
@@ -303,6 +306,8 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
+    assumeFalse(isBucketFSOptimized);
+
     OzoneConfiguration confTestLoader = new OzoneConfiguration();
     // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     Assert.assertEquals(FileSystem.getFileSystemClass(
@@ -781,6 +786,8 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testMkdirNonExistentVolume() throws Exception {
+    assumeFalse(isBucketFSOptimized);
+
     String volumeNameLocal = getRandomNonExistVolumeName();
     Path newVolume = new Path("/" + volumeNameLocal);
     fs.mkdirs(newVolume);
@@ -1147,6 +1154,8 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testListStatusRootAndVolumeRecursive() throws IOException {
+    assumeFalse(isBucketFSOptimized);
+
     Path bucketPath1 = createRandomVolumeBucketWithDirs();
     Path bucketPath2 = createRandomVolumeBucketWithDirs();
     // listStatus("/volume/bucket")
@@ -1360,6 +1369,8 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testTempMount() throws IOException {
+    assumeFalse(isBucketFSOptimized);
+
     // Prep
     // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
     ClientProtocol proxy = objectStore.getClientProxy();
@@ -1460,6 +1471,8 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testDeleteEmptyVolume() throws IOException {
+    assumeFalse(isBucketFSOptimized);
+
     // Create volume
     String volumeStr1 = getRandomNonExistVolumeName();
     Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
@@ -2048,6 +2061,8 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testCreateWithInvalidPaths() throws Exception {
+    assumeFalse(isBucketFSOptimized);
+
     // Test for path with ..
     Path parent = new Path("../../../../../d1/d2/");
     Path file1 = new Path(parent, "key1");

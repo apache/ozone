@@ -66,6 +66,15 @@ public class EventQueue implements EventPublisher, AutoCloseable {
           .create();
 
   private boolean isSilent = false;
+  private final String threadNamePrefix;
+
+  public EventQueue() {
+    threadNamePrefix = "";
+  }
+
+  public EventQueue(String threadNamePrefix) {
+    this.threadNamePrefix = threadNamePrefix;
+  }
 
   // The field parent in DatanodeDetails class has the circular reference
   // which will result in Gson infinite recursive parsing. We need to exclude
@@ -101,7 +110,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     Preconditions.checkNotNull(handler, "Handler should not be null.");
     validateEvent(event);
     String executorName = getExecutorName(event, handler);
-    this.addHandler(event, new SingleThreadExecutor<>(executorName), handler);
+    SingleThreadExecutor<PAYLOAD> executor =
+        new SingleThreadExecutor<>(executorName, threadNamePrefix);
+    this.addHandler(event, executor, handler);
   }
 
   /**

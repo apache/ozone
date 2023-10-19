@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Named;
@@ -176,6 +177,7 @@ class TestManagedSSTDumpIterator {
   @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
+  @Unhealthy("HDDS-9274")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
                                                String valueFormat)
       throws Exception {
