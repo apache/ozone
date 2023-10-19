@@ -360,6 +360,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
   private final String omId;
+  private final String threadPrefix;
   private ServiceInfoProvider serviceInfo;
 
   private OMMetadataManager metadataManager;
@@ -500,7 +501,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
-
     omStorage = new OMStorage(conf);
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
@@ -527,7 +527,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omStorage.getOmId(), omNodeDetails.getRpcAddress(),
           omNodeDetails.getRatisPort());
     }
-
+    this.threadPrefix = omNodeDetails.threadNamePrefix();
     loginOMUserIfSecurityEnabled(conf);
     setInstanceVariablesFromConf();
     this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
@@ -650,7 +650,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       SecretKeyProtocol secretKeyProtocol =
           HddsServerUtil.getSecretKeyClientForOm(conf);
-      secretKeyClient = new DefaultSecretKeySignerClient(secretKeyProtocol, "");
+      secretKeyClient = new DefaultSecretKeySignerClient(secretKeyProtocol,
+          omNodeDetails.threadNamePrefix());
     }
     serviceInfo = new ServiceInfoProvider(secConfig, this, certClient,
         testSecureOmFlag);
@@ -733,6 +734,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public static S3Authentication getS3Auth() {
     return S3_AUTH.get();
+  }
+
+  /** Returns the ThreadName prefix for the current OM. */
+  public String getThreadNamePrefix() {
+    return threadPrefix;
   }
 
   /**
@@ -1302,9 +1308,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private GrpcOzoneManagerServer startGrpcServer(OzoneConfiguration conf) {
     return new GrpcOzoneManagerServer(conf,
-            this.omServerProtocol,
-            this.delegationTokenMgr,
-            this.certClient);
+        this.omServerProtocol,
+        this.delegationTokenMgr,
+        this.certClient,
+        this.threadPrefix);
   }
 
   private static boolean isOzoneSecurityEnabled() {
@@ -2109,7 +2116,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           (PrivilegedExceptionAction<FileSystem>)
               () -> new TrashOzoneFileSystem(i));
       this.emptier = new Thread(new OzoneTrash(fs, conf, this).
-          getEmptier(), "Trash Emptier");
+          getEmptier(), threadPrefix + "TrashEmptier");
       this.emptier.setDaemon(true);
       this.emptier.start();
     }
@@ -3238,7 +3245,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Trigger Ranger BG Sync
     if (noWait) {
-      final Thread t = new Thread(bgSync::triggerRangerSyncOnce);
+      final Thread t = new Thread(bgSync::triggerRangerSyncOnce,
+          threadPrefix + "RangerSync");
       t.start();
       LOG.info("User '{}' manually triggered Multi-Tenancy Ranger Sync "
           + "in a new thread, tid={}", ugi, t.getId());

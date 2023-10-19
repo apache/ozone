@@ -73,6 +73,7 @@ public class GrpcOzoneManagerServer {
   private Server server;
   private int port;
   private final int maxSize;
+  private final String threadNamePrefix;
 
   private ThreadPoolExecutor readExecutors;
   private EventLoopGroup bossEventLoopGroup;
@@ -83,7 +84,8 @@ public class GrpcOzoneManagerServer {
                                     omTranslator,
                                 OzoneDelegationTokenSecretManager
                                     delegationTokenMgr,
-                                CertificateClient caClient) {
+                                CertificateClient caClient,
+                                String threadPrefix) {
     maxSize = config.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
     OptionalInt haPort = HddsUtils.getNumberFromConfigKeys(config,
@@ -99,7 +101,7 @@ public class GrpcOzoneManagerServer {
           GrpcOmTransport.GrpcOmTransportConfig.class).
           getPort();
     }
-
+    this.threadNamePrefix = threadPrefix;
     this.omS3gGrpcMetrics = GrpcMetrics.create(config);
 
     init(omTranslator,
@@ -127,16 +129,16 @@ public class GrpcOzoneManagerServer {
         60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("OmRpcReader-%d")
+            .setNameFormat(threadNamePrefix + "OmRpcReader-%d")
             .build());
 
     ThreadFactory bossFactory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("OmRpcBoss-ELG-%d")
+        .setNameFormat(threadNamePrefix + "OmRpcBoss-ELG-%d")
         .build();
     bossEventLoopGroup = new NioEventLoopGroup(bossGroupSize, bossFactory);
 
     ThreadFactory workerFactory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("OmRpcWorker-ELG-%d")
+        .setNameFormat(threadNamePrefix + "OmRpcWorker-ELG-%d")
         .build();
     workerEventLoopGroup =
         new NioEventLoopGroup(workerGroupSize, workerFactory);

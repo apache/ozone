@@ -98,6 +98,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
+  private final String threadPrefix;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -123,12 +124,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
-
+    this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
+        .setNameFormat(threadPrefix +
+            "OMStateMachineApplyTransactionThread - %d").build();
     this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
-    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
+
+    ThreadFactory installSnapshotThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
+    this.installSnapshotExecutor =
+        HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
   }
 
   /**
@@ -464,7 +470,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
-        .setIndexToTerm(this::getTermForIndex)
+        .setIndexToTerm(this::getTermForIndex).setThreadPrefix(threadPrefix)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
         .build();

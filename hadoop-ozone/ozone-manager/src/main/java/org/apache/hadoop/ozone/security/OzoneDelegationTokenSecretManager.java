@@ -564,10 +564,13 @@ public class OzoneDelegationTokenSecretManager
       throws IOException {
     super.start(certClient);
     tokenRemoverThread = new Daemon(new ExpiredTokenRemover());
+    tokenRemoverThread.setName(
+        ozoneManager.getThreadNamePrefix() +
+            "ExpiredTokenRemover");
     tokenRemoverThread.start();
   }
 
-  public void stopThreads() {
+  private synchronized void stopThreads() {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stopping expired delegation token remover thread");
     }
