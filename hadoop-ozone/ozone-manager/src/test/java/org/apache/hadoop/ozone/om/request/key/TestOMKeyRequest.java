@@ -222,7 +222,7 @@ public class TestOMKeyRequest {
     version = 0L;
 
     ResolvedBucket bucket = new ResolvedBucket(volumeName, bucketName,
-        bucketName, volumeName, "owner", BucketLayout.OBJECT_STORE);
+        volumeName, bucketName, "owner", BucketLayout.OBJECT_STORE);
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))
         .thenReturn(bucket);
