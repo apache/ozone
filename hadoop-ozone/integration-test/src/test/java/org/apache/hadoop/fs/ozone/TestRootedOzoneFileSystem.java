@@ -88,7 +88,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
@@ -119,7 +118,6 @@ import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
@@ -588,55 +586,8 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testListStatusIteratorOnPageSize() throws Exception {
-    final int pageSize = 32;
-    int[] dirCounts = {
-        1,
-        pageSize - 1,
-        pageSize,
-        pageSize + 1,
-        pageSize + pageSize / 2,
-        pageSize + pageSize
-    };
-    OzoneConfiguration config = new OzoneConfiguration(conf);
-    config.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
-    URI uri = FileSystem.getDefaultUri(config);
-    config.setBoolean(
-        String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
-    FileSystem subject = FileSystem.get(uri, config);
-    Path root = new Path("/" + volumeName + "/" + bucketName);
-    Path dir = new Path(root, "listStatusIterator");
-    try {
-      Set<String> paths = new TreeSet<>();
-      for (int dirCount : dirCounts) {
-        listStatusIterator(subject, dir, paths, dirCount);
-      }
-    } finally {
-      subject.delete(dir, true);
-    }
-  }
-
-  private static void listStatusIterator(FileSystem subject,
-      Path dir, Set<String> paths, int total) throws IOException {
-    for (int i = paths.size(); i < total; i++) {
-      Path p = new Path(dir, String.valueOf(i));
-      subject.mkdirs(p);
-      paths.add(p.getName());
-    }
-
-    RemoteIterator<FileStatus> iterator = subject.listStatusIterator(dir);
-    int iCount = 0;
-    if (iterator != null) {
-      while (iterator.hasNext()) {
-        FileStatus fileStatus = iterator.next();
-        iCount++;
-        String filename = fileStatus.getPath().getName();
-        assertTrue(filename + " not found", paths.contains(filename));
-      }
-    }
-
-    assertEquals(
-        "Total directories listed do not match the existing directories",
-        total, iCount);
+    OzoneFileSystemTests.listStatusIteratorOnPageSize(conf,
+        "/" + volumeName + "/" + bucketName);
   }
 
   /**
