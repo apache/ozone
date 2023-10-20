@@ -464,7 +464,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR,
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH,
         omKeyCreateResponse.getOMResponse().getStatus());
 
 

@@ -277,7 +277,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      PrefixManager prefixManager) throws IOException {
+      PrefixManager prefixManager) {
 
     List<OzoneAcl> acls = new ArrayList<>();
     if (keyArgs.getAclsList() != null) {
@@ -744,7 +744,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfo omPathInfo,
-      long transactionLogIndex, long objectID) throws IOException {
+      long transactionLogIndex, long objectID) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())

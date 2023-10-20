@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.util;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.OzoneConsts;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.nio.file.Path;
@@ -54,7 +52,7 @@ public class RadixTree<T> {
    * of the prefix path.
    * @param path
    */
-  public void insert(String path) throws IOException {
+  public void insert(String path) {
     insert(path, null);
   }
 
@@ -64,27 +62,23 @@ public class RadixTree<T> {
    * @param path
    * @param val
    */
-  public void insert(String path, T val) throws IOException {
-    try {
-      // all prefix path inserted should end with "/"
-      RadixNode<T> n = root;
-      Path p = Paths.get(path);
-      for (int level = 0; level < p.getNameCount(); level++) {
-        HashMap<String, RadixNode> child = n.getChildren();
-        String component = p.getName(level).toString();
-        if (child.containsKey(component)) {
-          n = child.get(component);
-        } else {
-          RadixNode tmp = new RadixNode(component);
-          child.put(component, tmp);
-          n = tmp;
-        }
+  public void insert(String path, T val) {
+    // all prefix path inserted should end with "/"
+    RadixNode<T> n = root;
+    Path p = Paths.get(path);
+    for (int level = 0; level < p.getNameCount(); level++) {
+      HashMap<String, RadixNode> child = n.getChildren();
+      String component = p.getName(level).toString();
+      if (child.containsKey(component)) {
+        n = child.get(component);
+      } else {
+        RadixNode tmp = new RadixNode(component);
+        child.put(component, tmp);
+        n = tmp;
       }
-      if (val != null) {
-        n.setValue(val);
-      }
-    } catch (InvalidPathException ex) {
-      throw new IOException(ex);
+    }
+    if (val != null) {
+      n.setValue(val);
     }
   }
 
@@ -93,17 +87,13 @@ public class RadixTree<T> {
    * @param path - prefix path
    * @return last node in the prefix tree or null if non exact prefix matchl
    */
-  public RadixNode<T> getLastNodeInPrefixPath(String path) throws IOException {
-    try {
-      List<RadixNode<T>> lpp = getLongestPrefixPath(path);
-      Path p = Paths.get(path);
-      if (lpp.size() != p.getNameCount() + 1) {
-        return null;
-      } else {
-        return lpp.get(p.getNameCount());
-      }
-    } catch (InvalidPathException ex) {
-      throw new IOException(ex);
+  public RadixNode<T> getLastNodeInPrefixPath(String path) {
+    List<RadixNode<T>> lpp = getLongestPrefixPath(path);
+    Path p = Paths.get(path);
+    if (lpp.size() != p.getNameCount() + 1) {
+      return null;
+    } else {
+      return lpp.get(p.getNameCount());
     }
   }
 
@@ -111,13 +101,9 @@ public class RadixTree<T> {
    * Remove prefix path.
    * @param path
    */
-  public void removePrefixPath(String path) throws IOException {
-    try {
-      Path p = Paths.get(path);
-      removePrefixPathInternal(root, p, 0);
-    } catch (InvalidPathException ex) {
-      throw new IOException(ex);
-    }
+  public void removePrefixPath(String path) {
+    Path p = Paths.get(path);
+    removePrefixPathInternal(root, p, 0);
   }
 
   /**
@@ -155,32 +141,27 @@ public class RadixTree<T> {
    * @param path - prefix path.
    * @return longest prefix path as list of RadixNode.
    */
-  public List<RadixNode<T>> getLongestPrefixPath(String path)
-      throws IOException {
-    try {
-      RadixNode n = root;
-      Path p = Paths.get(path);
-      int level = 0;
-      List<RadixNode<T>> result = new ArrayList<>();
-      result.add(root);
-      while (level < p.getNameCount()) {
-        HashMap<String, RadixNode> children = n.getChildren();
-        if (children.isEmpty()) {
-          break;
-        }
-        String component = p.getName(level).toString();
-        if (children.containsKey(component)) {
-          n = children.get(component);
-          result.add(n);
-          level++;
-        } else {
-          break;
-        }
+  public List<RadixNode<T>> getLongestPrefixPath(String path) {
+    RadixNode n = root;
+    Path p = Paths.get(path);
+    int level = 0;
+    List<RadixNode<T>> result = new ArrayList<>();
+    result.add(root);
+    while (level < p.getNameCount()) {
+      HashMap<String, RadixNode> children = n.getChildren();
+      if (children.isEmpty()) {
+        break;
       }
-      return result;
-    } catch (InvalidPathException ex) {
-      throw new IOException(ex);
+      String component = p.getName(level).toString();
+      if (children.containsKey(component)) {
+        n = children.get(component);
+        result.add(n);
+        level++;
+      } else {
+        break;
+      }
     }
+    return result;
   }
 
   @VisibleForTesting
@@ -204,35 +185,31 @@ public class RadixTree<T> {
    * @param path - prefix path.
    * @return longest prefix path as String separated by "/".
    */
-  public String getLongestPrefix(String path) throws IOException {
-    try {
-      RadixNode<T> n = root;
-      Path p = Paths.get(path);
-      int level = 0;
-      while (level < p.getNameCount()) {
-        HashMap<String, RadixNode> children = n.getChildren();
-        if (children.isEmpty()) {
-          break;
-        }
-        String component = p.getName(level).toString();
-        if (children.containsKey(component)) {
-          n = children.get(component);
-          level++;
-        } else {
-          break;
-        }
+  public String getLongestPrefix(String path) {
+    RadixNode<T> n = root;
+    Path p = Paths.get(path);
+    int level = 0;
+    while (level < p.getNameCount()) {
+      HashMap<String, RadixNode> children = n.getChildren();
+      if (children.isEmpty()) {
+        break;
       }
-
-      if (level >= 1) {
-        Path longestMatch =
-            Paths.get(root.getName()).resolve(p.subpath(0, level));
-        String ret = longestMatch.toString();
-        return path.endsWith("/") ? ret + "/" : ret;
+      String component = p.getName(level).toString();
+      if (children.containsKey(component)) {
+        n = children.get(component);
+        level++;
       } else {
-        return root.getName();
+        break;
       }
-    } catch (InvalidPathException ex) {
-      throw new IOException(ex);
+    }
+
+    if (level >= 1) {
+      Path longestMatch =
+          Paths.get(root.getName()).resolve(p.subpath(0, level));
+      String ret = longestMatch.toString();
+      return path.endsWith("/") ?  ret + "/" : ret;
+    } else {
+      return root.getName();
     }
   }
 
