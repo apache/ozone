@@ -350,9 +350,9 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           omVolumeArgs, volumeList, omDBTenantState);
 
     } catch (IOException ex) {
+      exception = ex;
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, ex));
-      exception = ex;
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
