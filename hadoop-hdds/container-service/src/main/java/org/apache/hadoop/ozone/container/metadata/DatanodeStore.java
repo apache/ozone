@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -29,6 +32,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Interface for interacting with datanode databases.
@@ -76,6 +80,13 @@ public interface DatanodeStore extends Closeable {
    * @return Table
    */
   Table<String, ChunkInfoList> getDeletedBlocksTable();
+
+  /**
+   * A Table that keeps the metadata of the lsast chunk of blocks.
+   *
+   * @return Table
+   */
+  Table<BlockID, List<ContainerProtos.ChunkInfo>> getLastChunkInfoTable();
 
   /**
    * Helper to create and write batch transactions.

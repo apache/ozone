@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -107,6 +108,23 @@ public class BlockManagerImpl implements BlockManager {
         endOfBlock);
   }
 
+  private static boolean isFullBlockData(BlockData data) {
+    if (data.getMetadata().containsKey("incremental")) {
+      return true;
+    }
+    return false;
+  }
+
+  // if eob or if the last chunk is full,
+  private static boolean shouldAppendLastChunk(boolean endOfBlock, BlockData data) {
+    if (endOfBlock) return true;
+    Preconditions.checkState(data.getChunks().size() > 0);
+    if (data.getChunks().get(data.getChunks().size() - 1).getLen() == 4 * 1024 * 1024) {
+      return true;
+    }
+    return false;
+  }
+
   public static long persistPutBlock(KeyValueContainer container,
       BlockData data, ConfigurationSource config, boolean endOfBlock)
       throws IOException {
@@ -153,6 +171,37 @@ public class BlockManagerImpl implements BlockManager {
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
 
+
+
+
+        // TODO: deal with both old and new clients
+        if (isFullBlockData(data)) {
+          db.getStore().getBlockDataTable().putWithBatch(
+              batch, containerData.getBlockKey(localID), data);
+        } else if (shouldAppendLastChunk(endOfBlock, data)) {
+          // if eob or if the last chunk is full,
+          // remove from lastChunkInfo
+          // the 'data' is complete so append it to the block table's chunk info
+
+          List<ContainerProtos.ChunkInfo> lastChunkInfo =
+              db.getStore().getLastChunkInfoTable().get(data.getBlockID());
+          // TODO: what if lastChunkInfo is null?
+          BlockData blockData = db.getStore().getBlockDataTable().get(
+              containerData.getBlockKey(localID));
+          for (ContainerProtos.ChunkInfo chunk : lastChunkInfo) {
+            blockData.addChunk(chunk);
+          }
+          // delete the entry from last chunk info table
+          db.getStore().getLastChunkInfoTable().putWithBatch(
+              batch, data.getBlockID(), null);
+        } else {
+          // old client
+          // if not,
+          // update the last chunk info table
+          db.getStore().getLastChunkInfoTable().putWithBatch(
+              batch, data.getBlockID(), data.getChunks());
+        }
+
         // If the block does not exist in the pendingPutBlockCache of the
         // container, then check the DB to ascertain if it exists or not.
         // If block exists in cache, blockCount should not be incremented.
@@ -164,9 +213,6 @@ public class BlockManagerImpl implements BlockManager {
             incrBlockCount = true;
           }
         }
-
-        db.getStore().getBlockDataTable().putWithBatch(
-            batch, containerData.getBlockKey(localID), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, containerData.getBcsIdKey(), bcsId);
