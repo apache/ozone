@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
 

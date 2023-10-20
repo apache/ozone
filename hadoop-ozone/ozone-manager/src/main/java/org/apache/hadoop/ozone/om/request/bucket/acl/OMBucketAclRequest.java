@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiPredicate;
