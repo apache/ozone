@@ -187,8 +187,10 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         omClientResponse =
             new OMDirectoryCreateResponseWithFSO(omResponse.build(), result);
       }
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMDirectoryCreateResponseWithFSO(
           createErrorOMResponse(omResponse, exception), result);
     } finally {

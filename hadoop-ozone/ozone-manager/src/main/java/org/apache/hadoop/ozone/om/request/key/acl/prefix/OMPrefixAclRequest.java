@@ -132,9 +132,11 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       omClientResponse = onSuccess(omResponse, omPrefixInfo, opResult);
       result = Result.SUCCESS;
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

@@ -135,8 +135,10 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
 
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,

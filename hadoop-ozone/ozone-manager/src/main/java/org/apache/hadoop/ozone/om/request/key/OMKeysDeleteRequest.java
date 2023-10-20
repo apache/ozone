@@ -185,9 +185,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       createErrorOMResponse(omResponse, exception);
 
       // reset deleteKeys as request failed.

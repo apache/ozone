@@ -217,8 +217,10 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       omClientResponse = new OMTenantAssignAdminResponse(omResponse.build(),
           accessId, newOmDBAccessIdInfo);
 
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       // Prepare omClientResponse
       omClientResponse = new OMTenantAssignAdminResponse(
           createErrorOMResponse(omResponse, exception));

@@ -226,9 +226,11 @@ public class S3InitiateMultipartUploadRequestWithFSO
               bucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new S3InitiateMultipartUploadResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {

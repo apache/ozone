@@ -224,8 +224,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           omResponse.build(), accessId, userPrincipal, principalInfo,
           s3SecretManager);
 
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           createErrorOMResponse(omResponse, exception));

@@ -193,10 +193,12 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
               omResponse.setGetDelegationTokenResponse(
                   updateGetDelegationTokenRequest
                       .getGetDelegationTokenResponse()).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in Updating DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
-      exception = ex;
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, exception));
     } finally {

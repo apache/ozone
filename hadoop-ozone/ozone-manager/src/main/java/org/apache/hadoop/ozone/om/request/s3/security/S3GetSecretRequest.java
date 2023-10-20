@@ -208,8 +208,10 @@ public class S3GetSecretRequest extends OMClientRequest {
           });
 
 
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new S3GetSecretResponse(null,
           ozoneManager.getS3SecretManager(),
           createErrorOMResponse(omResponse, exception));

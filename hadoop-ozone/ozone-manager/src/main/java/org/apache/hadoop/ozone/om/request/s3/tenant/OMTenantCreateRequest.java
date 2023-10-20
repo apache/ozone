@@ -350,8 +350,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantCreateResponse(omResponse.build(),
           omVolumeArgs, volumeList, omDBTenantState);
 
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex instanceof IOException ? (IOException) ex :
+          new OMException(ex.getMessage(),
+              OMException.ResultCodes.INVALID_PATH);
       omClientResponse = new OMTenantCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
