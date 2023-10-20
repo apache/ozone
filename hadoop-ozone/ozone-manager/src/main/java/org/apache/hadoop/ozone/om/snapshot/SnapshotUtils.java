@@ -182,10 +182,10 @@ public final class SnapshotUtils {
     String keyPrefixFso = OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
         bucketId + OM_KEY_PREFIX;
 
-    Map<String, String> comlumnFamilyToPrefixMap = new HashMap<>();
-    comlumnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
-    comlumnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
-    comlumnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
-    return comlumnFamilyToPrefixMap;
+    Map<String, String> columnFamilyToPrefixMap = new HashMap<>();
+    columnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
+    columnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
+    columnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
+    return columnFamilyToPrefixMap;
   }
 }

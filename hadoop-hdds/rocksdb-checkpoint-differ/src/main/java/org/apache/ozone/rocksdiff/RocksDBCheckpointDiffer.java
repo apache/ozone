@@ -1049,34 +1049,34 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             continue;
           }
 
-          for (CompactionNode nextNodes : successors) {
-            if (shouldSkipNode(nextNodes, columnFamilyToPrefixMap)) {
+          for (CompactionNode nextNode : successors) {
+            if (shouldSkipNode(nextNode, columnFamilyToPrefixMap)) {
               LOG.debug("Skipping next node: '{}' with startKey: '{}' and " +
                       "endKey: '{}' because it doesn't have keys related to " +
                       "columnFamilyToPrefixMap: '{}'.",
-                  nextNodes.getFileName(), nextNodes.getStartKey(),
-                  nextNodes.getEndKey(), columnFamilyToPrefixMap);
+                  nextNode.getFileName(), nextNode.getStartKey(),
+                  nextNode.getEndKey(), columnFamilyToPrefixMap);
               continue;
             }
 
-            if (sameFiles.contains(nextNodes.getFileName()) ||
-                differentFiles.contains(nextNodes.getFileName())) {
+            if (sameFiles.contains(nextNode.getFileName()) ||
+                differentFiles.contains(nextNode.getFileName())) {
               LOG.debug("Skipping known processed SST: {}",
-                  nextNodes.getFileName());
+                  nextNode.getFileName());
               continue;
             }
 
-            if (destSnapFiles.contains(nextNodes.getFileName())) {
+            if (destSnapFiles.contains(nextNode.getFileName())) {
               LOG.debug("Src '{}' and dest '{}' have the same SST: {}",
-                  src.getDbPath(), dest.getDbPath(), nextNodes.getFileName());
-              sameFiles.add(nextNodes.getFileName());
+                  src.getDbPath(), dest.getDbPath(), nextNode.getFileName());
+              sameFiles.add(nextNode.getFileName());
               continue;
             }
 
             // Queue different SST to the next level
             LOG.debug("Src '{}' and dest '{}' have a different SST: {}",
-                src.getDbPath(), dest.getDbPath(), nextNodes.getFileName());
-            nextLevel.add(nextNodes);
+                src.getDbPath(), dest.getDbPath(), nextNode.getFileName());
+            nextLevel.add(nextNode);
           }
         }
         currentLevel = nextLevel;
@@ -1551,6 +1551,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     for (String sstFile : sstFiles) {
       String fileName = sstFile.substring(fileNameOffset,
           sstFile.length() - SST_FILE_EXTENSION_LENGTH);
+      CompactionFileInfo.Builder fileInfoBuilder =
+          new CompactionFileInfo.Builder(fileName);
       SstFileReader fileReader = new SstFileReader(options);
       try {
         fileReader.open(sstFile);
@@ -1561,17 +1563,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         String startKey = StringUtils.bytes2String(iterator.key());
         iterator.seekToLast();
         String endKey = StringUtils.bytes2String(iterator.key());
-
-        CompactionFileInfo fileInfo = new CompactionFileInfo.Builder(fileName)
-            .setStartRange(startKey)
+        fileInfoBuilder.setStartRange(startKey)
             .setEndRange(endKey)
-            .setColumnFamily(columnFamily)
-            .build();
-        response.add(fileInfo);
+            .setColumnFamily(columnFamily);
       } catch (RocksDBException rocksDBException) {
-        throw new RuntimeException("Failed to read SST file: " + sstFile,
-            rocksDBException);
+        // Ideally it should not happen. If it does just log the exception.
+        // And let the compaction complete without the exception.
+        // Throwing exception in compaction listener could fail the RocksDB.
+        // In case of exception, compaction node will be missing start key,
+        // end key and column family. And it will continue the traversal as
+        // it was before HDDS-8940.
+        LOG.warn("Failed to read SST file: {}.", sstFile, rocksDBException);
       }
+      response.add(fileInfoBuilder.build());
     }
     return response;
   }
@@ -1581,6 +1585,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     // This is for backward compatibility. Before the compaction log table
     // migration, startKey, endKey and columnFamily information is not persisted
     // in compaction log files.
+    // Also for the scenario when there is an exception in reading SST files
+    // for the file node.
     if (node.getStartKey() == null || node.getEndKey() == null ||
         node.getColumnFamily() == null) {
       LOG.debug("Compaction node with fileName: {} doesn't have startKey, " +
