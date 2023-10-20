@@ -138,7 +138,6 @@ jobs:
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
         if: ${{ !cancelled() }}
-        continue-on-error: ${{ github.event.inputs.fail-fast != 'true' }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -152,6 +151,7 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
   count-failures:
+    if: ${{ always() }}
     needs: run-test
     runs-on: ubuntu-20.04
     steps:
