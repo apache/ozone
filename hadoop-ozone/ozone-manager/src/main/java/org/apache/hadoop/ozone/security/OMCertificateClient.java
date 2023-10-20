@@ -20,11 +20,12 @@
 package org.apache.hadoop.ozone.security;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -42,7 +43,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.utils.Certificate
 /**
  * Certificate client for OzoneManager.
  */
-public class OMCertificateClient extends CommonCertificateClient {
+public class OMCertificateClient extends DefaultCertificateClient {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMCertificateClient.class);
@@ -65,7 +66,8 @@ public class OMCertificateClient extends CommonCertificateClient {
       Runnable shutdownCallback
   ) {
     super(secConfig, scmSecurityClient, LOG, omStorage.getOmCertSerialId(),
-        COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
+        COMPONENT_NAME, HddsUtils.threadNamePrefix(omStorage.getOmNodeId()),
+        saveCertIdCallback, shutdownCallback);
     this.serviceId = serviceId;
     this.scmID = scmID;
     this.clusterID = omStorage.getClusterID();
@@ -81,9 +83,7 @@ public class OMCertificateClient extends CommonCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    CertificateSignRequest.Builder builder = super.getCSRBuilder()
-        .setDigitalEncryption(true)
-        .setDigitalSignature(true);
+    CertificateSignRequest.Builder builder = super.getCSRBuilder();
 
     String hostname = omInfo.getHostName();
     String subject;

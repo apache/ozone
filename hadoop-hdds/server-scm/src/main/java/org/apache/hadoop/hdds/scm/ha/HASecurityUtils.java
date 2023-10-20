@@ -123,10 +123,6 @@ public final class HASecurityUtils {
       case FAILURE:
         LOG.error("SCM security initialization failed.");
         throw new RuntimeException("OM security initialization failed.");
-      case RECOVER:
-        LOG.error("SCM security initialization failed. SCM certificate is " +
-            "missing.");
-        throw new RuntimeException("SCM security initialization failed.");
       default:
         LOG.error("SCM security initialization failed. Init response: {}",
             response);

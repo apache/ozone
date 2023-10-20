@@ -25,10 +25,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation to mark test classes or methods that are unhealthy which
+ * Annotation to mark JUnit5 test classes or methods that are unhealthy which
  * means either they are unstable or inconsistent to run.
- * These are excluded from CI runs for each commit and should run only
- * during nightly or other scheduled runs.
+ * These are excluded from CI runs for each commit, but can be run manually or
+ * in scheduled runs.
+ * Usage: <code>@Unhealthy("HDDS-123")</code>
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
