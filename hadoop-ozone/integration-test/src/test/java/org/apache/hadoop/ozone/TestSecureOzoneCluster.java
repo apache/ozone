@@ -1422,7 +1422,8 @@ final class TestSecureOzoneCluster {
             Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
             Date.from(start.plus(certDuration)
                 .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build(), "test", clusterId);
+            csrBuilder.build(), "test", clusterId,
+            String.valueOf(System.nanoTime()));
     return certificateHolder;
   }
 

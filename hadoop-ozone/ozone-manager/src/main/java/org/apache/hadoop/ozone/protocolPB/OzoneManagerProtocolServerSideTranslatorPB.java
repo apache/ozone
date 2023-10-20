@@ -77,6 +77,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       ProtocolMessageEnum> dispatcher;
   private final RequestValidations requestValidations;
 
+  // always true, only used in tests
+  private boolean shouldFlushCache = true;
+
   /**
    * Constructs an instance of the server handler.
    *
@@ -284,7 +287,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       return createErrorResponse(request, ex);
     }
     try {
-      omClientResponse.getFlushFuture().get();
+      if (shouldFlushCache) {
+        omClientResponse.getFlushFuture().get();
+      }
       if (LOG.isTraceEnabled()) {
         LOG.trace("Future for {} is completed", request);
       }
@@ -339,5 +344,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
+  }
+
+  @VisibleForTesting
+  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
+    return ozoneManagerDoubleBuffer;
+  }
+
+  @VisibleForTesting
+  public void setShouldFlushCache(boolean shouldFlushCache) {
+    this.shouldFlushCache = shouldFlushCache;
   }
 }

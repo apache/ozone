@@ -486,9 +486,9 @@ public final class OzoneConsts {
 
   // %s to distinguish different certificates
   public static final String SCM_SUB_CA = "scm-sub";
-  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "-%s@";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "@";
   public static final String SCM_ROOT_CA = "scm";
-  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "-%s@";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "@";
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";

@@ -22,6 +22,7 @@ cd "$DIR/../../.." || exit 1
 : ${CHECK:="unit"}
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
+: ${OZONE_REPO_CACHED:="false"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -42,7 +43,9 @@ else
 fi
 
 if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
-  mvn ${MAVEN_OPTIONS} -DskipTests clean install
+  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+    mvn ${MAVEN_OPTIONS} -DskipTests clean install
+  fi
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}

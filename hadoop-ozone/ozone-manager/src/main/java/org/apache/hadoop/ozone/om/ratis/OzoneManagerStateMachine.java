@@ -753,4 +753,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
   }
+
+  @VisibleForTesting
+  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
+    return ozoneManagerDoubleBuffer;
+  }
 }
