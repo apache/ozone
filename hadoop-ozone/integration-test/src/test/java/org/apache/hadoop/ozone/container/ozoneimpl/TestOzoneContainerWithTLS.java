@@ -38,8 +38,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -49,10 +48,11 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +95,7 @@ public class TestOzoneContainerWithTLS {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -186,8 +186,8 @@ public class TestOzoneContainerWithTLS {
       conf.setBoolean(
           OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
-          secretKeyClient);
+      container = new OzoneContainer(dn, conf, ContainerTestUtils
+          .getMockContext(dn, conf), caClient, secretKeyClient);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -226,8 +226,8 @@ public class TestOzoneContainerWithTLS {
 
     OzoneContainer container = null;
     try {
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
-          secretKeyClient);
+      container = new OzoneContainer(dn, conf, ContainerTestUtils
+          .getMockContext(dn, conf), caClient, secretKeyClient);
 
       // Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
@@ -370,14 +370,5 @@ public class TestOzoneContainerWithTLS {
         client.sendCommand(request);
     Assert.assertNotNull(response);
     Assert.assertTrue(response.getResult() == ContainerProtos.Result.SUCCESS);
-  }
-
-  private StateContext getContext(DatanodeDetails datanodeDetails) {
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
-    return context;
   }
 }

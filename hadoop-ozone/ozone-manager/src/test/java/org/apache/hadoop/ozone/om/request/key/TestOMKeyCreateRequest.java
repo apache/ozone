@@ -27,6 +27,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -66,6 +68,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
+import static org.slf4j.MDC.put;
 
 /**
  * Tests OMCreateKeyRequest class.
@@ -641,24 +644,43 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(OzoneConsts.OM_SNAPSHOT_INDICATOR + "/" + keyName);
+    Map<String, String> invalidKeyScenarios = new HashMap<String, String>() {
+      {
+        put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR,
+            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
+      }
+    };
 
-    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
-        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+    for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
+      String invalidKeyName = entry.getKey();
+      String expectedErrorMessage = entry.getValue();
 
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
-        .setClientId(UUID.randomUUID().toString())
-        .setCreateKeyRequest(createKeyRequest).build();
+      KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+          .setVolumeName(volumeName).setBucketName(bucketName)
+          .setKeyName(invalidKeyName);
 
-    OMException ex = Assert.assertThrows(OMException.class,
-        () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
-    );
-    Assert.assertTrue(ex.getMessage().contains(
-        "Cannot create key under path reserved for snapshot: "
-            + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+      OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+          CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+      OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+          .setClientId(UUID.randomUUID().toString())
+          .setCreateKeyRequest(createKeyRequest).build();
+
+      OMException ex = Assert.assertThrows(OMException.class,
+          () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
+      );
+      Assert.assertTrue(ex.getMessage().contains(expectedErrorMessage));
+    }
   }
 
   @Test

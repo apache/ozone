@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -250,10 +251,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   protected String getMultipartOpenKey(String multipartUploadID,
       String volumeName, String bucketName, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-
-    String multipartKey = omMetadataManager.getMultipartKey(
-        volumeName, bucketName, keyName, multipartUploadID);
-    return multipartKey;
+    return OMMultipartUploadUtils.getMultipartOpenKey(
+        volumeName, bucketName, keyName, multipartUploadID, omMetadataManager,
+        getBucketLayout());
   }
 
   @RequestFeatureValidator(

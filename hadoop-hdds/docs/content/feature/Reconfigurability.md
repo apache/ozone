@@ -38,13 +38,18 @@ The meaning of command options:
     - **status**:     Check reconfig status
     - **properties**: List reconfigurable properties
 
+## Retrieve the reconfigurable properties list
+To retrieve all the reconfigurable properties list for a specific component in Ozone,
+you can use the command: `ozone admin reconfig --address=<ip:port> properties`.
+This command will list all the properties that can be dynamically reconfigured at runtime for specific component.<br>
+
+> For example, get the Ozone OM reconfigurable properties list.
+>
+>$ `ozone admin reconfig --address=hadoop1:9862 properties`<br>
+OM: Node [hadoop1:9862] Reconfigurable properties:<br>
+ozone.administrators
+
 ## OM Reconfigurability
-
-**Reconfigurable properties**
-key | description
------------------------------------|-----------------------------------------
-ozone.administrators | OM startup user will be added to admin by default
-
 >For example, modify `ozone.administrators` in ozone-site.xml and execute:
 >
 > $ `ozone admin reconfig --address=hadoop1:9862 start`<br>
@@ -61,12 +66,6 @@ OM: Node [hadoop1:9862] Reconfigurable properties:<br>
 ozone.administrators
 
 ## SCM Reconfigurability
-
-**Reconfigurable properties**
-key | description
------------------------------------|-----------------------------------------
-ozone.administrators | OM startup user will be added to admin by default
-
 >For example, modify `ozone.administrators` in ozone-site.xml and execute:
 >
 > $ `ozone admin reconfig --address=hadoop1:9860 start`<br>
@@ -83,11 +82,6 @@ SCM: Node [hadoop1:9860] Reconfigurable properties:<br>
 ozone.administrators
 
 ## Datanode Reconfigurability
-
-**Reconfigurable properties**
-key | description
------------------------------------|-----------------------------------------
-
 >For example, modify `ozone.example.config` in ozone-site.xml and execute:
 >
 > $ `ozone admin reconfig --address=hadoop1:9864 start`<br>

@@ -32,7 +32,9 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.AfterClass;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -55,7 +57,7 @@ public class TestListStatus {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
 
   /**
    * Create a MiniDFSCluster for testing.

@@ -17,24 +17,24 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import io.grpc.Status;
 import com.google.protobuf.RpcController;
+import io.grpc.Status;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
+import org.apache.hadoop.util.UUIDUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -74,7 +74,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         null,
         null,
         RPC.RpcKind.RPC_PROTOCOL_BUFFER,
-        ClientId.getClientId()));
+        getClientId()));
     // TODO: currently require setting the Server class for each request
     // with thread context (Server.Call()) that includes retries
     // and importantly random ClientId.  This is currently necessary for
@@ -96,4 +96,13 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
     }
     responseObserver.onCompleted();
   }
+
+  private static byte[] getClientId() {
+    UUID uuid = UUIDUtil.randomUUID();
+    ByteBuffer buf = ByteBuffer.wrap(new byte[16]);
+    buf.putLong(uuid.getMostSignificantBits());
+    buf.putLong(uuid.getLeastSignificantBits());
+    return buf.array();
+  }
+
 }

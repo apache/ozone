@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -786,6 +787,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void writeLockInterruptibly() throws InterruptedException {
     this.lock.writeLock().lockInterruptibly();
 
+  }
+
+  public boolean writeLockTryLock(long time, TimeUnit unit)
+      throws InterruptedException {
+    return this.lock.writeLock().tryLock(time, unit);
   }
 
   /**

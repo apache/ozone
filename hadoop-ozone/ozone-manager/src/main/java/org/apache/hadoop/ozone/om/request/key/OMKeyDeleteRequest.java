@@ -94,13 +94,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
-    return validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper, BucketLayout.DEFAULT);
-  }
-
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper,
-      BucketLayout bucketLayout) {
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
@@ -123,10 +116,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    OmBucketInfo omBucketInfo =
-        OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now())
-            .setBucketLayout(bucketLayout).build();
+
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -146,7 +136,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       OmKeyInfo omKeyInfo =
-          omMetadataManager.getKeyTable(bucketLayout).get(objectKey);
+          omMetadataManager.getKeyTable(getBucketLayout()).get(objectKey);
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
@@ -160,7 +150,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
               omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           CacheValue.get(trxnLogIndex));
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      OmBucketInfo omBucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
       omBucketInfo.incrUsedBytes(-quotaReleased);

@@ -54,10 +54,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Slow;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,7 +141,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
-  @Disabled("RATIS-1481") // until upgrade to Ratis 2.3.0
+  @Unhealthy("RATIS-1481") // until upgrade to Ratis 2.3.0
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
@@ -411,7 +411,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       // Wait for a potentially slow follower to apply all key writes.
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000, () -> {
         List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
-            BUCKET, null, KEY_PREFIX, 100);
+            BUCKET, null, KEY_PREFIX, 100).getKeys();
 
         boolean allKeysFound = (expectedKeys.size() == keys.size());
         if (!allKeysFound) {

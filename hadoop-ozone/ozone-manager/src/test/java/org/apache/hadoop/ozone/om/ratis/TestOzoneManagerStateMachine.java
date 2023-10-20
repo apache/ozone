@@ -343,6 +343,7 @@ public class TestOzoneManagerStateMachine {
 
     TransactionContext mockTrx = Mockito.mock(TransactionContext.class);
     when(mockTrx.getStateMachineLogEntry()).thenReturn(logEntry);
+    when(mockTrx.getStateMachineContext()).thenReturn(request);
 
     return mockTrx;
   }

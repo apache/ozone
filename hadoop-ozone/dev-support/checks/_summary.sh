@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -12,11 +13,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: scheduled-ci
-on:
-  schedule:
-    - cron: 30 0,12 * * *
-jobs:
-  CI:
-    uses: ./.github/workflows/ci.yml
-    secrets: inherit
+
+REPORT_FILE="$1"
+
+: ${ITERATIONS:="1"}
+
+declare -i ITERATIONS
+
+rc=0
+
+if [[ ! -e "${REPORT_FILE}" ]]; then
+  echo "Report file missing, check logs for details"
+  rc=255
+
+elif [[ ${ITERATIONS} -gt 1 ]]; then
+  cat "${REPORT_FILE}"
+
+  if grep -q 'exit code: [^0]' "${REPORT_FILE}"; then
+    rc=1
+  fi
+
+elif [[ -s "${REPORT_FILE}" ]]; then
+  cat "${REPORT_FILE}"
+  rc=1
+fi
+
+exit ${rc}
