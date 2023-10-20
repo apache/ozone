@@ -109,17 +109,26 @@ public class NodeDecommissionManager {
     }
   }
 
-  private List<DatanodeDetails> mapHostnamesToDatanodes(List<String> hosts)
-      throws InvalidHostStringException {
+  private List<DatanodeDetails> mapHostnamesToDatanodes(List<String> hosts,
+      List<DatanodeAdminError> errors) {
     List<DatanodeDetails> results = new LinkedList<>();
+    HostDefinition host;
+    InetAddress addr;
+    String msg;
     for (String hostString : hosts) {
-      HostDefinition host = new HostDefinition(hostString);
-      InetAddress addr;
       try {
+        host = new HostDefinition(hostString);
         addr = InetAddress.getByName(host.getHostname());
+      } catch (InvalidHostStringException e) {
+        LOG.warn("Unable to resolve host {} ", hostString, e);
+        errors.add(new DatanodeAdminError(hostString,
+            e.getMessage()));
+        continue;
       } catch (UnknownHostException e) {
-        throw new InvalidHostStringException("Unable to resolve host "
-            + host.getRawHostname(), e);
+        LOG.warn("Unable to resolve host {} ", hostString, e);
+        errors.add(new DatanodeAdminError(hostString,
+            e.getMessage()));
+        continue;
       }
       String dnsName;
       if (useHostnames) {
@@ -129,16 +138,21 @@ public class NodeDecommissionManager {
       }
       List<DatanodeDetails> found = nodeManager.getNodesByAddress(dnsName);
       if (found.isEmpty()) {
-        throw new InvalidHostStringException("Host " + host.getRawHostname()
+        msg = "Host " + host.getRawHostname()
             + " (" + dnsName + ") is not running any datanodes registered"
-            + " with SCM. Please check the host name.");
+            + " with SCM. Please check the host name.";
+        LOG.warn(msg);
+        errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
       } else if (found.size() == 1) {
         if (host.getPort() != -1 &&
             !validateDNPortMatch(host.getPort(), found.get(0))) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
+          msg = "Host " + host.getRawHostname()
               + " is running a datanode registered with SCM,"
               + " but the port number doesn't match."
-              + " Please check the port number.");
+              + " Please check the port number.";
+          LOG.warn(msg);
+          errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
+          continue;
         }
         results.add(found.get(0));
       } else {
@@ -149,13 +163,17 @@ public class NodeDecommissionManager {
         // should be the same, and we should just use the one with the most
         // recent heartbeat.
         if (host.getPort() != -1) {
-          found.removeIf(dn -> !validateDNPortMatch(host.getPort(), dn));
+          HostDefinition finalHost = host;
+          found.removeIf(dn -> !validateDNPortMatch(finalHost.getPort(), dn));
         }
         if (found.isEmpty()) {
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
+          msg = "Host " + host.getRawHostname()
               + " is running multiple datanodes registered with SCM,"
               + " but no port numbers match."
-              + " Please check the port number.");
+              + " Please check the port number.";
+          LOG.warn(msg);
+          errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
+          continue;
         } else if (found.size() == 1) {
           results.add(found.get(0));
           continue;
@@ -168,19 +186,22 @@ public class NodeDecommissionManager {
           // not possible for a host to have 2 DNs coming from the same port.
           DatanodeDetails mostRecent = findDnWithMostRecentHeartbeat(found);
           if (mostRecent == null) {
-            throw new InvalidHostStringException("Host " + host.getRawHostname()
+            msg = "Host " + host.getRawHostname()
                 + " has multiple datanodes registered with SCM."
                 + " All have identical ports, but none have a newest"
-                + " heartbeat.");
+                + " heartbeat.";
+            errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
+            continue;
           }
           results.add(mostRecent);
         } else {
           // We have no passed in port or the ports in SCM do not all match, so
           // we cannot decide which DN to use.
-          throw new InvalidHostStringException("Host " + host.getRawHostname()
+          msg = "Host " + host.getRawHostname()
               + " is running multiple datanodes registered with SCM,"
               + " but no port numbers match."
-              + " Please check the port number.");
+              + " Please check the port number.";
+          errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
         }
       }
     }
@@ -287,9 +308,9 @@ public class NodeDecommissionManager {
   }
 
   public synchronized List<DatanodeAdminError> decommissionNodes(
-      List<String> nodes) throws InvalidHostStringException {
-    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
+      List<String> nodes) {
     List<DatanodeAdminError> errors = new ArrayList<>();
+    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
     for (DatanodeDetails dn : dns) {
       try {
         startDecommission(dn);
@@ -353,8 +374,8 @@ public class NodeDecommissionManager {
 
   public synchronized List<DatanodeAdminError> recommissionNodes(
       List<String> nodes) throws InvalidHostStringException {
-    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
     List<DatanodeAdminError> errors = new ArrayList<>();
+    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
     for (DatanodeDetails dn : dns) {
       try {
         recommission(dn);
@@ -390,8 +411,8 @@ public class NodeDecommissionManager {
 
   public synchronized List<DatanodeAdminError> startMaintenanceNodes(
       List<String> nodes, int endInHours) throws InvalidHostStringException {
-    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
     List<DatanodeAdminError> errors = new ArrayList<>();
+    List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
     for (DatanodeDetails dn : dns) {
       try {
         startMaintenance(dn, endInHours);
