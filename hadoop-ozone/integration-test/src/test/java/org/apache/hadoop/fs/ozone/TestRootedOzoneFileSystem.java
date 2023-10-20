@@ -88,6 +88,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
@@ -118,6 +119,7 @@ import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
@@ -153,28 +155,31 @@ public class TestRootedOzoneFileSystem {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true, true},
-        new Object[]{true, true, false},
-        new Object[]{true, false, false},
-        new Object[]{false, true, false},
-        new Object[]{false, false, false}
+        new Object[]{true, true, true, false},
+        new Object[]{true, true, false, false},
+        new Object[]{true, false, false, false},
+        new Object[]{false, true, false, false},
+        new Object[]{false, false, false, false},
+        new Object[]{true, true, false, true},
+        new Object[]{false, false, false, true}
     );
   }
 
   public TestRootedOzoneFileSystem(boolean setDefaultFs,
-      boolean enableOMRatis, boolean isAclEnabled) {
+      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
     // Ignored. Actual init done in initParam().
     // This empty constructor is still required to avoid argument exception.
   }
 
   @Parameterized.BeforeParam
-  public static void initParam(boolean setDefaultFs,
-                               boolean enableOMRatis, boolean isAclEnabled)
+  public static void initParam(boolean setDefaultFs, boolean enableOMRatis,
+      boolean isAclEnabled, boolean noFlush)
       throws IOException, InterruptedException, TimeoutException {
     // Initialize the cluster before EACH set of parameters
     enabledFileSystemPaths = setDefaultFs;
     omRatisEnabled = enableOMRatis;
     enableAcl = isAclEnabled;
+    useOnlyCache = noFlush;
     initClusterAndEnv();
   }
 
@@ -220,6 +225,8 @@ public class TestRootedOzoneFileSystem {
   private static boolean omRatisEnabled;
   private static boolean isBucketFSOptimized = false;
   private static boolean enableAcl;
+
+  private static boolean useOnlyCache;
 
   private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster = null;
@@ -294,6 +301,18 @@ public class TestRootedOzoneFileSystem {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
+
+    if (useOnlyCache) {
+      if (omRatisEnabled) {
+        cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
+            .getOzoneManagerDoubleBuffer().stopDaemon();
+      } else {
+        cluster.getOzoneManager().getOmServerProtocol()
+            .getOzoneManagerDoubleBuffer().stopDaemon();
+        cluster.getOzoneManager().getOmServerProtocol()
+            .setShouldFlushCache(false);
+      }
+    }
   }
 
   protected OMMetrics getOMMetrics() {
@@ -451,8 +470,9 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(fs, file4);
     fileStatuses = ofs.listStatus(parent);
     Assert.assertEquals(
-        "FileStatus did not return all children of the directory",
-        3, fileStatuses.length);
+        "FileStatus did not return all children of" +
+            " the directory : Got " + Arrays.toString(
+            fileStatuses), 3, fileStatuses.length);
 
     // Cleanup
     fs.delete(parent, true);
@@ -568,59 +588,55 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testListStatusIteratorOnPageSize() throws Exception {
-    int[] pageSize = {
-        1, LISTING_PAGE_SIZE, LISTING_PAGE_SIZE + 1,
-        LISTING_PAGE_SIZE - 1, LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2,
-        LISTING_PAGE_SIZE + LISTING_PAGE_SIZE
+    final int pageSize = 32;
+    int[] dirCounts = {
+        1,
+        pageSize - 1,
+        pageSize,
+        pageSize + 1,
+        pageSize + pageSize / 2,
+        pageSize + pageSize
     };
-    for (int numDir : pageSize) {
-      int range = numDir / LISTING_PAGE_SIZE;
-      switch (range) {
-      case 0:
-        listStatusIterator(numDir);
-        break;
-      case 1:
-        listStatusIterator(numDir);
-        break;
-      case 2:
-        listStatusIterator(numDir);
-        break;
-      default:
-        listStatusIterator(numDir);
+    OzoneConfiguration config = new OzoneConfiguration(conf);
+    config.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    URI uri = FileSystem.getDefaultUri(config);
+    config.setBoolean(
+        String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
+    FileSystem subject = FileSystem.get(uri, config);
+    Path root = new Path("/" + volumeName + "/" + bucketName);
+    Path dir = new Path(root, "listStatusIterator");
+    try {
+      Set<String> paths = new TreeSet<>();
+      for (int dirCount : dirCounts) {
+        listStatusIterator(subject, dir, paths, dirCount);
       }
+    } finally {
+      subject.delete(dir, true);
     }
   }
 
-  private void listStatusIterator(int numDirs) throws IOException {
-    Path root = new Path("/" + volumeName + "/" + bucketName);
-    Set<String> paths = new TreeSet<>();
-    try {
-      for (int i = 0; i < numDirs; i++) {
-        Path p = new Path(root, String.valueOf(i));
-        fs.mkdirs(p);
-        paths.add(p.getName());
-      }
+  private static void listStatusIterator(FileSystem subject,
+      Path dir, Set<String> paths, int total) throws IOException {
+    for (int i = paths.size(); i < total; i++) {
+      Path p = new Path(dir, String.valueOf(i));
+      subject.mkdirs(p);
+      paths.add(p.getName());
+    }
 
-      RemoteIterator<FileStatus> iterator = ofs.listStatusIterator(root);
-      int iCount = 0;
-      if (iterator != null) {
-        while (iterator.hasNext()) {
-          FileStatus fileStatus = iterator.next();
-          iCount++;
-          Assert.assertTrue(paths.contains(fileStatus.getPath().getName()));
-        }
-      }
-      Assert.assertEquals(
-          "Total directories listed do not match the existing directories",
-          numDirs, iCount);
-
-    } finally {
-      // Cleanup
-      for (int i = 0; i < numDirs; i++) {
-        Path p = new Path(root, String.valueOf(i));
-        fs.delete(p, true);
+    RemoteIterator<FileStatus> iterator = subject.listStatusIterator(dir);
+    int iCount = 0;
+    if (iterator != null) {
+      while (iterator.hasNext()) {
+        FileStatus fileStatus = iterator.next();
+        iCount++;
+        String filename = fileStatus.getPath().getName();
+        assertTrue(filename + " not found", paths.contains(filename));
       }
     }
+
+    assertEquals(
+        "Total directories listed do not match the existing directories",
+        total, iCount);
   }
 
   /**
@@ -2429,6 +2445,9 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testSnapshotRead() throws Exception {
+    if (useOnlyCache) {
+      return;
+    }
     // Init data
     OzoneBucket bucket1 =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
@@ -2475,6 +2494,9 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testSnapshotDiff() throws Exception {
+    if (useOnlyCache) {
+      return;
+    }
     OzoneBucket bucket1 =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
