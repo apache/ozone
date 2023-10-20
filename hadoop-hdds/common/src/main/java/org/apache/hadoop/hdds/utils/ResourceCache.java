@@ -32,7 +32,7 @@ public class ResourceCache<K, V> implements Cache<K, V> {
   private final com.google.common.cache.Cache<K, V> cache;
 
   public ResourceCache(
-      Weigher weigher, int limits,
+      Weigher weigher, long limits,
       RemovalListener<K, V> listener) {
     Objects.requireNonNull(weigher);
     if (listener == null) {
