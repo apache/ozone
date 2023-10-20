@@ -848,7 +848,6 @@ public class TestRocksDBCheckpointDiffer {
               sstFiles.stream()
                   .map(
                       sstFile -> new CompactionNode(sstFile,
-                          UUID.randomUUID().toString(),
                           1000L,
                           Long.parseLong(sstFile.substring(0, 6))
                       ))
