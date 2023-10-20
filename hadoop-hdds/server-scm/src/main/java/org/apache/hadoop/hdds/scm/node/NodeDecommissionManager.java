@@ -190,6 +190,7 @@ public class NodeDecommissionManager {
                 + " has multiple datanodes registered with SCM."
                 + " All have identical ports, but none have a newest"
                 + " heartbeat.";
+            LOG.warn(msg);
             errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
             continue;
           }
@@ -201,6 +202,7 @@ public class NodeDecommissionManager {
               + " is running multiple datanodes registered with SCM,"
               + " but no port numbers match."
               + " Please check the port number.";
+          LOG.warn(msg);
           errors.add(new DatanodeAdminError(host.getRawHostname(), msg));
         }
       }
