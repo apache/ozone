@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -41,7 +40,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PATH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PREFIX_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
@@ -149,12 +147,7 @@ public class PrefixManagerImpl implements PrefixManager {
         }
       }
     } catch (IOException e) {
-      if (e.getCause() != null &&
-          e.getCause() instanceof InvalidPathException) {
-        throw new OMException(e, INVALID_PATH);
-      } else {
-        throw new OMException(e, INTERNAL_ERROR);
-      }
+      throw new OMException(e, INTERNAL_ERROR);
     } finally {
       metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }

@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
 import java.io.File;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -415,9 +414,6 @@ public final class OzoneManagerRatisUtils {
       if (exception.getCause() != null
           && exception.getCause() instanceof RocksDBException) {
         return Status.METADATA_ERROR;
-      } else if (exception.getCause() != null
-          && exception.getCause() instanceof InvalidPathException) {
-        return Status.INVALID_PATH;
       } else {
         return Status.INTERNAL_ERROR;
       }
