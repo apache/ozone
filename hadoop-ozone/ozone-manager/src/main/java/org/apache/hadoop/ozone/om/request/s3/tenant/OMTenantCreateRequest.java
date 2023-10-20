@@ -352,7 +352,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMTenantCreateResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

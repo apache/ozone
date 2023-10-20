@@ -196,7 +196,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
           ozoneTokenIdentifierToken, ex);
       exception = ex;
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

@@ -227,7 +227,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

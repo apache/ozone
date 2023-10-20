@@ -162,7 +162,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omMetrics.incNumRecoverLeaseFails();
       omResponse.setCmdType(RecoverLease);
       omClientResponse = new OMRecoverLeaseResponse(
-          createErrorOMResponse(omResponse, ex), getBucketLayout());
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

@@ -136,7 +136,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

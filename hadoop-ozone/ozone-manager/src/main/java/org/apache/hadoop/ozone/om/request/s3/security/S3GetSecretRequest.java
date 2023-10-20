@@ -211,7 +211,7 @@ public class S3GetSecretRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new S3GetSecretResponse(null,
           ozoneManager.getS3SecretManager(),
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

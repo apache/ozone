@@ -220,7 +220,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantAssignAdminResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

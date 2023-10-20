@@ -126,7 +126,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

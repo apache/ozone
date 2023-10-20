@@ -130,7 +130,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumVolumeUpdateFails();
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

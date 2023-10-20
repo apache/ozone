@@ -187,7 +187,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      createErrorOMResponse(omResponse, ex);
+      createErrorOMResponse(omResponse, exception);
 
       // reset deleteKeys as request failed.
       deleteKeys = new ArrayList<>();

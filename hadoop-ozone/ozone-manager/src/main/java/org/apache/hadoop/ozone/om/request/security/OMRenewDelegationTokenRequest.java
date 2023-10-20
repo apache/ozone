@@ -179,7 +179,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
           ozoneTokenIdentifierToken, ex);
       exception = ex;
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

@@ -210,7 +210,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeAdminResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

@@ -226,7 +226,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      createErrorOMResponse(omResponse, ex);
+      createErrorOMResponse(omResponse, exception);
 
       omResponse.setRenameKeysResponse(RenameKeysResponse.newBuilder()
           .setStatus(renameStatus).addAllUnRenamedKeys(unRenamedKeys).build());
