@@ -98,6 +98,9 @@ public class BufferPool {
 
   void releaseBuffer(ChunkBuffer chunkBuffer) {
     Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
+    if (bufferList.get(0) != chunkBuffer) {
+      return;
+    }
     Preconditions.assertSame(bufferList.get(0), chunkBuffer,
         "only the first buffer can be released");
     Preconditions.assertTrue(currentBufferIndex >= 0,

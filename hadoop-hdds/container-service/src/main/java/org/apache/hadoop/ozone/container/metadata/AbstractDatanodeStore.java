@@ -21,7 +21,9 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
@@ -45,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
@@ -62,6 +65,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private Table<String, Long> metadataTable;
 
   private Table<String, BlockData> blockDataTable;
+
+  private Table<BlockID, List<ContainerProtos.ChunkInfo>> lastChunkInfoTable;
 
   private Table<String, BlockData> blockDataTableWithIterator;
 
@@ -202,6 +207,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   @Override
   public Table<String, BlockData> getBlockDataTable() {
     return blockDataTable;
+  }
+
+  @Override
+  public Table<BlockID, List<ContainerProtos.ChunkInfo>> getLastChunkInfoTable() {
+    return lastChunkInfoTable;
   }
 
   @Override
