@@ -138,7 +138,7 @@ jobs:
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
         if: ${{ !cancelled() }}
-        continue-on-error: true
+        continue-on-error: ${{ github.event.inputs.fail-fast != 'true' }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
