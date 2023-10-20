@@ -250,8 +250,12 @@ public class NodeDecommissionManager {
     this.metrics = null;
 
     executor = Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
-            .setDaemon(true).build());
+        new ThreadFactoryBuilder()
+            .setNameFormat(
+                scmContext.threadNamePrefix() + "DatanodeAdminManager-%d")
+            .setDaemon(true)
+            .build()
+    );
 
     useHostnames = conf.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
