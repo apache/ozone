@@ -4064,8 +4064,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * If ratis is not enabled, then it always returns true.
    */
   public boolean isLeaderReady() {
+    final OzoneManagerRatisServer ratisServer = omRatisServer;
     return !isRatisEnabled
-        || omRatisServer.checkLeaderStatus() == LEADER_AND_READY;
+        || (ratisServer != null &&
+            ratisServer.checkLeaderStatus() == LEADER_AND_READY);
   }
 
   /**
