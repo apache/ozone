@@ -373,6 +373,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   @Override
   public void restartOzoneManager() throws IOException {
     ozoneManager.stop();
+    ozoneManager.join();
     ozoneManager.restart();
   }
 
