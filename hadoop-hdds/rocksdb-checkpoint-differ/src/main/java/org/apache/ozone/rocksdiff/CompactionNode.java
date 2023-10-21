@@ -23,7 +23,6 @@ package org.apache.ozone.rocksdiff;
 public class CompactionNode {
   // Name of the SST file
   private final String fileName;
-  // The last snapshot created before this node came into existence
   private final long snapshotGeneration;
   private final long totalNumberOfKeys;
   private long cumulativeKeysReverseTraversal;
