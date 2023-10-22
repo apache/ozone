@@ -393,7 +393,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
           <Table
             dataSource={dataSource}
             columns={COLUMNS.reduce<any[]>((filtered, column) => {
-              if (selectedColumns.some(e => e.value === column.key)) {
+              if (selectedColumns && selectedColumns.some(e => e.value === column.key)) {
                 if (column.isSearchable) {
                   const newColumn = {
                     ...column,

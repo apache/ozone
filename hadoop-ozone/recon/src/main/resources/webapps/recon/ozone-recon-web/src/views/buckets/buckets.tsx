@@ -563,7 +563,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
           <Table
             dataSource={selectedBuckets}
             columns={COLUMNS.reduce<any[]>((filtered, column) => {
-              if (selectedColumns.some(e => e.value === column.key)) {
+              if (selectedColumns && selectedColumns.some(e => e.value === column.key)) {
                 if (column.isSearchable) {
                   const newColumn = {
                     ...column,
