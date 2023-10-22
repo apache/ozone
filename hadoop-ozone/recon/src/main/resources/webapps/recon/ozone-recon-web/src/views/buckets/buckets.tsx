@@ -581,6 +581,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
             pagination={paginationConfig}
             rowKey={(bucketRecord: IBucket) => `${bucketRecord.volumeName}_${bucketRecord.bucketName}`}
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+            locale={{filterTitle: ""}}
           />
         </div>
         <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.bucketName} objType='Bucket'/>

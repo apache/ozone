@@ -411,6 +411,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
             pagination={paginationConfig}
             rowKey='volume'
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+            locale={{filterTitle: ""}}
           />
         </div>
         <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType='Volume'/>
