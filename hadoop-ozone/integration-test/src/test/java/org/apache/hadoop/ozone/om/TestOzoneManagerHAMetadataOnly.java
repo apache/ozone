@@ -47,10 +47,7 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 
 import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
@@ -74,7 +71,6 @@ import static org.junit.Assert.fail;
 /**
  * Test Ozone Manager Metadata operation in distributed handler scenario.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   private OzoneVolume createAndCheckVolume(String volumeName)
@@ -189,7 +185,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
    * to OM client.
    */
   @Test
-  @Order(1)
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
     ObjectStore objectStore = getObjectStore();
@@ -259,7 +254,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   @Test
-  @Order(2)
   public void testOMRetryProxy() throws Exception {
     int maxFailoverAttempts = getOzoneClientFailoverMaxAttempts();
     // Stop all the OMs.
@@ -372,7 +366,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   @Test
-  @Order(3)
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     ObjectStore objectStore = getObjectStore();
