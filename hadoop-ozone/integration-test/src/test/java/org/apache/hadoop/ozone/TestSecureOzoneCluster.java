@@ -149,6 +149,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
@@ -695,6 +696,7 @@ final class TestSecureOzoneCluster {
   }
 
   @Test
+  @Flaky("HDDS-9349")
   public void testGetSetRevokeS3Secret() throws Exception {
 
     // Setup secure OM for start
