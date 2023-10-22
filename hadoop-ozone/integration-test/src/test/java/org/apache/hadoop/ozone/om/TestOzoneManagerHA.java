@@ -203,6 +203,15 @@ public abstract class TestOzoneManagerHA {
   }
 
   /**
+   * After restarting OMs we need to wait
+   * for a leader to be elected and ready.
+   */
+  @BeforeEach
+  protected void setup() throws Exception {
+    waitForLeaderToBeReady();
+  }
+
+  /**
    * Reset cluster between tests.
    */
   @AfterEach
@@ -472,11 +481,6 @@ public abstract class TestOzoneManagerHA {
     }
   }
 
-  /**
-   * After restarting OMs we need to wait
-   * for a leader to be elected and ready.
-   */
-  @BeforeEach
   protected void waitForLeaderToBeReady()
       throws InterruptedException, TimeoutException {
     // Wait for Leader Election timeout
