@@ -1413,26 +1413,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     CertificateClient certClient =
         new OMCertificateClient(
             new SecurityConfig(conf), scmSecurityClient, omStore, omInfo,
-            "", scmId, null, null);
+            "", scmId,
+            certId -> {
+              try {
+                omStore.setOmCertSerialId(certId);
+              } catch (IOException e) {
+                LOG.error("Failed to set new certificate ID", e);
+                throw new RuntimeException("Failed to set new certificate ID");
+              }}, null);
     CertificateClient.InitResponse response = certClient.init();
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful.");
-      break;
-    case GETCERT:
-      // Sign and persist OM cert.
-      CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
-      omStore.setOmCertSerialId(
-          certClient.signAndStoreCertificate(builder.build()));
-      LOG.info("Successfully stored SCM signed certificate.");
-      break;
-    case FAILURE:
-    default:
-      LOG.error("OM security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("OM security initialization failed.");
-    }
+    certClient.recoverStateIfNeeded(response);
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
