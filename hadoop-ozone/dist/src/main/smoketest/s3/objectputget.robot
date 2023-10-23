@@ -212,7 +212,7 @@ Create small file and expect ETag (MD5) in a reponse header
     ${result} =                 Execute AWSS3CliDebug      cp /tmp/small_file s3://${BUCKET}
                                 Should Match Regexp        ${result}    (?i)Response header.*ETag':\ '"${file_md5_checksum}"'
 
-# the test case depends on the previous one
+# The next two test cases depends on the previous one
 Download small file end expect ETag (MD5) in a response header
     ${file_md5_checksum} =      Execute                    md5sum /tmp/small_file | awk '{print $1}'
     ${result} =                 Execute AWSS3CliDebug      cp s3://${BUCKET}/small_file /tmp/small_file_downloaded
@@ -220,7 +220,20 @@ Download small file end expect ETag (MD5) in a response header
                                 Should Match Regexp        ${result}    (?is)GET /${BUCKET}/small_file.*?Response headers.*?ETag':\ '"${file_md5_checksum}"'
                                 # clean up
                                 Execute AWSS3Cli           rm s3://${BUCKET}/small_file
-                                Execute                    rm -rf /tmp/small_file
+                                Execute                    rm /tmp/small_file_downloaded
+
+Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request
+    ${file_md5_checksum}                    Execute                             md5sum /tmp/small_file | awk '{print $1}'
+                                            Execute AWSS3CliDebug               cp --metadata "ETag=custom-etag-value" /tmp/small_file s3://${BUCKET}/test_file
+    ${result}                               Execute AWSS3CliDebug               cp s3://${BUCKET}/test_file /tmp/test_file_downloaded
+    ${match}    ${ETag}     ${etagCustom}   Should Match Regexp                 ${result}    HEAD /${BUCKET}/test_file\ .*?Response headers.*?ETag':\ '"(.*?)"'.*?x-amz-meta-etag':\ '(.*?)'     flags=DOTALL
+                                            Should Be Equal As Strings          ${ETag}     ${file_md5_checksum}
+                                            Should BE Equal As Strings          ${etagCustom}       custom-etag-value
+                                            Should Not Be Equal As Strings      ${ETag}     ${etagCustom}
+                                            # clean up
+                                            Execute AWSS3Cli                    rm s3://${BUCKET}/test_file
+                                            Execute                             rm -rf /tmp/small_file
+                                            Execute                             rm -rf /tmp/test_file_downloaded
 
 Create&Download big file by multipart upload and expect ETag in a file download response
                                 Execute                    head -c 10MB </dev/urandom > /tmp/big_file
@@ -232,3 +245,16 @@ Create&Download big file by multipart upload and expect ETag in a file download 
                                 # clean up
                                 Execute AWSS3Cli           rm s3://${BUCKET}/big_file
                                 Execute                    rm -rf /tmp/big_file
+
+Create key twice with different content and expect different ETags
+                                Execute                    head -c 1MiB </dev/urandom > /tmp/file1
+                                Execute                    head -c 1MiB </dev/urandom > /tmp/file2
+    ${file1UploadResult}        Execute AWSS3CliDebug      cp /tmp/file1 s3://${BUCKET}/test_key_to_check_etag_differences
+    ${match}    ${etag1}        Should Match Regexp        ${file1UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+    ${file2UploadResult}        Execute AWSS3CliDebug      cp /tmp/file2 s3://${BUCKET}/test_key_to_check_etag_differences
+    ${match}    ${etag2}        Should Match Regexp        ${file2UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+                                Should Not Be Equal As Strings  ${etag1}    ${etag2}
+                                # clean up
+                                Execute AWSS3Cli           rm s3://${BUCKET}/test_key_to_check_etag_differences
+                                Execute                    rm -rf /tmp/file1
+                                Execute                    rm -rf /tmp/file2

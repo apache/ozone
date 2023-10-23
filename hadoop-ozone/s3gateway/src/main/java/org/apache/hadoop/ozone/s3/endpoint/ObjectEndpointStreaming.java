@@ -106,6 +106,22 @@ final class ObjectEndpointStreaming {
     return Pair.of(eTag, writeLen);
   }
 
+  public static long copyKeyWithStream(
+      OzoneBucket bucket,
+      String keyPath,
+      long length,
+      int bufferSize,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      InputStream body) throws IOException {
+    long writeLen = 0;
+    try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
+        length, replicationConfig, keyMetadata)) {
+      writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
+    }
+    return writeLen;
+  }
+
   private static long writeToStreamOutput(OzoneDataStreamOutput streamOutput,
                                           InputStream body, int bufferSize,
                                           long length)
