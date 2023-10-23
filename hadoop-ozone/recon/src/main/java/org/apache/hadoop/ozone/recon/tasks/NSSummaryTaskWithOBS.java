@@ -23,7 +23,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -31,13 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Class for handling OBS specific tasks.
@@ -52,11 +51,11 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
   private boolean enableFileSystemPaths;
 
   public NSSummaryTaskWithOBS(ReconNamespaceSummaryManager
-                                 reconNamespaceSummaryManager,
+                                  reconNamespaceSummaryManager,
                               ReconOMMetadataManager
-                                 reconOMMetadataManager,
+                                  reconOMMetadataManager,
                               OzoneConfiguration
-                                 ozoneConfiguration) {
+                                  ozoneConfiguration) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
     // true if FileSystemPaths enabled
@@ -74,7 +73,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           omMetadataManager.getKeyTable(BUCKET_LAYOUT);
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyTableIter = keyTable.iterator()) {
+               keyTableIter = keyTable.iterator()) {
 
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
@@ -122,6 +121,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
    * KeyTable entries don't have the parentId set.
    * In order to reuse the existing FSO methods that rely on
    * the parentId, we have to set it explicitly.
+   *
    * @param keyInfo
    * @throws IOException
    */
@@ -132,22 +132,22 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     System.out.println("keyName: " + keyInfo.getKeyName());
     System.out.println("OM_KEY_PREFIX: " + OM_KEY_PREFIX);
 
-      String bucketKey = getReconOMMetadataManager()
-          .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
+    String bucketKey = getReconOMMetadataManager()
+        .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
 
-      // bucketKey: /s3v/legacy-bucket
-      System.out.println("bucketKey: " + bucketKey);
+    // bucketKey: /s3v/legacy-bucket
+    System.out.println("bucketKey: " + bucketKey);
 
-      OmBucketInfo parentBucketInfo =
-          getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
+    OmBucketInfo parentBucketInfo =
+        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
 
-      System.out.println("parentBucketInfo: " + parentBucketInfo);
+    System.out.println("parentBucketInfo: " + parentBucketInfo);
 
-      if (parentBucketInfo != null) {
-        keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
-      } else {
-        throw new IOException("ParentKeyInfo for " +
-            "NSSummaryTaskWithOBS is null");
+    if (parentBucketInfo != null) {
+      keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
+    } else {
+      throw new IOException("ParentKeyInfo for " +
+          "NSSummaryTaskWithOBS is null");
     }
     System.out.println("#### GOING OUTSIDE NSSummaryTaskWithOBS #### ");
 

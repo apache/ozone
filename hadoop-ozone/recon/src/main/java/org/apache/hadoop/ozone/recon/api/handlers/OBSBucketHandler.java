@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -33,15 +35,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
 /**
  * Class for handling Legacy buckets.
  */
-public class OBSBucketHandler extends BucketHandler{
+public class OBSBucketHandler extends BucketHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       OBSBucketHandler.class);
@@ -71,12 +71,9 @@ public class OBSBucketHandler extends BucketHandler{
    */
   public EntityType determineKeyPath(String keyName)
       throws IOException {
-
-    String filename = OzoneFSUtils.removeTrailingSlashIfNeeded(keyName);
-
     String key = OM_KEY_PREFIX + vol +
         OM_KEY_PREFIX + bucket +
-        OM_KEY_PREFIX + filename;
+        OM_KEY_PREFIX + keyName;
 
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
@@ -158,7 +155,6 @@ public class OBSBucketHandler extends BucketHandler{
         totalDU += keyInfo.getReplicatedSize();
       }
     }
-
 
     return totalDU;
   }
@@ -249,20 +245,17 @@ public class OBSBucketHandler extends BucketHandler{
   }
 
   /**
-   * Given a valid path request for a directory,
-   * return the directory object ID.
+   * Object stores do not support directories, hence return null.
    *
    * @param names parsed path request in a list of names
    * @return directory object ID
    */
   public long getDirObjectId(String[] names) throws IOException {
-    return getDirObjectId(names, names.length);
+    return Long.parseLong(null);
   }
 
   /**
-   * Given a valid path request and a cutoff length where should be iterated
-   * up to.
-   * return the directory object ID for the object at the cutoff length
+   * Object stores do not support directories, hence return null.
    *
    * @param names  parsed path request in a list of names
    * @param cutoff cannot be larger than the names' length. If equals,
@@ -270,28 +263,12 @@ public class OBSBucketHandler extends BucketHandler{
    * @return directory object ID
    */
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
-    long dirObjectId = getBucketObjectId(names);
-    StringBuilder bld = new StringBuilder();
-    for (int i = 0; i < cutoff; ++i) {
-      bld.append(OM_KEY_PREFIX)
-          .append(names[i]);
-    }
-    bld.append(OM_KEY_PREFIX);
-    String dirKey = bld.toString();
-    OmKeyInfo dirInfo = getKeyTable().getSkipCache(dirKey);
-
-    if (dirInfo != null) {
-      dirObjectId = dirInfo.getObjectID();
-    } else {
-      throw new IOException("OmKeyInfo for the directory is null");
-    }
-
-    return dirObjectId;
+    return Long.parseLong(null);
   }
 
 
   public BucketLayout getBucketLayout() {
-    return BucketLayout.LEGACY;
+    return BucketLayout.OBJECT_STORE;
   }
 
 

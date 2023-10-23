@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
@@ -124,7 +123,6 @@ public abstract class EntityHandler {
    * @param path the original path request used to identify root level
    * @return the entity handler of client's request
    */
-
   public static EntityHandler getEntityHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
@@ -133,34 +131,24 @@ public abstract class EntityHandler {
     BucketHandler bucketHandler;
 
     String normalizedPath = normalizePath(path);
-    LOG.debug("normalizedPath: {}", normalizedPath);
-
     String[] names = parseRequestPath(normalizedPath);
-    LOG.debug("names: {}", Arrays.toString(names));
-
     if (path.equals(OM_KEY_PREFIX)) {
-      LOG.debug("path is OM_KEY_PREFIX");
       return EntityType.ROOT.create(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, null, path);
     }
 
     if (names.length == 0) {
-      LOG.debug("names length is 0");
       return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, null, path);
-    } else if (names.length == 1) {
-      LOG.debug("names length is 1");
+    } else if (names.length == 1) { // volume level check
       String volName = names[0];
       if (!volumeExists(omMetadataManager, volName)) {
-        LOG.debug("volume {} doesn't exist", volName);
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, null, path);
       }
-      LOG.debug("volume {} exists", volName);
       return EntityType.VOLUME.create(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, null, path);
-    } else if (names.length == 2) {
-      LOG.debug("names length is 2");
+    } else if (names.length == 2) { // bucket level check
       String volName = names[0];
       String bucketName = names[1];
 
@@ -171,15 +159,12 @@ public abstract class EntityHandler {
 
       if (bucketHandler == null
           || !bucketHandler.bucketExists(volName, bucketName)) {
-        LOG.debug("bucket {} doesn't exist", bucketName);
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, null, path);
       }
-      LOG.debug("bucket {} exists", bucketName);
       return EntityType.BUCKET.create(reconNamespaceSummaryManager,
           omMetadataManager, reconSCM, bucketHandler, path);
-    } else {
-      LOG.debug("names length is greater than 2");
+    } else { // length > 3. check dir or key existence
       String volName = names[0];
       String bucketName = names[1];
 
@@ -201,7 +186,6 @@ public abstract class EntityHandler {
           .create(reconNamespaceSummaryManager,
               omMetadataManager, reconSCM, bucketHandler, path);
     }
-
   }
 
   /**

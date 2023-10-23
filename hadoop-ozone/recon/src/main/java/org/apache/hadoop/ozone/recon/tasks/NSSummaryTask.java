@@ -17,6 +17,7 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,6 +67,7 @@ public class NSSummaryTask implements ReconOmTask {
   private final ReconOMMetadataManager reconOMMetadataManager;
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
+  private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
   private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
@@ -84,6 +86,9 @@ public class NSSummaryTask implements ReconOmTask {
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
+    this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
   }
 
   @Override
@@ -100,6 +105,12 @@ public class NSSummaryTask implements ReconOmTask {
     } else {
       LOG.error("processWithFSO failed.");
     }
+    if (success) {
+      success = nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
+    } else {
+      LOG.error("processWithFSO failed.");
+    }
+
     return new ImmutablePair<>(getTaskName(), success);
   }
 
@@ -120,6 +131,8 @@ public class NSSummaryTask implements ReconOmTask {
         .reprocessWithFSO(omMetadataManager));
     tasks.add(() -> nsSummaryTaskWithLegacy
         .reprocessWithLegacy(reconOMMetadataManager));
+    tasks.add(() -> nsSummaryTaskWithOBS
+        .reprocessWithOBS(reconOMMetadataManager));
 
     List<Future<Boolean>> results;
     ExecutorService executorService = Executors
