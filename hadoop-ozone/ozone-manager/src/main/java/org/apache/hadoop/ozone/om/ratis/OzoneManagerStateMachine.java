@@ -119,12 +119,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
+    this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
-    this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadPrefix +
