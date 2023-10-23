@@ -87,7 +87,7 @@ public class MockXceiverClientFactory
       throws IOException {
     MockXceiverClientSpi mockXceiverClientSpi =
         new MockXceiverClientSpi(pipeline, storage
-            .computeIfAbsent(pipeline.getFirstNode(),
+            .computeIfAbsent(pipeline.getClosestNode(),
                 r -> new MockDatanodeStorage()));
     // Incase if this node already set to mark as failed.
     for (IOException reason : pendingDNFailures.keySet()) {

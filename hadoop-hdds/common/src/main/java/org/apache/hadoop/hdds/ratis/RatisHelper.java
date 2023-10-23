@@ -196,12 +196,23 @@ public final class RatisHelper {
         toRaftPeers(pipeline));
   }
 
+  /**
+   * Create a Raft client used primarily for Ozone client communications with
+   * the Ratis pipeline.
+   * @param rpcType rpc type
+   * @param pipeline pipeline
+   * @param retryPolicy retry policy
+   * @param tlsConfig tls config
+   * @param ozoneConfiguration configuration
+   * @return Raft client
+   * @throws IOException IOException
+   */
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
-        toRaftPeer(pipeline.getFirstNode()),
+        toRaftPeer(pipeline.getClosestNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
