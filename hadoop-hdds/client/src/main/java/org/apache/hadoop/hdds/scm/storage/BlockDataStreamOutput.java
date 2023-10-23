@@ -607,7 +607,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   public void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {
-      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
+      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient,
+          true);
     }
     xceiverClientFactory = null;
     xceiverClient = null;
