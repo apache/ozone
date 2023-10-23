@@ -132,7 +132,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   /**
    * Acquires a XceiverClientSpi connected to a container capable of
-   * storing the specified key.
+   * storing the specified key. It does not consider the topology
+   * of the datanodes in the pipeline (e.g. closest datanode to the
+   * client)
    *
    * If there is already a cached XceiverClientSpi, simply return
    * the cached otherwise create a new one.
@@ -160,18 +162,30 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   @Override
   public XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
       throws IOException {
-    return acquireClient(pipeline, true);
+    return acquireClient(pipeline, topologyAwareRead);
   }
 
-  private XceiverClientSpi acquireClient(Pipeline pipeline, boolean read)
-      throws IOException {
+  /**
+   * Acquires a XceiverClientSpi connected to a container capable of
+   * storing the specified key.
+   *
+   * If there is already a cached XceiverClientSpi, simply return
+   * the cached otherwise create a new one.
+   *
+   * @param pipeline the container pipeline for the client connection
+   * @return XceiverClientSpi connected to a container
+   * @throws IOException if a XceiverClientSpi cannot be acquired
+   */
+  @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline,
+         boolean topologyAware) throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
     Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
         NO_REPLICA_FOUND);
 
     synchronized (clientCache) {
-      XceiverClientSpi info = getClient(pipeline, read);
+      XceiverClientSpi info = getClient(pipeline, topologyAware);
       info.incrementReference();
       return info;
     }
@@ -197,17 +211,18 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   @Override
   public void releaseClientForReadData(XceiverClientSpi client,
       boolean invalidateClient) {
-    releaseClient(client, invalidateClient, true);
+    releaseClient(client, invalidateClient, topologyAwareRead);
   }
 
-  private void releaseClient(XceiverClientSpi client, boolean invalidateClient,
-      boolean read) {
+  @Override
+  public void releaseClient(XceiverClientSpi client, boolean invalidateClient,
+      boolean topologyAware) {
     Preconditions.checkNotNull(client);
     synchronized (clientCache) {
       client.decrementReference();
       if (invalidateClient) {
         Pipeline pipeline = client.getPipeline();
-        String key = getPipelineCacheKey(pipeline, read);
+        String key = getPipelineCacheKey(pipeline, topologyAware);
         XceiverClientSpi cachedClient = clientCache.getIfPresent(key);
         if (cachedClient == client) {
           clientCache.invalidate(key);
@@ -216,13 +231,12 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     }
   }
 
-  private XceiverClientSpi getClient(Pipeline pipeline, boolean forRead)
+  private XceiverClientSpi getClient(Pipeline pipeline, boolean topologyAware)
       throws IOException {
     HddsProtos.ReplicationType type = pipeline.getType();
     try {
-      // create different client for read different pipeline node based on
-      // network topology
-      String key = getPipelineCacheKey(pipeline, forRead);
+      // create different client based on network topology
+      String key = getPipelineCacheKey(pipeline, topologyAware);
       // Append user short name to key to prevent a different user
       // from using same instance of xceiverClient.
       key = isSecurityEnabled ?
@@ -256,11 +270,12 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     }
   }
 
-  private String getPipelineCacheKey(Pipeline pipeline, boolean forRead) {
+  private String getPipelineCacheKey(Pipeline pipeline,
+                                     boolean topologyAware) {
     String key = pipeline.getId().getId().toString() + pipeline.getType();
     boolean isEC = pipeline.getReplicationConfig()
         .getReplicationType() == HddsProtos.ReplicationType.EC;
-    if (topologyAwareRead && forRead || isEC) {
+    if (topologyAware || isEC) {
       try {
         key += pipeline.getClosestNode().getHostName();
         if (isEC) {

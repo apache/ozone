@@ -166,7 +166,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .addMetadata(keyValue);
     this.xceiverClient =
-        (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
+        (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline, true);
     this.token = token;
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
