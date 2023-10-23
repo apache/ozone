@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -94,48 +95,53 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
-  public void testAnyInvalidHostThrowsException()
-      throws InvalidHostStringException {
+  public void testAnyInvalidHostThrowsException() {
     List<DatanodeDetails> dns = generateDatanodes();
 
     // Try to decommission a host that does exist, but give incorrect port
-    try {
-      decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress() + ":10"));
-      fail("InvalidHostStringException expected");
-    } catch (InvalidHostStringException e) {
-    }
+    List<DatanodeAdminError> error =
+        decom.decommissionNodes(
+            Arrays.asList(dns.get(1).getIpAddress() + ":10"));
+    Assert.assertTrue(error.size() == 1);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains(dns.get(1).getIpAddress()));
 
     // Try to decommission a host that does not exist
-    try {
-      decom.decommissionNodes(Arrays.asList("123.123.123.123"));
-      fail("InvalidHostStringException expected");
-    } catch (InvalidHostStringException e) {
-    }
+    error = decom.decommissionNodes(Arrays.asList("123.123.123.123"));
+    Assert.assertTrue(error.size() == 1);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains("123.123.123.123"));
 
     // Try to decommission a host that does exist and a host that does not
-    try {
-      decom.decommissionNodes(Arrays.asList(
+    error  = decom.decommissionNodes(Arrays.asList(
           dns.get(1).getIpAddress(), "123,123,123,123"));
-      fail("InvalidHostStringException expected");
-    } catch (InvalidHostStringException e) {
-    }
+    Assert.assertTrue(error.size() == 1);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains("123,123,123,123"));
 
     // Try to decommission a host with many DNs on the address with no port
-    try {
-      decom.decommissionNodes(Arrays.asList(
+    error = decom.decommissionNodes(Arrays.asList(
           dns.get(0).getIpAddress()));
-      fail("InvalidHostStringException expected");
-    } catch (InvalidHostStringException e) {
-    }
+    Assert.assertTrue(error.size() == 1);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains(dns.get(0).getIpAddress()));
 
     // Try to decommission a host with many DNs on the address with a port
     // that does not exist
-    try {
-      decom.decommissionNodes(Arrays.asList(
+    error = decom.decommissionNodes(Arrays.asList(
           dns.get(0).getIpAddress() + ":10"));
-      fail("InvalidHostStringException expected");
-    } catch (InvalidHostStringException e) {
-    }
+    Assert.assertTrue(error.size() == 1);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains(dns.get(0).getIpAddress() + ":10"));
+
+    // Try to decommission 2 hosts with address that does not exist
+    // Both should return error
+    error  = decom.decommissionNodes(Arrays.asList(
+        "123.123.123.123", "234.234.234.234"));
+    Assert.assertTrue(error.size() == 2);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains("123.123.123.123") &&
+            error.get(1).getHostname().contains("234.234.234.234"));
   }
 
   @Test
@@ -219,11 +225,12 @@ public class TestNodeDecommissionManager {
     nodeManager.register(extraDN, null, null);
 
     // Attempt to decommission with just the IP, which should fail.
-    try {
-      decom.decommissionNodes(Arrays.asList(extraDN.getIpAddress()));
-      fail("InvalidHostStringException expected");
-    } catch (InvalidHostStringException e) {
-    }
+    List<DatanodeAdminError> error =
+        decom.decommissionNodes(Arrays.asList(extraDN.getIpAddress()));
+    Assert.assertTrue(error.size() == 1);
+    Assert.assertTrue(
+        error.get(0).getHostname().contains(extraDN.getIpAddress()));
+
     // Now try the one with the unique port
     decom.decommissionNodes(Arrays.asList(
         extraDN.getIpAddress() + ":" + ratisPort + 1));
