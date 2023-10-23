@@ -139,10 +139,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.slowOpThresholdNs = getSlowOpThresholdMs(conf) * 1000000;
 
     protocolMetrics =
-        new ProtocolMessageMetrics<>(
+        ProtocolMessageMetrics.create(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
-            Type.values());
+            Type.values(),
+            conf);
 
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -51,10 +52,10 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
 
   @Override
   public ProtocolMessageMetrics<ProtocolMessageEnum>
-      getProtocolMessageMetrics() {
+      getProtocolMessageMetrics(ConfigurationSource conf) {
     return ProtocolMessageMetrics
         .create("ReconDatanodeProtocol", "Recon Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.values(), conf);
   }
 
   @Override
