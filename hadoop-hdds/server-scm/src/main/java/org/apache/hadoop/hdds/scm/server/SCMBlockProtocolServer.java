@@ -112,7 +112,8 @@ public class SCMBlockProtocolServer implements
         ProtocolMessageMetrics.create(
             "ScmBlockLocationProtocol",
             "SCM Block location protocol counters",
-            ScmBlockLocationProtocolProtos.Type.values());
+            ScmBlockLocationProtocolProtos.Type.values(),
+            conf);
 
     // SCM Block Service RPC.
     BlockingService blockProtoPbService =

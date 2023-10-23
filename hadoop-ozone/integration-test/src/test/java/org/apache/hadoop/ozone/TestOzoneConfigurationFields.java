@@ -112,6 +112,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY,
+        OzoneConfigKeys.OZONE_PROTOCOL_MESSAGE_METRICS_PERCENTILES_INTERVALS,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
         ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,

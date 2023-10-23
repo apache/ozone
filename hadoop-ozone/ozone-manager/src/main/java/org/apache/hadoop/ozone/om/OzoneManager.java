@@ -697,7 +697,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     omClientProtocolMetrics = ProtocolMessageMetrics
         .create("OmClientProtocol", "Ozone Manager RPC endpoint",
-            OzoneManagerProtocolProtos.Type.values());
+            OzoneManagerProtocolProtos.Type.values(), conf);
 
     // Start Om Rpc Server.
     omRpcServer = getRpcServer(configuration);

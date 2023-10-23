@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -29,6 +30,9 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
@@ -40,32 +44,59 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   private final String description;
 
+  private final MetricsRegistry registry;
+
+  private final boolean quantileEnable;
+
   private final Map<KEY, AtomicLong> counters =
       new ConcurrentHashMap<>();
 
   private final Map<KEY, AtomicLong> elapsedTimes =
       new ConcurrentHashMap<>();
 
+  private final Map<KEY, MutableQuantiles[]> quantiles =
+      new ConcurrentHashMap<>();
+
   private final AtomicInteger concurrency = new AtomicInteger(0);
 
   public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
-      String description, KEY[] types) {
-    return new ProtocolMessageMetrics<KEY>(name, description, types);
+      String description, KEY[] types, ConfigurationSource conf) {
+    return new ProtocolMessageMetrics<KEY>(name, description, types, conf);
   }
 
   public ProtocolMessageMetrics(String name, String description,
-      KEY[] values) {
+      KEY[] values, ConfigurationSource conf) {
     this.name = name;
     this.description = description;
+    registry = new MetricsRegistry(name + "MessageMetrics");
+    int[] intervals = conf.getInts(
+        OzoneConfigKeys.OZONE_PROTOCOL_MESSAGE_METRICS_PERCENTILES_INTERVALS);
+    quantileEnable = (intervals.length > 0);
     for (KEY value : values) {
       counters.put(value, new AtomicLong(0));
       elapsedTimes.put(value, new AtomicLong(0));
+      if (quantileEnable) {
+        MutableQuantiles[] mutableQuantiles =
+            new MutableQuantiles[intervals.length];
+        quantiles.put(value, mutableQuantiles);
+        for (int i = 0; i < intervals.length; i++) {
+          mutableQuantiles[i] = registry.newQuantiles(
+              value.toString() + "RpcTime" + intervals[i] + "s",
+              value.toString() + "rpc time in milli second",
+              "ops", "latency", intervals[i]);
+        }
+      }
     }
   }
 
   public void increment(KEY key, long duration) {
     counters.get(key).incrementAndGet();
     elapsedTimes.get(key).addAndGet(duration);
+    if (quantileEnable) {
+      for (MutableQuantiles q : quantiles.get(key)) {
+        q.add(duration);
+      }
+    }
   }
 
   public UncheckedAutoCloseable measure(KEY key) {
@@ -74,7 +105,13 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
     return () -> {
       concurrency.decrementAndGet();
       counters.get(key).incrementAndGet();
-      elapsedTimes.get(key).addAndGet(System.currentTimeMillis() - startTime);
+      long delta = System.currentTimeMillis() - startTime;
+      elapsedTimes.get(key).addAndGet(delta);
+      if (quantileEnable) {
+        for (MutableQuantiles q : quantiles.get(key)) {
+          q.add(delta);
+        }
+      }
     };
   }
 
@@ -89,6 +126,7 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
     counters.forEach((key, value) -> {
       MetricsRecordBuilder builder =
           collector.addRecord(name);
@@ -128,5 +166,9 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
     public String description() {
       return description;
     }
+  }
+
+  public boolean isQuantileEnable() {
+    return quantileEnable;
   }
 }
