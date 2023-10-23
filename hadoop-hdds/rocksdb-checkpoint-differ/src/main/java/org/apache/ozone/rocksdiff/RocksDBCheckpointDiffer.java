@@ -1580,8 +1580,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return response;
   }
 
-  private boolean shouldSkipNode(CompactionNode node,
-                                 Map<String, String> columnFamilyToPrefixMap) {
+  @VisibleForTesting
+  boolean shouldSkipNode(CompactionNode node,
+                         Map<String, String> columnFamilyToPrefixMap) {
     // This is for backward compatibility. Before the compaction log table
     // migration, startKey, endKey and columnFamily information is not persisted
     // in compaction log files.
@@ -1600,14 +1601,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
 
     if (!columnFamilyToPrefixMap.containsKey(node.getColumnFamily())) {
-      LOG.debug("SstFile: {} is for columnFamily: {} while filter map " +
+      LOG.debug("SstFile node: {} is for columnFamily: {} while filter map " +
               "contains columnFamilies: {}.", node.getFileName(),
           node.getColumnFamily(), columnFamilyToPrefixMap.keySet());
-      return false;
+      return true;
     }
 
     String keyPrefix = columnFamilyToPrefixMap.get(node.getColumnFamily());
-    return RocksDiffUtils.isKeyWithPrefixPresent(keyPrefix, node.getStartKey(),
+    return !RocksDiffUtils.isKeyWithPrefixPresent(keyPrefix, node.getStartKey(),
         node.getEndKey());
   }
 }
