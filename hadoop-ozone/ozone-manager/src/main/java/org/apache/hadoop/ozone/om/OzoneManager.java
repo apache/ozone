@@ -3012,6 +3012,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<Map<String, String>> getRatisRoles() {
     List<ServiceInfo> serviceList;
+    List<Map<String, String>> resultList = new ArrayList<>();
+    Map<String, String> messageException = new HashMap<>();
     int port = omNodeDetails.getRatisPort();
     RaftPeer leaderId;
     if (isRatisEnabled) {
@@ -3019,16 +3021,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         leaderId = omRatisServer.getLeader();
         if (leaderId == null) {
           LOG.error("No leader found");
-          return Collections.emptyList();
+          messageException.put("Message", "Exception: Not a leader");
+          resultList.add(messageException);
+          return resultList;
         }
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
-        return Collections.emptyList();
+        messageException.put("Message", "IO-Exception Occurred");
+        resultList.add(messageException);
+        return resultList;
       }
       return OmUtils.format(serviceList, port, leaderId.getId().toString());
     } else {
-      return Collections.emptyList();
+      messageException.put("Message", "Exception: Ratis Disabled");
+      resultList.add(messageException);
+      return resultList;
     }
   }
 

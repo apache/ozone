@@ -56,19 +56,18 @@
             <th>Role</th>
         </tr>
         </thead>
-        <tbody>
-        <tr class="om-roles-background" ng-repeat="roles in $ctrl.overview.jmx.RatisRoles"
-            ng-if="$ctrl.role.Id == roles[2].value">
+        <tbody ng-repeat="roles in $ctrl.overview.jmx.RatisRoles">
+        <tr class="om-roles-background" ng-if="$ctrl.role.Id == roles[3].value">
+            <td>{{roles[0].value}}</td>
             <td>{{roles[3].value}}</td>
             <td>{{roles[2].value}}</td>
             <td>{{roles[1].value}}</td>
-            <td>{{roles[0].value}}</td>
         </tr>
-        <tr ng-repeat="roles in $ctrl.overview.jmx.RatisRoles" ng-if="$ctrl.role.Id != roles[2].value">
+        <tr ng-if="$ctrl.role.Id != roles[3].value">
+            <td>{{roles[0].value}}</td>
             <td>{{roles[3].value}}</td>
             <td>{{roles[2].value}}</td>
             <td>{{roles[1].value}}</td>
-            <td>{{roles[0].value}}</td>
         </tr>
         </tbody>
     </table>

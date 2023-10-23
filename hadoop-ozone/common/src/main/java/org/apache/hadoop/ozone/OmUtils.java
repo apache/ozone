@@ -826,22 +826,17 @@ public final class OmUtils {
            if (info.getNodeType() == HddsProtos.NodeType.OM) {
                String role = info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" : "FOLLOWER";
                Map<String, String> omInfo = new HashMap<>();
-               omInfo.put("HostName", info.getHostname());
-               omInfo.put("Node-Id", info.getOmRoleInfo().getNodeId());
-               omInfo.put("Ratis-Port", String.valueOf(port));
-               omInfo.put("Role", role);
+               omInfo.put("hostName", info.getHostname());
+               omInfo.put("nodeId", info.getOmRoleInfo().getNodeId());
+               omInfo.put("ratisPort", String.valueOf(port));
+               omInfo.put("role", role);
 
                omInfoList.add(omInfo);
                count++;
            }
        }
-       // Print Stand-alone if only one OM exists
-       if (count == 1) {
-           // Return an empty list to indicate "STANDALONE"
-           return Collections.emptyList();
-       } else {
+       // Return omInfoList if count ==1 or count >=1
            return omInfoList;
-       }
   }
 
   /**
