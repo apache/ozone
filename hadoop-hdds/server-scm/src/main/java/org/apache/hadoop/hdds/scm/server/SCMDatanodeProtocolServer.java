@@ -30,6 +30,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -157,7 +158,7 @@ public class SCMDatanodeProtocolServer implements
     InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(
         conf, scm.getScmNodeDetails());
 
-    protocolMessageMetrics = getProtocolMessageMetrics();
+    protocolMessageMetrics = getProtocolMessageMetrics(conf);
     final int handlerCount = conf.getInt(OZONE_SCM_DATANODE_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -470,10 +471,10 @@ public class SCMDatanodeProtocolServer implements
    * @return ProtocolMessageMetrics
    */
   protected ProtocolMessageMetrics<ProtocolMessageEnum>
-        getProtocolMessageMetrics() {
+        getProtocolMessageMetrics(ConfigurationSource conf) {
     return ProtocolMessageMetrics
         .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.values(), conf);
   }
 
   /**
