@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
@@ -159,7 +160,7 @@ public class TestContainerStateMachineFailures {
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).setHbInterval(200)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
@@ -518,6 +519,8 @@ public class TestContainerStateMachineFailures {
     stateMachine.takeSnapshot();
     Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
     Assert.assertNotNull(snapshot);
+    long markIndex1 = StatemachineImplTestUtil.findLatestSnapshot(storage)
+            .getIndex();
     long containerID = omKeyLocationInfo.getContainerID();
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
             .getContainerWithPipeline(containerID).getPipeline();
@@ -548,6 +551,22 @@ public class TestContainerStateMachineFailures {
       Assert.fail("Exception should not be thrown");
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
+    }
+    // This is just an attempt to wait for an asynchronous call from Ratis API
+    // to updateIncreasingly to finish as part of flaky test issue "HDDS-6115"
+    // This doesn't solve the problem completely but reduce the failure ratio.
+    try {
+      GenericTestUtils.waitFor((() -> {
+        try {
+          return markIndex1 != StatemachineImplTestUtil
+                  .findLatestSnapshot(storage).getIndex();
+        } catch (IOException e) {
+          // No action needed. The test case is going to fail at assertion.
+          return true;
+        }
+      }), 1000, 30000);
+    } catch (Exception e) {
+      // No action needed. The test case is going to fail at assertion.
     }
     final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
     Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
