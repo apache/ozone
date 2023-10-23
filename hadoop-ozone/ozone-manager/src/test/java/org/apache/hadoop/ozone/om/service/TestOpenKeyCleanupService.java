@@ -20,7 +20,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -394,7 +394,7 @@ public class TestOpenKeyCleanupService {
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setAcls(Collections.emptyList())
-            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
             .build();
@@ -447,7 +447,7 @@ public class TestOpenKeyCleanupService {
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setAcls(Collections.emptyList())
-            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+            .setReplicationConfig(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
             .build();
@@ -466,7 +466,7 @@ public class TestOpenKeyCleanupService {
               .setMultipartUploadID(omMultipartInfo.getUploadID())
               .setMultipartUploadPartNumber(i)
               .setAcls(Collections.emptyList())
-              .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+              .setReplicationConfig(RatisReplicationConfig.getInstance(
                   HddsProtos.ReplicationFactor.ONE))
               .build();
 
@@ -482,7 +482,7 @@ public class TestOpenKeyCleanupService {
                 .setMultipartUploadID(omMultipartInfo.getUploadID())
                 .setMultipartUploadPartNumber(i)
                 .setAcls(Collections.emptyList())
-                .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
                 .setLocationInfoList(Collections.emptyList())
                 .build();
