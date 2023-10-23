@@ -132,12 +132,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
    * @return OMClientResponse
    */
   protected OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMKeySetTimesResponse(createErrorOMResponse(
         omResponse, exception), getBucketLayout());
   }
 
-  protected void onComplete(Result result, IOException exception,
+  protected void onComplete(Result result, Exception exception,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
@@ -178,7 +178,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -225,9 +225,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

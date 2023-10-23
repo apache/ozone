@@ -205,7 +205,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
     int numMissingParents = 0;
@@ -334,9 +334,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(
@@ -362,7 +360,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   }
 
   protected void logResult(CreateKeyRequest createKeyRequest,
-      OMMetrics omMetrics, IOException exception, Result result,
+      OMMetrics omMetrics, Exception exception, Result result,
        int numMissingParents) {
     switch (result) {
     case SUCCESS:

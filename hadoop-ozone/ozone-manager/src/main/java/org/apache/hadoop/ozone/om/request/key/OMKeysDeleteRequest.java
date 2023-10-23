@@ -90,7 +90,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     List<String> deleteKeys = new ArrayList<>(deleteKeyArgs.getKeysList());
 
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
 
@@ -187,9 +187,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       createErrorOMResponse(omResponse, exception);
 
       // reset deleteKeys as request failed.

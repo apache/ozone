@@ -104,7 +104,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = Result.FAILURE;
     List<OmDirectoryInfo> missingParentInfos;
@@ -188,9 +188,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             new OMDirectoryCreateResponseWithFSO(omResponse.build(), result);
       }
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMDirectoryCreateResponseWithFSO(
           createErrorOMResponse(omResponse, exception), result);
     } finally {
@@ -214,7 +212,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
                          KeyArgs keyArgs, OMMetrics omMetrics, int numKeys,
                          Result result,
-                         IOException exception) {
+                         Exception exception) {
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

@@ -90,7 +90,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
@@ -173,9 +173,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMKeyDeleteResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {

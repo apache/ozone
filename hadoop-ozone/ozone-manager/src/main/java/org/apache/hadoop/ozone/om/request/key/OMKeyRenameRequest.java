@@ -134,7 +134,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo fromKeyValue = null;
     String toKey = null, fromKey = null;
     Result result = null;
@@ -207,9 +207,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {

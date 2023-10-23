@@ -107,7 +107,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
@@ -169,9 +169,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           omResponse.build(), omBucketInfo);
     } catch (IOException | InvalidPathException ex) {
       success = false;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMBucketSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

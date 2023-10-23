@@ -222,7 +222,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String userPrincipal = request.getUserPrincipal();
 
     Preconditions.checkState(accessId.equals(request.getAccessId()));
-    IOException exception = null;
+    Exception exception = null;
 
     String volumeName = null;
 
@@ -329,9 +329,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           accessId, omDBAccessIdInfo, principalInfo,
           ozoneManager.getS3SecretManager());
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder().build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(

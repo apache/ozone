@@ -115,7 +115,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     boolean acquiredLock = false;
 
-    IOException exception = null;
+    Exception exception = null;
     String partName = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -247,9 +247,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse =
           getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo,
@@ -307,7 +305,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   private void logResult(OzoneManager ozoneManager,
       MultipartCommitUploadPartRequest multipartCommitUploadPartRequest,
       KeyArgs keyArgs, Map<String, String> auditMap, String volumeName,
-      String bucketName, String keyName, IOException exception,
+      String bucketName, String keyName, Exception exception,
       String partName, Result result) {
     // audit log
     // Add MPU related information.

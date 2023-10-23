@@ -183,7 +183,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     String volumeKey = metadataManager.getVolumeKey(volumeName);
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false;
     boolean acquiredVolumeLock = false;
     OMClientResponse omClientResponse = null;
@@ -247,9 +247,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
           omBucketInfo, omVolumeArgs.copyObject());
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

@@ -84,7 +84,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredUserLock = false;
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
     String owner = null;
     OMClientResponse omClientResponse = null;
     try {
@@ -142,9 +142,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
           volume, owner, newVolumeList);
 
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

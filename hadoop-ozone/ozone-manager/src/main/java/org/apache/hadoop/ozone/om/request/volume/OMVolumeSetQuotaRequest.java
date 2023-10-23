@@ -113,7 +113,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquireVolumeLock = false;
     OMClientResponse omClientResponse = null;
     try {
@@ -158,9 +158,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeSetQuotaResponse(omResponse.build(),
           omVolumeArgs);
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

@@ -105,7 +105,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo fromKeyValue = null;
     Result result = null;
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -226,9 +226,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       createErrorOMResponse(omResponse, exception);
 
       omResponse.setRenameKeysResponse(RenameKeysResponse.newBuilder()

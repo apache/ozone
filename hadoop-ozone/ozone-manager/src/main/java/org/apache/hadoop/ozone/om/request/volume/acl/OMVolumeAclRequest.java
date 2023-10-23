@@ -77,7 +77,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -129,9 +129,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumVolumeUpdateFails();
       omClientResponse = onFailure(omResponse, exception);
     } finally {
@@ -193,12 +191,12 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
    * Get the OM client response on failure case with lock.
    */
   abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException ex);
+      Exception ex);
 
   /**
    * Completion hook for final processing before return without lock.
    * Usually used for logging without lock.
    */
-  abstract void onComplete(Result result, IOException ex, long trxnLogIndex,
+  abstract void onComplete(Result result, Exception ex, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
 }

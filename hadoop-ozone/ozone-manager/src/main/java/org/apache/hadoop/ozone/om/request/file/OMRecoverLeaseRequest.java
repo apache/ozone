@@ -124,7 +124,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
     omMetadataManager = ozoneManager.getMetadataManager();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     // increment metric
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
@@ -159,9 +159,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     } catch (IOException | InvalidPathException ex) {
       LOG.error("Fail for recovering lease. Volume:{}, Bucket:{}, Key:{}",
           volumeName, bucketName, keyName, ex);
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumRecoverLeaseFails();
       omResponse.setCmdType(RecoverLease);
       omClientResponse = new OMRecoverLeaseResponse(

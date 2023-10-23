@@ -146,7 +146,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo omKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
@@ -329,9 +329,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {
@@ -394,7 +392,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   protected void processResult(CommitKeyRequest commitKeyRequest,
                                String volumeName, String bucketName,
                                String keyName, OMMetrics omMetrics,
-                               IOException exception, OmKeyInfo omKeyInfo,
+                               Exception exception, OmKeyInfo omKeyInfo,
                                Result result) {
     switch (result) {
     case SUCCESS:

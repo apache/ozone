@@ -95,7 +95,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
             getOmRequest());
 
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo omKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
@@ -273,9 +273,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMKeyCommitResponseWithFSO(createErrorOMResponse(
               omResponse, exception), getBucketLayout());
     } finally {

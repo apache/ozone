@@ -107,7 +107,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -233,9 +233,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseWithFSO(createErrorOMResponse(

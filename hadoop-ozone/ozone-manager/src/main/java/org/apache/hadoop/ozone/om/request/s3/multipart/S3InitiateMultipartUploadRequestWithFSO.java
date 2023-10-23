@@ -90,7 +90,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
     ozoneManager.getMetrics().incNumInitiateMultipartUploads();
     boolean acquiredBucketLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
     List<OmDirectoryInfo> missingParentInfos;
@@ -228,9 +228,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {

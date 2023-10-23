@@ -94,7 +94,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result;
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
@@ -220,9 +220,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(

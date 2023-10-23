@@ -116,7 +116,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     // Doing this here, so we can do protobuf conversion outside of lock.
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     OmVolumeArgs omVolumeArgs = null;
     Map<String, String> auditMap = null;
@@ -170,9 +170,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       }
 
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

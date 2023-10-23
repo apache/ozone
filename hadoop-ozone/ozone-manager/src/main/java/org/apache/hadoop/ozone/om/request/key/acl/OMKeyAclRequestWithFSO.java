@@ -64,7 +64,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -137,9 +137,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
@@ -168,7 +166,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
   @Override
   OMClientResponse onFailure(
       OzoneManagerProtocolProtos.OMResponse.Builder omResp,
-      IOException exception) {
+      Exception exception) {
     return new OMKeyAclResponseWithFSO(
         createErrorOMResponse(omResp, exception), getBucketLayout());
   }

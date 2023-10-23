@@ -117,7 +117,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false;
     boolean acquiredSnapshotLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -193,9 +193,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       // No longer need to invalidate the entry in the snapshot cache here.
 
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMSnapshotDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

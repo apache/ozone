@@ -76,7 +76,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -136,9 +136,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
 
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
@@ -199,7 +197,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * Get the om client response on failure case with lock.
    */
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMBucketAclResponse(
         createErrorOMResponse(omResponse, exception));
   }
@@ -208,7 +206,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * Completion hook for final processing before return without lock.
    * Usually used for logging without lock and metric update.
    */
-  abstract void onComplete(boolean operationResult, IOException exception,
+  abstract void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap);
 }

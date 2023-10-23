@@ -175,7 +175,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
 
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
 
     String userPrincipal = null;
 
@@ -225,9 +225,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           s3SecretManager);
 
     } catch (IOException | InvalidPathException ex) {
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           createErrorOMResponse(omResponse, exception));

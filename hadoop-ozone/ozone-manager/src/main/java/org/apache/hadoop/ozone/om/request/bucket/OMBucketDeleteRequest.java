@@ -102,7 +102,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.BUCKET, bucketName);
 
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
 
     boolean acquiredBucketLock = false, acquiredVolumeLock = false;
     boolean success = true;
@@ -185,9 +185,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           volumeName, bucketName, omVolumeArgs.copyObject());
     } catch (IOException | InvalidPathException ex) {
       success = false;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

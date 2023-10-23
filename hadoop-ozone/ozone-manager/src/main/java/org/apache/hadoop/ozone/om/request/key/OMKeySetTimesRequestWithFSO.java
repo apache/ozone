@@ -69,7 +69,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -126,9 +126,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
-      exception = ex instanceof IOException ? (IOException) ex :
-          new OMException(ex.getMessage(),
-              OMException.ResultCodes.INVALID_PATH);
+      exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
@@ -162,7 +160,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
   @Override
   protected OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMKeySetTimesResponseWithFSO(createErrorOMResponse(
         omResponse, exception), getBucketLayout());
   }
