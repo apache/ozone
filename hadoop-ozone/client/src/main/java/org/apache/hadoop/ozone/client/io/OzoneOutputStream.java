@@ -131,6 +131,12 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
       if (wrappedStream instanceof KeyOutputStream) {
         return ((KeyOutputStream) wrappedStream).getCommitUploadPartInfo();
       }
+    } else if (outputStream instanceof CipherOutputStreamOzone) {
+      OutputStream wrappedStream =
+          ((CipherOutputStreamOzone) outputStream).getWrappedStream();
+      if (wrappedStream instanceof KeyOutputStream) {
+        return ((KeyOutputStream)wrappedStream).getCommitUploadPartInfo();
+      }
     }
     // Otherwise return null.
     return null;
@@ -145,8 +151,8 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     if (outputStream instanceof CryptoOutputStream) {
       return ((KeyMetadataAware)((CryptoOutputStream) outputStream)
           .getWrappedStream()).getMetadata();
-    } else if (outputStream instanceof CipherOutputStream) {
-      return ((KeyMetadataAware)((CipherOutputStream) outputStream)
+    } else if (outputStream instanceof CipherOutputStreamOzone) {
+      return ((KeyMetadataAware)((CipherOutputStreamOzone) outputStream)
           .getWrappedStream()).getMetadata();
     }
     return ((KeyMetadataAware) outputStream).getMetadata();

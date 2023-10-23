@@ -72,9 +72,9 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
           return ((KeyDataStreamOutput) wrappedStream)
               .getCommitUploadPartInfo();
         }
-      } else if (outputStream instanceof CipherOutputStream) {
+      } else if (outputStream instanceof CipherOutputStreamOzone) {
         OutputStream wrappedStream =
-            ((CipherOutputStream) outputStream).getWrappedStream();
+            ((CipherOutputStreamOzone) outputStream).getWrappedStream();
         if (wrappedStream instanceof KeyDataStreamOutput) {
           return ((KeyDataStreamOutput) wrappedStream)
               .getCommitUploadPartInfo();
