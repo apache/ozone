@@ -17,7 +17,6 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
