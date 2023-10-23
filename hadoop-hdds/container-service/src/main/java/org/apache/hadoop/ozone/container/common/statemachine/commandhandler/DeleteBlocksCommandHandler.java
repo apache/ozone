@@ -326,9 +326,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
-      LOG.info("Start to delete container blocks, TXIDs={}, "
+      if (LOG.isDebugEnabled()) {
+        LOG.info("Start to delete container blocks, TXIDs={}",
+            summary.getTxIDSummary());
+      }
+      LOG.info("Summary of deleting container blocks, numOfTransactions={}, "
               + "numOfContainers={}, numOfBlocks={}",
-          summary.getTxIDSummary(),
+          summary.getNumOfTxs(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
       blockDeleteMetrics.incrReceivedContainerCount(
