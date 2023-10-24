@@ -268,7 +268,6 @@ public final class Pipeline {
     return getRandomNode(null);
   }
 
-
   public DatanodeDetails getRandomNode(Set<DatanodeDetails> excluded)
       throws IOException {
     final Set<DatanodeDetails> actualExcluded =
