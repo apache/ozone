@@ -175,12 +175,12 @@ public class TestOpenKeyCleanupService {
     final int n = hsync ? numDEFKeys + numFSOKeys : 1;
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT, n);
     waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED, n);
-    assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
-        oldkeyCount + keyCount);
+    assertAtLeast(oldkeyCount + keyCount,
+        openKeyCleanupService.getSubmittedOpenKeyCount());
 
     if (hsync) {
       assertAtLeast(numDEFKeys, metrics.getNumOpenKeysCleaned());
-      assertTrue(metrics.getNumOpenKeysHSyncCleaned() >= numFSOKeys);
+      assertAtLeast(numFSOKeys, metrics.getNumOpenKeysHSyncCleaned());
       assertEquals(numFSOKeys, metrics.getNumKeyHSyncs());
     } else {
       assertAtLeast(keyCount, metrics.getNumOpenKeysCleaned());
@@ -313,8 +313,8 @@ public class TestOpenKeyCleanupService {
     int numExpiredParts = NUM_MPU_PARTS * keyCount;
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT, 1);
     waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED, 1);
-    assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
-        (oldkeyCount + numExpiredParts));
+    assertAtLeast(oldkeyCount + numExpiredParts,
+        openKeyCleanupService.getSubmittedOpenKeyCount());
     assertAtLeast(numExpiredParts, metrics.getNumOpenKeysCleaned());
   }
 
