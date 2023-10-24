@@ -643,7 +643,7 @@ public class TestOmSnapshot {
                 .setVolumeName(volume)
                 .setBucketName(bucket)
                 .setKeyName(key).build(),
-                BucketLayout.DEFAULT, null);
+                bucketLayout, null);
   }
 
   /**
