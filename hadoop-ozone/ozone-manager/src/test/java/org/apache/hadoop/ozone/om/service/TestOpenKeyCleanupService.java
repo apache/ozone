@@ -168,15 +168,15 @@ public class TestOpenKeyCleanupService {
     openKeyCleanupService.resume();
 
     GenericTestUtils.waitFor(
-        () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
+        () -> openKeyCleanupService.getSubmittedOpenKeyCount() >=
+            oldkeyCount + keyCount,
         (int) SERVICE_INTERVAL.toMillis(),
         5 * (int) SERVICE_INTERVAL.toMillis());
+    assertAtLeast(oldrunCount + 1, openKeyCleanupService.getRunCount());
 
     final int n = hsync ? numDEFKeys + numFSOKeys : 1;
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT, n);
     waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED, n);
-    assertAtLeast(oldkeyCount + keyCount,
-        openKeyCleanupService.getSubmittedOpenKeyCount());
 
     if (hsync) {
       assertAtLeast(numDEFKeys, metrics.getNumOpenKeysCleaned());
@@ -288,6 +288,7 @@ public class TestOpenKeyCleanupService {
     assertEquals(0, metrics.getNumOpenKeysCleaned());
     assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
     final int keyCount = numDEFKeys + numFSOKeys;
+    int numExpiredParts = NUM_MPU_PARTS * keyCount;
     createIncompleteMPUKeys(numDEFKeys, BucketLayout.DEFAULT, NUM_MPU_PARTS,
         false);
     createIncompleteMPUKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED,
@@ -305,16 +306,15 @@ public class TestOpenKeyCleanupService {
     openKeyCleanupService.resume();
 
     GenericTestUtils.waitFor(
-        () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
+        () -> openKeyCleanupService.getSubmittedOpenKeyCount() >=
+            oldkeyCount + numExpiredParts,
         (int) SERVICE_INTERVAL.toMillis(),
         5 * (int) SERVICE_INTERVAL.toMillis());
+    assertAtLeast(oldrunCount + 1, openKeyCleanupService.getRunCount());
 
     // No expired MPU parts fetched
-    int numExpiredParts = NUM_MPU_PARTS * keyCount;
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT, 1);
     waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED, 1);
-    assertAtLeast(oldkeyCount + numExpiredParts,
-        openKeyCleanupService.getSubmittedOpenKeyCount());
     assertAtLeast(numExpiredParts, metrics.getNumOpenKeysCleaned());
   }
 
