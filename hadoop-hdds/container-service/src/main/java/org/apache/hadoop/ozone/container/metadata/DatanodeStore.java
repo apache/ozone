@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
@@ -86,7 +87,7 @@ public interface DatanodeStore extends Closeable {
    *
    * @return Table
    */
-  Table<BlockID, List<ContainerProtos.ChunkInfo>> getLastChunkInfoTable();
+  Table<String, ChunkInfo> getLastChunkInfoTable();
 
   /**
    * Helper to create and write batch transactions.

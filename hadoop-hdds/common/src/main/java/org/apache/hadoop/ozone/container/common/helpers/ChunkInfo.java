@@ -24,6 +24,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
+
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto3Codec;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -44,6 +48,12 @@ public class ChunkInfo {
   // reside in one buffer). This variable should be set to true for older
   // clients to maintain backward wire compatibility.
   private boolean readDataIntoSingleBuffer = false;
+
+  private static final Codec<ChunkInfo>
+      CODEC = new DelegatedCodec<>(
+      Proto3Codec.get(ContainerProtos.ChunkInfo.class),
+      ChunkInfo::getFromProtoBuf,
+      ChunkInfo::getProtoBufMessage);
 
   /**
    * Constructs a ChunkInfo.
@@ -207,5 +217,9 @@ public class ChunkInfo {
 
   public boolean isReadDataIntoSingleBuffer() {
     return readDataIntoSingleBuffer;
+  }
+
+  public static Codec<ChunkInfo> getCodec() {
+    return CODEC;
   }
 }

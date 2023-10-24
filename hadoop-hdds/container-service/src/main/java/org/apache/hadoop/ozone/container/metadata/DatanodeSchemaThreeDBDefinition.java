@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
@@ -92,6 +94,15 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.class));
 
+  public static final DBColumnFamilyDefinition<String, ChunkInfo>
+      LAST_CHUNK_INFO =
+      new DBColumnFamilyDefinition<>(
+          "last_chunk_info",
+          String.class,
+          FixedLengthStringCodec.get(),
+          ChunkInfo.class,
+          ChunkInfo.getCodec());
+
   private static String separator = "";
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
@@ -99,7 +110,8 @@ public class DatanodeSchemaThreeDBDefinition
          BLOCK_DATA,
          METADATA,
          DELETED_BLOCKS,
-         DELETE_TRANSACTION);
+         DELETE_TRANSACTION,
+         LAST_CHUNK_INFO);
 
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
@@ -122,6 +134,7 @@ public class DatanodeSchemaThreeDBDefinition
     METADATA.setCfOptions(cfOptions);
     DELETED_BLOCKS.setCfOptions(cfOptions);
     DELETE_TRANSACTION.setCfOptions(cfOptions);
+    LAST_CHUNK_INFO.setCfOptions(cfOptions);
   }
 
   @Override
@@ -144,6 +157,12 @@ public class DatanodeSchemaThreeDBDefinition
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, ChunkInfo>
+  getLastChunkInfoColumnFamily() {
+    return LAST_CHUNK_INFO;
   }
 
   public DBColumnFamilyDefinition<String, DeletedBlocksTransaction>

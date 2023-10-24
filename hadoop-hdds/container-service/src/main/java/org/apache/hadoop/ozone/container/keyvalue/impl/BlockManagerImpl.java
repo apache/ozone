@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -176,6 +177,7 @@ public class BlockManagerImpl implements BlockManager {
 
         // TODO: deal with both old and new clients
         if (isFullBlockData(data)) {
+          // old client: override chunk list.
           db.getStore().getBlockDataTable().putWithBatch(
               batch, containerData.getBlockKey(localID), data);
         } else if (shouldAppendLastChunk(endOfBlock, data)) {
@@ -183,23 +185,27 @@ public class BlockManagerImpl implements BlockManager {
           // remove from lastChunkInfo
           // the 'data' is complete so append it to the block table's chunk info
 
-          List<ContainerProtos.ChunkInfo> lastChunkInfo =
-              db.getStore().getLastChunkInfoTable().get(data.getBlockID());
+          //List<ContainerProtos.ChunkInfo> lastChunkInfo =
+          //    db.getStore().getLastChunkInfoTable().get(data.getBlockID());
           // TODO: what if lastChunkInfo is null?
           BlockData blockData = db.getStore().getBlockDataTable().get(
               containerData.getBlockKey(localID));
-          for (ContainerProtos.ChunkInfo chunk : lastChunkInfo) {
+          for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
             blockData.addChunk(chunk);
           }
           // delete the entry from last chunk info table
           db.getStore().getLastChunkInfoTable().putWithBatch(
-              batch, data.getBlockID(), null);
+              batch, data.getBlockID().toString(), null);
+          // update block data table
+          db.getStore().getBlockDataTable().putWithBatch(
+              batch, containerData.getBlockKey(localID), blockData);
         } else {
           // old client
           // if not,
-          // update the last chunk info table
+          // replace/update the last chunk info table
           db.getStore().getLastChunkInfoTable().putWithBatch(
-              batch, data.getBlockID(), data.getChunks());
+              batch, data.getBlockID().toString(),
+              ChunkInfo.getFromProtoBuf(data.getChunks().get(data.getChunks().size() -1)));
         }
 
         // If the block does not exist in the pendingPutBlockCache of the

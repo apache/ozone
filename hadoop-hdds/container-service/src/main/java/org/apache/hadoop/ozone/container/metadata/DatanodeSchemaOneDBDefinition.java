@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 import java.util.List;
@@ -100,6 +101,11 @@ public class DatanodeSchemaOneDBDefinition
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, ChunkInfo> getLastChunkInfoColumnFamily() {
+    return null;
   }
 
   @Override

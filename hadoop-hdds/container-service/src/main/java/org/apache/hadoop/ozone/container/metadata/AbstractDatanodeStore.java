@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -66,7 +67,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTable;
 
-  private Table<BlockID, List<ContainerProtos.ChunkInfo>> lastChunkInfoTable;
+  private Table<String, ChunkInfo> lastChunkInfoTable;
 
   private Table<String, BlockData> blockDataTableWithIterator;
 
@@ -178,6 +179,10 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       deletedBlocksTable = new DatanodeTable<>(
               dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
       checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
+
+      lastChunkInfoTable = new DatanodeTable<>(
+          dbDef.getLastChunkInfoColumnFamily().getTable(this.store));
+      checkTableStatus(blockDataTable, blockDataTable.getName());
     }
   }
 
@@ -210,7 +215,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<BlockID, List<ContainerProtos.ChunkInfo>> getLastChunkInfoTable() {
+  public Table<String, ChunkInfo> getLastChunkInfoTable() {
     return lastChunkInfoTable;
   }
 
