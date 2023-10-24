@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -76,7 +77,11 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.LoggerFactory;
@@ -118,6 +123,9 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestBlockDeletingService {
 
+  @Rule
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
+
   private File testRoot;
   private String scmId;
   private String clusterID;
@@ -143,6 +151,8 @@ public class TestBlockDeletingService {
 
   @Before
   public void init() throws IOException {
+    CodecBuffer.enableLeakDetection();
+
     testRoot = GenericTestUtils
         .getTestDir(TestBlockDeletingService.class.getSimpleName());
     if (testRoot.exists()) {
@@ -854,7 +864,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf);
+        10, conf, "", mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data
@@ -899,7 +909,7 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @Test(timeout = 30000)
+  @Test
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
@@ -965,7 +975,7 @@ public class TestBlockDeletingService {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testContainerMaxLockHoldingTime() throws Exception {
     GenericTestUtils.LogCapturer log =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -1023,7 +1033,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testBlockThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 5

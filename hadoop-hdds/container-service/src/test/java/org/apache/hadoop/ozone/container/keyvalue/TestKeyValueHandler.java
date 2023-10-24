@@ -38,13 +38,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -59,6 +59,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
 
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -84,7 +85,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public final TestRule timeout = Timeout.seconds(300);
+  public final TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
@@ -277,18 +278,14 @@ public class TestKeyValueHandler {
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
       DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails())
-          .thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(
+          datanodeDetails, conf);
       KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
           context.getParent().getDatanodeDetails().getUuidString(), cset,
           volumeSet, metrics, c -> {
       });
       assertEquals("org.apache.hadoop.ozone.container.common" +
-          ".volume.RoundRobinVolumeChoosingPolicy",
+          ".volume.CapacityVolumeChoosingPolicy",
           keyValueHandler.getVolumeChoosingPolicyForTesting()
               .getClass().getName());
 

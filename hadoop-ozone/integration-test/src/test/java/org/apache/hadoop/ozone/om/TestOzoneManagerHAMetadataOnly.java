@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.log4j.Logger;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -97,7 +96,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
 
     createAndCheckVolume(volumeName);
@@ -115,7 +113,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   @Test
   public void testAllBucketOperations() throws Exception {
-
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     String bucketName = "volume" + RandomStringUtils.randomNumeric(5);
 
@@ -332,7 +329,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   @Test
-  @Flaky("HDDS-6644")
   public void testReadRequest() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     ObjectStore objectStore = getObjectStore();
@@ -370,7 +366,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   @Test
-  @Flaky("HDDS-6642")
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     ObjectStore objectStore = getObjectStore();

@@ -229,7 +229,9 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, blockDeletingSvcInterval.toMillis(),
             blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
-            blockDeletingServiceWorkerSize, config);
+            blockDeletingServiceWorkerSize, config,
+            datanodeDetails.threadNamePrefix(),
+            context.getParent().getReconfigurationHandler());
 
     Duration recoveringContainerScrubbingSvcInterval = conf.getObject(
         DatanodeConfiguration.class).getRecoveringContainerScrubInterval();
@@ -551,4 +553,9 @@ public class OzoneContainer {
   public ContainerMetrics getMetrics() {
     return metrics;
   }
+
+  public BlockDeletingService getBlockDeletingService() {
+    return blockDeletingService;
+  }
+
 }

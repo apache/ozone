@@ -76,7 +76,7 @@ public class TestRootCaRotationPoller {
     List<String> certsFromScm = new ArrayList<>();
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
-        knownCerts, scmSecurityClient);
+        knownCerts, scmSecurityClient, "");
 
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
@@ -105,7 +105,7 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
     certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
-        knownCerts, scmSecurityClient);
+        knownCerts, scmSecurityClient, "");
     poller.run();
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
@@ -132,7 +132,7 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
     certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
-        knownCerts, scmSecurityClient);
+        knownCerts, scmSecurityClient, "");
     poller.run();
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);

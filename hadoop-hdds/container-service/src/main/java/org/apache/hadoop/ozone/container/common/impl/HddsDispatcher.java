@@ -78,6 +78,7 @@ import java.util.TreeMap;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import static org.apache.hadoop.ozone.container.common.volume.VolumeUsage.PrecomputedVolumeSpace;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
@@ -580,10 +581,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      long volumeCapacity = volume.getCapacity();
+      PrecomputedVolumeSpace precomputedVolumeSpace =
+          volume.getPrecomputedVolumeSpace();
+      long volumeCapacity = precomputedVolumeSpace.getCapacity();
       long volumeFreeSpaceToSpare =
           VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
-      long volumeFree = volume.getAvailable();
+      long volumeFree = volume.getAvailable(precomputedVolumeSpace);
       long volumeCommitted = volume.getCommittedBytes();
       long volumeAvailable = volumeFree - volumeCommitted;
       return (volumeAvailable <= volumeFreeSpaceToSpare);

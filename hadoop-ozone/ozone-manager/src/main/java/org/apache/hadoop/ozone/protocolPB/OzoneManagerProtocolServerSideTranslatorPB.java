@@ -20,6 +20,7 @@ import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServe
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -76,6 +78,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
   private final RequestValidations requestValidations;
+  private final OMPerformanceMetrics perfMetrics;
+
+  // always true, only used in tests
+  private boolean shouldFlushCache = true;
 
   /**
    * Constructs an instance of the server handler.
@@ -89,6 +95,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       boolean enableRatis,
       long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
+    this.perfMetrics = impl.getPerfMetrics();
     this.isRatisEnabled = enableRatis;
     // Update the transactionIndex with the last TransactionIndex read from DB.
     // New requests should have transactionIndex incremented from this index
@@ -137,7 +144,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OMRequest request) throws ServiceException {
     OMRequest validatedRequest;
     try {
-      validatedRequest = requestValidations.validateRequest(request);
+      validatedRequest = captureLatencyNs(
+          perfMetrics.getValidateRequestLatencyNs(),
+          () -> requestValidations.validateRequest(request));
     } catch (Exception e) {
       if (e instanceof OMException) {
         return createErrorResponse(request, (OMException) e);
@@ -146,16 +155,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     }
 
     OMResponse response = dispatcher.processRequest(validatedRequest,
-        this::processRequest,
-        request.getCmdType(),
-        request.getTraceID());
+        this::processRequest, request.getCmdType(), request.getTraceID());
 
-    return requestValidations.validateResponse(request, response);
+    return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
+        () -> requestValidations.validateResponse(request, response));
   }
 
   @VisibleForTesting
   public OMResponse processRequest(OMRequest request) throws ServiceException {
-    OMClientRequest omClientRequest = null;
     boolean s3Auth = false;
 
     try {
@@ -184,13 +191,16 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       if (!s3Auth) {
         OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
       }
+      OMClientRequest omClientRequest = null;
+      OMRequest requestToSubmit;
       try {
         omClientRequest = createClientRequest(request, ozoneManager);
         // TODO: Note: Due to HDDS-6055, createClientRequest() could now
         //  return null, which triggered the findbugs warning.
         //  Added the assertion.
         assert (omClientRequest != null);
-        request = omClientRequest.preExecute(ozoneManager);
+        OMClientRequest finalOmClientRequest = omClientRequest;
+        requestToSubmit = preExecute(finalOmClientRequest);
       } catch (IOException ex) {
         if (omClientRequest != null) {
           omClientRequest.handleRequestFailure(ozoneManager);
@@ -198,7 +208,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         return createErrorResponse(request, ex);
       }
 
-      OMResponse response = submitRequestToRatis(request);
+      OMResponse response = submitRequestToRatis(requestToSubmit);
       if (!response.getSuccess()) {
         omClientRequest.handleRequestFailure(ozoneManager);
       }
@@ -206,6 +216,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     } finally {
       OzoneManager.setS3Auth(null);
     }
+  }
+
+  private OMRequest preExecute(OMClientRequest finalOmClientRequest)
+      throws IOException {
+    return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+        () -> finalOmClientRequest.preExecute(ozoneManager));
   }
 
   /**
@@ -284,7 +300,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       return createErrorResponse(request, ex);
     }
     try {
-      omClientResponse.getFlushFuture().get();
+      if (shouldFlushCache) {
+        omClientResponse.getFlushFuture().get();
+      }
       if (LOG.isTraceEnabled()) {
         LOG.trace("Future for {} is completed", request);
       }
@@ -339,5 +357,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
+  }
+
+  @VisibleForTesting
+  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
+    return ozoneManagerDoubleBuffer;
+  }
+
+  @VisibleForTesting
+  public void setShouldFlushCache(boolean shouldFlushCache) {
+    this.shouldFlushCache = shouldFlushCache;
   }
 }

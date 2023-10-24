@@ -43,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -69,13 +70,14 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
+import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -170,12 +172,14 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -200,6 +204,7 @@ public class TestSnapshotDiffManager {
   private final List<String> snapshotNames = new ArrayList<>();
   private final List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
   private final List<SnapshotDiffJob> snapDiffJobs = new ArrayList<>();
+  private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
   @Mock
@@ -368,6 +373,7 @@ public class TestSnapshotDiffManager {
     when(omMetadataManager.getBucketKey(VOLUME_NAME, BUCKET_NAME))
         .thenReturn(bucketTableKey);
     when(omMetadataManager.getKeyTable(LEGACY)).thenReturn(keyInfoTable);
+    when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
@@ -1306,7 +1312,15 @@ public class TestSnapshotDiffManager {
     spy.loadJobsOnStartUp();
 
     // Wait for sometime to make sure that job finishes.
-    Thread.sleep(1000L);
+    Awaitility.await()
+        .atMost(10, TimeUnit.SECONDS)
+        .untilAsserted(() -> {
+          verify(spy, atLeast(1))
+              .generateSnapshotDiffReport(anyString(), anyString(),
+                  eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
+                  eq(snapshotInfoList.get(1).getName()), eq(false),
+                  eq(false));
+        });
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));
@@ -1555,7 +1569,7 @@ public class TestSnapshotDiffManager {
    * Tests that only QUEUED jobs are submitted to the executor and rest are
    * short-circuited based on previous one.
    */
-  @Disabled
+  @Unhealthy
   @Test
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {

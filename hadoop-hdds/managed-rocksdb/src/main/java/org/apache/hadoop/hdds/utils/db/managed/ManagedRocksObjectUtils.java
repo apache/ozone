@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
+import org.rocksdb.RocksDB;
 import org.rocksdb.RocksObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,5 +113,14 @@ public final class ManagedRocksObjectUtils {
       throws IOException {
     waitForFileDelete(file, maxDuration, POLL_INTERVAL_DURATION,
         POLL_DELAY_DURATION);
+  }
+
+  /**
+   * Ensures that the RocksDB native library is loaded.
+   * This method should be called before performing any operations
+   * that require the RocksDB native library.
+   */
+  public static void loadRocksDBLibrary() {
+    RocksDB.loadLibrary();
   }
 }

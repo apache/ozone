@@ -245,7 +245,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @SuppressWarnings("checkstyle:methodlength")
-  private RaftProperties newRaftProperties() {
+  public RaftProperties newRaftProperties() {
     final RaftProperties properties = new RaftProperties();
 
     // Set rpc type

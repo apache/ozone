@@ -50,6 +50,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DO
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -256,6 +257,10 @@ public class TestOzoneManagerHASnapshot {
     await().atMost(Duration.ofSeconds(180))
         .until(() -> cluster.getOMLeader() != null);
     assertNotNull(cluster.getOMLeader());
+    OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster
+        .getOMLeader().getMetadataManager();
+    assertFalse(metadataManager.getSnapshotChainManager()
+        .isSnapshotChainCorrupted());
   }
 
 

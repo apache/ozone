@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -45,7 +44,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Test Read Write with Mini Ozone Chaos Cluster.
  */
-@Ignore
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster extends GenericCli {

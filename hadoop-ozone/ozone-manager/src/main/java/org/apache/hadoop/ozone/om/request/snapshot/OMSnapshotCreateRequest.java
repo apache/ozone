@@ -56,6 +56,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
@@ -131,7 +132,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     omMetrics.incNumSnapshotCreates();
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
 
@@ -190,7 +191,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
           omResponse.build(), snapshotInfo);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -298,7 +299,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   ) {
     try {
       snapshotChainManager.deleteSnapshot(info);
-    } catch (IOException exception) {
+    } catch (IllegalStateException exception) {
       LOG.error("Failed to remove snapshot: {} from SnapshotChainManager.",
           info, exception);
     }

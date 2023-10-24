@@ -76,7 +76,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType) throws IOException {
     this(rawTable, codecRegistry, keyType, valueType,
-        CacheType.PARTIAL_CACHE);
+        CacheType.PARTIAL_CACHE, "");
   }
 
   /**
@@ -87,12 +87,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param keyType The key type.
    * @param valueType The value type.
    * @param cacheType How to cache the entries?
+   * @param threadNamePrefix
    * @throws IOException if failed to iterate the raw table.
    */
   public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType,
-      CacheType cacheType) throws IOException {
+      CacheType cacheType, String threadNamePrefix) throws IOException {
     this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
     Objects.requireNonNull(codecRegistry, "codecRegistry == null");
 
@@ -108,7 +109,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         && valueCodec.supportCodecBuffer();
 
     if (cacheType == CacheType.FULL_CACHE) {
-      cache = new FullTableCache<>();
+      cache = new FullTableCache<>(threadNamePrefix);
       //fill cache
       try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
               iterator()) {
@@ -124,7 +125,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         }
       }
     } else {
-      cache = new PartialTableCache<>();
+      cache = new PartialTableCache<>(threadNamePrefix);
     }
   }
 
@@ -192,7 +193,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       // keyCodec.supportCodecBuffer() is enough since value is not needed.
       try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
         // Use zero capacity buffer since value is not needed.
-        try (CodecBuffer outValue = CodecBuffer.allocateDirect(0)) {
+        try (CodecBuffer outValue = CodecBuffer.getEmptyBuffer()) {
           return getFromTableIfExist(inKey, outValue) != null;
         }
       }
@@ -414,7 +415,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       throws IOException {
     if (supportCodecBuffer) {
       final CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
-      return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
+      try {
+        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
+      } catch (Throwable t) {
+        prefixBuffer.release();
+        throw t;
+      }
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
       return new TypedTableIterator(rawTable.iterator(prefixBytes));

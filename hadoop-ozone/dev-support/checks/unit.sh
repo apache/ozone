@@ -18,4 +18,5 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=unit
-source "${DIR}/junit.sh" -pl \!:ozone-integration-test,\!:mini-chaos-tests -DexcludedGroups=native "$@"
+source "${DIR}/junit.sh" -pl \!:ozone-integration-test,\!:mini-chaos-tests \
+-DexcludedGroups="native | unhealthy | org.apache.ozone.test.UnhealthyTest" "$@"

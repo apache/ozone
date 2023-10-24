@@ -64,7 +64,7 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   @Override
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
-    long txnLogId = 10000;
+    long txnLogId = 0L;
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, parentID + 1, parentID,

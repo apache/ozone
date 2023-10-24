@@ -256,7 +256,8 @@ public class SnapshotDiffManager implements AutoCloseable {
         TimeUnit.MILLISECONDS,
         new ArrayBlockingQueue<>(threadPoolSize),
         new ThreadFactoryBuilder()
-            .setNameFormat("snapshot-diff-job-thread-id-%d")
+            .setNameFormat(ozoneManager.getThreadNamePrefix() +
+                "snapshot-diff-job-thread-id-%d")
             .build()
     );
 
@@ -304,7 +305,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
               threadPoolSize, 60, TimeUnit.SECONDS,
               new SynchronousQueue<>(), new ThreadFactoryBuilder()
-              .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
+          .setNameFormat(ozoneManager.getThreadNamePrefix() +
+              "snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
               new ThreadPoolExecutor.DiscardPolicy()));
       return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecService.get(),
@@ -835,6 +837,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     LOG.info("Started snap diff report generation for volume: '{}', " +
             "bucket: '{}', fromSnapshot: '{}', toSnapshot: '{}'",
         volumeName, bucketName, fromSnapshotName, toSnapshotName);
+    ozoneManager.getMetrics().incNumSnapshotDiffJobs();
 
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
@@ -1601,6 +1604,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       // TODO: [Snapshot] Revisit this when we have proper exception handling.
       snapshotDiffJob.setReason("Job failed due to unknown reason.");
     }
+    ozoneManager.getMetrics().incNumSnapshotDiffJobFails();
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 

@@ -29,10 +29,14 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
 
 import java.io.UnsupportedEncodingException;
 import java.util.UUID;
@@ -53,6 +57,9 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static String bucketOBS;
   private static String bucketFSO;
   private static OzoneClient client;
+
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(60));
 
   @BeforeClass
   public static void init() throws Exception {
@@ -107,7 +114,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   /**
    * Test NSSummaryCLI on root path.
    */
-  @Test(timeout = 60000)
+  @Test
   public void testNSSummaryCLIRoot() throws UnsupportedEncodingException {
     // Running on root path.
     String path = "/";
@@ -125,7 +132,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   /**
    * Test NSSummaryCLI on FILE_SYSTEM_OPTIMIZED bucket.
    */
-  @Test(timeout = 60000)
+  @Test
   public void testNSSummaryCLIFSO() throws UnsupportedEncodingException {
     // Running on FSO Bucket.
     String path = "/" + volumeName + "/" + bucketFSO;
@@ -143,7 +150,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   /**
    * Test NSSummaryCLI on OBJECT_STORE bucket.
    */
-  @Test(timeout = 60000)
+  @Test
   public void testNSSummaryCLIOBS() throws UnsupportedEncodingException {
     // Running on OBS Bucket.
     String path = "/" + volumeName + "/" + bucketOBS;

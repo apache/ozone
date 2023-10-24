@@ -25,6 +25,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +41,7 @@ import static org.junit.Assert.assertEquals;
 public class TestBlockData {
   static final Logger LOG = LoggerFactory.getLogger(TestBlockData.class);
   @Rule
-  public TestRule timeout = Timeout.seconds(10);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(10));
 
   static ContainerProtos.ChunkInfo buildChunkInfo(String name, long offset,
       long len) {

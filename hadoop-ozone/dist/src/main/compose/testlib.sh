@@ -337,7 +337,17 @@ stop_docker_env(){
   copy_daemon_logs
   save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose --ansi never down
+    down_repeats=3
+    for i in $(seq 1 $down_repeats)
+    do
+      if docker-compose --ansi never down; then
+        return
+      fi
+      sleep 5
+    done
+
+    echo "Failed to remove all docker containers in $down_repeats attempts."
+    return 1
   fi
 }
 
@@ -532,4 +542,27 @@ wait_for_datanode() {
     echo "SECONDS: $SECONDS"
   done
   echo "WARNING: $datanode is still not $state"
+}
+
+
+## @description wait for n root certificates
+wait_for_root_certificate(){
+  local container=$1
+  local timeout=$2
+  local count=$3
+  local command="ozone admin cert list --role=scm -c 100 | grep -v "scm-sub" | grep "scm" | wc -l"
+
+  #Reset the timer
+  SECONDS=0
+  while [[ $SECONDS -lt $timeout ]]; do
+    cert_number=`docker-compose exec -T $container /bin/bash -c "$command"`
+    if [[ $cert_number -eq $count ]]; then
+      echo "$count root certificates are found"
+      return
+    fi
+      echo "$count root certificates are not found yet"
+      sleep 1
+  done
+  echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
+  return 1
 }

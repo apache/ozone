@@ -99,7 +99,9 @@ public enum OMAction implements AuditAction {
   LIST_SNAPSHOT,
   DELETE_SNAPSHOT,
   SNAPSHOT_MOVE_DELETED_KEYS,
-  SET_TIMES;
+  SET_TIMES,
+
+  ABORT_EXPIRED_MULTIPART_UPLOAD;
 
   @Override
   public String getAction() {
