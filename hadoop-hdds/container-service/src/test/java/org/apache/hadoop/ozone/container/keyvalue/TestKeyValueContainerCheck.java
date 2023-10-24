@@ -177,7 +177,7 @@ public class TestKeyValueContainerCheck
     // Remove chunks directory to trigger a scanBlock exception
     File chunksDir = new File(containerData.getChunksPath());
     assertTrue(chunksDir.exists());
-    new File(containerData.getChunksPath()).delete();
+    assertTrue(new File(containerData.getChunksPath()).delete());
     assertFalse(chunksDir.exists());
 
     // Create mockContainerData to scan blocks that are
