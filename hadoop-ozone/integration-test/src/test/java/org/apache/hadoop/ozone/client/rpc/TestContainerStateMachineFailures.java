@@ -160,7 +160,7 @@ public class TestContainerStateMachineFailures {
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10).setHbInterval(200)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
