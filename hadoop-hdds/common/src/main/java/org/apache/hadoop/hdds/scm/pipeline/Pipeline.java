@@ -31,7 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SplittableRandom;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.StringUtils;
@@ -262,6 +264,32 @@ public final class Pipeline {
         "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
+  public DatanodeDetails getRandomNode() throws IOException {
+    return getRandomNode(null);
+  }
+
+
+  public DatanodeDetails getRandomNode(Set<DatanodeDetails> excluded)
+      throws IOException {
+    final Set<DatanodeDetails> actualExcluded =
+        excluded == null ? Collections.emptySet() : excluded;
+    if (nodeStatus.isEmpty()) {
+      throw new IOException(String.format("Pipeline=%s is empty", id));
+    }
+
+    List<DatanodeDetails> actualNodes = nodeStatus.keySet().stream()
+        .filter(node -> !actualExcluded.contains(node))
+        .collect(Collectors.toList());
+
+    if (actualNodes.size() == 0) {
+      throw new IOException(String.format(
+          "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
+    }
+    int randomNodePosition =
+        new SplittableRandom().nextInt(0, actualNodes.size());
+    return actualNodes.get(randomNodePosition);
+  }
+
   public DatanodeDetails getClosestNode() throws IOException {
     return getClosestNode(null);
   }
@@ -273,7 +301,7 @@ public final class Pipeline {
     }
     if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
-      return getFirstNode(excluded);
+      return getRandomNode(excluded);
     }
     for (DatanodeDetails d : nodesInOrder.get()) {
       if (!excluded.contains(d)) {

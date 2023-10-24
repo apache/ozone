@@ -262,11 +262,11 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
         .getReplicationType() == HddsProtos.ReplicationType.EC;
     if (topologyAwareRead && forRead || isEC) {
       try {
-        key += pipeline.getClosestNode().getHostName();
+        DatanodeDetails dataNode = pipeline.getClosestNode();
+        key += dataNode.getHostName();
         if (isEC) {
           // Currently EC uses standalone client.
-          key += pipeline.getClosestNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE);
+          key += dataNode.getPort(DatanodeDetails.Port.Name.STANDALONE);
         }
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
