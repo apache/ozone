@@ -82,8 +82,10 @@ public class TestOpenKeyCleanupService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOpenKeyCleanupService.class);
 
-  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(20);
-  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(140);
+  private static final int SERVICE_INTERVAL = 20;
+  private static final int EXPIRE_THRESHOLD_MS = 140;
+  private static final Duration EXPIRE_THRESHOLD =
+      Duration.ofMillis(EXPIRE_THRESHOLD_MS);
   private static final int NUM_MPU_PARTS = 5;
   private KeyManager keyManager;
   private OMMetadataManager omMetadataManager;
@@ -99,9 +101,9 @@ public class TestOpenKeyCleanupService {
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, tempDir.toString());
     conf.setTimeDuration(OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
-        SERVICE_INTERVAL.toMillis(), TimeUnit.MILLISECONDS);
+        SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
-        EXPIRE_THRESHOLD.toMillis(), TimeUnit.MILLISECONDS);
+        EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.setQuietMode(false);
     OmTestManagers omTestManagers = new OmTestManagers(conf);
@@ -144,7 +146,7 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.suspend();
     // wait for submitted tasks to complete
-    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    Thread.sleep(SERVICE_INTERVAL);
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
     final long oldrunCount = openKeyCleanupService.getRunCount();
     LOG.info("oldkeyCount={}, oldrunCount={}", oldkeyCount, oldrunCount);
@@ -159,7 +161,7 @@ public class TestOpenKeyCleanupService {
     createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // wait for open keys to expire
-    Thread.sleep(EXPIRE_THRESHOLD.toMillis());
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
 
     assertExpiredOpenKeys(numDEFKeys == 0, false, BucketLayout.DEFAULT);
     assertExpiredOpenKeys(numFSOKeys == 0, hsync,
@@ -170,8 +172,7 @@ public class TestOpenKeyCleanupService {
     GenericTestUtils.waitFor(
         () -> openKeyCleanupService.getSubmittedOpenKeyCount() >=
             oldkeyCount + keyCount,
-        (int) SERVICE_INTERVAL.toMillis(),
-        5 * (int) SERVICE_INTERVAL.toMillis());
+        SERVICE_INTERVAL, 5 * SERVICE_INTERVAL);
     assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
 
     final int n = hsync ? numDEFKeys + numFSOKeys : 1;
@@ -212,7 +213,7 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.suspend();
     // wait for submitted tasks to complete
-    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    Thread.sleep(SERVICE_INTERVAL);
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
     final long oldrunCount = openKeyCleanupService.getRunCount();
     LOG.info("oldMpuKeyCount={}, oldMpuRunCount={}", oldkeyCount, oldrunCount);
@@ -228,7 +229,7 @@ public class TestOpenKeyCleanupService {
         NUM_MPU_PARTS, true);
 
     // wait for open keys to expire
-    Thread.sleep(EXPIRE_THRESHOLD.toMillis());
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
 
     // All MPU open keys should be skipped
     assertExpiredOpenKeys(true, false, BucketLayout.DEFAULT);
@@ -239,11 +240,11 @@ public class TestOpenKeyCleanupService {
 
     GenericTestUtils.waitFor(
         () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
-        (int) SERVICE_INTERVAL.toMillis(),
-        5 * (int) SERVICE_INTERVAL.toMillis());
+        SERVICE_INTERVAL,
+        5 * SERVICE_INTERVAL);
 
     // wait for requests to complete
-    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    Thread.sleep(SERVICE_INTERVAL);
 
     // No expired open keys fetched
     assertEquals(openKeyCleanupService.getSubmittedOpenKeyCount(), oldkeyCount);
@@ -277,7 +278,7 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.suspend();
     // wait for submitted tasks to complete
-    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    Thread.sleep(SERVICE_INTERVAL);
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
     final long oldrunCount = openKeyCleanupService.getRunCount();
     LOG.info("oldMpuKeyCount={}, oldMpuRunCount={}", oldkeyCount, oldrunCount);
@@ -294,7 +295,7 @@ public class TestOpenKeyCleanupService {
     createIncompleteMPUKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED,
         NUM_MPU_PARTS, false);
 
-    Thread.sleep(EXPIRE_THRESHOLD.toMillis());
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
 
     // Each MPU keys create 1 MPU open key and some MPU open part keys
     // only the MPU open part keys will be deleted
@@ -308,8 +309,8 @@ public class TestOpenKeyCleanupService {
     GenericTestUtils.waitFor(
         () -> openKeyCleanupService.getSubmittedOpenKeyCount() >=
             oldkeyCount + numExpiredParts,
-        (int) SERVICE_INTERVAL.toMillis(),
-        5 * (int) SERVICE_INTERVAL.toMillis());
+        SERVICE_INTERVAL,
+        5 * SERVICE_INTERVAL);
     assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
 
     // No expired MPU parts fetched
@@ -344,8 +345,8 @@ public class TestOpenKeyCleanupService {
   void waitForOpenKeyCleanup(boolean hsync, BucketLayout layout, int n)
       throws Exception {
     GenericTestUtils.waitFor(() -> 0 == getExpiredOpenKeys(hsync, layout),
-        (int) SERVICE_INTERVAL.toMillis(),
-        (int) Math.max(n * SERVICE_INTERVAL.toMillis(), EXPIRE_THRESHOLD.toMillis()));
+        SERVICE_INTERVAL,
+        Math.max(n * SERVICE_INTERVAL, EXPIRE_THRESHOLD_MS));
   }
 
   private void createOpenKeys(int keyCount, boolean hsync,
