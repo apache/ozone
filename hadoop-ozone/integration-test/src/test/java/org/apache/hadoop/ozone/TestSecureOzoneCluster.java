@@ -466,6 +466,21 @@ final class TestSecureOzoneCluster {
           SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
                   .getLocalNodeDetails(), conf);
     }
+
+    /*
+     * As all these processes run inside the same JVM, there are issues around
+     * the Hadoop UGI if different processes run with different principals.
+     * In this test, the OM has to contact the SCM to download certs. SCM runs
+     * as scm/host@REALM, but the OM logs in as om/host@REALM, and then the test
+     * fails, and the OM is unable to contact the SCM due to kerberos login
+     * issues. To work around that, have the OM run as the same principal as the
+     * SCM, and then the test passes.
+     *
+     */
+    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+        "om/" + host + "@" + miniKdc.getRealm());
+    File keyTab = new File(workDir, "om.keytab");
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, keyTab.getAbsolutePath());
   }
 
   @Test
@@ -653,7 +668,7 @@ final class TestSecureOzoneCluster {
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token = omClient.getDelegationToken(
-          new Text("scm"));
+          new Text("om"));
 
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token);
@@ -690,7 +705,7 @@ final class TestSecureOzoneCluster {
       // 3. Test tampered token
       OzoneTokenIdentifier tokenId = OzoneTokenIdentifier.readProtoBuf(
           token.getIdentifier());
-      tokenId.setRenewer(new Text("scm"));
+      tokenId.setRenewer(new Text("om"));
       tokenId.setMaxDate(System.currentTimeMillis() * 2);
       Token<OzoneTokenIdentifier> tamperedToken = new Token<>(
           tokenId.getBytes(), token2.getPassword(), token2.getKind(),
@@ -715,13 +730,6 @@ final class TestSecureOzoneCluster {
     // writes the version file properties
     omStore.initialize();
     OzoneManager.setTestSecureOmFlag(true);
-
-    // OM uses scm/host@EXAMPLE.COM to access SCM
-    config.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "scm/" + host + "@" + miniKdc.getRealm());
-    omKeyTab = new File(workDir, "scm.keytab");
-    config.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeyTab.getAbsolutePath());
-
     om = OzoneManager.createOm(config);
   }
 
@@ -839,25 +847,6 @@ final class TestSecureOzoneCluster {
     LogCapturer omLogs =
         LogCapturer.captureLogs(OMCertificateClient.LOG);
     omLogs.clearOutput();
-
-    /*
-     * As all these processes run inside the same JVM, there are issues around
-     * the Hadoop UGI if different processes run with different principals.
-     * In this test, the OM has to contact the SCM to download certs. SCM runs
-     * as scm/host@REALM, but the OM logs in as om/host@REALM, and then the test
-     * fails, and the OM is unable to contact the SCM due to kerberos login
-     * issues. To work around that, have the OM run as the same principal as the
-     * SCM, and then the test passes.
-     *
-     * TODO: Need to look into this further to see if there is a better way to
-     *       address this problem.
-     */
-    String realm = miniKdc.getRealm();
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "scm/" + host + "@" + realm);
-    omKeyTab = new File(workDir, "scm.keytab");
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        omKeyTab.getAbsolutePath());
 
     initSCM();
     try {
@@ -1214,7 +1203,7 @@ final class TestSecureOzoneCluster {
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token1 = omClient.getDelegationToken(
-          new Text("scm"));
+          new Text("om"));
 
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token1);
@@ -1231,14 +1220,14 @@ final class TestSecureOzoneCluster {
       // Wait for OM certificate to renew
       LambdaTestUtils.await(certLifetime, 100, () ->
           !StringUtils.equals(token1.decodeIdentifier().getOmCertSerialId(),
-              omClient.getDelegationToken(new Text("scm"))
+              omClient.getDelegationToken(new Text("om"))
                   .decodeIdentifier().getOmCertSerialId()));
       String omCertId2 =
           certClient.getCertificate().getSerialNumber().toString();
       assertNotEquals(omCertId1, omCertId2);
       // Get a new delegation token
       Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
-          new Text("scm"));
+          new Text("om"));
       assertEquals(omCertId2, token2.decodeIdentifier().getOmCertSerialId());
 
       // Because old certificate is still valid, so renew old token will succeed
