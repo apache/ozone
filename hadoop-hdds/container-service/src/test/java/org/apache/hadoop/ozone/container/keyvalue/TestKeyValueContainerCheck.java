@@ -43,7 +43,6 @@ import java.io.RandomAccessFile;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -197,7 +196,7 @@ public class TestKeyValueContainerCheck
     when(mockdbFile.getAbsolutePath()).thenReturn("");
     // For Schema V2 mimic container DB deletion during Container Scan.
     when(mockContainerData.getDbFile()).thenReturn(containerData.getDbFile(),
-        containerData.getDbFile(),mockdbFile);
+        containerData.getDbFile(), mockdbFile);
 
     when(mockContainerData.getContainerDBType())
         .thenReturn(containerData.getContainerDBType());
@@ -217,7 +216,7 @@ public class TestKeyValueContainerCheck
     when(mockContainerData.getBlockKey(anyLong()))
         .thenAnswer(invocationOnMock -> {
           return containerData.getBlockKey(invocationOnMock.getArgument(0));
-    });
+        });
     when(mockContainerData.containerPrefix())
         .thenReturn(containerData.containerPrefix());
     when(mockContainerData.getBcsIdKey())
