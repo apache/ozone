@@ -124,7 +124,8 @@ public class TestKeyValueContainerIntegrityChecks {
    * deleted blocks.
    */
   protected KeyValueContainer createContainerWithBlocks(long containerId,
-      int normalBlocks, int deletedBlocks) throws Exception {
+      int normalBlocks, int deletedBlocks, boolean writeToDisk)
+      throws Exception {
     String strBlock = "block";
     String strChunk = "-chunkFile";
     long totalBlocks = normalBlocks + deletedBlocks;
@@ -165,10 +166,12 @@ public class TestKeyValueContainerIntegrityChecks {
           ChunkInfo info = new ChunkInfo(chunkName, offset, CHUNK_LEN);
           info.setChecksumData(checksumData);
           chunkList.add(info.getProtoBufMessage());
-          chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), writeStage);
-          chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), commitStage);
+          if (writeToDisk) {
+            chunkManager.writeChunk(container, blockID, info,
+                ByteBuffer.wrap(chunkData), writeStage);
+            chunkManager.writeChunk(container, blockID, info,
+                ByteBuffer.wrap(chunkData), commitStage);
+          }
         }
         blockData.setChunks(chunkList);
 
@@ -181,8 +184,10 @@ public class TestKeyValueContainerIntegrityChecks {
         metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }
 
-      containerLayoutTestInfo.validateFileCount(chunksPath, totalBlocks,
-          totalBlocks * CHUNKS_PER_BLOCK);
+      if (writeToDisk) {
+        containerLayoutTestInfo.validateFileCount(chunksPath, totalBlocks,
+            totalBlocks * CHUNKS_PER_BLOCK);
+      }
     }
 
     return container;

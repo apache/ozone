@@ -126,6 +126,8 @@ public class TestBackgroundContainerDataScanner extends
     verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
     verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
     verifyContainerMarkedUnhealthy(openContainer, never());
+    // Deleted containers should not be marked unhealthy
+    verifyContainerMarkedUnhealthy(deletedContainer, never());
   }
 
   @Test
@@ -145,6 +147,10 @@ public class TestBackgroundContainerDataScanner extends
     Mockito.verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(corruptData.getContainerData().getContainerID()), any());
+    // Metrics for Deleted container should not be updated.
+    Mockito.verify(controller, never())
+        .updateDataScanTimestamp(
+            eq(deletedContainer.getContainerData().getContainerID()), any());
   }
 
   @Test

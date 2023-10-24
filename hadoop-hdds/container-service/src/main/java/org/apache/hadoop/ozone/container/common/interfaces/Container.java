@@ -59,7 +59,8 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
       CORRUPT_CHUNK,
       INCONSISTENT_CHUNK_LENGTH,
       INACCESSIBLE_DB,
-      WRITE_FAILURE
+      WRITE_FAILURE,
+      DELETED_CONTAINER
     }
 
     private final boolean healthy;

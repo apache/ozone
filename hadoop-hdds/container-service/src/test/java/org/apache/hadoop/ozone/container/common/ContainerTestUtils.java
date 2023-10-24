@@ -223,6 +223,15 @@ public final class ContainerTestUtils {
         new IOException("Fake corruption failure for testing"));
   }
 
+  /**
+   * Construct an unhealthy scan result with DELETED_CONTAINER failure type.
+   */
+  public static ScanResult getDeletedContainerResult() {
+    return ScanResult.unhealthy(ScanResult.FailureType.DELETED_CONTAINER,
+        new File(""),
+        new IOException("Fake deleted container exception"));
+  }
+
   public static KeyValueContainer addContainerToDeletedDir(
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
