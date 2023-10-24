@@ -372,7 +372,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public void restartOzoneManager() throws IOException {
-    ozoneManager.stop();
+    stopOM(ozoneManager);
     ozoneManager.restart();
   }
 
@@ -551,10 +551,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
-  private static void stopOM(OzoneManager om) {
-    if (om != null) {
-      LOG.info("Stopping the OzoneManager");
-      om.stop();
+  protected static void stopOM(OzoneManager om) {
+    if (om != null && om.stop()) {
       om.join();
     }
   }
