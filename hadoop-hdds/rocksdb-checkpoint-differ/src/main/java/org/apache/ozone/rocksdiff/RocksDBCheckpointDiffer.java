@@ -538,8 +538,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           addToCompactionLogTable(compactionLogEntry);
 
           // Populate the DAG
-          // TODO: [SNAPSHOT] Once SnapshotChainManager is put into use,
-          //  set snapshotID to snapshotChainManager.getLatestGlobalSnapshot()
           populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
               db.getLatestSequenceNumber());
