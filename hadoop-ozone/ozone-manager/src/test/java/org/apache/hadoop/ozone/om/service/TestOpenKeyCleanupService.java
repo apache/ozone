@@ -54,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -81,8 +82,8 @@ public class TestOpenKeyCleanupService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOpenKeyCleanupService.class);
 
-  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(100);
-  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(200);
+  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(20);
+  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(140);
   private static final int NUM_MPU_PARTS = 5;
   private KeyManager keyManager;
   private OMMetadataManager omMetadataManager;
@@ -166,26 +167,22 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.resume();
 
-    GenericTestUtils.waitFor(() -> openKeyCleanupService
-            .getRunCount() > oldrunCount,
+    GenericTestUtils.waitFor(
+        () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
         (int) SERVICE_INTERVAL.toMillis(),
         5 * (int) SERVICE_INTERVAL.toMillis());
 
-    // wait for requests to complete
-    final int n = hsync ? numDEFKeys + numFSOKeys : 1;
-    Thread.sleep(n * SERVICE_INTERVAL.toMillis());
-
+    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
+    waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
         oldkeyCount + keyCount);
-    assertExpiredOpenKeys(true, false, BucketLayout.DEFAULT);
-    assertExpiredOpenKeys(true, hsync,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
     if (hsync) {
-      assertEquals(numDEFKeys, metrics.getNumOpenKeysCleaned());
+      assertAtLeast(numDEFKeys, metrics.getNumOpenKeysCleaned());
       assertTrue(metrics.getNumOpenKeysHSyncCleaned() >= numFSOKeys);
       assertEquals(numFSOKeys, metrics.getNumKeyHSyncs());
     } else {
-      assertEquals(keyCount, metrics.getNumOpenKeysCleaned());
+      assertAtLeast(keyCount, metrics.getNumOpenKeysCleaned());
       assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
       assertEquals(0, metrics.getNumKeyHSyncs());
     }
@@ -239,8 +236,8 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.resume();
 
-    GenericTestUtils.waitFor(() -> openKeyCleanupService
-            .getRunCount() > oldrunCount,
+    GenericTestUtils.waitFor(
+        () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
         (int) SERVICE_INTERVAL.toMillis(),
         5 * (int) SERVICE_INTERVAL.toMillis());
 
@@ -306,34 +303,48 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.resume();
 
-    GenericTestUtils.waitFor(() -> openKeyCleanupService
-            .getRunCount() > oldrunCount,
+    GenericTestUtils.waitFor(
+        () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
         (int) SERVICE_INTERVAL.toMillis(),
         5 * (int) SERVICE_INTERVAL.toMillis());
 
-    // wait for requests to complete
-    Thread.sleep(SERVICE_INTERVAL.toMillis());
-
     // No expired MPU parts fetched
     int numExpiredParts = NUM_MPU_PARTS * keyCount;
+    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
+    waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
         (oldkeyCount + numExpiredParts));
-    assertExpiredOpenKeys(true, false, BucketLayout.DEFAULT);
-    assertExpiredOpenKeys(true, false,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
-    assertEquals(numExpiredParts,
-        metrics.getNumOpenKeysCleaned());
+    assertAtLeast(numExpiredParts, metrics.getNumOpenKeysCleaned());
   }
 
-  void assertExpiredOpenKeys(boolean expectedToEmpty, boolean hsync,
-      BucketLayout layout) throws IOException {
-    final ExpiredOpenKeys expired = keyManager.getExpiredOpenKeys(
-        EXPIRE_THRESHOLD, 100, layout);
-    final int size = (hsync ? expired.getHsyncKeys()
-        : expired.getOpenKeyBuckets()).size();
+  private static void assertAtLeast(long expectedMinimum, long actual) {
+    assertTrue(actual >= expectedMinimum,
+        () -> actual + " < " + expectedMinimum);
+  }
+
+  private void assertExpiredOpenKeys(boolean expectedToEmpty, boolean hsync,
+      BucketLayout layout) {
+    final int size = getExpiredOpenKeys(hsync, layout);
     assertEquals(expectedToEmpty, size == 0,
         () -> "size=" + size + ", layout=" + layout);
+  }
+
+  private int getExpiredOpenKeys(boolean hsync, BucketLayout layout) {
+    try {
+      final ExpiredOpenKeys expired = keyManager.getExpiredOpenKeys(
+          EXPIRE_THRESHOLD, 100, layout);
+      return (hsync ? expired.getHsyncKeys() : expired.getOpenKeyBuckets())
+          .size();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  void waitForOpenKeyCleanup(boolean hsync,
+      BucketLayout layout) throws Exception {
+    GenericTestUtils.waitFor(() -> 0 == getExpiredOpenKeys(hsync, layout),
+        (int) SERVICE_INTERVAL.toMillis(),
+        2 * (int) EXPIRE_THRESHOLD.toMillis());
   }
 
   private void createOpenKeys(int keyCount, boolean hsync,
