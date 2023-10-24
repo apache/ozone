@@ -172,8 +172,9 @@ public class TestOpenKeyCleanupService {
         (int) SERVICE_INTERVAL.toMillis(),
         5 * (int) SERVICE_INTERVAL.toMillis());
 
-    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
-    waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    final int n = hsync ? numDEFKeys + numFSOKeys : 1;
+    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT, n);
+    waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED, n);
     assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
         oldkeyCount + keyCount);
 
@@ -310,8 +311,8 @@ public class TestOpenKeyCleanupService {
 
     // No expired MPU parts fetched
     int numExpiredParts = NUM_MPU_PARTS * keyCount;
-    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
-    waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    waitForOpenKeyCleanup(false, BucketLayout.DEFAULT, 1);
+    waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED, 1);
     assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
         (oldkeyCount + numExpiredParts));
     assertAtLeast(numExpiredParts, metrics.getNumOpenKeysCleaned());
@@ -340,11 +341,11 @@ public class TestOpenKeyCleanupService {
     }
   }
 
-  void waitForOpenKeyCleanup(boolean hsync,
-      BucketLayout layout) throws Exception {
+  void waitForOpenKeyCleanup(boolean hsync, BucketLayout layout, int n)
+      throws Exception {
     GenericTestUtils.waitFor(() -> 0 == getExpiredOpenKeys(hsync, layout),
         (int) SERVICE_INTERVAL.toMillis(),
-        2 * (int) EXPIRE_THRESHOLD.toMillis());
+        n * (int) SERVICE_INTERVAL.toMillis());
   }
 
   private void createOpenKeys(int keyCount, boolean hsync,
