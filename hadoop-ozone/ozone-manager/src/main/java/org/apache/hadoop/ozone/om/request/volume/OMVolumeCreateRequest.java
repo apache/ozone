@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -115,7 +116,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     // Doing this here, so we can do protobuf conversion outside of lock.
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     OmVolumeArgs omVolumeArgs = null;
     Map<String, String> auditMap = null;
@@ -168,7 +169,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
