@@ -171,7 +171,7 @@ public class DatanodeStateMachine implements Closeable {
         getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder().setNameFormat(
             datanodeDetails.threadNamePrefix() +
-                "Datanode State Machine Task Thread - %d").build());
+                "DatanodeStateMachineTaskThread-%d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     // OzoneContainer instance is used in a non-thread safe way by the context
@@ -553,7 +553,7 @@ public class DatanodeStateMachine implements Closeable {
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat(datanodeDetails.threadNamePrefix() +
-            "Datanode State Machine Daemon Thread")
+            "DatanodeStateMachineDaemonThread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
