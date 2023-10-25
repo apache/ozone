@@ -178,7 +178,7 @@ public class SCMNodeManager implements NodeManager {
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
     this.scmContext = scmContext;
     this.lastStateChangeTime = new HashMap<>();
-    for(DatanodeDetails d : getAllNodes()) {
+    for (DatanodeDetails d : getAllNodes()) {
       this.lastStateChangeTime.put(d.getUuid(), 0L);
     }
   }
@@ -285,7 +285,8 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public void setLastStateChangeTime(DatanodeDetails datanodeDetails, long stateChangeTime) {
+  public void setLastStateChangeTime(DatanodeDetails datanodeDetails,
+                                     long stateChangeTime) {
     this.lastStateChangeTime.put(datanodeDetails.getUuid(), stateChangeTime);
   }
 

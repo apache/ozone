@@ -180,12 +180,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       throws NodeNotFoundException;
 
   /**
-   * Returns the last operation state change time of a specific datanode
+   * Returns the last operation state change time of a specific datanode.
+   * @param datanodeDetails DatanodeDetails
    */
   long getLastStateChangeTime(DatanodeDetails datanodeDetails);
 
   /**
-   * Set the last operation state change time of a specific datanode
+   * Set the last operation state change time of a specific datanode.
+   * @param datanodeDetails DatanodeDetails
+   * @param stateChangeTime the state change time
    */
   void setLastStateChangeTime(DatanodeDetails datanodeDetails,
                               long stateChangeTime);

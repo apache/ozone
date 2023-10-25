@@ -712,14 +712,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         return ScmContainerLocationResponse.newBuilder()
                .setCmdType(request.getCmdType())
                .setStatus(Status.OK)
-               .setGetDnPipelineMapDecommissionResponse(getDnPipelineMapDecommission(
-                  request.getGetDnPipelineMapDecommissionRequest()))
+               .setGetDnPipelineMapDecommissionResponse(
+                   getDnPipelineMapDecommission(
+                       request.getGetDnPipelineMapDecommissionRequest()))
                .build();
       case GetDnContainerMapDecommission:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
               .setStatus(Status.OK)
-              .setGetDnContainerMapDecommissionResponse(getDnContainerMapDecommission(
+              .setGetDnContainerMapDecommissionResponse(
+                  getDnContainerMapDecommission(
                   request.getGetDnContainerMapDecommissionRequest()))
               .build();
       case GetContainersForDn:
@@ -1285,8 +1287,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .addAllDnPipelineMapDecommissionProto(proto).build();
   }
 
-  public GetDnContainerMapDecommissionResponseProto getDnContainerMapDecommission(
-      GetDnContainerMapDecommissionRequestProto request) throws IOException {
+  public GetDnContainerMapDecommissionResponseProto
+      getDnContainerMapDecommission(GetDnContainerMapDecommissionRequestProto
+                                        request) throws IOException {
     Map<UUID, Map<HddsProtos.LifeCycleState, Long>> map =
         impl.getContainerMap();
     List<DnContainerMapDecommissionProto> proto = new ArrayList();
@@ -1312,8 +1315,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetContainersForDnResponseProto getContainersForDn(
       GetContainersForDnRequestProto request)
       throws IOException {
-    Set<ContainerID> containers = impl.getContainers(DatanodeDetails.getFromProtoBuf(request.getDatanode()));
-    Set<HddsProtos.ContainerID> containersProto= new HashSet<>();
+    Set<ContainerID> containers = impl.getContainers(DatanodeDetails
+        .getFromProtoBuf(request.getDatanode()));
+    Set<HddsProtos.ContainerID> containersProto = new HashSet<>();
     for (ContainerID oneContainer : containers) {
       containersProto.add(oneContainer.getProtobuf());
     }

@@ -332,7 +332,7 @@ public class NodeDecommissionManager {
   private Map<HddsProtos.LifeCycleState, Long> getStateToContainerMap(
       DatanodeDetails dn) throws NodeNotFoundException {
     Map<HddsProtos.LifeCycleState, Long> containerMapForDn = new HashMap<>();
-    for(HddsProtos.LifeCycleState lc : HddsProtos.LifeCycleState.values()) {
+    for (HddsProtos.LifeCycleState lc : HddsProtos.LifeCycleState.values()) {
       containerMapForDn.put(lc,0L);
     }
     Set<ContainerID> containerIDs = nodeManager.getContainers(dn);

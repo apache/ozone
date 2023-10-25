@@ -154,7 +154,7 @@ public class MockNodeManager implements NodeManager {
         NUM_PIPELINE_PER_METADATA_DISK;
 
     this.lastStateChangeTime = new HashMap<>();
-    for(DatanodeDetails d : getAllNodes()) {
+    for (DatanodeDetails d : getAllNodes()) {
       this.lastStateChangeTime.put(d.getUuid(), 0L);
     }
   }
@@ -186,7 +186,7 @@ public class MockNodeManager implements NodeManager {
         NUM_PIPELINE_PER_METADATA_DISK;
 
     this.lastStateChangeTime = new HashMap<>();
-    for(DatanodeDetails d : getAllNodes()) {
+    for (DatanodeDetails d : getAllNodes()) {
       this.lastStateChangeTime.put(d.getUuid(), 0L);
     }
   }
@@ -227,7 +227,7 @@ public class MockNodeManager implements NodeManager {
         NUM_PIPELINE_PER_METADATA_DISK;
 
     this.lastStateChangeTime = new HashMap<>();
-    for(DatanodeDetails d : getAllNodes()) {
+    for (DatanodeDetails d : getAllNodes()) {
       this.lastStateChangeTime.put(d.getUuid(), 0L);
     }
   }

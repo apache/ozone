@@ -73,7 +73,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersForDnRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersForDnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetLastChangeTimeRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetLastChangeTimeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
@@ -735,7 +734,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     Map<UUID, Integer> map = new HashMap();
     for (DnPipelineMapDecommissionProto mapProto :
         response.getDnPipelineMapDecommissionProtoList()) {
-      map.put(ProtobufUtils.fromProtobuf(mapProto.getDatanodeId()), mapProto.getNumPipelines());
+      map.put(ProtobufUtils.fromProtobuf(mapProto.getDatanodeId()),
+          mapProto.getNumPipelines());
     }
     return map;
   }

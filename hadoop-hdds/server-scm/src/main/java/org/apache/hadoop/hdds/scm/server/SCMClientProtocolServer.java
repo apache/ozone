@@ -819,7 +819,7 @@ public class SCMClientProtocolServer implements
     try {
       return scm.getScmNodeManager().getContainers(datanodeDetails);
     } catch (Exception ex) {
-      throw new SCMException(ex.getMessage(),ResultCodes.NO_SUCH_DATANODE);
+      throw new SCMException(ex.getMessage(), ResultCodes.NO_SUCH_DATANODE);
     }
   }
 

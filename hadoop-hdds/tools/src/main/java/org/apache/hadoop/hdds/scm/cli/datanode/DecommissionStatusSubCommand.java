@@ -39,6 +39,9 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 
+/**
+ * Handler to print decommissioning nodes status
+ */
 @CommandLine.Command(
     name = "decommissionStatus",
     description = "Show decommission status for datanodes",
@@ -90,8 +93,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     }
     Set<ContainerID> containers = scmClient.getContainers(datanode);
     Map<HddsProtos.LifeCycleState, Long> containerMapForDn = new HashMap<>();
-    for(HddsProtos.LifeCycleState lc : HddsProtos.LifeCycleState.values()) {
-      containerMapForDn.put(lc,0L);
+    for (HddsProtos.LifeCycleState lc : HddsProtos.LifeCycleState.values()) {
+      containerMapForDn.put(lc, 0L);
     }
     for (ContainerID id : containers) {
       try {
