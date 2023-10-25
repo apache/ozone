@@ -288,9 +288,9 @@ class TestOpenKeyCleanupService {
 
     // Each MPU keys create 1 MPU open key and some MPU open part keys
     // only the MPU open part keys will be deleted
-    assertExpiredOpenKeys((numDEFKeys * NUM_MPU_PARTS) == 0, false,
+    assertExpiredOpenKeys(numDEFKeys == 0, false,
         BucketLayout.DEFAULT);
-    assertExpiredOpenKeys((numFSOKeys * NUM_MPU_PARTS) == 0, false,
+    assertExpiredOpenKeys(numFSOKeys == 0, false,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     openKeyCleanupService.resume();
