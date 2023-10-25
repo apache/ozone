@@ -94,14 +94,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.class));
 
-  public static final DBColumnFamilyDefinition<String, ChunkInfo>
+  public static final DBColumnFamilyDefinition<String, BlockData>
       LAST_CHUNK_INFO =
       new DBColumnFamilyDefinition<>(
           "last_chunk_info",
           String.class,
           FixedLengthStringCodec.get(),
-          ChunkInfo.class,
-          ChunkInfo.getCodec());
+          BlockData.class,
+          BlockData.getCodec());
 
   private static String separator = "";
 
@@ -160,7 +160,7 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, ChunkInfo>
+  public DBColumnFamilyDefinition<String, BlockData>
   getLastChunkInfoColumnFamily() {
     return LAST_CHUNK_INFO;
   }

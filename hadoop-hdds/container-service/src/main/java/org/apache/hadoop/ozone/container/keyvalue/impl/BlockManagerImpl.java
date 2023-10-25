@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -109,7 +110,7 @@ public class BlockManagerImpl implements BlockManager {
         endOfBlock);
   }
 
-  private static boolean isFullBlockData(BlockData data) {
+  private static boolean isPartialChunkList(BlockData data) {
     if (data.getMetadata().containsKey("incremental")) {
       return true;
     }
@@ -173,39 +174,72 @@ public class BlockManagerImpl implements BlockManager {
           .initBatchOperation()) {
 
 
-
+        Preconditions.checkState(!data.getChunks().isEmpty(), "empty chunk list unexpected");
 
         // TODO: deal with both old and new clients
-        if (isFullBlockData(data)) {
+        if (!isPartialChunkList(data)) {
           // old client: override chunk list.
           db.getStore().getBlockDataTable().putWithBatch(
               batch, containerData.getBlockKey(localID), data);
         } else if (shouldAppendLastChunk(endOfBlock, data)) {
           // if eob or if the last chunk is full,
-          // remove from lastChunkInfo
           // the 'data' is complete so append it to the block table's chunk info
-
-          //List<ContainerProtos.ChunkInfo> lastChunkInfo =
-          //    db.getStore().getLastChunkInfoTable().get(data.getBlockID());
-          // TODO: what if lastChunkInfo is null?
+          // and then remove from lastChunkInfo
           BlockData blockData = db.getStore().getBlockDataTable().get(
               containerData.getBlockKey(localID));
-          for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
-            blockData.addChunk(chunk);
+          if (blockData == null) {
+            // if the block did not have full chunks before,
+            // the block's chunk is what received from client this time.
+            blockData = data;
+          } else {
+            List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
+            blockData.setChunks(new ArrayList<>(chunkInfoList));
+            for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
+              blockData.addChunk(chunk);
+            }
+            blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
           }
           // delete the entry from last chunk info table
-          db.getStore().getLastChunkInfoTable().putWithBatch(
-              batch, data.getBlockID().toString(), null);
+          db.getStore().getLastChunkInfoTable().deleteWithBatch(
+              batch, containerData.getBlockKey(localID));
           // update block data table
           db.getStore().getBlockDataTable().putWithBatch(
               batch, containerData.getBlockKey(localID), blockData);
         } else {
-          // old client
-          // if not,
-          // replace/update the last chunk info table
-          db.getStore().getLastChunkInfoTable().putWithBatch(
-              batch, data.getBlockID().toString(),
-              ChunkInfo.getFromProtoBuf(data.getChunks().get(data.getChunks().size() -1)));
+          // incremental chunk list,
+          // not end of block, has partial chunks
+          if (data.getChunks().size() == 1) {
+            // replace/update the last chunk info table
+            db.getStore().getLastChunkInfoTable().putWithBatch(
+                batch, containerData.getBlockKey(localID),
+                data);
+          } else {
+            // received more than one chunk this time
+            List<ContainerProtos.ChunkInfo> lastChunkInfo =
+                Collections.singletonList(
+                    data.getChunks().get(data.getChunks().size() -1));
+            BlockData blockData = db.getStore().getBlockDataTable().get(
+                containerData.getBlockKey(localID));
+            if (blockData == null) {
+              // if the block does not exist in the block data table
+              blockData = data;
+              ContainerProtos.ChunkInfo lastPartialChunk =
+                  data.getChunks().get(data.getChunks().size() -1);
+              blockData.removeChunk(lastPartialChunk);
+            } else {
+              // if the block exists in the block data table,
+              // append chunks till except the last one (supposedly partial)
+              for (int i = 0; i < data.getChunks().size() - 1; i++) {
+                blockData.addChunk(data.getChunks().get(i));
+              }
+            }
+            db.getStore().getBlockDataTable().putWithBatch(
+                batch, containerData.getBlockKey(localID), blockData);
+            // update the last partial chunk
+            data.setChunks(lastChunkInfo);
+            db.getStore().getLastChunkInfoTable().putWithBatch(
+                batch, containerData.getBlockKey(localID), data);
+          }
         }
 
         // If the block does not exist in the pendingPutBlockCache of the
@@ -406,10 +440,32 @@ public class BlockManagerImpl implements BlockManager {
       KeyValueContainerData containerData) throws IOException {
     String blockKey = containerData.getBlockKey(blockID.getLocalID());
 
+    // check last chunk table
+    BlockData lastChunk = db.getStore().getLastChunkInfoTable().
+        get(blockKey);
+
+    // check block data table
     BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
+
     if (blockData == null) {
-      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG +
-              " BlockID : " + blockID, NO_SUCH_BLOCK);
+      if (lastChunk == null) {
+        throw new StorageContainerException(
+            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
+      } else {
+        return lastChunk;
+      }
+    } else {
+      // append last partial chunk to the block data
+      if (lastChunk != null) {
+        Preconditions.checkState(lastChunk.getChunks().size() == 1);
+        ContainerProtos.ChunkInfo lastChunkInBlockData =
+            blockData.getChunks().get(blockData.getChunks().size() - 1);
+        Preconditions.checkState(
+            lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
+          == lastChunk.getChunks().get(0).getOffset(), "chunk offset does not match");
+          blockData.addChunk(lastChunk.getChunks().get(0));
+          blockData.setBlockCommitSequenceId(lastChunk.getBlockCommitSequenceId());
+      }
     }
 
     return blockData;

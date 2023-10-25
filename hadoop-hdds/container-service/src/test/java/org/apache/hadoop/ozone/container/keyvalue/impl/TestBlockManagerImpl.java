@@ -44,6 +44,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -227,7 +228,8 @@ public class TestBlockManagerImpl {
   }
 
   private BlockData createBlockData(long containerID, long blockID,
-      int chunkID, long begining, long offset, long len, long bcsID) {
+      int chunkID, long begining, long offset, long len, long bcsID)
+      throws IOException {
     BlockData blockData;
     BlockID blockID1 = new BlockID(containerID, blockID);
     blockData = new BlockData(blockID1);
@@ -237,12 +239,14 @@ public class TestBlockManagerImpl {
     chunkList1.add(info1.getProtoBufMessage());
     blockData.setChunks(chunkList1);
     blockData.setBlockCommitSequenceId(bcsID);
+    blockData.addMetadata("incremental", "1");
 
     return blockData;
   }
 
   private BlockData createBlockDataWithOneFullChunk(long containerID, long blockID,
-      int chunkID, long begining, long offset, long len, long bcsID) {
+      int chunkID, long begining, long offset, long len, long bcsID)
+      throws IOException {
     BlockData blockData;
     BlockID blockID1 = new BlockID(containerID, blockID);
     blockData = new BlockData(blockID1);
@@ -255,24 +259,26 @@ public class TestBlockManagerImpl {
     chunkList1.add(info2.getProtoBufMessage());
     blockData.setChunks(chunkList1);
     blockData.setBlockCommitSequenceId(bcsID);
+    blockData.addMetadata("incremental", "1");
 
     return blockData;
   }
 
-  private BlockData createBlockDataWithFourFullChunks(long containerID,
-      long blockID, long bcsID) {
+  private BlockData createBlockDataWithThreeFullChunks(long containerID,
+      long blockID, long bcsID) throws IOException {
     BlockData blockData;
     BlockID blockID1 = new BlockID(containerID, blockID);
     blockData = new BlockData(blockID1);
     List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
     long chunkLimit = 4 * 1024 * 1024;
-    for (int i = 0; i < 4; i ++) {
+    for (int i = 1; i < 4; i ++) {
       ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID1.getLocalID(), i),
           chunkLimit * i, chunkLimit);
       chunkList1.add(info1.getProtoBufMessage());
     }
     blockData.setChunks(chunkList1);
     blockData.setBlockCommitSequenceId(bcsID);
+    blockData.addMetadata("incremental", "1");
 
     return blockData;
   }
@@ -286,20 +292,29 @@ public class TestBlockManagerImpl {
     long blockID = 2;
     // put 1st chunk
     BlockData blockData1 = createBlockData(containerID, blockID,1, 0, 0, 1024, 1);
-    blockManager.putBlock(keyValueContainer, blockData1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
     // put 2nd chunk
     BlockData blockData2 = createBlockData(containerID, blockID,1, 0, 0, 2048, 2);
-    blockManager.putBlock(keyValueContainer, blockData2);
-    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
-    // put 3rd chunk
-    BlockData blockData3 = createBlockData(containerID, blockID,1, 0, 0, 307, 3);
-    blockManager.putBlock(keyValueContainer, blockData3);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
     assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
 
-    BlockData getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(blockID, containerID));
+    BlockData getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(containerID, blockID));
+    assertEquals(2048, getBlockData.getSize());
+    assertEquals(2, getBlockData.getBlockCommitSequenceId());
+    List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
+    assertEquals(1, chunkInfos.size());
+    assertEquals(2048, chunkInfos.get(0).getLen());
+    assertEquals(0, chunkInfos.get(0).getOffset());
+
+    // put 3rd chunk, end-of-block
+    BlockData blockData3 = createBlockData(containerID, blockID,1, 0, 0, 3072, 3);
+    blockManager.putBlock(keyValueContainer, blockData3, true);
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+
+    getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(containerID, blockID));
     assertEquals(3072, getBlockData.getSize());
     assertEquals(3, getBlockData.getBlockCommitSequenceId());
-    List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
+    chunkInfos = getBlockData.getChunks();
     assertEquals(1, chunkInfos.size());
     assertEquals(3072, chunkInfos.get(0).getLen());
     assertEquals(0, chunkInfos.get(0).getOffset());
@@ -315,19 +330,19 @@ public class TestBlockManagerImpl {
     long chunkLimit = 4 * 1024 * 1024;
     // first hsync (a full chunk + 1024 bytes)
     BlockData blockData1 = createBlockDataWithOneFullChunk(containerID, blockID,2, chunkLimit, chunkLimit , 1024, 1);
-    blockManager.putBlock(keyValueContainer, blockData1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
     // second hsync (1024 bytes)
     BlockData blockData2 = createBlockData(containerID, blockID,2, chunkLimit, chunkLimit, 2048, 2);
-    blockManager.putBlock(keyValueContainer, blockData2);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
     assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
     // third hsync (1024 bytes)
     BlockData blockData3 = createBlockData(containerID, blockID,2, chunkLimit, chunkLimit, 3072, 3);
-    blockManager.putBlock(keyValueContainer, blockData3);
+    blockManager.putBlock(keyValueContainer, blockData3, false);
     assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
 
     // verify that first chunk is full, second chunk is 3072 bytes
-    BlockData getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(blockID, containerID));
-    assertEquals(3076 + chunkLimit, getBlockData.getSize());
+    BlockData getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(containerID, blockID));
+    assertEquals(3072 + chunkLimit, getBlockData.getSize());
     assertEquals(3, getBlockData.getBlockCommitSequenceId());
     List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
     assertEquals(2, chunkInfos.size());
@@ -346,18 +361,18 @@ public class TestBlockManagerImpl {
     long chunkLimit = 4 * 1024 * 1024;
     // first hsync (1024 bytes)
     BlockData blockData1 = createBlockDataWithOneFullChunk(containerID, blockID,2, chunkLimit, chunkLimit , 1024, 1);
-    blockManager.putBlock(keyValueContainer, blockData1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
     // full flush (4 chunks)
-    BlockData blockData2 = createBlockDataWithFourFullChunks(containerID, blockID,2);
-    blockManager.putBlock(keyValueContainer, blockData2);
+    BlockData blockData2 = createBlockDataWithThreeFullChunks(containerID, blockID,2);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
     assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
 
-    // verify that first chunk is full, second chunk is 3072 bytes
-    BlockData getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(blockID, containerID));
+    // verify that the four chunks are full
+    BlockData getBlockData = blockManager.getBlock(keyValueContainer, new BlockID(containerID, blockID));
     assertEquals(chunkLimit * 4, getBlockData.getSize());
     assertEquals(2, getBlockData.getBlockCommitSequenceId());
     List<ContainerProtos.ChunkInfo> chunkInfos = getBlockData.getChunks();
-    assertEquals(2, chunkInfos.size());
+    assertEquals(4, chunkInfos.size());
     for (int i = 0 ;i < 4; i++) {
       assertEquals(chunkLimit, chunkInfos.get(i).getLen());
       assertEquals(chunkLimit * i, chunkInfos.get(i).getOffset());

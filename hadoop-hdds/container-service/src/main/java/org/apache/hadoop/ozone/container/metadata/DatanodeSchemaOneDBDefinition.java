@@ -104,7 +104,7 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, ChunkInfo> getLastChunkInfoColumnFamily() {
+  public DBColumnFamilyDefinition<String, BlockData> getLastChunkInfoColumnFamily() {
     return null;
   }
 

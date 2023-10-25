@@ -83,11 +83,11 @@ public interface DatanodeStore extends Closeable {
   Table<String, ChunkInfoList> getDeletedBlocksTable();
 
   /**
-   * A Table that keeps the metadata of the lsast chunk of blocks.
+   * A Table that keeps the metadata of the last chunk of blocks.
    *
    * @return Table
    */
-  Table<String, ChunkInfo> getLastChunkInfoTable();
+  Table<String, BlockData> getLastChunkInfoTable();
 
   /**
    * Helper to create and write batch transactions.

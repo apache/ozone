@@ -67,7 +67,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTable;
 
-  private Table<String, ChunkInfo> lastChunkInfoTable;
+  private Table<String, BlockData> lastChunkInfoTable;
 
   private Table<String, BlockData> blockDataTableWithIterator;
 
@@ -182,7 +182,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
       lastChunkInfoTable = new DatanodeTable<>(
           dbDef.getLastChunkInfoColumnFamily().getTable(this.store));
-      checkTableStatus(blockDataTable, blockDataTable.getName());
+      checkTableStatus(lastChunkInfoTable, lastChunkInfoTable.getName());
     }
   }
 
@@ -215,7 +215,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<String, ChunkInfo> getLastChunkInfoTable() {
+  public Table<String, BlockData> getLastChunkInfoTable() {
     return lastChunkInfoTable;
   }
 
