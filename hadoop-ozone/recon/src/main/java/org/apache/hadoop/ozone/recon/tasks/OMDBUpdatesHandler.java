@@ -153,8 +153,18 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
           }
         }
       } else if (action.equals(DELETE)) {
-        if (oldValue != null && !omUpdateEventValidator.isValidEvent(tableName,
-            oldValue, key, action)) {
+        if (null == oldValue) {
+          String keyStr = "";
+          if (key instanceof String) {
+            keyStr = (String) key;
+          }
+          LOG.info(
+              "WARNING !!!, Value of Key: {} in table: {} should not be null " +
+                  "for DELETE event ", keyStr, tableName);
+          return;
+        }
+        if (!omUpdateEventValidator.isValidEvent(tableName, oldValue, key,
+            action)) {
           return;
         }
         // When you delete a Key, we add the old value to the event so that
