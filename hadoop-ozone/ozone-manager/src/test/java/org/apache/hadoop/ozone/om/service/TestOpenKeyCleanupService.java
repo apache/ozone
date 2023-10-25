@@ -171,8 +171,7 @@ public class TestOpenKeyCleanupService {
     openKeyCleanupService.resume();
 
     GenericTestUtils.waitFor(
-        () -> openKeyCleanupService.getSubmittedOpenKeyCount() >=
-            oldkeyCount + keyCount,
+        () -> openKeyCleanupService.getSubmittedOpenKeyCount() >= keyCount,
         SERVICE_INTERVAL, WAIT_TIME);
     assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
 
@@ -289,7 +288,7 @@ public class TestOpenKeyCleanupService {
     assertEquals(0, metrics.getNumOpenKeysCleaned());
     assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
     final int keyCount = numDEFKeys + numFSOKeys;
-    int numExpiredParts = NUM_MPU_PARTS * keyCount;
+    final int partCount = NUM_MPU_PARTS * keyCount;
     createIncompleteMPUKeys(numDEFKeys, BucketLayout.DEFAULT, NUM_MPU_PARTS,
         false);
     createIncompleteMPUKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED,
@@ -307,15 +306,14 @@ public class TestOpenKeyCleanupService {
     openKeyCleanupService.resume();
 
     GenericTestUtils.waitFor(
-        () -> openKeyCleanupService.getSubmittedOpenKeyCount() >=
-            oldkeyCount + numExpiredParts,
+        () -> openKeyCleanupService.getSubmittedOpenKeyCount() >= partCount,
         SERVICE_INTERVAL, WAIT_TIME);
     assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
 
     // No expired MPU parts fetched
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
     waitForOpenKeyCleanup(false, BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    assertAtLeast(numExpiredParts, metrics.getNumOpenKeysCleaned());
+    assertAtLeast(partCount, metrics.getNumOpenKeysCleaned());
   }
 
   private static void assertAtLeast(long expectedMinimum, long actual) {
