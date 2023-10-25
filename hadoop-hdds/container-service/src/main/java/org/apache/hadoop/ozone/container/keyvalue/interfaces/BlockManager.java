@@ -53,6 +53,19 @@ public interface BlockManager {
       throws IOException;
 
   /**
+   * Puts or overwrites a block.
+   *
+   * @param container - Container for which block need to be added.
+   * @param data     - Block Data.
+   * @param incrKeyCount - Whether to increase container key count.
+   * @param incremental - chunk list is incremental.
+   * @return length of the Block.
+   * @throws IOException
+   */
+  long putBlock(Container container, BlockData data, boolean incrKeyCount,
+      boolean incremental) throws IOException;
+
+  /**
    * Gets an existing block.
    *
    * @param container - Container from which block need to be get.

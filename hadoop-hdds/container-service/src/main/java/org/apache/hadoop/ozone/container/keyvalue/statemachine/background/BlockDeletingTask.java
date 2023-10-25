@@ -434,6 +434,7 @@ public class BlockDeletingTask implements BackgroundTask {
       for (Long blkLong : entry.getLocalIDList()) {
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
+        //// TODO: deal with the last chunk table
         LOG.debug("Deleting block {}", blkLong);
         if (blkInfo == null) {
           try {

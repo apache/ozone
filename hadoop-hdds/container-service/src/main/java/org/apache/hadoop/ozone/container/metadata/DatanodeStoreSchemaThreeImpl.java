@@ -41,6 +41,8 @@ import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -260,5 +262,91 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     }
 
     return blockData;
+  }
+  private static boolean isPartialChunkList(BlockData data) {
+    if (data.getMetadata().containsKey("incremental")) {
+      return true;
+    }
+    return false;
+  }
+
+  // if eob or if the last chunk is full,
+  private static boolean shouldAppendLastChunk(boolean endOfBlock,
+      BlockData data) {
+    if (endOfBlock) return true;
+    Preconditions.checkState(data.getChunks().size() > 0);
+    if (data.getChunks().get(data.getChunks().size() - 1).getLen() == 4 * 1024 * 1024) {
+      return true;
+    }
+    return false;
+  }
+
+  public void putBlockByID(BatchOperation batch, boolean incremental,
+      long localID, BlockData data, KeyValueContainerData containerData,
+      boolean endOfBlock) throws IOException {
+    if (!incremental && !isPartialChunkList(data)) {
+      // old client: override chunk list.
+      getBlockDataTable().putWithBatch(
+          batch, containerData.getBlockKey(localID), data);
+    } else if (shouldAppendLastChunk(endOfBlock, data)) {
+      // if eob or if the last chunk is full,
+      // the 'data' is complete so append it to the block table's chunk info
+      // and then remove from lastChunkInfo
+      BlockData blockData = getBlockDataTable().get(
+          containerData.getBlockKey(localID));
+      if (blockData == null) {
+        // if the block did not have full chunks before,
+        // the block's chunk is what received from client this time.
+        blockData = data;
+      } else {
+        List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
+        blockData.setChunks(new ArrayList<>(chunkInfoList));
+        for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
+          blockData.addChunk(chunk);
+        }
+        blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
+      }
+      // delete the entry from last chunk info table
+      getLastChunkInfoTable().deleteWithBatch(
+          batch, containerData.getBlockKey(localID));
+      // update block data table
+      getBlockDataTable().putWithBatch(
+          batch, containerData.getBlockKey(localID), blockData);
+    } else {
+      // incremental chunk list,
+      // not end of block, has partial chunks
+      if (data.getChunks().size() == 1) {
+        // replace/update the last chunk info table
+        getLastChunkInfoTable().putWithBatch(
+            batch, containerData.getBlockKey(localID),
+            data);
+      } else {
+        // received more than one chunk this time
+        List<ContainerProtos.ChunkInfo> lastChunkInfo =
+            Collections.singletonList(
+                data.getChunks().get(data.getChunks().size() -1));
+        BlockData blockData = getBlockDataTable().get(
+            containerData.getBlockKey(localID));
+        if (blockData == null) {
+          // if the block does not exist in the block data table
+          blockData = data;
+          ContainerProtos.ChunkInfo lastPartialChunk =
+              data.getChunks().get(data.getChunks().size() -1);
+          blockData.removeChunk(lastPartialChunk);
+        } else {
+          // if the block exists in the block data table,
+          // append chunks till except the last one (supposedly partial)
+          for (int i = 0; i < data.getChunks().size() - 1; i++) {
+            blockData.addChunk(data.getChunks().get(i));
+          }
+        }
+        getBlockDataTable().putWithBatch(
+            batch, containerData.getBlockKey(localID), blockData);
+        // update the last partial chunk
+        data.setChunks(lastChunkInfo);
+        getLastChunkInfoTable().putWithBatch(
+            batch, containerData.getBlockKey(localID), data);
+      }
+    }
   }
 }

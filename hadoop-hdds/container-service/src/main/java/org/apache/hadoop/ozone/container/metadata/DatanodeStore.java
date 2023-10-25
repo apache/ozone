@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -135,5 +136,14 @@ public interface DatanodeStore extends Closeable {
     }
 
     return blockData;
+  }
+
+  default void putBlockByID(BatchOperation batch, boolean incremental,
+      long localID, BlockData data, KeyValueContainerData containerData,
+      boolean endOfBlock)
+      throws IOException {
+    // old client: override chunk list.
+    getBlockDataTable().putWithBatch(
+        batch, containerData.getBlockKey(localID), data);
   }
 }

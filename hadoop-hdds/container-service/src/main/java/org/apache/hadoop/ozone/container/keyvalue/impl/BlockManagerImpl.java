@@ -90,6 +90,23 @@ public class BlockManagerImpl implements BlockManager {
   public long putBlock(Container container, BlockData data) throws IOException {
     return putBlock(container, data, true);
   }
+
+  /**
+   * Puts or overwrites a block.
+   *
+   * @param container - Container for which block need to be added.
+   * @param data     - BlockData.
+   * @param endOfBlock - The last putBlock call for this block (when
+   *                   all the chunks are written and stream is closed)
+   * @return length of the block.
+   * @throws IOException
+   */
+  @Override
+  public long putBlock(Container container, BlockData data, boolean endOfBlock)
+      throws IOException {
+    return putBlock(container, data, endOfBlock, true);
+  }
+
   /**
    * Puts or overwrites a block.
    *
@@ -97,38 +114,24 @@ public class BlockManagerImpl implements BlockManager {
    * @param data - BlockData.
    * @param endOfBlock - The last putBlock call for this block (when
    *                   all the chunks are written and stream is closed)
+   * @param incremental - chunk list is incremental.
    * @return length of the block.
    * @throws IOException
    */
   @Override
   public long putBlock(Container container, BlockData data,
-      boolean endOfBlock) throws IOException {
+      boolean endOfBlock, boolean incremental) throws IOException {
     return persistPutBlock(
         (KeyValueContainer) container,
         data,
         config,
-        endOfBlock);
-  }
-
-  private static boolean isPartialChunkList(BlockData data) {
-    if (data.getMetadata().containsKey("incremental")) {
-      return true;
-    }
-    return false;
-  }
-
-  // if eob or if the last chunk is full,
-  private static boolean shouldAppendLastChunk(boolean endOfBlock, BlockData data) {
-    if (endOfBlock) return true;
-    Preconditions.checkState(data.getChunks().size() > 0);
-    if (data.getChunks().get(data.getChunks().size() - 1).getLen() == 4 * 1024 * 1024) {
-      return true;
-    }
-    return false;
+        endOfBlock,
+        incremental);
   }
 
   public static long persistPutBlock(KeyValueContainer container,
-      BlockData data, ConfigurationSource config, boolean endOfBlock)
+      BlockData data, ConfigurationSource config, boolean endOfBlock,
+      boolean incremental)
       throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
@@ -172,75 +175,7 @@ public class BlockManagerImpl implements BlockManager {
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
-
-
         Preconditions.checkState(!data.getChunks().isEmpty(), "empty chunk list unexpected");
-
-        // TODO: deal with both old and new clients
-        if (!isPartialChunkList(data)) {
-          // old client: override chunk list.
-          db.getStore().getBlockDataTable().putWithBatch(
-              batch, containerData.getBlockKey(localID), data);
-        } else if (shouldAppendLastChunk(endOfBlock, data)) {
-          // if eob or if the last chunk is full,
-          // the 'data' is complete so append it to the block table's chunk info
-          // and then remove from lastChunkInfo
-          BlockData blockData = db.getStore().getBlockDataTable().get(
-              containerData.getBlockKey(localID));
-          if (blockData == null) {
-            // if the block did not have full chunks before,
-            // the block's chunk is what received from client this time.
-            blockData = data;
-          } else {
-            List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
-            blockData.setChunks(new ArrayList<>(chunkInfoList));
-            for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
-              blockData.addChunk(chunk);
-            }
-            blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
-          }
-          // delete the entry from last chunk info table
-          db.getStore().getLastChunkInfoTable().deleteWithBatch(
-              batch, containerData.getBlockKey(localID));
-          // update block data table
-          db.getStore().getBlockDataTable().putWithBatch(
-              batch, containerData.getBlockKey(localID), blockData);
-        } else {
-          // incremental chunk list,
-          // not end of block, has partial chunks
-          if (data.getChunks().size() == 1) {
-            // replace/update the last chunk info table
-            db.getStore().getLastChunkInfoTable().putWithBatch(
-                batch, containerData.getBlockKey(localID),
-                data);
-          } else {
-            // received more than one chunk this time
-            List<ContainerProtos.ChunkInfo> lastChunkInfo =
-                Collections.singletonList(
-                    data.getChunks().get(data.getChunks().size() -1));
-            BlockData blockData = db.getStore().getBlockDataTable().get(
-                containerData.getBlockKey(localID));
-            if (blockData == null) {
-              // if the block does not exist in the block data table
-              blockData = data;
-              ContainerProtos.ChunkInfo lastPartialChunk =
-                  data.getChunks().get(data.getChunks().size() -1);
-              blockData.removeChunk(lastPartialChunk);
-            } else {
-              // if the block exists in the block data table,
-              // append chunks till except the last one (supposedly partial)
-              for (int i = 0; i < data.getChunks().size() - 1; i++) {
-                blockData.addChunk(data.getChunks().get(i));
-              }
-            }
-            db.getStore().getBlockDataTable().putWithBatch(
-                batch, containerData.getBlockKey(localID), blockData);
-            // update the last partial chunk
-            data.setChunks(lastChunkInfo);
-            db.getStore().getLastChunkInfoTable().putWithBatch(
-                batch, containerData.getBlockKey(localID), data);
-          }
-        }
 
         // If the block does not exist in the pendingPutBlockCache of the
         // container, then check the DB to ascertain if it exists or not.
@@ -253,6 +188,9 @@ public class BlockManagerImpl implements BlockManager {
             incrBlockCount = true;
           }
         }
+
+        db.getStore().putBlockByID(batch, incremental, localID, data,
+            containerData, endOfBlock);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, containerData.getBcsIdKey(), bcsId);

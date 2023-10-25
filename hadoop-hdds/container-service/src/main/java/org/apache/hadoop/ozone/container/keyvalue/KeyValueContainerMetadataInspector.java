@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
+import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -548,6 +549,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     for (long id : localIDs) {
       try {
         final String blockKey = containerData.getBlockKey(id);
+        //// TODO: use store.getBlockByID() instead
         final BlockData blockData = blockDataTable.get(blockKey);
         if (blockData != null) {
           pendingDeleteBytes += blockData.getSize();

@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -546,7 +547,9 @@ public class KeyValueHandler extends Handler {
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      blockManager.putBlock(kvContainer, blockData, endOfBlock);
+      boolean incrementalChunkList =
+          request.getVersion() >= ClientVersion.INCREMENTAL_CHUNK_LIST_SUPPORT.toProtoValue();
+      blockManager.putBlock(kvContainer, blockData, endOfBlock, incrementalChunkList);
 
       blockDataProto = blockData.getProtoBufMessage();
 

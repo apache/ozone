@@ -41,6 +41,8 @@ public enum ClientVersion implements ComponentVersion {
   BUCKET_LAYOUT_SUPPORT(3,
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
+  INCREMENTAL_CHUNK_LIST_SUPPORT(4,
+      "This client version has support for incremental chunk list."),
 
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
