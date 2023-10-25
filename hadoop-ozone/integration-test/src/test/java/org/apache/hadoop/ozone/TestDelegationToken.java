@@ -112,7 +112,7 @@ public final class TestDelegationToken {
       .getLogger(TestDelegationToken.class);
 
   @TempDir
-  public Path folder;
+  private Path folder;
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
