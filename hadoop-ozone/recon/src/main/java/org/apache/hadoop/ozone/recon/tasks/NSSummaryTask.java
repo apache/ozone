@@ -101,7 +101,7 @@ public class NSSummaryTask implements ReconOmTask {
     boolean success;
     success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (success) {
-      success = nsSummaryTaskWithLegacy.processWithLegacy(events);
+      success = nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     } else {
       LOG.error("processWithFSO failed.");
     }
