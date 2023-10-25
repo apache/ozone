@@ -24,13 +24,13 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -200,7 +200,8 @@ public class SCMBlockProtocolServer implements
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           if (StringUtils.isNotEmpty(clientMachine)) {
-            List<String> uuidList = toNodeUuid(block.getPipeline().getNodes());
+            List<String> uuidList = HddsUtils.toNodeUuid(
+                block.getPipeline().getNodes());
             block.getPipeline().setNodesInOrder(
                 sortDatanodes(uuidList, clientMachine));
           }
@@ -230,15 +231,6 @@ public class SCMBlockProtocolServer implements
       throw ex;
     }
   }
-
-  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
-    List<String> nodeSet = new ArrayList<>(nodes.size());
-    for (DatanodeDetails node : nodes) {
-      nodeSet.add(node.getUuidString());
-    }
-    return nodeSet;
-  }
-
 
   /**
    * Delete blocks for a set of object keys.

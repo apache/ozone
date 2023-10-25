@@ -30,6 +30,7 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -895,4 +897,16 @@ public final class HddsUtils {
         ? Thread.currentThread().getStackTrace()
         : null;
   }
+
+  /**
+   * Given the list of datanode details, extract the uuid as string.
+   */
+  public static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
+    List<String> nodeSet = new ArrayList<>(nodes.size());
+    for (DatanodeDetails node : nodes) {
+      nodeSet.add(node.getUuidString());
+    }
+    return nodeSet;
+  }
+
 }

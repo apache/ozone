@@ -46,6 +46,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -1765,7 +1766,7 @@ public class KeyManagerImpl implements KeyManager {
         for (OmKeyLocationInfo k : key.getLocationList()) {
           Pipeline pipeline = k.getPipeline();
           List<DatanodeDetails> nodes = pipeline.getNodes();
-          List<String> uuidList = toNodeUuid(nodes);
+          List<String> uuidList = HddsUtils.toNodeUuid(nodes);
           Set<String> uuidSet = new HashSet<>(uuidList);
           List<DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
           if (sortedNodes == null) {
@@ -1808,13 +1809,6 @@ public class KeyManagerImpl implements KeyManager {
     return sortedNodes;
   }
 
-  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
-    List<String> nodeSet = new ArrayList<>(nodes.size());
-    for (DatanodeDetails node : nodes) {
-      nodeSet.add(node.getUuidString());
-    }
-    return nodeSet;
-  }
   private void slimLocationVersion(OmKeyInfo... keyInfos) {
     if (keyInfos != null) {
       for (OmKeyInfo keyInfo : keyInfos) {
