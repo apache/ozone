@@ -166,7 +166,6 @@ class TestOpenKeyCleanupService {
         SERVICE_INTERVAL, WAIT_TIME);
     assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
 
-    final int n = hsync ? numDEFKeys + numFSOKeys : 1;
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
     waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
