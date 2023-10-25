@@ -248,12 +248,7 @@ public interface CertificateClient extends Closeable {
    * Initialize certificate client.
    *
    * */
-  InitResponse init() throws CertificateException;
-
-  /**
-   * Recover the state if needed.
-   * */
-  void recoverStateIfNeeded(InitResponse state) throws IOException;
+  void initWithRecovery() throws IOException;
 
   /**
    * Represents initialization response of client.

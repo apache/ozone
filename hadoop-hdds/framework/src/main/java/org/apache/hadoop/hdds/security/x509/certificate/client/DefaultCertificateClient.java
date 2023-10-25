@@ -130,7 +130,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private KeyStoresFactory clientKeyStoresFactory;
 
   private ScheduledExecutorService executorService;
-  private Consumer<String> certIdSaveCallback;
+  protected Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;
@@ -660,39 +660,48 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. Generates and stores a keypair.
    * 3. Try to recover public key if private key and certificate is present
    *    but public key is missing.
+   * 4. Try to refetch certificate if public key and private key are present
+   *    but certificate is missing.
+   * 5. Try to recover public key from private key(RSA only) if private key
+   *    is present but public key and certificate are missing, and refetch
+   *    certificate.
    *
    * Truth table:
-   *  +--------------+-----------------+--------------+----------------+
-   *  | Private Key  | Public Keys     | Certificate  |   Result       |
-   *  +--------------+-----------------+--------------+----------------+
-   *  | False  (0)   | False   (0)     | False  (0)   |   GETCERT  000 |
-   *  | False  (0)   | False   (0)     | True   (1)   |   FAILURE  001 |
-   *  | False  (0)   | True    (1)     | False  (0)   |   FAILURE  010 |
-   *  | False  (0)   | True    (1)     | True   (1)   |   FAILURE  011 |
-   *  | True   (1)   | False   (0)     | False  (0)   |   FAILURE  100 |
-   *  | True   (1)   | False   (0)     | True   (1)   |   SUCCESS  101 |
-   *  | True   (1)   | True    (1)     | False  (0)   |   GETCERT  110 |
-   *  | True   (1)   | True    (1)     | True   (1)   |   SUCCESS  111 |
+   *  +--------------+---------------+--------------+---------------------+
+   *  | Private Key  | Public Keys   | Certificate  |   Result            |
+   *  +--------------+---------------+--------------+---------------------+
+   *  | False  (0)   | False   (0)   | False  (0)   |   GETCERT->SUCCESS  |
+   *  | False  (0)   | False   (0)   | True   (1)   |   FAILURE           |
+   *  | False  (0)   | True    (1)   | False  (0)   |   FAILURE           |
+   *  | False  (0)   | True    (1)   | True   (1)   |   FAILURE           |
+   *  | True   (1)   | False   (0)   | False  (0)   |   GETCERT->SUCCESS  |
+   *  | True   (1)   | False   (0)   | True   (1)   |   SUCCESS           |
+   *  | True   (1)   | True    (1)   | False  (0)   |   GETCERT->SUCCESS  |
+   *  | True   (1)   | True    (1)   | True   (1)   |   SUCCESS           |
    *  +--------------+-----------------+--------------+----------------+
    *
-   * @return InitResponse
-   * Returns FAILURE in following cases:
-   * 1. If private key is missing but public key or certificate is available.
-   * 2. If public key and certificate is missing.
-   *
-   * Returns SUCCESS in following cases:
+   * Success in following cases:
    * 1. If keypair as well certificate is available.
    * 2. If private key and certificate is available and public key is
    *    recovered successfully.
+   * 3. If private key and public key are present while certificate is
+   *    missing, certificate is refetched successfully.
+   * 4. If private key is present while public key and certificate are missing,
+   *    public key is recovered and certificate is refetched successfully.
    *
-   * Returns GETCERT in following cases:
-   * 1. First time when keypair and certificate is not available, keypair
-   *    will be generated and stored at configured location.
-   * 2. When keypair (public/private key) is available but certificate is
-   *    missing.
+   * Throw exception in following cases:
+   * 1. If private key is missing.
+   * 2. If private key or certificate is present, public key is missing,
+   *    and cannot recover public key from private key or certificate
+   * 3. If refetch certificate fails.
    */
   @Override
-  public synchronized InitResponse init() throws CertificateException {
+  public synchronized void initWithRecovery() throws IOException {
+    recoverStateIfNeeded(init());
+  }
+
+  @VisibleForTesting
+  public synchronized InitResponse init() throws IOException {
     int initCase = 0;
     PrivateKey pvtKey = getPrivateKey();
     PublicKey pubKey = getPublicKey();
@@ -777,7 +786,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     default:
       getLogger().error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));
-
       return FAILURE;
     }
   }
@@ -786,7 +794,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    * Recover the state if needed.
    * */
-  public void recoverStateIfNeeded(InitResponse state) throws IOException {
+  protected void recoverStateIfNeeded(InitResponse state) throws IOException {
     String upperCaseComponent = component.toUpperCase();
     getLogger().info("Init response: {}", state);
     switch (state) {
@@ -798,7 +806,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       if (certIdSaveCallback != null) {
         certIdSaveCallback.accept(certId);
       } else {
-        throw new IOException(upperCaseComponent + " doesn't have " +
+        throw new RuntimeException(upperCaseComponent + " doesn't have " +
             "the certIdSaveCallback set. The new " +
             "certificate ID " + certId + " cannot be persisted to " +
             "the VERSION file");

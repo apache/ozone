@@ -84,7 +84,7 @@ public class TestOzoneDelegationTokenSecretManager {
   private OzoneManager om;
   private OzoneDelegationTokenSecretManager secretManager;
   private SecurityConfig securityConfig;
-  private CertificateClient certificateClient;
+  private OMCertificateClient certificateClient;
   private long expiryTime;
   private Text serviceRpcAdd;
   private OzoneConfiguration conf;
@@ -138,7 +138,7 @@ public class TestOzoneDelegationTokenSecretManager {
   /**
    * Helper function to create certificate client.
    * */
-  private CertificateClient setupCertificateClient() throws Exception {
+  private OMCertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     CertificateFactory fact = CertificateCodec.getCertFactory();
     X509Certificate singleCert = KeyStoreTestUtil

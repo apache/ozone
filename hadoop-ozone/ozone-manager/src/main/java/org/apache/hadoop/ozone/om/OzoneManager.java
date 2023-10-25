@@ -649,8 +649,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omStorage, omInfo, "",
           scmInfo == null ? null : scmInfo.getScmId(),
           this::saveNewCertId, this::terminateOM);
-      CertificateClient.InitResponse response = certClient.init();
-      certClient.recoverStateIfNeeded(response);
+      certClient.initWithRecovery();
 
       SecretKeyProtocol secretKeyProtocol =
           HddsServerUtil.getSecretKeyClientForOm(conf);
@@ -1421,8 +1420,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 LOG.error("Failed to set new certificate ID", e);
                 throw new RuntimeException("Failed to set new certificate ID");
               }}, null);
-    CertificateClient.InitResponse response = certClient.init();
-    certClient.recoverStateIfNeeded(response);
+    certClient.initWithRecovery();
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {

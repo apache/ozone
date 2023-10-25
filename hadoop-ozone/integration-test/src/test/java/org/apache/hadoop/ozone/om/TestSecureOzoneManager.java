@@ -124,7 +124,7 @@ public class TestSecureOzoneManager {
     // Case 1: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail when SCM is not running.
     SecurityConfig securityConfig = new SecurityConfig(conf);
-    CertificateClient client =
+    OMCertificateClient client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());

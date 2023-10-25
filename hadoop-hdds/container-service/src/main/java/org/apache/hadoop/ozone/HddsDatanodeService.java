@@ -392,8 +392,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           this::terminateDatanode);
       certClient = dnCertClient;
     }
-    CertificateClient.InitResponse response = certClient.init();
-    certClient.recoverStateIfNeeded(response);
+    certClient.initWithRecovery();
     return certClient;
   }
 

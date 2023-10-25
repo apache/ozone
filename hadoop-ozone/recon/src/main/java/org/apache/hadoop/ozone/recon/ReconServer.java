@@ -183,9 +183,7 @@ public class ReconServer extends GenericCli {
     SecurityConfig secConf = new SecurityConfig(configuration);
     certClient = new ReconCertificateClient(secConf, scmSecurityClient,
         reconStorage, this::saveNewCertId, this::terminateRecon);
-
-    CertificateClient.InitResponse response = certClient.init();
-    certClient.recoverStateIfNeeded(response);
+    certClient.initWithRecovery();
   }
 
   public void saveNewCertId(String newCertId) {
