@@ -80,7 +80,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private String scmHostname;
   private ExecutorService executorService;
   private boolean isPrimarySCM = false;
+  private Consumer<String> saveCertIdCallback;
 
+  @SuppressWarnings("parameternumber")
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String scmId, String clusterId, String scmCertId, String hostname,
@@ -91,6 +93,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     this.cId = clusterId;
     this.scmHostname = hostname;
     this.isPrimarySCM = isPrimarySCM;
+    this.saveCertIdCallback = saveCertId;
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
@@ -281,22 +284,22 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   protected void recoverStateIfNeeded(InitResponse state) throws IOException {
     LOG.info("Init response: {}", state);
     switch (state) {
-      case SUCCESS:
-        LOG.info("Initialization successful.");
-        break;
-      case GETCERT:
-        if (!isPrimarySCM) {
-          getRootCASignedSCMCert();
-        } else {
-          getPrimarySCMSelfSignedCert();
-        }
-        LOG.info("Successfully stored SCM signed certificate.");
-        break;
-      case FAILURE:
-      default:
-        LOG.error("SCM security initialization failed. Init response: {}",
-            state);
-        throw new RuntimeException("SCM security initialization failed.");
+    case SUCCESS:
+      LOG.info("Initialization successful.");
+      break;
+    case GETCERT:
+      if (!isPrimarySCM) {
+        getRootCASignedSCMCert();
+      } else {
+        getPrimarySCMSelfSignedCert();
+      }
+      LOG.info("Successfully stored SCM signed certificate.");
+      break;
+    case FAILURE:
+    default:
+      LOG.error("SCM security initialization failed. Init response: {}",
+          state);
+      throw new RuntimeException("SCM security initialization failed.");
     }
   }
 
@@ -331,7 +334,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         X509Certificate certificate =
             CertificateCodec.getX509Certificate(pemEncodedCert);
         // Persist scm cert serial ID.
-        certIdSaveCallback.accept(certificate.getSerialNumber().toString());
+        saveCertIdCallback.accept(certificate.getSerialNumber().toString());
       } else {
         throw new RuntimeException("Unable to retrieve SCM certificate chain");
       }
@@ -372,7 +375,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
           CertificateCodec.getCertificateHolder(cert);
 
       // Persist scm cert serial ID.
-      certIdSaveCallback.accept(subSCMCertHolder.getSerialNumber().toString());
+      saveCertIdCallback.accept(subSCMCertHolder.getSerialNumber().toString());
     } catch (InterruptedException | ExecutionException | IOException |
              java.security.cert.CertificateException e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);

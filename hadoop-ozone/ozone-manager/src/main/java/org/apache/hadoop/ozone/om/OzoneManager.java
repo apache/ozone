@@ -113,7 +113,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -1419,7 +1418,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               } catch (IOException e) {
                 LOG.error("Failed to set new certificate ID", e);
                 throw new RuntimeException("Failed to set new certificate ID");
-              }}, null);
+              }
+            }, null);
     certClient.initWithRecovery();
   }
 

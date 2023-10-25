@@ -130,7 +130,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private KeyStoresFactory clientKeyStoresFactory;
 
   private ScheduledExecutorService executorService;
-  protected Consumer<String> certIdSaveCallback;
+  private Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;

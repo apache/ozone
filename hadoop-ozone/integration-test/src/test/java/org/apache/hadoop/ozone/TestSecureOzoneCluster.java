@@ -651,7 +651,6 @@ final class TestSecureOzoneCluster {
       scm.start();
 
       // Setup secure OM for start.
-      OzoneConfiguration newConf = new OzoneConfiguration(conf);
       int tokenMaxLifetime = 1000;
       conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
       setupOm(conf);
