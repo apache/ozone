@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
@@ -62,6 +63,17 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnPipelineMapDecommissionRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnPipelineMapDecommissionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DnPipelineMapDecommissionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnContainerMapDecommissionRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMapDecommissionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DnContainerMapDecommissionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnContainerMapDecommissionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersForDnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersForDnResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetLastChangeTimeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetLastChangeTimeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
@@ -113,14 +125,18 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
@@ -706,6 +722,76 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  @Override
+  public Map<UUID, Integer> getPipelineMap() throws IOException {
+    GetDnPipelineMapDecommissionRequestProto request =
+        GetDnPipelineMapDecommissionRequestProto.getDefaultInstance();
+    GetDnPipelineMapDecommissionResponseProto response =
+        submitRequest(Type.GetDnPipelineMapDecommission,
+            builder -> builder.setGetDnPipelineMapDecommissionRequest(request))
+            .getGetDnPipelineMapDecommissionResponse();
+    Map<UUID, Integer> map = new HashMap();
+    for (DnPipelineMapDecommissionProto mapProto :
+        response.getDnPipelineMapDecommissionProtoList()) {
+      map.put(ProtobufUtils.fromProtobuf(mapProto.getDatanodeId()), mapProto.getNumPipelines());
+    }
+    return map;
+  }
+
+  @Override
+  public Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap()
+      throws IOException {
+    GetDnContainerMapDecommissionRequestProto request =
+        GetDnContainerMapDecommissionRequestProto.getDefaultInstance();
+    GetDnContainerMapDecommissionResponseProto response =
+        submitRequest(Type.GetDnContainerMapDecommission,
+            builder -> builder.setGetDnContainerMapDecommissionRequest(request))
+            .getGetDnContainerMapDecommissionResponse();
+    Map<UUID, Map<HddsProtos.LifeCycleState, Long>> finalMap = new HashMap<>();
+    for (DnContainerMapDecommissionProto mapProto :
+        response.getDnContainerMapDecommissionProtoList()) {
+      Map<HddsProtos.LifeCycleState, Long> stateMap = new HashMap();
+      for (ContainerMapDecommissionProto mapP :
+          mapProto.getContainerMapList()) {
+        stateMap.put(mapP.getState(), mapP.getNumContainers());
+      }
+      finalMap.put(ProtobufUtils.fromProtobuf(mapProto.getDatanodeId()),
+          stateMap);
+    }
+    return finalMap;
+  }
+
+  @Override
+  public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
+      throws IOException {
+    GetContainersForDnRequestProto request =
+        GetContainersForDnRequestProto.newBuilder()
+            .setDatanode(datanodeDetails.getExtendedProtoBufMessage()).build();
+
+    GetContainersForDnResponseProto response =
+        submitRequest(Type.GetContainersForDn,
+            builder -> builder.setGetContainersForDnRequestProto(request))
+            .getGetContainersForDnResponseProto();
+    Set<ContainerID> containers = new HashSet<>();
+    for (HddsProtos.ContainerID containerProto :
+        response.getContainerIdList()) {
+      containers.add(ContainerID.getFromProtobuf(containerProto));
+    }
+    return containers;
+  }
+
+  @Override
+  public long getLastChangeTime(DatanodeDetails datanodeDetails)
+      throws IOException {
+    GetLastChangeTimeRequestProto request =
+        GetLastChangeTimeRequestProto.newBuilder()
+            .setDatanode(datanodeDetails.getExtendedProtoBufMessage())
+            .build();
+    return submitRequest(Type.GetLastChangeTime,
+        builder -> builder.setGetLastChangeTimeRequestProto(request)).
+        getGetLastChangeTimeResponseProto().getLastChangeTime();
   }
 
   @Override

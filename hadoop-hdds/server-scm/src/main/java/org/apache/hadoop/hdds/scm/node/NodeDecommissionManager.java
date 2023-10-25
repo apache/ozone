@@ -20,10 +20,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -37,8 +41,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -52,19 +60,30 @@ public class NodeDecommissionManager {
   private DatanodeAdminMonitor monitor;
 
   private NodeManager nodeManager;
-  //private ContainerManager containerManager;
+  private ContainerManager containerManager;
   private SCMContext scmContext;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
   private boolean useHostnames;
   private long monitorInterval;
+  private Map<UUID, Integer> pipelineMap;
+  private Map<UUID, Map<HddsProtos.LifeCycleState, Long>> containerMap;
+
 
   // Decommissioning and Maintenance mode progress related metrics.
   private NodeDecommissionMetrics metrics;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeDecommissionManager.class);
+
+  public Map<UUID, Integer> getPipelineMap() {
+    return pipelineMap;
+  }
+
+  public Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap() {
+    return containerMap;
+  }
 
   static class HostDefinition {
     private String rawHostname;
@@ -180,11 +199,13 @@ public class NodeDecommissionManager {
              EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
-    //this.containerManager = containerManager;
+    this.containerManager = containerManager;
     this.scmContext = scmContext;
     this.eventQueue = eventQueue;
     this.replicationManager = rm;
     this.metrics = null;
+    this.pipelineMap = new HashMap<>();
+    this.containerMap = new HashMap<>();
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
@@ -216,6 +237,25 @@ public class NodeDecommissionManager {
     monitor.setMetrics(this.metrics);
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
         TimeUnit.SECONDS);
+  }
+
+  private Map<HddsProtos.LifeCycleState, Long> getStateToContainerMap(
+      DatanodeDetails dn) throws NodeNotFoundException {
+    Map<HddsProtos.LifeCycleState, Long> containerMapForDn = new HashMap<>();
+    for(HddsProtos.LifeCycleState lc : HddsProtos.LifeCycleState.values()) {
+      containerMapForDn.put(lc,0L);
+    }
+    Set<ContainerID> containerIDs = nodeManager.getContainers(dn);
+    for (ContainerID id : containerIDs) {
+      try {
+        ContainerInfo containerInfo = containerManager.getContainer(id);
+        containerMapForDn.replace(containerInfo.getState(),
+            (containerMapForDn.get(containerInfo.getState()) + 1));
+      } catch (ContainerNotFoundException e) {
+        // don't do anything, Map values are not incremented
+      }
+    }
+    return containerMapForDn;
   }
 
   @VisibleForTesting
@@ -275,6 +315,8 @@ public class NodeDecommissionManager {
     NodeOperationalState opState = nodeStatus.getOperationalState();
     if (opState == NodeOperationalState.IN_SERVICE) {
       LOG.info("Starting Decommission for node {}", dn);
+      pipelineMap.put(dn.getUuid(), nodeManager.getPipelines(dn).size());
+      containerMap.put(dn.getUuid(), getStateToContainerMap(dn));
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
       monitor.startMonitoring(dn);

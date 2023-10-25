@@ -24,6 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
@@ -66,6 +67,17 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnPipelineMapDecommissionRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnPipelineMapDecommissionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DnPipelineMapDecommissionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnContainerMapDecommissionRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMapDecommissionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DnContainerMapDecommissionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDnContainerMapDecommissionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersForDnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersForDnResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetLastChangeTimeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetLastChangeTimeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
@@ -120,14 +132,18 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
@@ -692,6 +708,34 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               .setDecommissionScmResponse(decommissionScm(
                   request.getDecommissionScmRequest()))
               .build();
+      case GetDnPipelineMapDecommission:
+        return ScmContainerLocationResponse.newBuilder()
+               .setCmdType(request.getCmdType())
+               .setStatus(Status.OK)
+               .setGetDnPipelineMapDecommissionResponse(getDnPipelineMapDecommission(
+                  request.getGetDnPipelineMapDecommissionRequest()))
+               .build();
+      case GetDnContainerMapDecommission:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setGetDnContainerMapDecommissionResponse(getDnContainerMapDecommission(
+                  request.getGetDnContainerMapDecommissionRequest()))
+              .build();
+      case GetContainersForDn:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setGetContainersForDnResponseProto(getContainersForDn(
+                  request.getGetContainersForDnRequestProto()))
+              .build();
+      case GetLastChangeTime:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setGetLastChangeTimeResponseProto(getLastChangeTime(
+                  request.getGetLastChangeTimeRequestProto()))
+              .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1224,5 +1268,64 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
         request.getScmId());
+  }
+
+  public GetDnPipelineMapDecommissionResponseProto getDnPipelineMapDecommission(
+      GetDnPipelineMapDecommissionRequestProto request) throws IOException {
+    Map<UUID, Integer> map = impl.getPipelineMap();
+    List<DnPipelineMapDecommissionProto> proto = new ArrayList();
+    for (Map.Entry<UUID, Integer> entry : map.entrySet()) {
+      proto.add(DnPipelineMapDecommissionProto.newBuilder()
+          .setDatanodeId(ProtobufUtils.toProtobuf(entry.getKey()))
+          .setNumPipelines(entry.getValue())
+          .build());
+    }
+
+    return GetDnPipelineMapDecommissionResponseProto.newBuilder()
+        .addAllDnPipelineMapDecommissionProto(proto).build();
+  }
+
+  public GetDnContainerMapDecommissionResponseProto getDnContainerMapDecommission(
+      GetDnContainerMapDecommissionRequestProto request) throws IOException {
+    Map<UUID, Map<HddsProtos.LifeCycleState, Long>> map =
+        impl.getContainerMap();
+    List<DnContainerMapDecommissionProto> proto = new ArrayList();
+    for (Map.Entry<UUID, Map<HddsProtos.LifeCycleState, Long>> entry :
+        map.entrySet()) {
+      List<ContainerMapDecommissionProto> subProto = new ArrayList();
+      for (Map.Entry<HddsProtos.LifeCycleState, Long> subEntry :
+          entry.getValue().entrySet()) {
+        subProto.add(ContainerMapDecommissionProto.newBuilder()
+            .setState(subEntry.getKey())
+            .setNumContainers(subEntry.getValue())
+            .build());
+      }
+      proto.add(DnContainerMapDecommissionProto.newBuilder()
+          .setDatanodeId(ProtobufUtils.toProtobuf(entry.getKey()))
+          .addAllContainerMap(subProto)
+          .build());
+    }
+    return GetDnContainerMapDecommissionResponseProto.newBuilder()
+        .addAllDnContainerMapDecommissionProto(proto).build();
+  }
+
+  public GetContainersForDnResponseProto getContainersForDn(
+      GetContainersForDnRequestProto request)
+      throws IOException {
+    Set<ContainerID> containers = impl.getContainers(DatanodeDetails.getFromProtoBuf(request.getDatanode()));
+    Set<HddsProtos.ContainerID> containersProto= new HashSet<>();
+    for (ContainerID oneContainer : containers) {
+      containersProto.add(oneContainer.getProtobuf());
+    }
+    return GetContainersForDnResponseProto.newBuilder()
+        .addAllContainerId(containersProto).build();
+  }
+
+  public GetLastChangeTimeResponseProto getLastChangeTime(
+      GetLastChangeTimeRequestProto request) throws IOException {
+    return GetLastChangeTimeResponseProto.newBuilder()
+        .setLastChangeTime(impl.getLastChangeTime(
+            DatanodeDetails.getFromProtoBuf(request.getDatanode())))
+        .build();
   }
 }
