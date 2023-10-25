@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -168,24 +169,62 @@ public final class SnapshotUtils {
    * the given volume and bucket.
    * Column families, map is returned for, are keyTable, dirTable and fileTable.
    */
-  public static Map<String, String> getColumnFamilyToPrefixMap(
+  public static Map<String, String> getColumnFamilyToKeyPrefixMap(
       OMMetadataManager omMetadataManager,
       String volumeName,
       String bucketName
   ) throws IOException {
-    long volumeId = omMetadataManager.getVolumeId(volumeName);
-    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
-
-    String keyPrefix = OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
-        + OM_KEY_PREFIX;
-
-    String keyPrefixFso = OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
-        bucketId + OM_KEY_PREFIX;
+    String keyPrefix = getOzonePathKey(volumeName, bucketName);
+    String keyPrefixFso = getOzonePathKeyForFso(omMetadataManager, volumeName,
+        bucketName);
 
     Map<String, String> columnFamilyToPrefixMap = new HashMap<>();
     columnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
     columnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
     columnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
     return columnFamilyToPrefixMap;
+  }
+
+  /**
+   * Helper method to generate /volumeName/bucketBucket/ DB key prefix from
+   * given volume name and bucket name as a prefix for legacy and OBS buckets.
+   * Follows:
+   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
+   * <p>
+   * Note: Currently, this is only intended to be a special use case in
+   * Snapshot. If this is used elsewhere, consider moving this to
+   * @link OMMetadataManager}.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return /volumeName/bucketName/
+   */
+  public static String getOzonePathKey(String volumeName,
+                                       String bucketName) throws IOException {
+    return OM_KEY_PREFIX + volumeName + bucketName;
+  }
+
+  /**
+   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
+   * volume name and bucket name as a prefix for FSO buckets.
+   * Follows:
+   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
+   * <p>
+   * Note: Currently, this is only intended to be a special use case in
+   * Snapshot. If this is used elsewhere, consider moving this to
+   * {@link OMMetadataManager}.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
+   */
+  public static String getOzonePathKeyForFso(OMMetadataManager metadataManager,
+                                             String volumeName,
+                                             String bucketName)
+      throws IOException {
+    final long volumeId = metadataManager.getVolumeId(volumeName);
+    final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 }

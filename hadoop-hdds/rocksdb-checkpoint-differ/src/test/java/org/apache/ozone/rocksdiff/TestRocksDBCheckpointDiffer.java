@@ -475,8 +475,7 @@ public class TestRocksDBCheckpointDiffer {
           srcSnapshotSstFiles,
           destSnapshotSstFiles,
           actualSameSstFiles,
-          actualDiffSstFiles,
-          Collections.emptyMap());
+          actualDiffSstFiles);
     } catch (RuntimeException rtEx) {
       if (!expectingException) {
         fail("Unexpected exception thrown in test.");
@@ -572,8 +571,7 @@ public class TestRocksDBCheckpointDiffer {
     int index = 0;
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksDiff
-      List<String> sstDiffList = differ.getSSTDiffList(src, snap,
-          Collections.emptyMap());
+      List<String> sstDiffList = differ.getSSTDiffList(src, snap);
       LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
@@ -1733,9 +1731,9 @@ public class TestRocksDBCheckpointDiffer {
     // Snapshot is used for logging purpose and short-circuiting traversal.
     // Using gen 0 for this test.
     DifferSnapshotInfo mockedSourceSnapshot = new DifferSnapshotInfo(
-        "/path/to/dbcp1", UUID.randomUUID(), 0L, null, null);
+        "/path/to/dbcp1", UUID.randomUUID(), 0L, columnFamilyToPrefixMap, null);
     DifferSnapshotInfo mockedDestinationSnapshot = new DifferSnapshotInfo(
-        "/path/to/dbcp2", UUID.randomUUID(), 0L, null, null);
+        "/path/to/dbcp2", UUID.randomUUID(), 0L, columnFamilyToPrefixMap, null);
 
     Set<String> actualSameSstFiles = new HashSet<>();
     Set<String> actualDiffSstFiles = new HashSet<>();
@@ -1746,8 +1744,7 @@ public class TestRocksDBCheckpointDiffer {
         srcSnapshotSstFiles,
         destSnapshotSstFiles,
         actualSameSstFiles,
-        actualDiffSstFiles,
-        columnFamilyToPrefixMap);
+        actualDiffSstFiles);
 
     // Check same and different SST files result
     Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);

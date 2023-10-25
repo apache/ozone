@@ -29,10 +29,10 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -214,8 +214,7 @@ public class TestOMSnapshotCreateResponse {
     // Add deletedDirectoryTable key entries that "surround" the snapshot scope
     Set<String> sentinelKeys = new HashSet<>();
 
-    final String dbKeyPfx =
-        OmSnapshotManager.getOzonePathKeyWithVolumeBucketNames(
+    final String dbKeyPfx = SnapshotUtils.getOzonePathKeyForFso(
             omMetadataManager, volumeName, bucketName);
 
     // Calculate offset to bucketId's last character in dbKeyPfx.

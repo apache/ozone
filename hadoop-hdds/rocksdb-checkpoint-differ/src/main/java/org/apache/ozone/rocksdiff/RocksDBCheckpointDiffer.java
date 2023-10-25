@@ -860,8 +860,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param dest destination snapshot
    * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
    *                                 for snapDiff job.
-   * @param columnFamilyToPrefixMap map containing tableName to prefix for
-   *                               the keys in the table.
    * @return A list of SST files without extension.
    *         e.g. ["/path/to/sstBackupDir/000050.sst",
    *               "/path/to/sstBackupDir/000060.sst"]
@@ -869,12 +867,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public synchronized List<String> getSSTDiffListWithFullPath(
       DifferSnapshotInfo src,
       DifferSnapshotInfo dest,
-      String sstFilesDirForSnapDiffJob,
-      Map<String, String> columnFamilyToPrefixMap
+      String sstFilesDirForSnapDiffJob
   ) throws IOException {
 
-    List<String> sstDiffList = getSSTDiffList(src, dest,
-        columnFamilyToPrefixMap);
+    List<String> sstDiffList = getSSTDiffList(src, dest);
 
     return sstDiffList.stream()
         .map(
@@ -898,14 +894,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    *
    * @param src source snapshot
    * @param dest destination snapshot
-   * @param columnFamilyToPrefixMap map containing tableName to prefix for
-   *                               the keys in the table.
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized List<String> getSSTDiffList(
       DifferSnapshotInfo src,
-      DifferSnapshotInfo dest,
-      Map<String, String> columnFamilyToPrefixMap
+      DifferSnapshotInfo dest
   ) throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
@@ -919,7 +912,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     LOG.debug("Doing forward diff from src '{}' to dest '{}'",
         src.getDbPath(), dest.getDbPath());
     internalGetSSTDiffList(src, dest, srcSnapFiles, destSnapFiles,
-        fwdDAGSameFiles, fwdDAGDifferentFiles, columnFamilyToPrefixMap);
+        fwdDAGSameFiles, fwdDAGDifferentFiles);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Result of diff from src '" + src.getDbPath() + "' to dest '" +
@@ -980,12 +973,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       Set<String> srcSnapFiles,
       Set<String> destSnapFiles,
       Set<String> sameFiles,
-      Set<String> differentFiles,
-      Map<String, String> columnFamilyToPrefixMap) {
+      Set<String> differentFiles) {
 
-    // Sanity check
     Preconditions.checkArgument(sameFiles.isEmpty(), "Set must be empty");
     Preconditions.checkArgument(differentFiles.isEmpty(), "Set must be empty");
+
+    // Use source snapshot's table prefix. At this point Source and target's
+    // table prefix should be same.
+    Map<String, String> columnFamilyToPrefixMap = src.getTablePrefixes();
 
     for (String fileName : srcSnapFiles) {
       if (destSnapFiles.contains(fileName)) {

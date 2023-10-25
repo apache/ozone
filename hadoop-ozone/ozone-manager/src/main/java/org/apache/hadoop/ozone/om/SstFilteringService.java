@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToPrefixMap;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 /**
  * When snapshots are taken, an entire snapshot of the
@@ -176,7 +176,7 @@ public class SstFilteringService extends BackgroundService
                 snapShotTableKey);
 
             Map<String, String> columnFamilyNameToPrefixMap =
-                getColumnFamilyToPrefixMap(ozoneManager.getMetadataManager(),
+                getColumnFamilyToKeyPrefixMap(ozoneManager.getMetadataManager(),
                     snapshotInfo.getVolumeName(),
                     snapshotInfo.getBucketName());
 

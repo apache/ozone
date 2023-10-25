@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -60,10 +59,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -73,6 +69,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -158,24 +155,9 @@ public class TestOMSnapshotDAG {
     // persisted at the time of snapshot creation, as the snapshot generation
     return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
-        getTablePrefixes(omMetadataManager, volumeName, bucketName),
+        getColumnFamilyToKeyPrefixMap(omMetadataManager, volumeName,
+            bucketName),
         snapshotDB);
-  }
-
-  private Map<String, String> getTablePrefixes(
-      OMMetadataManager omMetadataManager, String volumeName, String bucketName)
-      throws IOException {
-    HashMap<String, String> tablePrefixes = new HashMap<>();
-    String volumeId = String.valueOf(omMetadataManager.getVolumeId(volumeName));
-    String bucketId =
-        String.valueOf(omMetadataManager.getBucketId(volumeName, bucketName));
-    tablePrefixes.put(OmMetadataManagerImpl.KEY_TABLE,
-        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
-    tablePrefixes.put(OmMetadataManagerImpl.FILE_TABLE,
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
-    tablePrefixes.put(OmMetadataManagerImpl.DIRECTORY_TABLE,
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
-    return tablePrefixes;
   }
 
   @Test
@@ -253,8 +235,7 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap2 = new File(snap2.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap2::exists, 2000, 20000);
 
-    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1,
-        Collections.emptyMap());
+    List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1);
     LOG.debug("Got diff list: {}", sstDiffList21);
 
     // Delete 1000 keys, take a 3rd snapshot, and do another diff
@@ -275,16 +256,13 @@ public class TestOMSnapshotDAG {
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
-    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2,
-        Collections.emptyMap());
+    List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2);
 
     // snap3-snap1 diff result is a combination of snap3-snap2 and snap2-snap1
-    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1,
-        Collections.emptyMap());
+    List<String> sstDiffList31 = differ.getSSTDiffList(snap3, snap1);
 
     // Same snapshot. Result should be empty list
-    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2,
-        Collections.emptyMap());
+    List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
     Assertions.assertTrue(sstDiffList22.isEmpty());
     snapDB1.close();
     snapDB2.close();
@@ -313,16 +291,13 @@ public class TestOMSnapshotDAG {
         volumeName, bucketName, "snap3",
         ((RDBStore)((OmSnapshot)snapDB3.get())
             .getMetadataManager().getStore()).getDb().getManagedRocksDb());
-    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1,
-        Collections.emptyMap());
+    List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
     Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
 
-    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2,
-        Collections.emptyMap());
+    List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
     Assertions.assertEquals(sstDiffList32, sstDiffList32Run2);
 
-    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1,
-        Collections.emptyMap());
+    List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
     Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
     snapDB1.close();
     snapDB2.close();
