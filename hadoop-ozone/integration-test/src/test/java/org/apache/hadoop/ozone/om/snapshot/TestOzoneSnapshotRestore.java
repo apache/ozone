@@ -225,12 +225,11 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assertions.assertEquals(5, volBucketKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, snapshotKeyPrefix + keyPrefix,
+        5));
 
     deleteKeys(buck);
-    int delKeyCount = keyCount(buck, keyPrefix);
-    Assertions.assertEquals(0, delKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix, 0));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
         + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -269,8 +268,9 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assertions.assertEquals(5, volBucketKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, snapshotKeyPrefix + keyPrefix,
+        5));
+
 
     // Delete keys from the source bucket.
     // This is temporary fix to make sure that test passes all the time.
@@ -328,8 +328,8 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assertions.assertEquals(5, volBucketKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, snapshotKeyPrefix + keyPrefix,
+        5));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
         + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -345,7 +345,6 @@ public class TestOzoneSnapshotRestore {
 
   @ParameterizedTest
   @MethodSource("bucketTypes")
-  @Flaky("HDDS-9436")
   public void testUnorderedDeletion(BucketLayout bucketLayoutTest)
           throws Exception {
     String volume = "vol-" + counter.incrementAndGet();
@@ -377,8 +376,7 @@ public class TestOzoneSnapshotRestore {
 
     // delete all keys in bucket before restoring from snapshot
     deleteKeys(buck);
-    int keyCountAfterDelete = keyCount(buck, "key-");
-    Assertions.assertEquals(0, keyCountAfterDelete);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, "key-", 0));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
             + OM_KEY_PREFIX + snapshotKeyPrefix[9];
