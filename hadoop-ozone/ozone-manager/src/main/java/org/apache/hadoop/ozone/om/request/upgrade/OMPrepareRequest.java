@@ -84,6 +84,15 @@ public class OMPrepareRequest extends OMClientRequest {
         Duration.of(args.getTxnApplyCheckIntervalSeconds(), ChronoUnit.SECONDS);
 
     try {
+      UserGroupInformation ugi = createUGIForApi();
+      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
+        throw new OMException("Access denied for user "
+            + ugi + ". " +
+            "Superuser privilege is required to execute ozone manager " +
+            "preparation.",
+            OMException.ResultCodes.ACCESS_DENIED);
+      }
+
       // Create response.
       PrepareResponse omResponse = PrepareResponse.newBuilder()
               .setTxnID(transactionLogIndex)
