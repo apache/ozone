@@ -98,7 +98,7 @@ public final class HASecurityUtils {
       certClient.initWithRecovery();
     }
   }
-  
+
   /**
    * This function creates/initializes a certificate server as needed.
    * This function is idempotent, so calling this again and again after the

@@ -356,8 +356,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
           CertificateCodec.getPEMEncodedString(rootCACertificatePath);
 
       PKCS10CertificationRequest csr = getCSRBuilder().build();
-      CertPath subSCMCertHolderList = rootCAServer.
-          requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
+      CertPath subSCMCertHolderList = rootCAServer.requestCertificate(
+          csr, KERBEROS_TRUSTED, SCM,
+              BigInteger.ONE.add(BigInteger.ONE).toString()).get();
       String pemEncodedCert =
           CertificateCodec.getPEMEncodedString(subSCMCertHolderList);
 

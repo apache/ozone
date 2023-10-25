@@ -15,19 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:cert-rotation
-
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
-
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-export SECURITY_ENABLED=true
-
-: ${OZONE_BUCKET_KEY_NAME:=key1}
-
-start_docker_env
+#suite:secure
 
 #test recon
 wait_for_port recon 9888 120
