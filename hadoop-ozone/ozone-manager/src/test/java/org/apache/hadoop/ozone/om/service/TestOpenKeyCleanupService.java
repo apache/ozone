@@ -166,7 +166,9 @@ class TestOpenKeyCleanupService {
     GenericTestUtils.waitFor(
         () -> openKeyCleanupService.getSubmittedOpenKeyCount() >= keyCount,
         SERVICE_INTERVAL, WAIT_TIME);
-    assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
+    GenericTestUtils.waitFor(
+        () -> openKeyCleanupService.getRunCount() >= oldrunCount + 2,
+        SERVICE_INTERVAL, WAIT_TIME);
 
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
     waitForOpenKeyCleanup(hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -231,7 +233,7 @@ class TestOpenKeyCleanupService {
     openKeyCleanupService.resume();
 
     GenericTestUtils.waitFor(
-        () -> openKeyCleanupService.getRunCount() > oldrunCount + 1,
+        () -> openKeyCleanupService.getRunCount() >= oldrunCount + 2,
         SERVICE_INTERVAL, WAIT_TIME);
 
     // wait for requests to complete
@@ -300,7 +302,9 @@ class TestOpenKeyCleanupService {
     GenericTestUtils.waitFor(
         () -> openKeyCleanupService.getSubmittedOpenKeyCount() >= partCount,
         SERVICE_INTERVAL, WAIT_TIME);
-    assertAtLeast(oldrunCount + 2, openKeyCleanupService.getRunCount());
+    GenericTestUtils.waitFor(
+        () -> openKeyCleanupService.getRunCount() >= oldrunCount + 2,
+        SERVICE_INTERVAL, WAIT_TIME);
 
     // No expired MPU parts fetched
     waitForOpenKeyCleanup(false, BucketLayout.DEFAULT);
