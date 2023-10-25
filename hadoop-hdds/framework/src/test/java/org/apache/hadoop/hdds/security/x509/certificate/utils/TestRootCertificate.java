@@ -102,7 +102,7 @@ public class TestRootCertificate {
 
     // Check the Subject Name and Issuer Name is in the expected format.
     String dnName = String.format(SelfSignedCertificate.getNameFormat(),
-        subject, scmID, clusterID);
+        subject, scmID, clusterID, certificateHolder.getSerialNumber());
     Assertions.assertEquals(dnName, certificateHolder.getIssuer().toString());
     Assertions.assertEquals(dnName, certificateHolder.getSubject().toString());
 

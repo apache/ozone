@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -101,7 +102,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.BUCKET, bucketName);
 
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
 
     boolean acquiredBucketLock = false, acquiredVolumeLock = false;
     boolean success = true;
@@ -182,7 +183,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketDeleteResponse(

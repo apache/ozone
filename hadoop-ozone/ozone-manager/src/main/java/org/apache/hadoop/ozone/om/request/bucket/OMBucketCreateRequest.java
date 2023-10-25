@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -182,7 +183,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     String volumeKey = metadataManager.getVolumeKey(volumeName);
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false;
     boolean acquiredVolumeLock = false;
     OMClientResponse omClientResponse = null;
@@ -245,7 +246,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
           omBucketInfo, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));

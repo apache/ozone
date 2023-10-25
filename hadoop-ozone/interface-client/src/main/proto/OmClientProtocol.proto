@@ -507,6 +507,7 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
@@ -515,6 +516,8 @@ enum Status {
     UNAUTHORIZED = 91;
 
     S3_SECRET_ALREADY_EXISTS = 92;
+    
+    INVALID_PATH = 93;
 }
 
 /**

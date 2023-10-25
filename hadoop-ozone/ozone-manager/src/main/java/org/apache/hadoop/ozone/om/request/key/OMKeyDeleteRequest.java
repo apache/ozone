@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -112,7 +113,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
@@ -168,7 +169,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =

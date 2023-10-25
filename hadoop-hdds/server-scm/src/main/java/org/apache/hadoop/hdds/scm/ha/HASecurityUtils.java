@@ -100,7 +100,7 @@ public final class HASecurityUtils {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
-    try (CertificateClient certClient =
+    try (SCMCertificateClient certClient =
         new SCMCertificateClient(securityConfig, scmSecurityClient,
             scmStorageConfig.getScmId(), scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmCertSerialId(), scmHostname)) {
@@ -137,10 +137,14 @@ public final class HASecurityUtils {
    * client.
    */
   private static void getRootCASignedSCMCert(
-      OzoneConfiguration configuration, CertificateClient client,
+      OzoneConfiguration configuration, SCMCertificateClient client,
       SecurityConfig securityConfig,
       SCMStorageConfig scmStorageConfig, String scmHostname) {
     try {
+      // Create SCM security client.
+      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
+          getScmSecurityClientWithFixedDuration(configuration);
+
       // Generate CSR.
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
           securityConfig, scmHostname);
@@ -150,10 +154,6 @@ public final class HASecurityUtils {
               .setClusterId(scmStorageConfig.getClusterID())
               .setHostName(scmHostname)
               .setScmNodeId(scmStorageConfig.getScmId()).build();
-
-      // Create SCM security client.
-      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          getScmSecurityClientWithFixedDuration(configuration);
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = secureScmClient.
@@ -189,21 +189,22 @@ public final class HASecurityUtils {
    * For primary SCM get sub-ca signed certificate and root CA certificate by
    * root CA certificate server and store it using certificate client.
    */
-  private static void getPrimarySCMSelfSignedCert(CertificateClient client,
+  private static void getPrimarySCMSelfSignedCert(SCMCertificateClient client,
       SecurityConfig config, SCMStorageConfig scmStorageConfig,
       String scmHostname) {
-
     try {
-
       CertificateServer rootCAServer =
           initializeRootCertificateServer(config, null, scmStorageConfig,
               new DefaultCAProfile());
+
+      // First SCM sub CA certificate ID 2
+      String certId = BigInteger.ONE.add(BigInteger.ONE).toString();
 
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
           config, scmHostname);
 
       CertPath subSCMCertHolderList = rootCAServer.
-          requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
+          requestCertificate(csr, KERBEROS_TRUSTED, SCM, certId).get();
 
       CertPath rootCACertificatePath =
           rootCAServer.getCaCertPath();
@@ -251,7 +252,7 @@ public final class HASecurityUtils {
       SecurityConfig config, CertificateStore scmCertStore,
       SCMStorageConfig scmStorageConfig, BigInteger rootCertId,
       PKIProfile pkiProfile, String component) throws IOException {
-    String subject = String.format(SCM_ROOT_CA_PREFIX, rootCertId) +
+    String subject = SCM_ROOT_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
@@ -287,14 +288,13 @@ public final class HASecurityUtils {
    * Generate CSR to obtain SCM sub CA certificate.
    */
   private static PKCS10CertificationRequest generateCSR(
-      CertificateClient client, SCMStorageConfig scmStorageConfig,
+      SCMCertificateClient client, SCMStorageConfig scmStorageConfig,
       SecurityConfig config, String scmHostname)
       throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
 
     // Get host name.
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
-        + scmHostname;
+    String subject = SCM_SUB_CA_PREFIX + scmHostname;
 
     builder.setConfiguration(config)
         .setScmID(scmStorageConfig.getScmId())

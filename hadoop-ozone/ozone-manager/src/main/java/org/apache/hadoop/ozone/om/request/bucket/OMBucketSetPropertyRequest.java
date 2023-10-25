@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
@@ -118,7 +119,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
@@ -200,7 +201,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse = new OMBucketSetPropertyResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
