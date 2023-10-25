@@ -67,16 +67,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_T
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Test Key Deleting Service.
- * <p>
- * This test does the following things.
- * <p>
- * 1. Creates a bunch of keys. 2. Then executes delete key directly using
- * Metadata Manager. 3. Waits for a while for the KeyDeleting Service to pick up
- * and call into SCM. 4. Confirms that calls have been successful.
- */
-public class TestOpenKeyCleanupService {
+class TestOpenKeyCleanupService {
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private static final Logger LOG =
