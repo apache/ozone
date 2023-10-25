@@ -114,6 +114,7 @@ public class MockNodeManager implements NodeManager {
   private int numHealthyDisksPerDatanode;
   private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
+  private Map<UUID, Long> lastStateChangeTime;
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -151,6 +152,11 @@ public class MockNodeManager implements NodeManager {
     numRaftLogDisksPerDatanode = 1;
     numPipelinePerDatanode = numRaftLogDisksPerDatanode *
         NUM_PIPELINE_PER_METADATA_DISK;
+
+    this.lastStateChangeTime = new HashMap<>();
+    for(DatanodeDetails d : getAllNodes()) {
+      this.lastStateChangeTime.put(d.getUuid(), 0L);
+    }
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -178,6 +184,11 @@ public class MockNodeManager implements NodeManager {
     numRaftLogDisksPerDatanode = 1;
     numPipelinePerDatanode = numRaftLogDisksPerDatanode *
         NUM_PIPELINE_PER_METADATA_DISK;
+
+    this.lastStateChangeTime = new HashMap<>();
+    for(DatanodeDetails d : getAllNodes()) {
+      this.lastStateChangeTime.put(d.getUuid(), 0L);
+    }
   }
 
   public MockNodeManager(
@@ -214,6 +225,11 @@ public class MockNodeManager implements NodeManager {
     numRaftLogDisksPerDatanode = 1;
     numPipelinePerDatanode = numRaftLogDisksPerDatanode *
         NUM_PIPELINE_PER_METADATA_DISK;
+
+    this.lastStateChangeTime = new HashMap<>();
+    for(DatanodeDetails d : getAllNodes()) {
+      this.lastStateChangeTime.put(d.getUuid(), 0L);
+    }
   }
 
   /**
@@ -925,6 +941,17 @@ public class MockNodeManager implements NodeManager {
   @Override
   public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
     return -1;
+  }
+
+  @Override
+  public long getLastStateChangeTime(DatanodeDetails datanodeDetails) {
+    return lastStateChangeTime.get(datanodeDetails.getUuid());
+  }
+
+  @Override
+  public void setLastStateChangeTime(DatanodeDetails datanodeDetails,
+                                     long stateChangeTime) {
+    this.lastStateChangeTime.put(datanodeDetails.getUuid(), stateChangeTime);
   }
 
   public void setNumPipelinePerDatanode(int value) {

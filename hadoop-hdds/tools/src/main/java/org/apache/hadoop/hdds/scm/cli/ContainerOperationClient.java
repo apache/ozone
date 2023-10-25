@@ -58,6 +58,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -493,6 +495,29 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
+
+  @Override
+  public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails) throws
+      IOException {
+    return storageContainerLocationClient.getContainers(datanodeDetails);
+  }
+
+  @Override
+  public Map<UUID, Integer> getPipelineMap() throws IOException {
+    return storageContainerLocationClient.getPipelineMap();
+  }
+
+  @Override
+  public Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap()
+      throws IOException {
+    return storageContainerLocationClient.getContainerMap();
+  }
+
+  @Override
+  public long getLastChangeTime(DatanodeDetails datanodeDetails)
+      throws IOException {
+    return storageContainerLocationClient.getLastChangeTime(datanodeDetails);
   }
 
   @Override

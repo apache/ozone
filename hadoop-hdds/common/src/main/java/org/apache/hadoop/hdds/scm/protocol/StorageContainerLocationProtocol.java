@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -309,6 +311,16 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   ScmInfo getScmInfo() throws IOException;
+
+  Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
+      throws IOException;
+
+  Map<UUID, Integer> getPipelineMap() throws IOException;
+
+  Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap()
+      throws IOException;
+
+  long getLastChangeTime(DatanodeDetails datanodeDetails) throws IOException;
 
   /**
    * Transfer the raft leadership.

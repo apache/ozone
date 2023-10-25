@@ -107,6 +107,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -810,6 +811,33 @@ public class SCMClientProtocolServer implements
         );
       }
     }
+  }
+
+  @Override
+  public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
+      throws IOException {
+    try {
+      return scm.getScmNodeManager().getContainers(datanodeDetails);
+    } catch (Exception ex) {
+      throw new SCMException(ex.getMessage(),ResultCodes.NO_SUCH_DATANODE);
+    }
+  }
+
+  @Override
+  public Map<UUID, Integer> getPipelineMap() throws IOException {
+    return scm.getScmDecommissionManager().getPipelineMap();
+  }
+
+  @Override
+  public Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap()
+      throws IOException {
+    return scm.getScmDecommissionManager().getContainerMap();
+  }
+
+  @Override
+  public long getLastChangeTime(DatanodeDetails datanodeDetails)
+      throws IOException {
+    return scm.getScmNodeManager().getLastStateChangeTime(datanodeDetails);
   }
 
   @Override

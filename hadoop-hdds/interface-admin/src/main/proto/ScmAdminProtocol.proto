@@ -78,9 +78,13 @@ message ScmContainerLocationRequest {
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
-  optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
+  optional TransferLeadershipRequestProto transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
+  optional GetDnPipelineMapDecommissionRequestProto getDnPipelineMapDecommissionRequest = 45;
+  optional GetDnContainerMapDecommissionRequestProto getDnContainerMapDecommissionRequest = 46;
+  optional GetContainersForDnRequestProto getContainersForDnRequestProto = 47;
+  optional GetLastChangeTimeRequestProto getLastChangeTimeRequestProto = 48;
 }
 
 message ScmContainerLocationResponse {
@@ -130,9 +134,13 @@ message ScmContainerLocationResponse {
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
-  optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
+  optional TransferLeadershipResponseProto transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
+  optional GetDnPipelineMapDecommissionResponseProto getDnPipelineMapDecommissionResponse = 45;
+  optional GetDnContainerMapDecommissionResponseProto getDnContainerMapDecommissionResponse = 46;
+  optional GetContainersForDnResponseProto getContainersForDnResponseProto = 47;
+  optional GetLastChangeTimeResponseProto getLastChangeTimeResponseProto = 48;
 
   enum Status {
     OK = 1;
@@ -184,6 +192,10 @@ enum Type {
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
   DecommissionScm = 40;
+  GetDnPipelineMapDecommission = 41;
+  GetDnContainerMapDecommission = 42;
+  GetContainersForDn = 43;
+  GetLastChangeTime = 44;
 }
 
 /**
@@ -249,6 +261,51 @@ message GetContainerWithPipelineBatchRequestProto {
 message GetExistContainerWithPipelinesInBatchRequestProto {
   repeated int64 containerIDs = 1;
   optional string traceID = 2;
+}
+
+message GetDnPipelineMapDecommissionRequestProto {
+}
+
+message DnPipelineMapDecommissionProto {
+    required UUID datanodeId = 1;
+    required int32 numPipelines = 2;
+}
+
+message GetDnPipelineMapDecommissionResponseProto {
+    repeated DnPipelineMapDecommissionProto dnPipelineMapDecommissionProto = 1;
+}
+
+message GetDnContainerMapDecommissionRequestProto {
+}
+
+message ContainerMapDecommissionProto {
+    required LifeCycleState state = 1;
+    required int64 numContainers = 2;
+}
+
+message DnContainerMapDecommissionProto {
+    required UUID datanodeId = 1;
+    repeated ContainerMapDecommissionProto containerMap = 2;
+}
+
+message GetDnContainerMapDecommissionResponseProto {
+    repeated DnContainerMapDecommissionProto dnContainerMapDecommissionProto = 1;
+}
+
+message GetContainersForDnRequestProto {
+    required ExtendedDatanodeDetailsProto datanode = 1;
+}
+
+message GetContainersForDnResponseProto {
+    repeated ContainerID containerId = 1;
+}
+
+message GetLastChangeTimeRequestProto {
+  required ExtendedDatanodeDetailsProto datanode = 1;
+}
+
+message GetLastChangeTimeResponseProto {
+  required int64 lastChangeTime = 1;
 }
 
 message GetSafeModeRuleStatusesRequestProto {
