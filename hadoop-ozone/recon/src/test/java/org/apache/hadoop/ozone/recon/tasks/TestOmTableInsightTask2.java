@@ -1,21 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -28,18 +10,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
-
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,38 +28,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenFileToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
+import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.*;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-
-/**
- * Unit test for Object Count Task.
- */
-public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
+public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
 
   private static GlobalStatsDao globalStatsDao;
-  private static OmTableInsightTask omTableInsightTask;
+  private static OmTableInsightTask2 omTableInsightTask;
   private static DSLContext dslContext;
   private boolean isSetupDone = false;
   private static ReconOMMetadataManager reconOMMetadataManager;
@@ -145,7 +104,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
 
-    omTableInsightTask = new OmTableInsightTask(
+    omTableInsightTask = new OmTableInsightTask2(
         globalStatsDao, getConfiguration(), reconOMMetadataManager,
         reconNamespaceSummaryManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
@@ -262,7 +221,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         VOL_OBJECT_ID,
         DIR_TWO_OBJECT_ID);
     writeDeletedDirToOm(reconOMMetadataManager,
-        BUCKET_TWO, VOL,
+        BUCKET_TWO,
+        VOL,
         DIR_THREE,
         BUCKET_TWO_OBJECT_ID,
         BUCKET_TWO_OBJECT_ID,
@@ -281,7 +241,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     Pair<String, Boolean> result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
-    // Total Size = 500+1025+2000 = 3525
     assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
     assertEquals(3525, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
   }
@@ -337,8 +296,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Testing PUT events
     // Create 5 OMDBUpdateEvent instances for 5 different deletedDirectory paths
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
-    for (int i = 0; i < 5; i++) {
-      putEvents.add(getOMUpdateEvent(paths.get(i), mock(OmKeyInfo.class),
+    for (long i = 0L; i < 5L; i++) {
+      putEvents.add(getOMUpdateEvent(paths.get((int) i),
+          getOmKeyInfo("vol1", "bucket1", DIR_ONE, (i + 1), false),
           DELETED_DIR_TABLE, PUT, null));
     }
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
@@ -510,14 +470,14 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     when(omKeyInfo.getDataSize()).thenReturn(sizeToBeReturned);
     when(omKeyInfo.getReplicatedSize()).thenReturn(sizeToBeReturned * 3);
 
-    // Test PUT events
+    // Test PUT events.
+    // Add 5 PUT events for OpenKeyTable and OpenFileTable.
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
-      for (int i = 0; i < 5; i++) {
-        putEvents.add(
-            getOMUpdateEvent("item" + i, omKeyInfo, tableName, PUT, null));
-      }
+    for (int i = 0; i < 10; i++) {
+      String table = (i < 5) ? OPEN_KEY_TABLE : OPEN_FILE_TABLE;
+      putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, table, PUT, null));
     }
+
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
     omTableInsightTask.process(putEventBatch);
 
@@ -530,11 +490,12 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Test DELETE events
     ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
-      // Delete "item0"
-      deleteEvents.add(
-          getOMUpdateEvent("item0", omKeyInfo, tableName, DELETE, null));
-    }
+    // Delete "item0" for OpenKeyTable and OpenFileTable.
+    deleteEvents.add(
+        getOMUpdateEvent("item0", omKeyInfo, OPEN_KEY_TABLE, DELETE, null));
+    deleteEvents.add(
+        getOMUpdateEvent("item0", omKeyInfo, OPEN_FILE_TABLE, DELETE, null));
+
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
     omTableInsightTask.process(deleteEventBatch);
 
@@ -548,7 +509,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Test UPDATE events
     ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
     Long newSizeToBeReturned = 2000L;
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : new ArrayList<>(
+        Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE))) {
       // Update "item1" with a new size
       OmKeyInfo newKeyInfo = mock(OmKeyInfo.class);
       when(newKeyInfo.getDataSize()).thenReturn(newSizeToBeReturned);
@@ -556,6 +518,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       updateEvents.add(
           getOMUpdateEvent("item1", newKeyInfo, tableName, UPDATE, omKeyInfo));
     }
+
     OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
     omTableInsightTask.process(updateEventBatch);
 
@@ -575,9 +538,10 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         new ImmutablePair<>(1000L, 3000L);
     ArrayList<OmKeyInfo> omKeyInfoList = new ArrayList<>();
     // Add 5 OmKeyInfo objects to the list
-    for (int i = 0; i < 5; i++) {
+    for (long i = 0; i < 5; i++) {
       OmKeyInfo omKeyInfo =
-          getOmKeyInfo("sampleVol", "non_fso_Bucket", "non_fso_key1", true);
+          getOmKeyInfo("sampleVol", "non_fso_Bucket", "non_fso_key1", i + 1,
+              true);
       // Set properties of OmKeyInfo object if needed
       omKeyInfoList.add(omKeyInfo);
     }
@@ -640,13 +604,12 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(10500L, getReplicatedSizeForTable(DELETED_TABLE));
   }
 
-
   private OMDBUpdateEvent getOMUpdateEvent(
       String name, Object value,
       String table,
       OMDBUpdateEvent.OMDBUpdateAction action,
       Object oldValue) {
-    return new OMUpdateEventBuilder()
+    return new OMDBUpdateEvent.OMUpdateEventBuilder()
         .setAction(action)
         .setKey(name)
         .setValue(value)
@@ -671,7 +634,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-                                 String keyName, boolean isFile) {
+                                 String keyName, Long objectID,
+                                 boolean isFile) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -680,6 +644,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(100L)
+        .setObjectID(objectID)
         .build();
   }
 }

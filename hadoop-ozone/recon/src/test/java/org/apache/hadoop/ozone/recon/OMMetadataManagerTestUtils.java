@@ -421,6 +421,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName(bucketName)
             .setVolumeName(volumeName)
             .setKeyName(dirName)
+            .setObjectID(objectId)
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .build());
   }
