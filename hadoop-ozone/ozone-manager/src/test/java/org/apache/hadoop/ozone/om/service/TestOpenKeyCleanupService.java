@@ -107,7 +107,9 @@ class TestOpenKeyCleanupService {
 
   @AfterEach
   public void cleanup() throws Exception {
-    om.stop();
+    if (om.stop()) {
+      om.join();
+    }
   }
 
   /**
