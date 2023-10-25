@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -28,7 +29,9 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -50,6 +53,7 @@ import java.util.Map.Entry;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -65,14 +69,20 @@ public class OmTableInsightTask implements ReconOmTask {
   private GlobalStatsDao globalStatsDao;
   private Configuration sqlConfiguration;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+  private Table<Long, NSSummary> nsSummaryTable;
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
                             Configuration sqlConfiguration,
-                            ReconOMMetadataManager reconOMMetadataManager) {
+                            ReconOMMetadataManager reconOMMetadataManager,
+                            ReconNamespaceSummaryManagerImpl
+                                  reconNamespaceSummaryManager) {
     this.globalStatsDao = globalStatsDao;
     this.sqlConfiguration = sqlConfiguration;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.nsSummaryTable = reconNamespaceSummaryManager.getNSSummaryTable();
   }
 
   /**
@@ -104,7 +114,8 @@ public class OmTableInsightTask implements ReconOmTask {
           TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
               = table.iterator()) {
         if (getTablesToCalculateSize().contains(tableName)) {
-          Triple<Long, Long, Long> details = getTableSizeAndCount(iterator);
+          Triple<Long, Long, Long> details = getTableSizeAndCount(iterator,
+              tableName);
           objectCountMap.put(getTableCountKeyFromTable(tableName),
               details.getLeft());
           unReplicatedSizeCountMap.put(
@@ -139,7 +150,8 @@ public class OmTableInsightTask implements ReconOmTask {
    * Returns a triple with the total count of records (left), total unreplicated
    * size (middle), and total replicated size (right) in the given iterator.
    * Increments count for each record and adds the dataSize if a record's value
-   * is an instance of OmKeyInfo. If the iterator is null, returns (0, 0, 0).
+   * is an instance of OmKeyInfo,RepeatedOmKeyInfo.
+   * If the iterator is null, returns (0, 0, 0).
    *
    * @param iterator The iterator over the table to be iterated.
    * @return A Triple with three Long values representing the count,
@@ -147,11 +159,16 @@ public class OmTableInsightTask implements ReconOmTask {
    * @throws IOException If an I/O error occurs during the iterator traversal.
    */
   private Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
+      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator,
+      String tableName)
       throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
     long replicatedSize = 0;
+
+    boolean isFileTable = tableName.equals(OPEN_FILE_TABLE);
+    boolean isKeyTable = tableName.equals(OPEN_KEY_TABLE);
+    boolean isDeletedDirTable = tableName.equals(DELETED_DIR_TABLE);
 
     if (iterator != null) {
       while (iterator.hasNext()) {
@@ -159,8 +176,12 @@ public class OmTableInsightTask implements ReconOmTask {
         if (kv != null && kv.getValue() != null) {
           if (kv.getValue() instanceof OmKeyInfo) {
             OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
-            unReplicatedSize += omKeyInfo.getDataSize();
-            replicatedSize += omKeyInfo.getReplicatedSize();
+            if (isFileTable || isKeyTable) {
+              unReplicatedSize += omKeyInfo.getDataSize();
+              replicatedSize += omKeyInfo.getReplicatedSize();
+            } else if (isDeletedDirTable) {
+              unReplicatedSize += fetchSizeForDeletedDirectory(kv.getKey());
+            }
             count++;
           }
           if (kv.getValue() instanceof RepeatedOmKeyInfo) {
@@ -180,6 +201,40 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   /**
+   * Fetches the size of a deleted directory identified by the given path.
+   * The size is obtained from the NSSummary table using the directory objectID.
+   * The path is expected to be in the format :-
+   * "volumeId/bucketId/parentId/dirName/dirObjectId".
+   *
+   * @param path             The path of the deleted directory.
+   * @return The size of the deleted directory.
+   * @throws IOException If an I/O error occurs while retrieving the size.
+   */
+  public long fetchSizeForDeletedDirectory(String path)
+      throws IOException {
+    if (path == null || path.isEmpty()) {
+      return 0L;
+    }
+    String[] parts = path.split("/");
+    String directoryObjectId = parts.length >= 6 ? parts[5] : "";
+    /* DB key in DeletedDirectoryTable =>
+                      "volumeId/bucketId/parentId/dirName/dirObjectId" */
+    try {
+      long convertedValue = Long.parseLong(directoryObjectId);
+      NSSummary nsSummary = nsSummaryTable.get(convertedValue);
+      if (nsSummary != null) {
+        return nsSummary.getSizeOfFiles();
+      } else {
+        LOG.error("NSSummary not found for directory: {}", path);
+      }
+    } catch (NumberFormatException e) {
+      // Handle parsing error if the last string is not a valid long value
+      LOG.error("Invalid last string format: {}", directoryObjectId);
+    }
+    return 0L;
+  }
+
+  /**
    * Returns a collection of table names that require data size calculation.
    */
   public Collection<String> getTablesToCalculateSize() {
@@ -187,6 +242,7 @@ public class OmTableInsightTask implements ReconOmTask {
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
     taskTables.add(DELETED_TABLE);
+    taskTables.add(DELETED_DIR_TABLE);
     return taskTables;
   }
 
@@ -271,36 +327,47 @@ public class OmTableInsightTask implements ReconOmTask {
                               Collection<String> sizeRelatedTables,
                               HashMap<String, Long> objectCountMap,
                               HashMap<String, Long> unreplicatedSizeCountMap,
-                              HashMap<String, Long> replicatedSizeCountMap) {
+                              HashMap<String, Long> replicatedSizeCountMap)
+      throws IOException {
+    String countKey = getTableCountKeyFromTable(tableName);
+    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
+    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
 
     if (sizeRelatedTables.contains(tableName)) {
-      handleSizeRelatedTablePutEvent(event, tableName, objectCountMap,
+      handleSizeRelatedTablePutEvent(event, countKey, unReplicatedSizeKey,
+          replicatedSizeKey, tableName, objectCountMap,
           unreplicatedSizeCountMap, replicatedSizeCountMap);
     } else {
-      String countKey = getTableCountKeyFromTable(tableName);
       objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
     }
   }
 
   private void handleSizeRelatedTablePutEvent(
-      OMDBUpdateEvent<String, Object> event,
-      String tableName,
+      OMDBUpdateEvent<String, Object> event, String countKey,
+      String unReplicatedSizeKey, String replicatedSizeKey, String tableName,
       HashMap<String, Long> objectCountMap,
       HashMap<String, Long> unreplicatedSizeCountMap,
-      HashMap<String, Long> replicatedSizeCountMap) {
+      HashMap<String, Long> replicatedSizeCountMap) throws IOException {
 
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+    boolean isFileTable = tableName.equals(OPEN_FILE_TABLE);
+    boolean isKeyTable = tableName.equals(OPEN_KEY_TABLE);
+    boolean isDeletedDirTable = tableName.equals(DELETED_DIR_TABLE);
 
+    // Handle PUT for OpenKeyTable & OpenFileTable
     if (event.getValue() instanceof OmKeyInfo) {
-      // Handle PUT for OpenKeyTable & OpenFileTable
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-          (k, size) -> size + omKeyInfo.getDataSize());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-          (k, size) -> size + omKeyInfo.getReplicatedSize());
+      if (isFileTable || isKeyTable) {
+        unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+            (k, size) -> size + omKeyInfo.getDataSize());
+        replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+            (k, size) -> size + omKeyInfo.getReplicatedSize());
+      } else if (isDeletedDirTable) {
+        Long newDeletedDirectorySize =
+            fetchSizeForDeletedDirectory(event.getKey());
+        unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+            (k, size) -> size + newDeletedDirectorySize);
+      }
     } else if (event.getValue() instanceof RepeatedOmKeyInfo) {
       // Handle PUT for DeletedTable
       RepeatedOmKeyInfo repeatedOmKeyInfo =
@@ -315,20 +382,23 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
-
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName,
                                  Collection<String> sizeRelatedTables,
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unreplicatedSizeCountMap,
-                                 HashMap<String, Long> replicatedSizeCountMap) {
+                                 HashMap<String, Long> replicatedSizeCountMap)
+      throws IOException {
+    String countKey = getTableCountKeyFromTable(tableName);
+    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
+    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
 
     if (event.getValue() != null) {
       if (sizeRelatedTables.contains(tableName)) {
-        handleSizeRelatedTableDeleteEvent(event, tableName, objectCountMap,
+        handleSizeRelatedTableDeleteEvent(event, countKey, unReplicatedSizeKey,
+            replicatedSizeKey, tableName, objectCountMap,
             unreplicatedSizeCountMap, replicatedSizeCountMap);
       } else {
-        String countKey = getTableCountKeyFromTable(tableName);
         objectCountMap.computeIfPresent(countKey,
             (k, count) -> count > 0 ? count - 1L : 0L);
       }
@@ -336,33 +406,41 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   private void handleSizeRelatedTableDeleteEvent(
-      OMDBUpdateEvent<String, Object> event,
-      String tableName,
+      OMDBUpdateEvent<String, Object> event, String countKey,
+      String unReplicatedSizeKey, String replicatedSizeKey, String tableName,
       HashMap<String, Long> objectCountMap,
       HashMap<String, Long> unreplicatedSizeCountMap,
-      HashMap<String, Long> replicatedSizeCountMap) {
+      HashMap<String, Long> replicatedSizeCountMap) throws IOException {
 
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+    Boolean isFileTable = tableName.equals(OPEN_FILE_TABLE);
+    Boolean isKeyTable = tableName.equals(OPEN_KEY_TABLE);
+    Boolean isDeletedDirTable = tableName.equals(DELETED_DIR_TABLE);
 
     if (event.getValue() instanceof OmKeyInfo) {
       // Handle DELETE for OpenKeyTable & OpenFileTable
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(countKey,
           (k, count) -> count > 0 ? count - 1L : 0L);
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-          (k, size) -> size > omKeyInfo.getDataSize() ?
-              size - omKeyInfo.getDataSize() : 0L);
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-          (k, size) -> size > omKeyInfo.getReplicatedSize() ?
-              size - omKeyInfo.getReplicatedSize() : 0L);
+      if (isFileTable || isKeyTable) {
+        unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+            (k, size) -> size > omKeyInfo.getDataSize() ?
+                size - omKeyInfo.getDataSize() : 0L);
+        replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+            (k, size) -> size > omKeyInfo.getReplicatedSize() ?
+                size - omKeyInfo.getReplicatedSize() : 0L);
+      } else if (isDeletedDirTable) {
+        Long newDeletedDirectorySize =
+            fetchSizeForDeletedDirectory(event.getKey());
+        unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+            (k, size) -> size > newDeletedDirectorySize ?
+                size - newDeletedDirectorySize : 0L);
+      }
     } else if (event.getValue() instanceof RepeatedOmKeyInfo) {
       // Handle DELETE for DeletedTable
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           (RepeatedOmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey, (k, count) -> count > 0 ?
-          count - repeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
+      objectCountMap.computeIfPresent(countKey, (k, count) ->
+          count > 0 ? count - repeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
       Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
       unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
           (k, size) -> size > result.getLeft() ? size - result.getLeft() : 0L);
@@ -378,37 +456,14 @@ public class OmTableInsightTask implements ReconOmTask {
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unreplicatedSizeCountMap,
                                  HashMap<String, Long> replicatedSizeCountMap) {
-
-    if (event.getValue() != null) {
-      if (sizeRelatedTables.contains(tableName)) {
-        // Handle update for only size related tables
-        handleSizeRelatedTableUpdateEvent(event, tableName, objectCountMap,
-            unreplicatedSizeCountMap, replicatedSizeCountMap);
-      }
-    }
-  }
-
-
-  private void handleSizeRelatedTableUpdateEvent(
-      OMDBUpdateEvent<String, Object> event,
-      String tableName,
-      HashMap<String, Long> objectCountMap,
-      HashMap<String, Long> unreplicatedSizeCountMap,
-      HashMap<String, Long> replicatedSizeCountMap) {
-
-    if (event.getOldValue() == null) {
-      LOG.warn("Update event does not have the old Key Info for {}.",
-          event.getKey());
-      return;
-    }
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
     String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
-
-    // In Update event the count for the open table will not change. So we don't
+    // In Update event the count for the table will not change. So we don't
     // need to update the count. Except for RepeatedOmKeyInfo, for which the
     // size of omKeyInfoList can change
-    if (event.getValue() instanceof OmKeyInfo) {
+    if (event.getValue() instanceof OmKeyInfo && event.getOldValue() != null &&
+        sizeRelatedTables.contains(tableName)) {
       // Handle UPDATE for OpenKeyTable & OpenFileTable
       OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
       OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
@@ -418,7 +473,8 @@ public class OmTableInsightTask implements ReconOmTask {
       replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size - oldKeyInfo.getReplicatedSize() +
               newKeyInfo.getReplicatedSize());
-    } else if (event.getValue() instanceof RepeatedOmKeyInfo) {
+    } else if (event.getValue() instanceof RepeatedOmKeyInfo &&
+        sizeRelatedTables.contains(tableName) && event.getOldValue() != null) {
       // Handle UPDATE for DeletedTable
       RepeatedOmKeyInfo oldRepeatedOmKeyInfo =
           (RepeatedOmKeyInfo) event.getOldValue();
@@ -434,6 +490,9 @@ public class OmTableInsightTask implements ReconOmTask {
           (k, size) -> size - oldSize.getLeft() + newSize.getLeft());
       replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size - oldSize.getRight() + newSize.getRight());
+    } else if (event.getValue() != null) {
+      LOG.warn("Update event does not have the old Key Info for {}.",
+          event.getKey());
     }
   }
 
@@ -489,7 +548,7 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   public static String getTableCountKeyFromTable(String tableName) {
-    return tableName + "Count";
+    return tableName + "TableCount";
   }
 
   public static String getReplicatedSizeKeyFromTable(String tableName) {
@@ -511,6 +570,11 @@ public class OmTableInsightTask implements ReconOmTask {
     GlobalStats record = globalStatsDao.fetchOneByKey(key);
 
     return (record == null) ? 0L : record.getValue();
+  }
+
+  @VisibleForTesting
+  public void setNsSummaryTable(Table<Long, NSSummary> nsSummaryTable) {
+    this.nsSummaryTable = nsSummaryTable;
   }
 
 }

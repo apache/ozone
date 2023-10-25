@@ -403,13 +403,19 @@ public final class OMMetadataManagerTestUtils {
                                          String dirName,
                                          long parentObjectId,
                                          long bucketObjectId,
-                                         long volumeObjectId)
+                                         long volumeObjectId,
+                                         long objectId)
       throws IOException {
-    // DB key in DeletedDirectoryTable => "volumeID/bucketID/parentId/dirName"
-    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
-            bucketObjectId, parentObjectId, dirName);
+    // DB key in DeletedDirectoryTable =>
+    // "volumeID/bucketID/parentId/dirName/dirObjectId"
 
-    omMetadataManager.getDeletedDirTable().put(omKey,
+    String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+        bucketObjectId, parentObjectId, dirName);
+    String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+        objectId, ozoneDbKey);
+
+
+    omMetadataManager.getDeletedDirTable().put(ozoneDeleteKey,
         new OmKeyInfo.Builder()
             .setBucketName(bucketName)
             .setVolumeName(volumeName)

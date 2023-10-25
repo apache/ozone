@@ -21,26 +21,36 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
 
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
@@ -53,6 +63,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpen
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenFileToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
@@ -62,24 +74,81 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+
 /**
  * Unit test for Object Count Task.
  */
 public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
-  private GlobalStatsDao globalStatsDao;
-  private OmTableInsightTask omTableInsightTask;
-  private DSLContext dslContext;
+  private static GlobalStatsDao globalStatsDao;
+  private static OmTableInsightTask omTableInsightTask;
+  private static DSLContext dslContext;
   private boolean isSetupDone = false;
-  private ReconOMMetadataManager reconOMMetadataManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
+  private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+  private static OzoneConfiguration ozoneConfiguration;
+  private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+
+  // Object names in FSO-enabled format
+  private static final String VOL = "volume1";
+  private static final String BUCKET_ONE = "bucket1";
+  private static final String BUCKET_TWO = "bucket2";
+  private static final String KEY_ONE = "file1";
+  private static final String KEY_TWO = "file2";
+  private static final String KEY_THREE = "dir1/dir2/file3";
+  private static final String FILE_ONE = "file1";
+  private static final String FILE_TWO = "file2";
+  private static final String FILE_THREE = "file3";
+  private static final String DIR_ONE = "dir1";
+  private static final String DIR_TWO = "dir2";
+  private static final String DIR_THREE = "dir3";
+
+
+  private static final long VOL_OBJECT_ID = 0L;
+  private static final long BUCKET_ONE_OBJECT_ID = 1L;
+  private static final long BUCKET_TWO_OBJECT_ID = 2L;
+  private static final long KEY_ONE_OBJECT_ID = 3L;
+  private static final long DIR_ONE_OBJECT_ID = 14L;
+  private static final long KEY_TWO_OBJECT_ID = 5L;
+  private static final long DIR_TWO_OBJECT_ID = 17L;
+  private static final long KEY_THREE_OBJECT_ID = 8L;
+  private static final long DIR_THREE_OBJECT_ID = 10L;
+
+  private static final long KEY_ONE_SIZE = 500L;
+  private static final long KEY_TWO_SIZE = 1025L;
+  private static final long KEY_THREE_SIZE = 2000L;
+
+  // mock client's path requests
+  private static final String TEST_USER = "TestUser";
+
+  @Mock
+  private Table<Long, NSSummary> nsSummaryTable;
 
   private void initializeInjector() throws IOException {
+    ozoneConfiguration = new OzoneConfiguration();
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
         temporaryFolder.newFolder());
     globalStatsDao = getDao(GlobalStatsDao.class);
+
+    OzoneStorageContainerManager ozoneStorageContainerManager =
+        mock(OzoneStorageContainerManager.class);
+
+    ReconTestInjector reconTestInjector =
+        new ReconTestInjector.Builder(temporaryFolder)
+            .withReconSqlDb()
+            .withReconOm(reconOMMetadataManager)
+            .withContainerDB()
+            .build();
+    reconNamespaceSummaryManager = reconTestInjector.getInstance(
+        ReconNamespaceSummaryManagerImpl.class);
+
     omTableInsightTask = new OmTableInsightTask(
-        globalStatsDao, getConfiguration(), reconOMMetadataManager);
+        globalStatsDao, getConfiguration(), reconOMMetadataManager,
+        reconNamespaceSummaryManager);
+    nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration);
     dslContext = getDslContext();
   }
 
@@ -90,8 +159,205 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       initializeInjector();
       isSetupDone = true;
     }
+    MockitoAnnotations.openMocks(this);
     // Truncate table before running each test
     dslContext.truncate(GLOBAL_STATS);
+  }
+
+  /**
+   * Populate OM-DB with the following structure.
+   * volume1
+   * |      \
+   * bucket1   bucket2
+   * /     \       \
+   * dir1    dir2     dir3
+   * / \        \
+   * file1  file2  file3
+   *
+   * @throws IOException
+   */
+  private void populateOMDB() throws IOException {
+
+    // Create 2 Buckets bucket1 and bucket2
+    OmBucketInfo bucketInfo1 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_ONE)
+        .setObjectID(BUCKET_ONE_OBJECT_ID)
+        .build();
+    String bucketKey = reconOMMetadataManager.getBucketKey(
+        bucketInfo1.getVolumeName(), bucketInfo1.getBucketName());
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo1);
+    OmBucketInfo bucketInfo2 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL)
+        .setBucketName(BUCKET_TWO)
+        .setObjectID(BUCKET_TWO_OBJECT_ID)
+        .build();
+    bucketKey = reconOMMetadataManager.getBucketKey(
+        bucketInfo2.getVolumeName(), bucketInfo2.getBucketName());
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo2);
+
+    // Create a single volume named volume1
+    String volumeKey = reconOMMetadataManager.getVolumeKey(VOL);
+    OmVolumeArgs args =
+        OmVolumeArgs.newBuilder()
+            .setObjectID(VOL_OBJECT_ID)
+            .setVolume(VOL)
+            .setAdminName(TEST_USER)
+            .setOwnerName(TEST_USER)
+            .build();
+    reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
+
+    // Generate keys for the File Table
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_ONE,
+        BUCKET_ONE,
+        VOL,
+        FILE_ONE,
+        KEY_ONE_OBJECT_ID,
+        DIR_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        KEY_ONE_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWO,
+        BUCKET_ONE,
+        VOL,
+        FILE_TWO,
+        KEY_TWO_OBJECT_ID,
+        DIR_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        KEY_TWO_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THREE,
+        BUCKET_ONE,
+        VOL,
+        FILE_THREE,
+        KEY_THREE_OBJECT_ID,
+        DIR_TWO_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        KEY_THREE_SIZE,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    // Generate Deleted Directories in OM
+    writeDeletedDirToOm(reconOMMetadataManager,
+        BUCKET_ONE,
+        VOL,
+        DIR_ONE,
+        BUCKET_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        DIR_ONE_OBJECT_ID);
+    writeDeletedDirToOm(reconOMMetadataManager,
+        BUCKET_ONE,
+        VOL,
+        DIR_TWO,
+        BUCKET_ONE_OBJECT_ID,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        DIR_TWO_OBJECT_ID);
+    writeDeletedDirToOm(reconOMMetadataManager,
+        BUCKET_TWO, VOL,
+        DIR_THREE,
+        BUCKET_TWO_OBJECT_ID,
+        BUCKET_TWO_OBJECT_ID,
+        VOL_OBJECT_ID,
+        DIR_THREE_OBJECT_ID);
+  }
+
+  @Test
+  public void testReprocessForDeletedDirectory() throws Exception {
+    // Create keys and deleted directories
+    populateOMDB();
+
+    // Generate NamespaceSummary for the OM DB
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+
+    Pair<String, Boolean> result =
+        omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.getRight());
+    // Total Size = 500+1025+2000 = 3525
+    assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
+    assertEquals(3525, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
+  }
+
+  @Test
+  public void testFetchSizeForDeletedDirectory() throws IOException {
+    // Check for valid and invalid paths
+    String validPath = "/volumeId/bucketId/parentId/dirName/12345";
+    String invalidPath = "/volumeId/bucketId/parentId/dirName/invalid";
+    long expectedSize = 500L;
+    NSSummary nsSummary = new NSSummary();
+    nsSummary.setSizeOfFiles(expectedSize);
+
+    when(nsSummaryTable.get(12345L)).thenReturn(nsSummary);
+    omTableInsightTask.setNsSummaryTable(nsSummaryTable);
+
+    // Act and Assert
+    long actualValidSize =
+        omTableInsightTask.fetchSizeForDeletedDirectory(validPath);
+    assertEquals(expectedSize, actualValidSize);
+
+    long actualInvalidSize =
+        omTableInsightTask.fetchSizeForDeletedDirectory(invalidPath);
+    assertEquals(0L, actualInvalidSize);
+  }
+
+  @Test
+  public void testProcessForDeletedDirectoryTable() throws IOException {
+    // Prepare mock data size
+    Long expectedSize1 = 1000L;
+    Long expectedSize2 = 2000L;
+    NSSummary nsSummary1 = new NSSummary();
+    NSSummary nsSummary2 = new NSSummary();
+    nsSummary1.setSizeOfFiles(expectedSize1);
+    nsSummary2.setSizeOfFiles(expectedSize2);
+    when(nsSummaryTable.get(1L)).thenReturn(nsSummary1);
+    when(nsSummaryTable.get(2L)).thenReturn(nsSummary1);
+    when(nsSummaryTable.get(3L)).thenReturn(nsSummary2);
+    when(nsSummaryTable.get(4L)).thenReturn(nsSummary2);
+    when(nsSummaryTable.get(5L)).thenReturn(nsSummary2);
+    omTableInsightTask.setNsSummaryTable(nsSummaryTable);
+
+    /* DB key in DeletedDirectoryTable =>
+                  "/volumeId/bucketId/parentId/dirName/dirObjectId" */
+    List<String> paths = Arrays.asList(
+        "/18/28/22/dir1/1",
+        "/18/26/23/dir1/2",
+        "/18/20/24/dir1/3",
+        "/18/21/25/dir1/4",
+        "/18/27/26/dir1/5"
+    );
+
+    // Testing PUT events
+    // Create 5 OMDBUpdateEvent instances for 5 different deletedDirectory paths
+    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      putEvents.add(getOMUpdateEvent(paths.get(i), mock(OmKeyInfo.class),
+          DELETED_DIR_TABLE, PUT, null));
+    }
+    OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
+    omTableInsightTask.process(putEventBatch);
+    // After 5 PUTs, size should be 1000*2 + 2000*3 = 8000
+    assertEquals(8000L, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
+    assertEquals(5, getCountForTable(DELETED_DIR_TABLE));
+
+
+    // Testing DELETE events
+    // Create 2 OMDBUpdateEvent instances for 2 different deletedDirectory paths
+    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    deleteEvents.add(getOMUpdateEvent(paths.get(0), mock(OmKeyInfo.class),
+        DELETED_DIR_TABLE, DELETE, null));
+    deleteEvents.add(getOMUpdateEvent(paths.get(2), mock(OmKeyInfo.class),
+        DELETED_DIR_TABLE, DELETE, null));
+    OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
+    omTableInsightTask.process(deleteEventBatch);
+    // After 2 DELETEs, size should be 8000-(1000+2000) = 3000
+    assertEquals(5000L, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
+    assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
   }
 
   @Test
@@ -253,8 +519,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
     omTableInsightTask.process(putEventBatch);
 
-    // After 5 PUTs, size should be 5 * 1000 = 5000 for each size-related table
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
+    // After 5 PUTs, size should be 5 * 1000 = 5000
+    for (String tableName : new ArrayList<>(
+        Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE))) {
       assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
       assertEquals(15000L, getReplicatedSizeForTable(tableName));
     }
@@ -270,7 +537,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     omTableInsightTask.process(deleteEventBatch);
 
     // After deleting "item0", size should be 4 * 1000 = 4000
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : new ArrayList<>(
+        Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE))) {
       assertEquals(4000L, getUnReplicatedSizeForTable(tableName));
       assertEquals(12000L, getReplicatedSizeForTable(tableName));
     }
@@ -291,7 +559,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // After updating "item1", size should be 4000 - 1000 + 2000 = 5000
     //  presentValue - oldValue + newValue = updatedValue
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : new ArrayList<>(
+        Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE))) {
       assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
       assertEquals(15000L, getReplicatedSizeForTable(tableName));
     }
