@@ -301,7 +301,7 @@ public final class OzoneConfigKeys {
       OZONE_RECOVERING_CONTAINER_TIMEOUT =
       "ozone.recovering.container.timeout";
   public static final String
-      OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "30m";
+      OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "1d";
 
 
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
