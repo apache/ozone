@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -167,11 +168,13 @@ public class DatanodeStateMachine implements Closeable {
     VersionedDatanodeFeatures.initialize(layoutVersionManager);
 
     this.dnCRLStore = crlStore;
+    String threadNamePrefix = datanodeDetails.threadNamePrefix();
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
-        new ThreadFactoryBuilder().setNameFormat(
-            datanodeDetails.threadNamePrefix() +
-                "DatanodeStateMachineTaskThread-%d").build());
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix +
+                "DatanodeStateMachineTaskThread-%d")
+            .build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     // OzoneContainer instance is used in a non-thread safe way by the context
@@ -217,32 +220,35 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionMetrics = ECReconstructionMetrics.create();
 
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
-        conf, certClient, secretKeyClient, context, ecReconstructionMetrics);
+        conf, certClient, secretKeyClient, context, ecReconstructionMetrics,
+        threadNamePrefix);
 
     // This is created as an instance variable as Mockito needs to access it in
     // a test. The test mocks it in a running mini-cluster.
     reconstructECContainersCommandHandler =
         new ReconstructECContainersCommandHandler(conf, supervisor,
-        ecReconstructionCoordinator);
+            ecReconstructionCoordinator);
 
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
+        .build();
     pipelineCommandExecutorService = Executors
-        .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(
-            datanodeDetails + "PipelineCommandHandlerThread-%d").build());
+        .newSingleThreadExecutor(threadFactory);
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler(
             dnConf.getContainerCloseThreads(),
-            dnConf.getCommandQueueLimit()))
+            dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
-            conf, dnConf))
+            conf, dnConf, threadNamePrefix))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
             pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock,
-            dnConf.getCommandQueueLimit()))
+            dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(
             new ClosePipelineCommandHandler(pipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
@@ -263,6 +269,7 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
         .addPublisherFor(CRLStatusReport.class)
+        .addThreadNamePrefix(threadNamePrefix)
         .build();
 
     queueMetrics = DatanodeQueueMetrics.create(this);

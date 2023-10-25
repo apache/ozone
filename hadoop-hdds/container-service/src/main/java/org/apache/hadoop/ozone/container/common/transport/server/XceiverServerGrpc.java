@@ -114,11 +114,13 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("ChunkReader-%d")
+            .setNameFormat(datanodeDetails.threadNamePrefix() +
+                "ChunkReader-%d")
             .build());
 
     ThreadFactory factory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("ChunkReader-ELG-%d")
+        .setNameFormat(datanodeDetails.threadNamePrefix() +
+            "ChunkReader-ELG-%d")
         .build();
 
     if (Epoll.isAvailable()) {

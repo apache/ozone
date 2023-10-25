@@ -141,7 +141,8 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
+    this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
+        datanodeDetails.threadNamePrefix());
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.DATA_VOLUME, volumeChecker);
@@ -211,7 +212,8 @@ public class OzoneContainer {
         secConf,
         certClient,
         new ContainerImporter(conf, containerSet, controller,
-            volumeSet));
+            volumeSet),
+        datanodeDetails.threadNamePrefix());
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);

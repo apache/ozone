@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -186,10 +187,13 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final CSMMetrics metrics;
 
   @SuppressWarnings("parameternumber")
-  public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
+  public ContainerStateMachine(RaftGroupId gid,
+      ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
-      XceiverServerRatis ratisServer, ConfigurationSource conf) {
+      XceiverServerRatis ratisServer,
+      ConfigurationSource conf,
+      String threadNamePrefix) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -225,10 +229,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
 
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(
+            threadNamePrefix + "ContainerOp-" + gid.getUuid() + "-%d")
+        .build();
     this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
-        new ThreadFactoryBuilder()
-            .setNameFormat("ContainerOp-" + gid.getUuid() + "-%d")
-            .build());
+        threadFactory);
 
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();

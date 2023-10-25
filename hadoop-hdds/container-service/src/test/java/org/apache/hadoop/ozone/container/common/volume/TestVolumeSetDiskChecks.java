@@ -373,7 +373,7 @@ public class TestVolumeSetDiskChecks {
 
     DummyChecker(ConfigurationSource conf, Timer timer, int numBadVolumes)
         throws DiskErrorException {
-      super(conf, timer);
+      super(conf, timer, "");
       this.numBadVolumes = numBadVolumes;
     }
 
