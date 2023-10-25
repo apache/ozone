@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -225,8 +224,8 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    assertDoesNotThrow(() -> waitForKeyCount(buck, snapshotKeyPrefix + keyPrefix,
-        5));
+    assertDoesNotThrow(() -> waitForKeyCount(buck,
+        snapshotKeyPrefix + keyPrefix, 5));
 
     deleteKeys(buck);
     assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix, 0));
@@ -268,8 +267,8 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    assertDoesNotThrow(() -> waitForKeyCount(buck, snapshotKeyPrefix + keyPrefix,
-        5));
+    assertDoesNotThrow(() -> waitForKeyCount(buck,
+        snapshotKeyPrefix + keyPrefix, 5));
 
 
     // Delete keys from the source bucket.
@@ -328,8 +327,8 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    assertDoesNotThrow(() -> waitForKeyCount(buck, snapshotKeyPrefix + keyPrefix,
-        5));
+    assertDoesNotThrow(() -> waitForKeyCount(buck,
+        snapshotKeyPrefix + keyPrefix, 5));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
         + OM_KEY_PREFIX + snapshotKeyPrefix;
