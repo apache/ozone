@@ -40,7 +40,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 
 /**
- * Handler to print decommissioning nodes status
+ * Handler to print decommissioning nodes status.
  */
 @CommandLine.Command(
     name = "decommissionStatus",
