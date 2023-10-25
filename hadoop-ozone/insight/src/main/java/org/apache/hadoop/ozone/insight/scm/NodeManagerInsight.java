@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.insight.scm;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,39 +51,19 @@ public class NodeManagerInsight extends BaseInsightPoint {
     MetricGroupDisplay nodes =
         new MetricGroupDisplay(Type.SCM, "Node counters");
 
-    nodes.addMetrics(new MetricDisplay("In-Service Healthy Nodes",
-        "scm_node_manager_in_service_healthy_nodes"));
-    nodes.addMetrics(new MetricDisplay("In-Service Dead Nodes",
-        "scm_node_manager_in_service_dead_nodes"));
-    nodes.addMetrics(new MetricDisplay("In-Service Stale Nodes",
-        "scm_node_manager_in_service_stale_nodes"));
-    nodes.addMetrics(new MetricDisplay("Decommissioning Healthy Nodes",
-        "scm_node_manager_decommissioning_healthy_nodes"));
-    nodes.addMetrics(new MetricDisplay("Decommissioning Dead Nodes",
-        "scm_node_manager_decommissioning_dead_nodes"));
-    nodes.addMetrics(new MetricDisplay("Decommissioning Stale Nodes",
-        "scm_node_manager_decommissioning_stale_nodes"));
-    nodes.addMetrics(new MetricDisplay("Decommissioned Healthy Nodes",
-        "scm_node_manager_decommissioned_healthy_nodes"));
-    nodes.addMetrics(new MetricDisplay("Decommissioned Dead Nodes",
-        "scm_node_manager_decommissioned_dead_nodes"));
-    nodes.addMetrics(new MetricDisplay("Decommissioned Stale Nodes",
-        "scm_node_manager_decommissioned_stale_nodes"));
-    nodes.addMetrics(new MetricDisplay("In-maintenance Healthy Nodes",
-        "scm_node_manager_in_maintenance_healthy_nodes"));
-    nodes.addMetrics(new MetricDisplay("In-maintenance Dead Nodes",
-        "scm_node_manager_in_maintenance_dead_nodes"));
-    nodes.addMetrics(new MetricDisplay("In-maintenance Stale Nodes",
-        "scm_node_manager_in_maintenance_stale_nodes"));
-    nodes.addMetrics(new MetricDisplay(
-        "Entering-maintenance Healthy Nodes",
-        "scm_node_manager_entering_maintenance_healthy_nodes"));
-    nodes.addMetrics(new MetricDisplay(
-        "Entering-maintenance Dead Nodes",
-        "scm_node_manager_entering_maintenance_dead_nodes"));
-    nodes.addMetrics(new MetricDisplay(
-        "Entering-maintenance Stale Nodes",
-        "scm_node_manager_entering_maintenance_dead_nodes"));
+    String[] operationalState = {"in_service", "decommissioning",
+        "decommissioned", "entering_maintenance", "in_maintenance"};
+    String[] healthState = {"healthy", "stale", "dead"};
+
+    for(int i=0; i < operationalState.length; i++){
+      for(int j=0; j < healthState.length; j++){
+        String metricId = String.format("scm_node_manager_%s_%s_nodes",
+            operationalState[i], healthState[j]);
+        String metricDescription = String.format("%s %s Nodes",
+            operationalState[i], healthState[j]);
+        nodes.addMetrics(new MetricDisplay(metricDescription, metricId));
+      }
+    }
     display.add(nodes);
 
     MetricGroupDisplay hb =
