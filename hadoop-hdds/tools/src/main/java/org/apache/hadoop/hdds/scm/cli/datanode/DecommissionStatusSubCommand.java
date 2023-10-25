@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -50,19 +52,39 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 
 public class DecommissionStatusSubCommand extends ScmSubcommand {
 
+  @CommandLine.Option(names = { "--decommissioned" },
+      description = "Show info of decommissioned nodes too",
+      defaultValue = "false")
+  private boolean decommissioned;
+
+  @CommandLine.Option(names = { "--id" },
+      description = "Show info by datanode UUID",
+      defaultValue = "")
+  private String uuid;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<HddsProtos.Node> decommissionedNodes = scmClient.queryNode(
-        DECOMMISSIONED, null, HddsProtos.QueryScope.CLUSTER, "");
-    List<HddsProtos.Node> decommissioningNodes = scmClient.queryNode(
-        DECOMMISSIONING, null, HddsProtos.QueryScope.CLUSTER, "");
+    List<HddsProtos.Node> decommissioningNodes = new ArrayList<>();
+
+    if (!Strings.isNullOrEmpty(uuid)) {
+      decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
+          HddsProtos.QueryScope.CLUSTER, "").stream().filter(p ->
+          p.getNodeID().getUuid().equals(uuid)).collect(Collectors.toList());
+      if (decommissioningNodes.isEmpty()) {
+        System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
+        return;
+      }
+    } else {
+      decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
+          HddsProtos.QueryScope.CLUSTER, "");
+      System.out.println("\nDecommission Status: DECOMMISSIONING - " +
+          decommissioningNodes.size() + " nodes");
+    }
+
     Map<UUID, Map<HddsProtos.LifeCycleState, Long>> containerMap =
         scmClient.getContainerMap();
     Map<UUID, Integer> pipelineMap = scmClient.getPipelineMap();
     List<Pipeline> currentPipelines = scmClient.listPipelines();
-
-    System.out.println("\nDecommission Status: DECOMMISSIONING - " +
-        decommissioningNodes.size() + " nodes");
 
     for (HddsProtos.Node node : decommissioningNodes) {
       DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
@@ -71,13 +93,20 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           currentPipelines);
     }
 
-    System.out.println("\n\nDecommission Status: DECOMMISSIONED - " +
-        decommissionedNodes.size() + " nodes");
-    for (HddsProtos.Node node : decommissionedNodes) {
-      DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
-          node.getNodeID());
-      printDetails(datanode, scmClient, containerMap, pipelineMap,
-          currentPipelines);
+    if (decommissioned) {
+      List<HddsProtos.Node> decommissionedNodes = scmClient.queryNode(
+          DECOMMISSIONED, null, HddsProtos.QueryScope.CLUSTER, "");
+      System.out.println("\n\nDecommission Status: DECOMMISSIONED - " +
+          decommissionedNodes.size() + " nodes");
+      for (HddsProtos.Node node : decommissionedNodes) {
+        DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
+            node.getNodeID());
+        System.out.println("\nDatanode: " + datanode.getUuid().toString() +
+            " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
+            + "/" + datanode.getHostName() + ")");
+        System.out.println("Decommissioning ended at : " +
+            scmClient.getLastChangeTime(datanode));
+      }
     }
   }
   private void printDetails(DatanodeDetails datanode, ScmClient scmClient,
