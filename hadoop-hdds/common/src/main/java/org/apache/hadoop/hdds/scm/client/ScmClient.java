@@ -366,14 +366,42 @@ public interface ScmClient extends Closeable {
    */
   List<String> getScmRatisRoles() throws IOException;
 
+  /**
+   * returns the set of container IDs in a datanode
+   *
+   * @param datanodeDetails
+   * @return Set of ContainerID of containers in DN
+   * @throws IOException
+   */
   Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
       throws IOException;
 
+  /**
+   * returns the map of number of pipelines in each datanode in decommissioning.
+   *
+   * @return Map of uuid of Datanode to no. of containers in that DN
+   * @throws IOException
+   */
   Map<UUID, Integer> getPipelineMap() throws IOException;
 
+  /**
+   * returns the map of number of containers in each state in all datanode in
+   * decommissioning.
+   *
+   * @return Map of uuid of Datanode to no. of containers in each state
+   * in that DN
+   * @throws IOException
+   */
   Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap()
       throws IOException;
 
+  /**
+   * returns the last state change time of a datanode.
+   *
+   * @param datanodeDetails
+   * @return time of state change
+   * @throws IOException
+   */
   long getLastChangeTime(DatanodeDetails datanodeDetails) throws IOException;
   /**
    * Force generates new secret keys (rotate).

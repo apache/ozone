@@ -182,6 +182,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Returns the last operation state change time of a specific datanode.
    * @param datanodeDetails DatanodeDetails
+   * @return time of last state change
    */
   long getLastStateChangeTime(DatanodeDetails datanodeDetails);
 

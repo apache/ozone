@@ -279,11 +279,21 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getNodeStatus(datanodeDetails);
   }
 
+  /**
+   * Returns the last operation state change time of a specific datanode.
+   * @param datanodeDetails DatanodeDetails
+   * @return time of last state change
+   */
   @Override
   public long getLastStateChangeTime(DatanodeDetails datanodeDetails) {
     return lastStateChangeTime.get(datanodeDetails.getUuid());
   }
 
+  /**
+   * Set the last operation state change time of a specific datanode.
+   * @param datanodeDetails DatanodeDetails
+   * @param stateChangeTime the state change time
+   */
   @Override
   public void setLastStateChangeTime(DatanodeDetails datanodeDetails,
                                      long stateChangeTime) {
