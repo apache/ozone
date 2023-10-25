@@ -180,9 +180,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
               dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
       checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
 
-      lastChunkInfoTable = new DatanodeTable<>(
-          dbDef.getLastChunkInfoColumnFamily().getTable(this.store));
-      checkTableStatus(lastChunkInfoTable, lastChunkInfoTable.getName());
+      if (dbDef.getLastChunkInfoColumnFamily() != null) {
+        lastChunkInfoTable = new DatanodeTable<>(
+            dbDef.getLastChunkInfoColumnFamily().getTable(this.store));
+        checkTableStatus(lastChunkInfoTable, lastChunkInfoTable.getName());
+      }
     }
   }
 

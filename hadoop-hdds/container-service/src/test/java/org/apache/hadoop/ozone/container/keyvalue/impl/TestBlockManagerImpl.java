@@ -49,9 +49,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -285,6 +287,7 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testFlush1() throws Exception {
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // simulates writing 1024 bytes, hsync,
     // write another 1024 bytes, hsync
     // write another 1024 bytes, hsync
@@ -322,6 +325,7 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testFlush2() throws Exception {
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // simulates writing a full chunk + 1024 bytes, hsync,
     // write another 1024 bytes, hsync
     // write another 1024 bytes, hsync
@@ -354,6 +358,7 @@ public class TestBlockManagerImpl {
 
   @Test
   public void testFlush3() throws Exception {
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // simulates writing 1024 bytes, hsync,
     // and then write till 4 chunks are full
     long containerID = 1;

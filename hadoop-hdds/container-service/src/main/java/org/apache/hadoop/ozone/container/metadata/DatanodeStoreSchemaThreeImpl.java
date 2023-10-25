@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -30,6 +33,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+
+import com.google.common.base.Preconditions;
 import org.bouncycastle.util.Strings;
 import org.rocksdb.LiveFileMetaData;
 
@@ -40,6 +46,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.NO_SUCH_BLOCK_ERR_MSG;
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
 /**
@@ -216,5 +224,41 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         }
       }
     }
+  }
+
+  @Override
+  public BlockData getBlockByID(BlockID blockID,
+      KeyValueContainerData containerData) throws IOException {
+    String blockKey = containerData.getBlockKey(blockID.getLocalID());
+
+    // check last chunk table
+    BlockData lastChunk = getLastChunkInfoTable().
+        get(blockKey);
+
+    // check block data table
+    BlockData blockData = getBlockDataTable().get(blockKey);
+
+    if (blockData == null) {
+      if (lastChunk == null) {
+        throw new StorageContainerException(
+            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
+      } else {
+        return lastChunk;
+      }
+    } else {
+      // append last partial chunk to the block data
+      if (lastChunk != null) {
+        Preconditions.checkState(lastChunk.getChunks().size() == 1);
+        ContainerProtos.ChunkInfo lastChunkInBlockData =
+            blockData.getChunks().get(blockData.getChunks().size() - 1);
+        Preconditions.checkState(
+            lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
+                == lastChunk.getChunks().get(0).getOffset(), "chunk offset does not match");
+        blockData.addChunk(lastChunk.getChunks().get(0));
+        blockData.setBlockCommitSequenceId(lastChunk.getBlockCommitSequenceId());
+      }
+    }
+
+    return blockData;
   }
 }

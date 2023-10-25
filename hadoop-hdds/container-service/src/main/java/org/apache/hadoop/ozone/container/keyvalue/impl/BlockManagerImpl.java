@@ -58,7 +58,7 @@ public class BlockManagerImpl implements BlockManager {
   private ConfigurationSource config;
 
   private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
-  private static final String NO_SUCH_BLOCK_ERR_MSG =
+  public static final String NO_SUCH_BLOCK_ERR_MSG =
       "Unable to find the block.";
 
   // Default Read Buffer capacity when Checksum is not present
@@ -438,36 +438,6 @@ public class BlockManagerImpl implements BlockManager {
 
   private BlockData getBlockByID(DBHandle db, BlockID blockID,
       KeyValueContainerData containerData) throws IOException {
-    String blockKey = containerData.getBlockKey(blockID.getLocalID());
-
-    // check last chunk table
-    BlockData lastChunk = db.getStore().getLastChunkInfoTable().
-        get(blockKey);
-
-    // check block data table
-    BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
-
-    if (blockData == null) {
-      if (lastChunk == null) {
-        throw new StorageContainerException(
-            NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
-      } else {
-        return lastChunk;
-      }
-    } else {
-      // append last partial chunk to the block data
-      if (lastChunk != null) {
-        Preconditions.checkState(lastChunk.getChunks().size() == 1);
-        ContainerProtos.ChunkInfo lastChunkInBlockData =
-            blockData.getChunks().get(blockData.getChunks().size() - 1);
-        Preconditions.checkState(
-            lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
-          == lastChunk.getChunks().get(0).getOffset(), "chunk offset does not match");
-          blockData.addChunk(lastChunk.getChunks().get(0));
-          blockData.setBlockCommitSequenceId(lastChunk.getBlockCommitSequenceId());
-      }
-    }
-
-    return blockData;
+    return db.getStore().getBlockByID(blockID, containerData);
   }
 }
