@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.insight.scm;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +27,8 @@ import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.LoggerSource;
 import org.apache.hadoop.ozone.insight.MetricDisplay;
 import org.apache.hadoop.ozone.insight.MetricGroupDisplay;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 
 /**
  * Insight definition to check node manager / node report events.
@@ -51,16 +52,12 @@ public class NodeManagerInsight extends BaseInsightPoint {
     MetricGroupDisplay nodes =
         new MetricGroupDisplay(Type.SCM, "Node counters");
 
-    String[] operationalState = {"in_service", "decommissioning",
-        "decommissioned", "entering_maintenance", "in_maintenance"};
-    String[] healthState = {"healthy", "stale", "dead"};
-
-    for(int i=0; i < operationalState.length; i++){
-      for(int j=0; j < healthState.length; j++){
+    for (NodeOperationalState opState : NodeOperationalState.values()) {
+      for (NodeState healthState : NodeState.values()) {
         String metricId = String.format("scm_node_manager_%s_%s_nodes",
-            operationalState[i], healthState[j]);
+            opState, healthState).toLowerCase();
         String metricDescription = String.format("%s %s Nodes",
-            operationalState[i], healthState[j]);
+            opState, healthState);
         nodes.addMetrics(new MetricDisplay(metricDescription, metricId));
       }
     }
