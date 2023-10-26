@@ -1,3 +1,9 @@
+---
+title: Interactive Recon API Specification
+type: custompage
+layout: swagger-page
+---
+
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -14,30 +20,6 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-{{ partial "header.html" . }}
 
-<body>
+{{< swagger-ui url="/swagger-resources/recon-api.yaml" >}}
 
-{{ partial "navbar.html" . }}
-
-<div class="wrapper">
-<div class="container-fluid">
-    <div class="row">
-        {{ partial "sidebar.html" . }}
-        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main-content">
-
-            <main>
-                {{ block "main" .}}
-                {{end}}
-            </main>
-
-        </div>
-    </div>
-</div>
-    <div class="push"></div>
-</div>
-
-{{ partial "footer.html" . }}
-
-</body>
-</html>
