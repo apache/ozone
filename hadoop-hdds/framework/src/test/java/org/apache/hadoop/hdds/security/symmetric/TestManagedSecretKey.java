@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Simple test cases for {@link ManagedSecretKey}.
  */
-public class ManagedSecretKeyTest {
+public class TestManagedSecretKey {
 
   @Test
   public void testSignAndVerifySuccess() throws Exception {

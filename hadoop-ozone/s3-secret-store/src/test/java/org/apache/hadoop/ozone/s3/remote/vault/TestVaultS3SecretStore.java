@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test suite for {@link VaultS3SecretStore}.
  */
-public class VaultS3SecretStoreTest {
+public class TestVaultS3SecretStore {
   private static final String TOKEN = "token";
   private static final AtomicInteger AUTH_OPERATION_PROVIDER
       = new AtomicInteger(0);
