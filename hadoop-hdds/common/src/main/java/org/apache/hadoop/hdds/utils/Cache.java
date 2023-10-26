@@ -28,7 +28,7 @@ public interface Cache<K, V> {
 
   void put(K key, V value) throws InterruptedException;
 
-  V remove(K key);
+  void remove(K key);
 
   void removeIf(Predicate<K> predicate);
 

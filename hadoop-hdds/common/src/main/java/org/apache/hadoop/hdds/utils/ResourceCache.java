@@ -32,7 +32,7 @@ public class ResourceCache<K, V> implements Cache<K, V> {
   private final com.google.common.cache.Cache<K, V> cache;
 
   public ResourceCache(
-      Weigher weigher, long limits,
+      Weigher<K, V> weigher, long limits,
       RemovalListener<K, V> listener) {
     Objects.requireNonNull(weigher);
     if (listener == null) {
@@ -59,11 +59,9 @@ public class ResourceCache<K, V> implements Cache<K, V> {
   }
 
   @Override
-  public V remove(K key) {
+  public void remove(K key) {
     Objects.requireNonNull(key);
-    V value = cache.getIfPresent(key);
     cache.invalidate(key);
-    return value;
   }
 
   @Override
