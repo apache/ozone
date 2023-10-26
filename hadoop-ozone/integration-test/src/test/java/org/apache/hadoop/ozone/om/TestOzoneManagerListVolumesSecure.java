@@ -111,6 +111,7 @@ public class TestOzoneManagerListVolumesSecure {
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
     conf.set(OZONE_SECURITY_ENABLED_KEY, "true");
     conf.set("hadoop.security.authentication", "kerberos");
+    OzoneManager.setRecoverCertificateFlag(false);
 
     this.workDir = folder.newFolder();
 

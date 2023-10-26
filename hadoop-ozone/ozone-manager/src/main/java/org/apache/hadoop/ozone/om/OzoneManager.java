@@ -450,6 +450,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
   private static UserGroupInformation testUgi;
+  private static boolean recoverCertificate = true;
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
@@ -648,7 +649,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omStorage, omInfo, "",
           scmInfo == null ? null : scmInfo.getScmId(),
           this::saveNewCertId, this::terminateOM);
-      certClient.initWithRecovery();
+      if (recoverCertificate) {
+        certClient.initWithRecovery();
+      } else if (certClient instanceof OMCertificateClient) {
+        ((OMCertificateClient)certClient).init();
+      }
 
       SecretKeyProtocol secretKeyProtocol =
           HddsServerUtil.getSecretKeyClientForOm(conf);
@@ -1408,7 +1413,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
 
-    CertificateClient certClient =
+    OMCertificateClient certClient =
         new OMCertificateClient(
             new SecurityConfig(conf), scmSecurityClient, omStore, omInfo,
             "", scmId,
@@ -1420,7 +1425,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 throw new RuntimeException("Failed to set new certificate ID");
               }
             }, null);
-    certClient.initWithRecovery();
+    if (recoverCertificate) {
+      certClient.initWithRecovery();
+    } else {
+      certClient.init();
+    }
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
@@ -4021,6 +4030,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public static void setUgi(UserGroupInformation user) {
     OzoneManager.testUgi = user;
+  }
+
+  @VisibleForTesting
+  public static void setRecoverCertificateFlag(boolean recoverCertificateFlag) {
+    OzoneManager.recoverCertificate = recoverCertificateFlag;
   }
 
   public OMNodeDetails getNodeDetails() {
