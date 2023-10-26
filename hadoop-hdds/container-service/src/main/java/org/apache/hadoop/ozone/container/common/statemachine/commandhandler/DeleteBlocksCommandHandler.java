@@ -333,7 +333,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           summary.getNumOfBlocks());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Start to delete container blocks, TXIDs={}",
-          summary.getTxIDSummary());
+            summary.getTxIDSummary());
       }
       blockDeleteMetrics.incrReceivedContainerCount(
           summary.getNumOfContainers());
