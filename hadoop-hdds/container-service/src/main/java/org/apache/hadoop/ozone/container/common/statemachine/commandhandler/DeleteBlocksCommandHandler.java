@@ -69,6 +69,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -100,7 +101,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final Map<String, SchemaHandler> schemaHandlers;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
-      ConfigurationSource conf, DatanodeConfiguration dnConf) {
+      ConfigurationSource conf, DatanodeConfiguration dnConf,
+      String threadNamePrefix) {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
@@ -111,9 +113,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
     schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
 
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix +
+            "DeleteBlocksCommandHandlerThread-%d")
+        .build();
     this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-        dnConf.getBlockDeleteThreads(), new ThreadFactoryBuilder()
-            .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
+        dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
     handlerThread = new Daemon(new DeleteCmdWorker());
