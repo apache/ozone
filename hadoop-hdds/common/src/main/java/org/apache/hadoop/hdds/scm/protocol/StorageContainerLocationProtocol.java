@@ -313,7 +313,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   ScmInfo getScmInfo() throws IOException;
 
   /**
-   * returns the set of container IDs in a datanode
+   * returns the set of container IDs in a datanode.
    *
    * @param datanodeDetails
    * @return Set of ContainerID of containers in DN

@@ -367,7 +367,7 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
-   * returns the set of container IDs in a datanode
+   * returns the set of container IDs in a datanode.
    *
    * @param datanodeDetails
    * @return Set of ContainerID of containers in DN

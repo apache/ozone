@@ -64,7 +64,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<HddsProtos.Node> decommissioningNodes = new ArrayList<>();
+    List<HddsProtos.Node> decommissioningNodes;
 
     if (!Strings.isNullOrEmpty(uuid)) {
       decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
