@@ -137,19 +137,22 @@ public class VaultS3SecretStore implements S3SecretStore {
       throws VaultException {
     LogicalResponse response = action.call();
     int status = response.getRestResponse().getStatus();
-    if (status == 403 || status == 401 || status == 400) {
+    if (isAuthFailed(status)) {
       auth();
 
       response = action.call();
       status = response.getRestResponse().getStatus();
 
-      if (status == 403 || status == 401 || status == 400) {
-        throw new VaultException("Failed to re-authenticate",
-            response.getRestResponse().getStatus());
+      if (isAuthFailed(status)) {
+        throw new VaultException("Failed to re-authenticate", status);
       }
     }
 
     return response;
+  }
+
+  private static boolean isAuthFailed(int status) {
+    return status == 403 || status == 401 || status == 400;
   }
 
   @Override
