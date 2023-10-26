@@ -102,7 +102,8 @@ public class VaultS3SecretStore implements S3SecretStore {
   @Override
   public S3SecretValue getSecret(String kerberosID) throws IOException {
     try {
-      Map<String, String> data = callWithReAuth(() -> vault.logical().read(secretPath + '/' + kerberosID))
+      Map<String, String> data = callWithReAuth(() -> vault.logical()
+          .read(secretPath + '/' + kerberosID))
           .getData();
 
       if (data == null) {
@@ -124,14 +125,16 @@ public class VaultS3SecretStore implements S3SecretStore {
   @Override
   public void revokeSecret(String kerberosId) throws IOException {
     try {
-      callWithReAuth(() -> vault.logical().delete(secretPath + '/' + kerberosId));
+      callWithReAuth(() -> vault.logical()
+          .delete(secretPath + '/' + kerberosId));
     } catch (VaultException e) {
       LOG.error("Failed to delete secret", e);
       throw new IOException("Failed to revoke secret", e);
     }
   }
 
-  private LogicalResponse callWithReAuth(RestCall action) throws VaultException {
+  private LogicalResponse callWithReAuth(RestCall action)
+      throws VaultException {
     LogicalResponse response = action.call();
     int status = response.getRestResponse().getStatus();
     if (status == 403 || status == 401 || status == 400) {
