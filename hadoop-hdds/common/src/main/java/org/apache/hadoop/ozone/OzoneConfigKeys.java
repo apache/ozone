@@ -185,7 +185,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
       "ozone.client.ec.grpc.write.timeout";
-  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "10s";
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
 
   /**
    * Ozone administrator users delimited by comma.
