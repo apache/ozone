@@ -79,7 +79,7 @@ public class OzoneDelegationTokenSecretManager
    * If the delegation token update thread holds this lock, it will not get
    * interrupted.
    */
-  private Object noInterruptsLock = new Object();
+  private final Object noInterruptsLock = new Object();
 
   private boolean isRatisEnabled;
 
@@ -609,7 +609,7 @@ public class OzoneDelegationTokenSecretManager
    */
   private void removeExpiredToken() {
     long now = Time.now();
-    synchronized (this) {
+    synchronized (noInterruptsLock) {
       Iterator<Map.Entry<OzoneTokenIdentifier,
           TokenInfo>> i = currentTokens.entrySet().iterator();
       while (i.hasNext()) {
