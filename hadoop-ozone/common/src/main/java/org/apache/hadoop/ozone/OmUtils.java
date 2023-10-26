@@ -813,30 +813,29 @@ public final class OmUtils {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
 
-   public static List<Map<String, String>> format(List<ServiceInfo> nodes, int port, String leaderId) {
-    List<Map<String, String>> omInfoList = new ArrayList<>();
+  public static List<List<String>> format(List<ServiceInfo> nodes, int port, String leaderId) {
+    List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
         .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
     int count = 0;
-       for (ServiceInfo info : omNodes) {
-           // Printing only the OM's running
-           if (info.getNodeType() == HddsProtos.NodeType.OM) {
-               String role = info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" : "FOLLOWER";
-               Map<String, String> omInfo = new HashMap<>();
-               omInfo.put("hostName", info.getHostname());
-               omInfo.put("nodeId", info.getOmRoleInfo().getNodeId());
-               omInfo.put("ratisPort", String.valueOf(port));
-               omInfo.put("role", role);
-
-               omInfoList.add(omInfo);
-               count++;
-           }
-       }
-       // Return omInfoList if count ==1 or count >=1
-           return omInfoList;
+    for (ServiceInfo info : omNodes) {
+      // Printing only the OM's running
+      if (info.getNodeType() == HddsProtos.NodeType.OM) {
+        String role = info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" : "FOLLOWER";
+        List<String> omInfo = new ArrayList<>();
+        omInfo.add(info.getHostname());
+        omInfo.add(info.getOmRoleInfo().getNodeId());
+        omInfo.add(String.valueOf(port));
+        omInfo.add(role);
+        omInfoList.add(omInfo);
+        count++;
+      }
+    }
+    // Return omInfoList if count ==1 or count >=1
+    return omInfoList;
   }
 
   /**
