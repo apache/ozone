@@ -575,7 +575,7 @@ public class TestEndPoint {
 
       final StateContext stateContext =
           new StateContext(conf, DatanodeStateMachine.DatanodeStates.RUNNING,
-              stateMachine);
+              stateMachine, "");
 
       HeartbeatEndpointTask endpointTask =
           new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext,

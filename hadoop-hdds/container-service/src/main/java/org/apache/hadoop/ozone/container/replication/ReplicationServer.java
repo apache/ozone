@@ -86,9 +86,9 @@ public class ReplicationServer {
             + " queue length = {}",
         replicationConfig.getReplicationMaxStreams(),
         replicationConfig.getReplicationQueueLimit());
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat(threadNamePrefix + "ReplicationContainerReader" +
-            "-%d")
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "ReplicationContainerReader-%d")
         .build();
     this.executor = new ThreadPoolExecutor(
         replicationServerWorkers,

@@ -176,7 +176,8 @@ public class DatanodeStateMachine implements Closeable {
                 "DatanodeStateMachineTaskThread-%d")
             .build());
     connectionManager = new SCMConnectionManager(conf);
-    context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
+    context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
+        threadNamePrefix);
     // OzoneContainer instance is used in a non-thread safe way by the context
     // past to its constructor, so we much synchronize its access. See
     // HDDS-3116 for more details.
@@ -699,7 +700,7 @@ public class DatanodeStateMachine implements Closeable {
     Thread handlerThread = new Thread(processCommandQueue);
     handlerThread.setDaemon(true);
     handlerThread.setName(
-        datanodeDetails.threadNamePrefix() + "Command processor thread");
+        datanodeDetails.threadNamePrefix() + "CommandProcessorThread");
     handlerThread.setUncaughtExceptionHandler((Thread t, Throwable e) -> {
       // Let us just restart this thread after logging a critical error.
       // if this thread is not running we cannot handle commands from SCM.

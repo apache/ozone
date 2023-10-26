@@ -118,7 +118,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
                 "ChunkReader-%d")
             .build());
 
-    ThreadFactory factory = new ThreadFactoryBuilder().setDaemon(true)
+    ThreadFactory factory = new ThreadFactoryBuilder()
+        .setDaemon(true)
         .setNameFormat(datanodeDetails.threadNamePrefix() +
             "ChunkReader-ELG-%d")
         .build();
