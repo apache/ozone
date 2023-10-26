@@ -60,6 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -114,7 +115,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     boolean acquiredLock = false;
 
-    IOException exception = null;
+    Exception exception = null;
     String partName = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -244,7 +245,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
               omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
@@ -304,7 +305,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   private void logResult(OzoneManager ozoneManager,
       MultipartCommitUploadPartRequest multipartCommitUploadPartRequest,
       KeyArgs keyArgs, Map<String, String> auditMap, String volumeName,
-      String bucketName, String keyName, IOException exception,
+      String bucketName, String keyName, Exception exception,
       String partName, Result result) {
     // audit log
     // Add MPU related information.

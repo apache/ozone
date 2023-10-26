@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -78,6 +79,7 @@ public class SCMBlockDeletingService extends BackgroundService
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
   private final SCMContext scmContext;
+  private final ScmConfig scmConf;
 
   private int blockDeleteLimitSize;
   private ScmBlockDeletingServiceMetrics metrics;
@@ -98,13 +100,14 @@ public class SCMBlockDeletingService extends BackgroundService
              SCMContext scmContext, SCMServiceManager serviceManager,
              ConfigurationSource conf,
              ScmBlockDeletingServiceMetrics metrics,
-             Clock clock) {
+             Clock clock, ReconfigurationHandler reconfigurationHandler) {
     super("SCMBlockDeletingService",
-        conf.getObject(ScmConfig.class).getBlockDeletionInterval().toMillis(),
+        conf.getObject(ScmConfig.class)
+            .getBlockDeletionInterval().toMillis(),
         TimeUnit.MILLISECONDS, BLOCK_DELETING_SERVICE_CORE_POOL_SIZE,
         conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS));
+            TimeUnit.MILLISECONDS), scmContext.threadNamePrefix());
 
     this.safemodeExitRunDelayMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -116,9 +119,9 @@ public class SCMBlockDeletingService extends BackgroundService
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.metrics = metrics;
-
-    blockDeleteLimitSize =
-        conf.getObject(ScmConfig.class).getBlockDeletionLimit();
+    scmConf = conf.getObject(ScmConfig.class);
+    reconfigurationHandler.register(scmConf);
+    blockDeleteLimitSize = scmConf.getBlockDeletionLimit();
     Preconditions.checkArgument(blockDeleteLimitSize > 0,
         "Block deletion limit should be positive.");
 
@@ -164,7 +167,7 @@ public class SCMBlockDeletingService extends BackgroundService
                 Type.deleteBlocksCommand) == 0).collect(Collectors.toSet());
         try {
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(blockDeleteLimitSize, included);
+              deletedBlockLog.getTransactions(getBlockDeleteTXNum(), included);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -222,7 +225,13 @@ public class SCMBlockDeletingService extends BackgroundService
 
   @VisibleForTesting
   public void setBlockDeleteTXNum(int numTXs) {
-    blockDeleteLimitSize = numTXs;
+    Preconditions.checkArgument(numTXs > 0,
+        "Block deletion limit should be positive.");
+    scmConf.setBlockDeletionLimit(numTXs);
+  }
+
+  public int getBlockDeleteTXNum() {
+    return scmConf.getBlockDeletionLimit();
   }
 
   @Override

@@ -1392,6 +1392,55 @@
   </property>
 
   <property>
+    <name>ozone.om.open.mpu.cleanup.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically checks inactive multipart info
+      send multipart upload abort requests for them.
+      This entry controls the interval of this
+      cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A timeout value of multipart upload cleanup service. If this is set
+      greater than 0, the service will stop waiting for the multipart info abort
+      completion after this time. If timeout happens to a large proportion of
+      multipart aborts, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.expire.threshold</name>
+    <value>30d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long multipart upload is considered active. Specifically, if a multipart info
+      has been ongoing longer than the value of this config entry, that multipart info is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.parts.cleanup.limit.per.task</name>
+    <value>0</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of parts, rounded up to the nearest
+      number of expired multipart upload. This property is used
+      to approximately throttle the number of MPU parts sent
+      to the OM.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1785,6 +1834,32 @@
     <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
     <description>The keytab file used by the S3Gateway server to login as its
       service principal. </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.list-keys.shallow.enabled</name>
+    <value>true</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>If this is true, there will be efficiency optimization effects
+      when calling s3g list interface with delimiter '/' parameter, especially
+      when there are a large number of keys.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.secret.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The boolean which enables the Ozone S3Gateway Secret endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.type</name>
+    <value>kerberos</value>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
   </property>
 
   <property>
@@ -2301,6 +2376,14 @@
       certificate was generated. Once there is a change, the system
       automatically adds the new root ca to the clients'
       trust stores and requests a new certificate to be signed.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.expired.certificate.check.interval</name>
+    <value>P1D</value>
+    <description>Interval to use for removing expired certificates. A background
+      task to remove expired certificates from the scm metadata store is
+      scheduled to run at the rate this configuration option specifies.
     </description>
   </property>
   <property>
@@ -3348,7 +3431,7 @@
   </property>
   <property>
     <name>ozone.path.deleting.limit.per.task</name>
-    <value>10000</value>
+    <value>6000</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>A maximum number of paths(dirs/files) to be deleted by
       directory deleting service per time interval.

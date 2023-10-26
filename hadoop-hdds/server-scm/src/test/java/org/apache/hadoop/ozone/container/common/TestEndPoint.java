@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -78,6 +79,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -90,6 +92,9 @@ public class TestEndPoint {
   private static ScmTestMock scmServerImpl;
   @TempDir
   private static File testDir;
+  private static OzoneConfiguration ozoneConf;
+  private static DatanodeLayoutStorage layoutStorage;
+  private static DatanodeDetails dnDetails;
 
   @AfterAll
   public static void tearDown() throws Exception {
@@ -101,8 +106,14 @@ public class TestEndPoint {
   @BeforeAll
   static void setUp() throws Exception {
     serverAddress = SCMTestUtils.getReuseableAddress();
+    ozoneConf = SCMTestUtils.getConf();
     scmServerImpl = new ScmTestMock();
-    scmServer = SCMTestUtils.startScmRpcServer(SCMTestUtils.getConf(),
+    dnDetails = randomDatanodeDetails();
+    layoutStorage = new DatanodeLayoutStorage(ozoneConf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+    layoutStorage.initialize();
+    scmServer = SCMTestUtils.startScmRpcServer(ozoneConf,
         scmServerImpl, serverAddress, 10);
   }
 
@@ -131,20 +142,19 @@ public class TestEndPoint {
    */
   @Test
   public void testGetVersionTask() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setFromObject(new ReplicationConfig().setPort(0));
-    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+    ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+      ozoneConf.setBoolean(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
           true);
-      conf.setBoolean(
+      ozoneConf.setBoolean(
           OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-      OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails));
+      OzoneContainer ozoneContainer = new OzoneContainer(dnDetails,
+          ozoneConf, ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
+          ozoneConf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       // if version call worked the endpoint should automatically move to the
@@ -165,18 +175,17 @@ public class TestEndPoint {
    */
   @Test
   public void testDeletedContainersClearedOnStartup() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
         true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
-    conf.setFromObject(new ReplicationConfig().setPort(0));
-    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+    ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
-      OzoneContainer ozoneContainer = createVolume(conf);
+      OzoneContainer ozoneContainer = createVolume(ozoneConf);
       HddsVolume hddsVolume = (HddsVolume) ozoneContainer.getVolumeSet()
           .getVolumesList().get(0);
-      KeyValueContainer kvContainer = addContainer(conf, hddsVolume);
+      KeyValueContainer kvContainer = addContainer(ozoneConf, hddsVolume);
       // For testing, we are moving the container under the tmp directory,
       // in order to delete during datanode startup or shutdown
       KeyValueContainerUtil.moveToDeletedContainerDir(
@@ -189,7 +198,7 @@ public class TestEndPoint {
 
       // versionTask.call() cleans the tmp dir and removes container from DB
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
+          ozoneConf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
@@ -205,24 +214,22 @@ public class TestEndPoint {
 
   @Test
   public void testCheckVersionResponse() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
         true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
-    conf.setBoolean(
+    ozoneConf.setBoolean(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-    conf.setFromObject(new ReplicationConfig().setPort(0));
-    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+    ozoneConf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
         serverAddress, 1000)) {
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(VersionEndpointTask.LOG);
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails));
+      OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
+          ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
+          ozoneConf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       // if version call worked the endpoint should automatically move to the
@@ -255,6 +262,33 @@ public class TestEndPoint {
   }
 
   /**
+   * This test checks that dnlayout version file contains proper
+   * clusterID identifying the scm cluster the datanode is part of.
+   * Dnlayout version file set upon call to version endpoint.
+   */
+  @Test
+  public void testDnLayoutVersionFile() throws Exception {
+    ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(ozoneConf,
+        serverAddress, 1000)) {
+      OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
+          ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          ozoneConf, ozoneContainer);
+      versionTask.call();
+
+      // After the version call, the datanode layout file should
+      // have its clusterID field set to the clusterID of the scm
+      DatanodeLayoutStorage layout
+          = new DatanodeLayoutStorage(ozoneConf,
+          "na_expect_storage_initialized");
+      assertEquals(scmServerImpl.getClusterId(), layout.getClusterID());
+    }
+  }
+
+  /**
    * This test makes a call to end point where there is no SCM server. We
    * expect that versionTask should be able to handle it.
    */
@@ -267,8 +301,8 @@ public class TestEndPoint {
         nonExistentServerAddress, 1000)) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails));
+      OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails,
+          conf, ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
@@ -295,8 +329,8 @@ public class TestEndPoint {
         serverAddress, (int) rpcTimeout)) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails));
+      OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails, conf,
+          ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
 
@@ -581,20 +615,10 @@ public class TestEndPoint {
     Assertions.assertTrue(end - start <= rpcTimeout + tolerance + 6000);
   }
 
-  private StateContext getContext(DatanodeDetails datanodeDetails) {
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
-    return context;
-  }
-
   private OzoneContainer createVolume(OzoneConfiguration conf)
       throws IOException {
-    DatanodeDetails datanodeDetails = randomDatanodeDetails();
-    OzoneContainer ozoneContainer = new OzoneContainer(
-        datanodeDetails, conf, getContext(datanodeDetails));
+    OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, conf,
+        ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
 
     String clusterId = scmServerImpl.getClusterId();
 

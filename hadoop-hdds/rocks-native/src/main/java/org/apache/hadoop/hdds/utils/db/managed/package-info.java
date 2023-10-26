@@ -17,8 +17,7 @@
  */
 
 /**
- * Annotation processors used at compile time by the Ozone project to validate
- * internal annotations and related code as needed, if needed.
+ * This package contains utility classes related to Managed SST dump tool.
  */
 
 package org.apache.hadoop.hdds.utils.db.managed;

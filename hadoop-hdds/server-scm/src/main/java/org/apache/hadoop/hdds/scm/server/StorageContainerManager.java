@@ -192,6 +192,7 @@ import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -279,7 +280,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ReplicationManager replicationManager;
 
   private SCMSafeModeManager scmSafeModeManager;
-  private CertificateClient scmCertificateClient;
+  private SCMCertificateClient scmCertificateClient;
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
@@ -305,6 +306,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SecurityConfig securityConfig;
 
   private final SCMHANodeDetails scmHANodeDetails;
+  private final String threadNamePrefix;
 
   private final ContainerBalancer containerBalancer;
   // MoveManager is used by ContainerBalancer to schedule container moves
@@ -370,6 +372,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
+    threadNamePrefix = getScmNodeDetails().threadNamePrefix();
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
 
     jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
@@ -389,7 +392,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
 
-    eventQueue = new EventQueue();
+    eventQueue = new EventQueue(threadNamePrefix);
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
@@ -513,7 +516,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
-        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+            threadNamePrefix, queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
@@ -653,7 +657,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
           OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
               .getDuration(), TimeUnit.MILLISECONDS);
-      leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
+      leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
@@ -694,6 +698,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
+          .setThreadNamePrefix(threadNamePrefix)
           .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
           .build();
     }
@@ -856,7 +861,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final CertificateServer rootCertificateServer;
 
     // Start specific instance SCM CA server.
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime()) +
+    String subject = SCM_SUB_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {
       scmCertificateServer = configurator.getCertificateServer();
@@ -941,6 +946,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       certificateStore.storeValidScmCertificate(
           rootCACert.getSerialNumber(), rootCACert);
     }
+    // Upgrade certificate sequence ID
+    SequenceIdGenerator.upgradeToCertificateSequenceId(scmMetadataStore, true);
   }
 
   public CertificateServer getRootCertificateServer() {
@@ -953,15 +960,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public CertificateClient getScmCertificateClient() {
     return scmCertificateClient;
-  }
-
-  @VisibleForTesting
-  public void setScmCertificateClient(CertificateClient client)
-      throws IOException {
-    if (scmCertificateClient != null) {
-      scmCertificateClient.close();
-    }
-    scmCertificateClient = client;
   }
 
   public Clock getSystemClock() {
@@ -995,7 +993,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
           getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
       scmCertificateClient = new SCMCertificateClient(securityConfig,
-          scmSecurityClient, certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
+          scmSecurityClient, certSerialNumber, getScmId(),
+          SCM_ROOT_CA_COMPONENT_NAME);
     }
     return new ContainerTokenSecretManager(expiryTime,
         secretKeyManagerService.getSecretKeyManager());
@@ -1470,6 +1469,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmHANodeDetails;
   }
 
+  public String threadNamePrefix() {
+    return threadNamePrefix;
+  }
+
   @Override
   public String getDatanodeRpcPort() {
     InetSocketAddress addr = getDatanodeRpcAddress();
@@ -1542,6 +1545,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // At this point leader is not known
     scmHAMetricsUpdate(null);
+
+    if (scmCertificateClient != null) {
+      // In case root CA certificate is rotated during this SCM is offline
+      // period, fetch the new root CA list from leader SCM and refresh ratis
+      // server's tlsConfig.
+      scmCertificateClient.refreshCACertificates();
+    }
   }
 
   /**
@@ -2144,12 +2154,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot remove current leader.");
     }
 
-    if (rootCARotationManager != null &&
-        rootCARotationManager.isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
-          " Please try the operation later again."),
-          ResultCodes.CA_ROTATION_IN_PROGRESS);
-    }
+    checkIfCertSignRequestAllowed(rootCARotationManager, false, configuration,
+        "removePeerFromHARing");
 
     Preconditions.checkNotNull(getScmHAManager().getRatisServer()
         .getDivision().getGroup());
@@ -2180,6 +2186,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
+  @Override
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }

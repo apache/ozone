@@ -71,14 +71,14 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
     // add parentDir to dirTable
     long parentID = getParentID(volumeName, bucketName, keyName);
-    long txnId = 50;
+    long txnId = 2;
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+                    Time.now(), true);
 
     // add key to openFileTable
     String fileName = OzoneFSUtils.getFileName(keyName);

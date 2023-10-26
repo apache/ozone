@@ -18,11 +18,18 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -48,6 +55,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
+import static org.slf4j.MDC.put;
 
 /**
  * Tests OMFileCreateRequest.
@@ -338,14 +346,169 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @Test
+  public void testCreateFileInheritParentDefaultAcls()
+      throws Exception {
+    volumeName = UUID.randomUUID().toString();
+    bucketName = UUID.randomUUID().toString();
+    String prefix = "a/b/c/";
+    List<String> dirs = new ArrayList<>();
+    dirs.add("a");
+    dirs.add("b");
+    dirs.add("c");
+    String keyName = prefix + UUID.randomUUID();
+    List<OzoneAcl> bucketAclResults = new ArrayList<>();
+
+    OmKeyInfo omKeyInfo = createFileWithInheritAcls(keyName, bucketAclResults);
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+
+    verifyInheritAcls(dirs, omKeyInfo, volumeId, bucketId, bucketAclResults);
+  }
+
+  protected OmKeyInfo createFileWithInheritAcls(String keyName,
+      List<OzoneAcl> bucketAclResults) throws Exception {
+    List<OzoneAcl> acls = new ArrayList<>();
+    acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
+    acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
+
+    // Create bucket with DEFAULT acls
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setAcls(acls));
+
+    // Verify bucket has DEFAULT acls.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    bucketAclResults.addAll(omMetadataManager.getBucketTable()
+        .get(bucketKey).getAcls());
+    Assert.assertEquals(acls, bucketAclResults);
+
+    // Recursive create file with acls inherited from bucket DEFAULT acls
+    OMRequest omRequest = createFileRequest(volumeName, bucketName,
+        keyName, HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, false, true);
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omFileCreateResponse =
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omFileCreateResponse.getOMResponse().getStatus());
+
+    long id = modifiedOmRequest.getCreateFileRequest().getClientID();
+    return verifyPathInOpenKeyTable(keyName, id, true);
+  }
+
+  /**
+   * The following layout should inherit the parent DEFAULT acls:
+   *  (1) FSO
+   *  (2) Legacy when EnableFileSystemPaths
+   *
+   *  The following layout should inherit the bucket DEFAULT acls:
+   *  (1) OBS
+   *  (2) Legacy when DisableFileSystemPaths
+   *
+   * Note: Acl which dir inherited itself has DEFAULT scope,
+   * and acl which leaf file inherited itself has ACCESS scope.
+   */
+  protected void verifyInheritAcls(List<String> dirs, OmKeyInfo omKeyInfo,
+      long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
+      throws IOException {
+
+    if (getBucketLayout().shouldNormalizePaths(
+        ozoneManager.getEnableFileSystemPaths())) {
+
+      // bucketID is the parent
+      long parentID = bucketId;
+      List<OzoneAcl> expectedInheritAcls = bucketAcls.stream()
+          .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+          .collect(Collectors.toList());
+      System.out.println("expectedInheritAcls: " + expectedInheritAcls);
+
+      // dir should inherit parent DEFAULT acls and itself has DEFAULT scope
+      // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
+      for (int indx = 0; indx < dirs.size(); indx++) {
+        String dirName = dirs.get(indx);
+        String dbKey = "";
+        // for index=0, parentID is bucketID
+        dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, dirName);
+        OmDirectoryInfo omDirInfo =
+            omMetadataManager.getDirectoryTable().get(dbKey);
+        List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
+
+        System.out.println(
+            "  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
+        Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
+            expectedInheritAcls, omDirAcls);
+
+        parentID = omDirInfo.getObjectID();
+        expectedInheritAcls = omDirAcls;
+
+        // file should inherit parent DEFAULT acls and itself has ACCESS scope
+        // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
+        if (indx == dirs.size() - 1) {
+          // verify file acls
+          Assert.assertEquals(omDirInfo.getObjectID(),
+              omKeyInfo.getParentObjectID());
+          List<OzoneAcl> fileAcls = omDirInfo.getAcls();
+          System.out.println("  file acls : " + omKeyInfo + " ==> " + fileAcls);
+          Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
+              expectedInheritAcls.stream()
+                  .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+                  .collect(Collectors.toList()), fileAcls);
+        }
+      }
+    } else {
+      List<OzoneAcl> keyAcls = omKeyInfo.getAcls();
+
+      List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
+          .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+          .collect(Collectors.toList());
+
+      OzoneAcl parentAccessAcl = bucketAcls.stream()
+          .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.ACCESS)
+          .findAny().orElse(null);
+
+      // Should inherit parent DEFAULT acls
+      // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
+      Assert.assertEquals("Failed to inherit bucket DEFAULT acls!",
+          parentDefaultAcl.stream()
+              .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+              .collect(Collectors.toList()), keyAcls);
+      // Should not inherit parent ACCESS acls
+      Assert.assertFalse(keyAcls.contains(parentAccessAcl));
+    }
+  }
+
+  @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    String[] invalidKeyNames = {
-        OM_SNAPSHOT_INDICATOR + "/" + keyName,
-        OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
-        OM_SNAPSHOT_INDICATOR + "/a/b/" + keyName
+    Map<String, String> invalidKeyScenarios = new HashMap<String, String>() {
+      {
+        put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR,
+            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
+      }
     };
 
-    for (String invalidKeyName : invalidKeyNames) {
+    for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
+      String invalidKeyName = entry.getKey();
+      String expectedErrorMessage = entry.getValue();
+
       OMRequest omRequest = createFileRequest(volumeName, bucketName,
           invalidKeyName, HddsProtos.ReplicationFactor.ONE,
           HddsProtos.ReplicationType.RATIS, false, false);
@@ -356,9 +519,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       OMException ex = Assert.assertThrows(OMException.class,
           () -> omFileCreateRequest.preExecute(ozoneManager));
 
-      Assert.assertTrue(ex.getMessage().contains(
-          "Cannot create key under path reserved for snapshot: "
-              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+      Assert.assertTrue(ex.getMessage().contains(expectedErrorMessage));
     }
   }
 

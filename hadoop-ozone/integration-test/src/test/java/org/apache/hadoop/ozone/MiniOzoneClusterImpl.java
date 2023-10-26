@@ -66,6 +66,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -119,6 +120,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
+
+  static {
+    CodecBuffer.enableLeakDetection();
+  }
 
   private OzoneConfiguration conf;
   private final SCMConfigurator scmConfigurator;
@@ -367,7 +372,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public void restartOzoneManager() throws IOException {
-    ozoneManager.stop();
+    stopOM(ozoneManager);
     ozoneManager.restart();
   }
 
@@ -449,8 +454,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       DefaultMetricsSystem.shutdown();
 
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
-      CodecBuffer.assertNoLeaks();
-    } catch (IOException e) {
+      CodecTestUtil.gc();
+    } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }
   }
@@ -546,10 +551,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
-  private static void stopOM(OzoneManager om) {
-    if (om != null) {
-      LOG.info("Stopping the OzoneManager");
-      om.stop();
+  protected static void stopOM(OzoneManager om) {
+    if (om != null && om.stop()) {
       om.join();
     }
   }

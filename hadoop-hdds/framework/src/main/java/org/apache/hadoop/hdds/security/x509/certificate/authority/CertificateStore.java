@@ -107,6 +107,15 @@ public interface CertificateStore {
   void removeExpiredCertificate(BigInteger serialID) throws IOException;
 
   /**
+   * Deletes all non-revoked expired certificates from the store.
+   *
+   * @return The list of removed expired certificates
+   * @throws IOException - on failure
+   */
+  @Replicate
+  List<X509Certificate> removeAllExpiredCertificates() throws IOException;
+
+  /**
    * Retrieves a Certificate based on the Serial number of that certificate.
    * @param serialID - ID of the certificate.
    * @param certType - Whether its Valid or Revoked certificate.

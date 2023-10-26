@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,10 +37,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRespon
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -98,6 +101,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
@@ -147,6 +151,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.ProtobufUtils;
@@ -162,8 +167,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
-  private static final int MAX_SIZE_KB = 2097151;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -217,6 +220,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysResponse listKeysResponse = listKeys(
             request.getListKeysRequest(), request.getVersion());
         responseBuilder.setListKeysResponse(listKeysResponse);
+        break;
+      case ListKeysLight:
+        ListKeysLightResponse listKeysLightResponse = listKeysLight(
+            request.getListKeysRequest());
+        responseBuilder.setListKeysLightResponse(listKeysLightResponse);
         break;
       case ListTrash:
         ListTrashResponse listTrashResponse = listTrash(
@@ -367,14 +375,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) throws IOException {
-    OMClientRequest omClientRequest = null;
-    OMClientResponse omClientResponse = null;
-    omClientRequest =
+    OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    omClientResponse = omClientRequest
-        .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
-            ozoneManagerDoubleBuffer::add);
-    return omClientResponse;
+    return captureLatencyNs(
+        impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
+        () -> omClientRequest.validateAndUpdateCache(getOzoneManager(),
+            transactionLogIndex, ozoneManagerDoubleBuffer::add));
   }
 
   @Override
@@ -673,16 +679,34 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListKeysResponse.Builder resp =
         ListKeysResponse.newBuilder();
 
-    List<OmKeyInfo> keys = impl.listKeys(
+    ListKeysResult listKeysResult = impl.listKeys(
         request.getVolumeName(),
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
         request.getCount());
-    for (OmKeyInfo key : keys) {
+    for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
+    resp.setIsTruncated(listKeysResult.isTruncated());
+    return resp.build();
+  }
 
+  private ListKeysLightResponse listKeysLight(ListKeysRequest request)
+      throws IOException {
+    ListKeysLightResponse.Builder resp =
+        ListKeysLightResponse.newBuilder();
+
+    ListKeysLightResult listKeysLightResult = impl.listKeysLight(
+        request.getVolumeName(),
+        request.getBucketName(),
+        request.getStartKey(),
+        request.getPrefix(),
+        request.getCount());
+    for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
+      resp.addBasicKeyInfo(key.getProtobuf());
+    }
+    resp.setIsTruncated(listKeysLightResult.isTruncated());
     return resp.build();
   }
 
@@ -1348,16 +1372,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private EchoRPCResponse echoRPC(EchoRPCRequest req) {
-    EchoRPCResponse.Builder builder =
-            EchoRPCResponse.newBuilder();
-
-    byte[] payloadBytes = new byte[0];
-    int payloadRespSize = Math.min(
-            req.getPayloadSizeResp()
-                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
-    if (payloadRespSize > 0) {
-      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
-    }
+    EchoRPCResponse.Builder builder = EchoRPCResponse.newBuilder();
+    byte[] payloadBytes =
+        PayloadUtils.generatePayloadBytes(req.getPayloadSizeResp());
     builder.setPayload(ByteString.copyFrom(payloadBytes));
     return builder.build();
   }

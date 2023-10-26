@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.container.common;
 
 import com.google.common.collect.Lists;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -62,7 +64,8 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingTask;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -74,14 +77,20 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -114,6 +123,9 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestBlockDeletingService {
 
+  @Rule
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
+
   private File testRoot;
   private String scmId;
   private String clusterID;
@@ -139,6 +151,8 @@ public class TestBlockDeletingService {
 
   @Before
   public void init() throws IOException {
+    CodecBuffer.enableLeakDetection();
+
     testRoot = GenericTestUtils
         .getTestDir(TestBlockDeletingService.class.getSimpleName());
     if (testRoot.exists()) {
@@ -850,7 +864,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf);
+        10, conf, "", mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data
@@ -895,7 +909,7 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @Test(timeout = 30000)
+  @Test
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
@@ -961,6 +975,55 @@ public class TestBlockDeletingService {
     }
   }
 
+  @Test
+  public void testContainerMaxLockHoldingTime() throws Exception {
+    GenericTestUtils.LogCapturer log =
+        GenericTestUtils.LogCapturer.captureLogs(
+            LoggerFactory.getLogger(BlockDeletingTask.class));
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+
+    // Ensure that the lock holding timeout occurs every time a deletion
+    // transaction is executed by setting BlockDeletingMaxLockHoldingTime to -1.
+    dnConf.setBlockDeletingMaxLockHoldingTime(Duration.ofMillis(-1));
+    dnConf.setBlockDeletionLimit(3);
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = new ContainerSet(1000);
+
+    int containerCount = 1;
+    int chunksPerBlock = 10;
+    int blocksPerContainer = 3;
+    createToDeleteBlocks(containerSet, containerCount, blocksPerContainer,
+        chunksPerBlock);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            ContainerMetrics.create(conf), c -> {
+        });
+    BlockDeletingServiceTestImpl service =
+        getBlockDeletingService(containerSet, conf, keyValueHandler);
+    service.start();
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, containerCount, containerData);
+    try {
+      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+      deleteAndWait(service, 1);
+      GenericTestUtils.waitFor(() ->
+              (containerData.get(0).getBytesUsed() == 0),
+          100, 3000);
+      if (schemaVersion != null && (
+          schemaVersion.equals(SCHEMA_V2) || schemaVersion.equals(SCHEMA_V3))) {
+
+        // Since MaxLockHoldingTime is -1, every "deletion transaction" triggers
+        // a timeout except the last one, where a "deletion transaction"
+        // will be created for each Block, so it will start
+        // blocksPerContainer - 1 timeout.
+        Assert.assertEquals(blocksPerContainer - 1,
+            StringUtils.countMatches(log.getOutput(), "Max lock hold time"));
+      }
+    } finally {
+      service.shutdown();
+    }
+  }
+
   public long currentBlockSpace(List<ContainerData> containerData,
       int totalContainers) {
     long totalSpaceUsed = 0;
@@ -970,7 +1033,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testBlockThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 5

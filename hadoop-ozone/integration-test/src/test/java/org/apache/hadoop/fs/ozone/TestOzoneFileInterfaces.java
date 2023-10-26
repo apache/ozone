@@ -63,18 +63,25 @@ import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
+
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -92,7 +99,7 @@ public class TestOzoneFileInterfaces {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private String rootPath;
 
@@ -218,6 +225,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testFileSystemInit() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     if (setDefaultFs) {
       assertTrue(
           "The initialized file system is not OzoneFileSystem but " +
@@ -230,6 +239,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testOzFsReadWrite() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     long currentTime = Time.now();
     int stringLen = 20;
     OMMetadataManager metadataManager = cluster.getOzoneManager()
@@ -316,6 +327,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testReplication() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     int stringLen = 20;
     String data = RandomStringUtils.randomAlphanumeric(stringLen);
     String filePath = RandomStringUtils.randomAlphanumeric(5);
@@ -342,6 +355,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testDirectory() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     String leafName = RandomStringUtils.randomAlphanumeric(5);
     OMMetadataManager metadataManager = cluster.getOzoneManager()
         .getMetadataManager();
@@ -503,7 +518,7 @@ public class TestOzoneFileInterfaces {
   }
 
   @Test
-  @Ignore("HDDS-3506")
+  @Category(UnhealthyTest.class) @Unhealthy("HDDS-3506")
   public void testOzoneManagerLocatedFileStatusBlockOffsetsWithMultiBlockFile()
       throws Exception {
     // naive assumption: MiniOzoneCluster will not have larger than ~1GB
@@ -534,6 +549,7 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testPathToKey() throws Exception {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
     assertEquals("a/b/1", o3fs.pathToKey(new Path("/a/b/1")));
 

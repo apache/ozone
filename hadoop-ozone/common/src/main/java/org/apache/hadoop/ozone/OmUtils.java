@@ -241,6 +241,7 @@ public final class OmUtils {
     case ListBuckets:
     case LookupKey:
     case ListKeys:
+    case ListKeysLight:
     case ListTrash:
     case ServiceList:
     case ListMultiPartUploadParts:
@@ -257,7 +258,6 @@ public final class OmUtils {
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
-    case EchoRPC:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -321,8 +321,12 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
     case UnknownCommand:
       return false;
+    case EchoRPC:
+      return omRequest.getEchoRPCRequest().getReadOnly();
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
@@ -616,13 +620,24 @@ public final class OmUtils {
    * ozone.om.keyname.character.check.enabled sets to false
    */
   public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
-          throws OMException {
-    if (keyName != null && 
-        keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
-      throw new OMException(
-          "Cannot create key under path reserved for "
-              + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+      throws OMException {
+    if (keyName != null &&
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
+        if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
+            .startsWith(OM_KEY_PREFIX)) {
+          throw new OMException(
+              "Cannot create key under path reserved for "
+                  + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
               OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      } else {
+        // We checked for startsWith OM_SNAPSHOT_INDICATOR and the length is
+        // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
+        throw new OMException(
+            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+            OMException.ResultCodes.INVALID_KEY_NAME);
+      }
     }
   }
 

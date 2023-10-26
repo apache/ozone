@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
 
@@ -112,7 +113,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquireVolumeLock = false;
     OMClientResponse omClientResponse = null;
     try {
@@ -156,7 +157,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
           SetVolumePropertyResponse.newBuilder().build());
       omClientResponse = new OMVolumeSetQuotaResponse(omResponse.build(),
           omVolumeArgs);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
@@ -202,6 +203,9 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         volumeName, null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
+      if (bucketInfo.isLink()) {
+        continue;
+      }
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;

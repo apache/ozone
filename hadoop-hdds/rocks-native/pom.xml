@@ -57,6 +57,11 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -116,7 +121,7 @@
                                     <goal>wget</goal>
                                 </goals>
                                 <configuration>
-                                    <url>https://zlib.net/zlib-${zlib.version}.tar.gz</url>
+                                    <url>https://zlib.net/fossils/zlib-${zlib.version}.tar.gz</url>
                                     <outputFileName>zlib-${zlib.version}.tar.gz</outputFileName>
                                     <outputDirectory>${project.build.directory}/zlib</outputDirectory>
                                 </configuration>

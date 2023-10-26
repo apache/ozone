@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -120,6 +121,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String caCertId;
   private String rootCaCertId;
   private String component;
+  private final String threadNamePrefix;
   private List<String> pemEncodedCACerts = null;
   private Lock pemEncodedCACertsLock = new ReentrantLock();
   private KeyStoresFactory serverKeyStoresFactory;
@@ -132,12 +134,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private final Set<CertificateNotification> notificationReceivers;
   private RootCaRotationPoller rootCaRotationPoller;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected DefaultCertificateClient(
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
       Logger log,
       String certSerialId,
       String component,
+      String threadNamePrefix,
       Consumer<String> saveCertId,
       Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
@@ -147,6 +151,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
     this.component = component;
+    this.threadNamePrefix = threadNamePrefix;
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
@@ -192,10 +197,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  protected String threadNamePrefix() {
+    return threadNamePrefix;
+  }
+
   private void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
-          new HashSet<>(rootCaCertificates), scmSecurityClient);
+          new HashSet<>(rootCaCertificates), scmSecurityClient,
+          threadNamePrefix);
       rootCaRotationPoller.addRootCARotationProcessor(
           this::getRootCaRotationListener);
       rootCaRotationPoller.run();
@@ -408,7 +418,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       chain.add(lastInsertedCert);
       List<X509Certificate> caCertList =
           OzoneSecurityUtil.convertToX509(listCA());
-      while (!getAllRootCaCerts().contains(lastInsertedCert)) {
+      Set<X509Certificate> rootCaCertList = getAllRootCaCerts();
+      while (!rootCaCertList.isEmpty() &&
+          !rootCaCertList.contains(lastInsertedCert)) {
         Optional<X509Certificate> issuerOpt =
             getIssuerForCert(lastInsertedCert, caCertList);
         if (issuerOpt.isPresent()) {
@@ -572,7 +584,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
             .setConfiguration(securityConfig)
-            .addInetAddresses();
+            .addInetAddresses()
+            .setDigitalEncryption(true)
+            .setDigitalSignature(true);
     return builder;
   }
 
@@ -613,10 +627,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
       }
 
-      codec.writeCertificate(certName,
-          pemEncodedCert);
+      codec.writeCertificate(certName, pemEncodedCert);
       if (addToCertMap) {
         certificateMap.put(cert.getSerialNumber().toString(), certificatePath);
+        if (caType == CAType.SUBORDINATE) {
+          caCertificates.add(cert);
+        }
+        if (caType == CAType.ROOT) {
+          rootCaCertificates.add(cert);
+        }
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,
@@ -972,6 +991,18 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  /**
+   * Notify all certificate renewal receivers that the certificate is renewed.
+   *
+   */
+  protected void notifyNotificationReceivers(String oldCaCertId,
+      String newCaCertId) {
+    synchronized (notificationReceivers) {
+      notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+          this, oldCaCertId, newCaCertId));
+    }
+  }
+
   @Override
   public synchronized void close() throws IOException {
     if (executorService != null) {
@@ -1212,9 +1243,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Reset and reloaded key and all certificates for new " +
         "certificate {}.", newCertId);
 
-    // notify notification receivers
-    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-        this, oldCaCertId, newCertId));
+    notifyNotificationReceivers(oldCaCertId, newCertId);
   }
 
   public SecurityConfig getSecurityConfig() {
@@ -1285,8 +1314,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         securityConfig.getCertificateLocation(getComponentName())));
   }
 
-  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
-      throws IOException {
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
   }
 
@@ -1318,14 +1346,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     if (executorService == null) {
       executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-CertificateRenewerService")
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix + getComponentName()
+                  + "-CertificateRenewerService")
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(
         new CertificateRenewerService(false, () -> {
         }),
-        timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
+        // The Java mills resolution is 1ms, add 1ms to avoid task scheduled
+        // ahead of time.
+        timeBeforeGracePeriod + 1, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateRenewerService for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
         timeBeforeGracePeriod, interval);
@@ -1358,6 +1389,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
 
         if (!forceRenewal && !timeLeft.isZero()) {
+          getLogger().info("Current certificate {} hasn't entered the " +
+              "renew grace period. Remaining period is {}. ",
+              currentCert.getSerialNumber().toString(), timeLeft);
           return;
         }
         String newCertId;
@@ -1403,8 +1437,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public synchronized void setCACertificate(X509Certificate cert)
       throws Exception {
     caCertId = cert.getSerialNumber().toString();
+    String pemCert = CertificateCodec.getPEMEncodedString(cert);
     certificateMap.put(caCertId,
-        CertificateCodec.getCertPathFromPemEncodedString(
-            CertificateCodec.getPEMEncodedString(cert)));
+        CertificateCodec.getCertPathFromPemEncodedString(pemCert));
+    pemEncodedCACerts = Arrays.asList(pemCert);
   }
 }

@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 
 
 /** Block Manager manages the block access for SCM. */
-public class BlockManagerImpl implements BlockManager {
+public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockManagerImpl.class);
   // TODO : FIX ME : Hard coding the owner.
@@ -104,11 +104,12 @@ public class BlockManagerImpl implements BlockManager {
         scm.getSequenceIdGen(),
         metrics);
 
+
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
             scm.getSCMServiceManager(), conf,
-            metrics, scm.getSystemClock());
+            metrics, scm.getSystemClock(), scm.getReconfigurationHandler());
   }
 
   /**

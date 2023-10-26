@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -624,7 +625,7 @@ public interface ClientProtocol {
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  @Nonnull S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
    * Returns S3 Secret given kerberos user.
@@ -998,6 +999,10 @@ public interface ClientProtocol {
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearThreadLocalS3Auth();
+
+  default ThreadLocal<S3Auth> getS3CredentialsProvider() {
+    return null;
+  }
 
   /**
    * Sets the owner of bucket.

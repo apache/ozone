@@ -95,7 +95,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.Sets;
@@ -313,11 +312,11 @@ public class TestKeyManagerImpl {
     metadataManager.getOpenKeyTable(getDefaultBucketLayout()).put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
         omKeyInfo);
-    LambdaTestUtils.intercept(OMException.class,
-        "SafeModePrecheck failed for allocateBlock", () -> {
-          writeClient
-              .allocateBlock(keyArgs, 1L, new ExcludeList());
-        });
+    OMException omException = assertThrows(OMException.class,
+         () ->
+             writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));
+    assertTrue(omException.getMessage()
+        .contains("SafeModePrecheck failed for allocateBlock"));
   }
 
   @Test
@@ -331,10 +330,10 @@ public class TestKeyManagerImpl {
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
-    LambdaTestUtils.intercept(OMException.class,
-        "SafeModePrecheck failed for allocateBlock", () -> {
-          writeClient.openKey(keyArgs);
-        });
+    OMException omException = assertThrows(OMException.class,
+        () -> writeClient.openKey(keyArgs));
+    assertTrue(omException.getMessage()
+        .contains("SafeModePrecheck failed for allocateBlock"));
   }
 
   @Test
@@ -954,8 +953,9 @@ public class TestKeyManagerImpl {
     assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListKeys (latestLocationVersion is always true for ListKeys)
-    List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
-        keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
+    List<OmKeyInfo> keyInfos =
+        keyManager.listKeys(keyArgs.getVolumeName(), keyArgs.getBucketName(),
+            "", keyArgs.getKeyName(), 100).getKeys();
     assertEquals(keyInfos.size(), 1);
     assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
   }

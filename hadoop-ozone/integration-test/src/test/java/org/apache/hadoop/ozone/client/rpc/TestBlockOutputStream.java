@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
@@ -224,7 +223,8 @@ public class TestBlockOutputStream {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
   }
@@ -309,7 +309,8 @@ public class TestBlockOutputStream {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(pendingWriteChunkCount, metrics
         .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     Assert.assertEquals(pendingPutBlockCount, metrics
@@ -325,7 +326,6 @@ public class TestBlockOutputStream {
   }
 
   @Test
-  @Flaky("HDDS-7875")
   public void testMultiChunkWrite() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -346,10 +346,7 @@ public class TestBlockOutputStream {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(data1);
-    Assert.assertEquals(pendingWriteChunkCount + 1, metrics
-        .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(pendingPutBlockCount, metrics
-        .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
+    Assert.assertEquals(totalOpCount + 1, metrics.getTotalOpCount());
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream)key.getOutputStream();
 
@@ -405,7 +402,8 @@ public class TestBlockOutputStream {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(pendingWriteChunkCount, metrics
         .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     Assert.assertEquals(pendingPutBlockCount, metrics
@@ -421,7 +419,6 @@ public class TestBlockOutputStream {
   }
 
   @Test
-  @Flaky("HDDS-7875")
   public void testMultiChunkWrite2() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -442,10 +439,7 @@ public class TestBlockOutputStream {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(data1);
-    Assert.assertEquals(pendingWriteChunkCount + 2, metrics
-        .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(pendingPutBlockCount + 1, metrics
-        .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
+    Assert.assertEquals(totalOpCount + 3, metrics.getTotalOpCount());
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream)key.getOutputStream();
 
@@ -492,13 +486,13 @@ public class TestBlockOutputStream {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
   }
 
   @Test
-  @Flaky("HDDS-7875")
   public void testFullBufferCondition() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -560,10 +554,7 @@ public class TestBlockOutputStream {
     // the map.
     key.flush();
     Assert.assertEquals(1, keyOutputStream.getStreamEntries().size());
-    Assert.assertEquals(pendingWriteChunkCount, metrics
-        .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(pendingPutBlockCount, metrics
-        .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
+    Assert.assertEquals(totalOpCount + 6, metrics.getTotalOpCount());
 
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
@@ -593,7 +584,8 @@ public class TestBlockOutputStream {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
   }
@@ -697,7 +689,8 @@ public class TestBlockOutputStream {
     Assert.assertEquals(totalOpCount + 9,
         metrics.getTotalOpCount());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
   }

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -98,8 +100,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return a list of keys.
    * @throws IOException
    */
-  List<OmKeyInfo> listKeys(String volumeName,
-      String bucketName, String startKey, String keyPrefix, int maxKeys)
+  ListKeysResult listKeys(String volumeName, String bucketName, String startKey,
+                          String keyPrefix, int maxKeys)
       throws IOException;
 
   /**
@@ -145,6 +147,25 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Returns the MPU infos of up to {@code count} whose age is greater
+   * than or equal to {@code expireThreshold}.
+   *
+   * @param expireThreshold The threshold of expired multipart uploads
+   *                        to return.
+   * @param maxParts The threshold of number of MPU parts to return.
+   *                 This is a soft limit, which means if the last MPU has
+   *                 parts that exceed this limit, it will be included
+   *                 in the returned expired MPUs. This is to handle
+   *                 situation where MPU that has more parts than
+   *                 maxParts never get deleted.
+   * @return a {@link List} of the expired
+   *        {@link ExpiredMultipartUploadsBucket}, the expired multipart
+   *        uploads, grouped by volume and bucket.
+   */
+  List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
+      Duration expireThreshold, int maxParts) throws IOException;
 
   /**
    * Returns the metadataManager.
@@ -244,6 +265,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   BackgroundService getOpenKeyCleanupService();
+
+  /**
+   * Returns the instance of Multipart Upload Cleanup Service.
+   * @return Background service.
+   */
+  BackgroundService getMultipartUploadCleanupService();
 
   /**
    * Returns the instance of Snapshot SST Filtering service.

@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -41,7 +42,8 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
   @Test
   void reconfigurableProperties() {
     assertProperties(getSubject(),
-        ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS));
+        ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS,
+            OZONE_KEY_DELETING_LIMIT_PER_TASK));
   }
 
   @Test
@@ -65,6 +67,18 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue),
         getCluster().getOzoneManager().getOmReadOnlyAdminUsernames());
+  }
+
+  @Test
+  public void keyDeletingLimitPerTask() throws ReconfigurationException {
+    int originLimit = getCluster().getOzoneManager()
+        .getKeyManager().getDeletingService().getKeyLimitPerTask();
+
+    getSubject().reconfigurePropertyImpl(OZONE_KEY_DELETING_LIMIT_PER_TASK,
+        String.valueOf(originLimit + 1));
+
+    assertEquals(originLimit + 1, getCluster().getOzoneManager()
+        .getKeyManager().getDeletingService().getKeyLimitPerTask());
   }
 
 }

@@ -26,6 +26,11 @@ Execute read-replicas CLI tool
     File Should Exist               ${directory}/${TESTFILE}_manifest
     [Return]                        ${directory}
 
+Execute Lease recovery cli
+    [Arguments]                     ${KEY_PATH}
+    ${result} =                     Execute And Ignore Error      ozone debug recover --path=${KEY_PATH}
+    [Return]                        ${result}
+
 Read Replicas Manifest
     ${manifest} =        Get File        ${DIR}/${TESTFILE}_manifest
     ${json} =            Evaluate        json.loads('''${manifest}''')        json

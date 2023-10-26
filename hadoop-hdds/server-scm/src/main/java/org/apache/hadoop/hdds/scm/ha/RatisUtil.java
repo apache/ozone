@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -26,7 +25,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -40,6 +38,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_PREFIX;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
@@ -75,6 +74,10 @@ public final class RatisUtil {
     setRaftRetryCacheProperties(properties, conf);
     setRaftSnapshotProperties(properties, conf);
     setRaftLeadElectionProperties(properties, conf);
+
+    final String prefix = RaftServerConfigKeys.PREFIX + ".";
+    conf.getPropsMatchPrefixAndTrimPrefix(OZONE_SCM_HA_PREFIX + "." + prefix)
+        .forEach((k, v) -> properties.set(prefix + k, v));
     return properties;
   }
 
@@ -85,19 +88,11 @@ public final class RatisUtil {
    * @param conf ConfigurationSource
    */
   public static void setRaftStorageDir(final RaftProperties properties,
-                                       final ConfigurationSource conf) {
-    RaftServerConfigKeys.setStorageDir(properties,
-        Collections.singletonList(new File(getRatisStorageDir(conf))));
+      final ConfigurationSource conf) {
+    RaftServerConfigKeys.setStorageDir(properties, Collections
+        .singletonList(new File(SCMHAUtils.getRatisStorageDir(conf))));
   }
 
-  public static String getRatisStorageDir(final ConfigurationSource conf) {
-    String storageDir = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
-    if (Strings.isNullOrEmpty(storageDir)) {
-      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-      storageDir = (new File(metaDirPath, "scm-ha")).getPath();
-    }
-    return storageDir;
-  }
   /**
    * Set properties related to Raft RPC.
    *

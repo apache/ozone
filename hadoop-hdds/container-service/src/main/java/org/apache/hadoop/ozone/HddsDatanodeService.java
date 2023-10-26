@@ -59,6 +59,7 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -79,9 +80,11 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.slf4j.Logger;
@@ -278,13 +281,22 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         if (secConf.isTokenEnabled()) {
           SecretKeyProtocol secretKeyProtocol =
               HddsServerUtil.getSecretKeyClientForDatanode(conf);
-          secretKeyClient = DefaultSecretKeyClient.create(conf,
-              secretKeyProtocol);
+          secretKeyClient = DefaultSecretKeyClient.create(
+              conf, secretKeyProtocol, "");
           secretKeyClient.start(conf);
         }
       }
+
+      reconfigurationHandler =
+          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+              .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
+                  this::reconfigBlockDeleteThreadMax)
+              .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+                  this::reconfigDeletingServiceWorkers);
+
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore);
+          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
+          reconfigurationHandler);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
@@ -301,8 +313,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-      reconfigurationHandler =
-          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege);
 
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
@@ -401,10 +411,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       break;
     case FAILURE:
       LOG.error("DN security initialization failed, case:{}.", response);
-      throw new RuntimeException("DN security initialization failed.");
-    case RECOVER:
-      LOG.error("DN security initialization failed, case:{}. OM certificate " +
-          "is missing.", response);
       throw new RuntimeException("DN security initialization failed.");
     default:
       LOG.error("DN security initialization failed. Init response: {}",
@@ -667,5 +673,23 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @VisibleForTesting
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  private String reconfigBlockDeleteThreadMax(String value) {
+    getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
+
+    DeleteBlocksCommandHandler handler =
+        (DeleteBlocksCommandHandler) getDatanodeStateMachine()
+            .getCommandDispatcher().getDeleteBlocksCommandHandler();
+    handler.setPoolSize(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigDeletingServiceWorkers(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
+
+    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .setPoolSize(Integer.parseInt(value));
+    return value;
   }
 }

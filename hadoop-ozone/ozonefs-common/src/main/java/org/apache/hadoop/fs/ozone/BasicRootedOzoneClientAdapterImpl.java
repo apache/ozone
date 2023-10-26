@@ -1209,7 +1209,10 @@ public class BasicRootedOzoneClientAdapterImpl
           ozoneSnapshot.getName(), pathStr);
     }
     Path path = new Path(pathStr);
-    return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
+    return new FileStatusAdapter(
+        ozoneSnapshot.getReferencedSize(),
+        ozoneSnapshot.getReferencedReplicatedSize(),
+        path, true, (short) 0, 0L,
         ozoneSnapshot.getCreationTime(), 0L,
         FsPermission.getDirDefault().toShort(),
         owner, group, null, new BlockLocation[0],
@@ -1354,12 +1357,10 @@ public class BasicRootedOzoneClientAdapterImpl
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot) {
-        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
-            ofsPath.getBucketName(), toSnapshot);
+        OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, ofsPath);
       }
       if (takeTemporaryFromSnapshot) {
-        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
-            ofsPath.getBucketName(), fromSnapshot);
+        OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, ofsPath);
       }
     }
   }

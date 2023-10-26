@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -82,8 +84,11 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -108,6 +113,7 @@ import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlock
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -189,12 +195,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  Column Family        |        VALUE                                    |
    * |-------------------------------------------------------------------------|
-   * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * | snapshotInfoTable     | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
    * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
    * |                       |  1. /volumeId/bucketId/parentId/dirName         |
    * |                       |  2. /volumeId/bucketId/parentId/fileName        |
    * |                       |  3. /volumeName/bucketName/keyName              |
+   * |-------------------------------------------------------------------------|
+   * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
    * |-------------------------------------------------------------------------|
    */
 
@@ -224,6 +232,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
   public static final String SNAPSHOT_RENAMED_TABLE =
       "snapshotRenamedTable";
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -246,7 +256,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_TABLE
+      SNAPSHOT_RENAMED_TABLE,
+      COMPACTION_LOG_TABLE
   };
 
   private DBStore store;
@@ -276,6 +287,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table snapshotInfoTable;
   private Table snapshotRenamedTable;
+  private Table compactionLogTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -614,6 +626,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
         .addTable(SNAPSHOT_RENAMED_TABLE)
+        .addTable(COMPACTION_LOG_TABLE)
         .addCodec(OzoneTokenIdentifier.class, TokenIdentifierCodec.get())
         .addCodec(OmKeyInfo.class, OmKeyInfo.getCodec(true))
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
@@ -628,7 +641,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, OmDBTenantState.getCodec())
         .addCodec(OmDBAccessIdInfo.class, OmDBAccessIdInfo.getCodec())
         .addCodec(OmDBUserPrincipalInfo.class, OmDBUserPrincipalInfo.getCodec())
-        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec());
+        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec())
+        .addCodec(CompactionLogEntry.class, CompactionLogEntry.getCodec());
   }
 
   /**
@@ -728,6 +742,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
+    // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
+    //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
         String.class, SnapshotInfo.class);
@@ -739,6 +755,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
         addCacheMetrics);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
+
+    compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
+        String.class, CompactionLogEntry.class);
+    checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
+        addCacheMetrics);
   }
 
   /**
@@ -930,6 +951,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     String volumeId = String.valueOf(getVolumeId(
             omBucketInfo.getVolumeName()));
     String bucketId = String.valueOf(omBucketInfo.getObjectID());
+
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
 
     // keyPrefix is different in case of fileTable and keyTable.
@@ -1151,12 +1173,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
-      String startKey, String keyPrefix, int maxKeys) throws IOException {
+  public ListKeysResult listKeys(String volumeName, String bucketName,
+                                 String startKey, String keyPrefix, int maxKeys)
+      throws IOException {
 
     List<OmKeyInfo> result = new ArrayList<>();
     if (maxKeys <= 0) {
-      return result;
+      return new ListKeysResult(result, false);
     }
 
     if (Strings.isNullOrEmpty(volumeName)) {
@@ -1251,6 +1274,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
+    boolean isTruncated = cacheKeyMap.size() > maxKeys;
+
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
     currentCount = 0;
@@ -1271,7 +1296,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Clear map and set.
     cacheKeyMap.clear();
 
-    return result;
+    return new ListKeysResult(result, isTruncated);
   }
 
   // TODO: HDDS-2419 - Complete stub below for core logic
@@ -1355,7 +1380,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue< String, SnapshotInfo> snapshotinfo;
+      KeyValue<String, SnapshotInfo> snapshotinfo;
       snapshotIter.seek(previous);
       while (snapshotIter.hasNext() && count < maxListResult) {
         snapshotinfo = snapshotIter.next();
@@ -1461,6 +1486,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
           cacheIterator.next();
       omVolumeArgs = entry.getValue().getCacheValue();
+      if (omVolumeArgs == null) {
+        continue;
+      }
       volumeName = omVolumeArgs.getVolume();
 
       if (!prefixIsEmpty && !volumeName.startsWith(prefix)) {
@@ -1565,7 +1593,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                   prevKeyTableDBKey = getOzonePathKey(volumeId,
                       bucketInfo.getObjectID(),
                       info.getParentObjectID(),
-                      info.getKeyName());
+                      info.getFileName());
                 } else if (prevKeyTableDBKey == null) {
                   prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
                       info.getBucketName(),
@@ -1684,6 +1712,44 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return rcOmSnapshot.orElse(null);
   }
 
+  /**
+   * Decide whether the open key is a multipart upload related key.
+   * @param openKeyInfo open key related to multipart upload
+   * @param openDbKey db key of open key related to multipart upload, which
+   *                  might have different format depending on the bucket
+   *                  layout
+   * @return true open key is a multipart upload related key.
+   *         false otherwise.
+   */
+  private boolean isOpenMultipartKey(OmKeyInfo openKeyInfo, String openDbKey)
+      throws IOException {
+    if (OMMultipartUploadUtils.isMultipartKeySet(openKeyInfo)) {
+      return true;
+    }
+
+    String multipartUploadId =
+        OMMultipartUploadUtils.getUploadIdFromDbKey(openDbKey);
+
+    if (StringUtils.isEmpty(multipartUploadId)) {
+      return false;
+    }
+
+    String multipartInfoDbKey = getMultipartKey(openKeyInfo.getVolumeName(),
+        openKeyInfo.getBucketName(), openKeyInfo.getKeyName(),
+        multipartUploadId);
+
+    // In addition to checking isMultipartKey flag in the open key info,
+    // multipartInfoTable needs to be checked to handle multipart upload
+    // open keys that already set isMultipartKey = false prior to HDDS-9017.
+    // These open keys should not be deleted since doing so will result in
+    // orphan MPUs (i.e. multipart upload exists in multipartInfoTable, but
+    // does not exist in the openKeyTable/openFileTable). These orphan MPUs
+    // will not be able to be aborted / completed by the user
+    // since the MPU abort and complete requests require the open MPU keys
+    // to exist in the open key/file table.
+    return getMultipartInfoTable().isExist(multipartInfoDbKey);
+  }
+
   @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
@@ -1708,6 +1774,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
         final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
+
+        if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
+          continue;
+        }
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
           final String clientIdString
@@ -1748,6 +1818,53 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return expiredKeys;
+  }
+
+  @Override
+  public List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
+      Duration expireThreshold, int maxParts) throws IOException {
+    Map<String, ExpiredMultipartUploadsBucket.Builder> expiredMPUs =
+        new HashMap<>();
+
+    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
+             mpuInfoTableIterator = getMultipartInfoTable().iterator()) {
+
+      final long expiredCreationTimestamp =
+          Instant.now().minus(expireThreshold).toEpochMilli();
+
+      ExpiredMultipartUploadInfo.Builder builder =
+          ExpiredMultipartUploadInfo.newBuilder();
+
+      int numParts = 0;
+      while (numParts < maxParts &&
+          mpuInfoTableIterator.hasNext()) {
+        KeyValue<String, OmMultipartKeyInfo> mpuInfoValue =
+            mpuInfoTableIterator.next();
+        String dbMultipartInfoKey = mpuInfoValue.getKey();
+        OmMultipartKeyInfo omMultipartKeyInfo = mpuInfoValue.getValue();
+
+        if (omMultipartKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
+          OmMultipartUpload expiredMultipartUpload =
+              OmMultipartUpload.from(dbMultipartInfoKey);
+          final String volume =  expiredMultipartUpload.getVolumeName();
+          final String bucket = expiredMultipartUpload.getBucketName();
+          final String mapKey = volume + OM_KEY_PREFIX + bucket;
+          expiredMPUs.computeIfAbsent(mapKey, k ->
+              ExpiredMultipartUploadsBucket.newBuilder()
+                  .setVolumeName(volume)
+                  .setBucketName(bucket));
+          expiredMPUs.get(mapKey)
+              .addMultipartUploads(builder.setName(dbMultipartInfoKey)
+                  .build());
+          numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+        }
+
+      }
+    }
+
+    return expiredMPUs.values().stream().map(
+            ExpiredMultipartUploadsBucket.Builder::build)
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -1895,6 +2012,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, String> getSnapshotRenamedTable() {
     return snapshotRenamedTable;
+  }
+
+  @Override
+  public Table<String, CompactionLogEntry> getCompactionLogTable() {
+    return compactionLogTable;
   }
 
   /**

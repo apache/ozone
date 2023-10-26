@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.parser;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -141,7 +141,7 @@ class TestOzoneHARatisLogParser {
 
     // Now check for SCM.
     File scmMetadataDir =
-        new File(RatisUtil.getRatisStorageDir(leaderSCMConfig));
+        new File(SCMHAUtils.getRatisStorageDir(leaderSCMConfig));
     Assertions.assertTrue(scmMetadataDir.isDirectory());
 
     ratisDirs = scmMetadataDir.list();

@@ -89,6 +89,11 @@ public class ResolvedBucket {
     return !Objects.equals(requested, resolved);
   }
 
+  public boolean isDangling() {
+    return resolved == null;
+  }
+
+
   public Map<String, String> audit() {
     return audit(new LinkedHashMap<>());
   }

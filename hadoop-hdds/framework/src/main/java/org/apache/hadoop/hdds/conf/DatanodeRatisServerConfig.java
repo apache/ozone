@@ -190,4 +190,21 @@ public class DatanodeRatisServerConfig {
   public void setPreVote(boolean preVote) {
     this.preVoteEnabled = preVote;
   }
+
+  /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
+  @Config(key = "log.appender.wait-time.min",
+      defaultValue = "1ms",
+      type = ConfigType.TIME,
+      tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
+      description = "Minimum wait time between two appendEntries calls."
+  )
+  private long logAppenderWaitTimeMin;
+
+  public long getLogAppenderWaitTimeMin() {
+    return logAppenderWaitTimeMin;
+  }
+
+  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
+    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
+  }
 }

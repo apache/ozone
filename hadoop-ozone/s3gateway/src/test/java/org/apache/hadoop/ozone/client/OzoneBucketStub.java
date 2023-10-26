@@ -52,6 +52,8 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 /**
  * In-memory ozone bucket for testing.
  */
@@ -210,6 +212,10 @@ public class OzoneBucketStub extends OzoneBucket {
             byte[] bytes1 = new byte[buffer.remaining()];
             buffer.get(bytes1);
             keyContents.put(key, bytes1);
+
+            Map<String, String> objectMetadata = keyMetadata == null ?
+                new HashMap<>() : keyMetadata;
+
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
@@ -217,7 +223,7 @@ public class OzoneBucketStub extends OzoneBucket {
                 size,
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
-                new ArrayList<>(), rConfig, metadata, null,
+                new ArrayList<>(), rConfig, objectMetadata, null,
                 null, false
             ));
           }
@@ -337,6 +343,45 @@ public class OzoneBucketStub extends OzoneBucket {
         .filter(key -> key.getName().startsWith(keyPrefix))
         .collect(Collectors.toList())
         .iterator();
+  }
+
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
+      String prevKey, boolean shallow) throws IOException {
+    if (!shallow) {
+      return prevKey == null ? listKeys(keyPrefix)
+          : listKeys(keyPrefix, prevKey);
+    }
+
+    Map<String, OzoneKey> sortedKey = new TreeMap<>(keyDetails);
+    List<OzoneKey> ozoneKeys = sortedKey.values()
+        .stream()
+        .filter(key -> key.getName().startsWith(keyPrefix))
+        .map(key -> {
+          String[] res = key.getName().split(OZONE_URI_DELIMITER);
+          String newKeyName;
+          if (res.length < 2) {
+            newKeyName = key.getName();
+          } else if (res.length == 2) {
+            newKeyName = res[0] + OZONE_URI_DELIMITER + res[1];
+          } else {
+            newKeyName =
+                res[0] + OZONE_URI_DELIMITER + res[1] + OZONE_URI_DELIMITER;
+          }
+          return new OzoneKey(key.getVolumeName(),
+              key.getBucketName(), newKeyName,
+              key.getDataSize(),
+              key.getCreationTime().getEpochSecond() * 1000,
+              key.getModificationTime().getEpochSecond() * 1000,
+              key.getReplicationConfig(), key.isFile());
+        }).collect(Collectors.toList());
+
+    if (prevKey != null) {
+      return ozoneKeys.stream()
+          .filter(key -> key.getName().compareTo(prevKey) > 0)
+          .collect(Collectors.toList())
+          .iterator();
+    }
+    return ozoneKeys.iterator();
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -131,12 +132,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
    * @return OMClientResponse
    */
   protected OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMKeySetTimesResponse(createErrorOMResponse(
         omResponse, exception), getBucketLayout());
   }
 
-  protected void onComplete(Result result, IOException exception,
+  protected void onComplete(Result result, Exception exception,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
@@ -177,7 +178,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -222,10 +223,10 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

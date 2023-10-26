@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
@@ -241,13 +242,18 @@ public class ObjectEndpoint extends EndpointBase {
             "Connection", "close").build();
       }
 
-      if (length == 0 &&
-          ozoneConfiguration
-              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
-          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      boolean canCreateDirectory = ozoneConfiguration
+          .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+              OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
+          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
+
+      String amzDecodedLength =
+          headers.getHeaderString(S3Consts.DECODED_CONTENT_LENGTH_HEADER);
+      boolean hasAmzDecodedLengthZero = amzDecodedLength != null &&
+          Long.parseLong(amzDecodedLength) == 0;
+      if (canCreateDirectory &&
+          (length == 0 || hasAmzDecodedLengthZero)) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
-        // create directory
         getClientProtocol()
             .createDirectory(volume.getName(), bucketName, keyPath);
         return Response.ok().status(HttpStatus.SC_OK).build();
@@ -919,6 +925,11 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_PART) {
+        OS3Exception os3Exception = newError(
+            S3ErrorTable.INVALID_ARGUMENT, String.valueOf(partNumber), ex);
+        os3Exception.setErrorMessage(ex.getMessage());
+        throw os3Exception;
       }
       throw ex;
     }
@@ -999,11 +1010,18 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationConfig replication,
             Map<String, String> metadata) throws IOException {
     long copyLength;
-    try (OzoneOutputStream dest =
-                 getClientProtocol().createKey(
-        volume.getName(), destBucket, destKey, srcKeyLen,
-        replication, metadata)) {
-      copyLength = IOUtils.copyLarge(src, dest);
+    if (datastreamEnabled && !(replication != null &&
+        replication.getReplicationType() == EC) &&
+        srcKeyLen > datastreamMinLength) {
+      copyLength = ObjectEndpointStreaming
+          .putKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
+              chunkSize, replication, metadata, src);
+    } else {
+      try (OzoneOutputStream dest = getClientProtocol()
+          .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
+              replication, metadata)) {
+        copyLength = IOUtils.copyLarge(src, dest);
+      }
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
   }
