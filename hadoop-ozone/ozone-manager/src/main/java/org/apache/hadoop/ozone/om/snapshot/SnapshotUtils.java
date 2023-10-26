@@ -201,7 +201,8 @@ public final class SnapshotUtils {
    */
   public static String getOzonePathKey(String volumeName,
                                        String bucketName) throws IOException {
-    return OM_KEY_PREFIX + volumeName + bucketName;
+    return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX;
   }
 
   /**
