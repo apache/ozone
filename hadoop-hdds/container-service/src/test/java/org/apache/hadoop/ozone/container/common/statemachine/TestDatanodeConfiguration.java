@@ -131,9 +131,9 @@ public class TestDatanodeConfiguration {
     assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
         subject.getFailedDbVolumesTolerated());
     assertEquals(DISK_CHECK_MIN_GAP_DEFAULT,
-        subject.getDiskCheckMinGap().toMillis());
+        subject.getDiskCheckMinGap());
     assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
-        subject.getDiskCheckTimeout().toMillis());
+        subject.getDiskCheckTimeout());
   }
 
   @Test
@@ -156,9 +156,9 @@ public class TestDatanodeConfiguration {
     assertEquals(FAILED_VOLUMES_TOLERATED_DEFAULT,
         subject.getFailedDbVolumesTolerated());
     assertEquals(DISK_CHECK_MIN_GAP_DEFAULT,
-        subject.getDiskCheckMinGap().toMillis());
+        subject.getDiskCheckMinGap());
     assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
-        subject.getDiskCheckTimeout().toMillis());
+        subject.getDiskCheckTimeout());
   }
 
   @Test

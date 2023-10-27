@@ -42,7 +42,7 @@ import java.util.Random;
 /**
  * Testing HttpServer2Metrics.
  */
-public class TestHttpServer2MetricsTest {
+public class TestHttpServer2Metrics {
 
   private QueuedThreadPool threadPool;
   private MetricsCollector metricsCollector;
