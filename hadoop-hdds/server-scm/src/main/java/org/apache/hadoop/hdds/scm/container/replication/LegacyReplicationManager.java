@@ -400,11 +400,11 @@ public class LegacyReplicationManager {
            * forever as there is no replicas to CLOSE.
            */
           if (replicas.isEmpty() && (container.getNumberOfKeys() == 0)) {
-            closeEmptyContainer(container);
+            deleteEmptyClosingContainer(container);
             return;
           }
 
-          if (!foundHealthy) {
+          if (!replicas.isEmpty() && !foundHealthy) {
             /* If we get here, then this container has replicas and all are
             UNHEALTHY. Move it from CLOSING to QUASI_CLOSED so RM can then try
             to maintain replication factor number of replicas.
@@ -1761,7 +1761,7 @@ public class LegacyReplicationManager {
   private void setHealthStateForClosing(Set<ContainerReplica> replicas,
                                         ContainerInfo container,
                                         ReplicationManagerReport report) {
-    if (replicas.size() == 0) {
+    if (replicas.isEmpty() && container.getNumberOfKeys() != 0) {
       report.incrementAndSample(HealthState.MISSING, container.containerID());
       report.incrementAndSample(HealthState.UNDER_REPLICATED,
               container.containerID());
@@ -2494,9 +2494,9 @@ public class LegacyReplicationManager {
     }
   }
 
-  private void closeEmptyContainer(ContainerInfo containerInfo) {
+  private void deleteEmptyClosingContainer(ContainerInfo containerInfo) {
     /*
-     * We should wait for sometime before moving the container to CLOSED state.
+     * We should wait for sometime before moving the container to DELETED state.
      * This will give enough time for Datanodes to report the container,
      * in cases where the container creation was successful on Datanodes.
      *
@@ -2511,10 +2511,10 @@ public class LegacyReplicationManager {
     try {
       if (clock.instant().isAfter(closingTime.plus(waitTime))) {
         containerManager.updateContainerState(containerInfo.containerID(),
-            HddsProtos.LifeCycleEvent.CLOSE);
+            HddsProtos.LifeCycleEvent.CLEANUP);
       }
     } catch (IOException | InvalidStateTransitionException e) {
-      LOG.error("Failed to CLOSE the container {}",
+      LOG.error("Failed to move the container {} to DELETED state",
           containerInfo.containerID(), e);
     }
   }

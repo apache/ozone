@@ -190,6 +190,7 @@ public final class ContainerStateManagerImpl
     containerLifecycleSM.addTransition(OPEN, CLOSING, FINALIZE);
     containerLifecycleSM.addTransition(CLOSING, QUASI_CLOSED, QUASI_CLOSE);
     containerLifecycleSM.addTransition(CLOSING, CLOSED, CLOSE);
+    containerLifecycleSM.addTransition(CLOSING, DELETED, CLEANUP);
     containerLifecycleSM.addTransition(QUASI_CLOSED, CLOSED, FORCE_CLOSE);
     containerLifecycleSM.addTransition(CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(DELETING, DELETED, CLEANUP);

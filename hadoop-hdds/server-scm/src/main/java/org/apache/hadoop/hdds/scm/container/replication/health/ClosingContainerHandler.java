@@ -70,12 +70,6 @@ public class ClosingContainerHandler extends AbstractCheck {
     boolean forceClose = containerInfo.getReplicationConfig()
         .getReplicationType() != ReplicationType.RATIS;
 
-    if (request.getContainerReplicas().isEmpty()) {
-      request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.MISSING,
-          containerInfo.containerID());
-    }
-
     boolean allUnhealthy = true;
     for (ContainerReplica replica : request.getContainerReplicas()) {
       if (replica.getState() != ContainerReplicaProto.State.UNHEALTHY) {
@@ -101,14 +95,14 @@ public class ClosingContainerHandler extends AbstractCheck {
     }
 
     /*
-     * Empty containers in CLOSING state should be CLOSED.
+     * Empty containers in CLOSING state should be moved to DELETED.
      *
      * These are containers that are allocated in SCM but never got created
      * on Datanodes. Since these containers don't have any replica associated
      * with them, they are stuck in CLOSING state forever as there is no
      * replicas to CLOSE.
      *
-     * We should wait for sometime before moving the container to CLOSED state.
+     * We should wait for sometime before moving the container to DELETED state.
      * This will give enough time for Datanodes to report the container,
      * in cases where the container creation was successful on Datanodes.
      *
@@ -121,10 +115,15 @@ public class ClosingContainerHandler extends AbstractCheck {
         hasWaitTimeElapsed(containerInfo)) {
 
       LOG.debug("Container appears to be empty, has no replicas, and has been "
-          + "closing, so moving to closed state: {}", containerInfo);
+          + "closing, so moving to deleted state: {}", containerInfo);
 
       replicationManager.updateContainerState(
-          containerInfo.containerID(), LifeCycleEvent.CLOSE);
+          containerInfo.containerID(), LifeCycleEvent.CLEANUP);
+    } else if (request.getContainerReplicas().isEmpty() &&
+        containerInfo.getNumberOfKeys() != 0) {
+      request.getReport().incrementAndSample(
+          ReplicationManagerReport.HealthState.MISSING,
+          containerInfo.containerID());
     }
 
     return true;

@@ -194,6 +194,7 @@ public final class ReplicationTestUtil {
         .setContainerID(containerID)
         .setReplicationConfig(replicationConfig)
         .setState(containerState)
+        .setNumberOfKeys(10)
         .build();
   }
 

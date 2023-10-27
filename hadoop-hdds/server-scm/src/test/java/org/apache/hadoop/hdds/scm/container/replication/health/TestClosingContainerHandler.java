@@ -47,6 +47,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
@@ -229,7 +230,7 @@ public class TestClosingContainerHandler {
   public void testEmptyContainerInClosingState() throws InterruptedException {
 
     /*
-     * Empty Container in CLOSING state should be CLOSED after
+     * Empty Container in CLOSING state should be DELETED after
      * a timeout (ReplicationManager Interval * 5)
      */
     Duration replicationInterval = Duration.ofSeconds(1);
@@ -253,14 +254,16 @@ public class TestClosingContainerHandler {
     clock.fastForward(notEnoughTime);
     assertAndVerify(request, true, 0);
     Mockito.verify(replicationManager, never())
-        .updateContainerState(containerInfo.containerID(), CLOSE);
+        .updateContainerState(containerInfo.containerID(), CLEANUP);
 
     // wait time has elapsed (3x + 2x + a bit)
     Duration moreTime = replicationInterval.multipliedBy(2);
     clock.fastForward(moreTime);
     assertAndVerify(request, true, 0);
     Mockito.verify(replicationManager, Mockito.times(1))
-        .updateContainerState(containerInfo.containerID(), CLOSE);
+        .updateContainerState(containerInfo.containerID(), CLEANUP);
+    Assertions.assertEquals(0, request.getReport()
+        .getStat(ReplicationManagerReport.HealthState.MISSING));
   }
 
   @Test

@@ -376,17 +376,19 @@ public class ReplicationManager implements SCMService {
       if (!shouldRun()) {
         break;
       }
-      report.increment(c.getState());
       if (rmConf.isLegacyEnabled() && !isEC(c.getReplicationConfig())) {
         legacyReplicationManager.processContainer(c, report);
+        report.increment(c.getState());
         continue;
       }
       try {
         processContainer(c, newRepQueue, report);
-        // TODO - send any commands contained in the health result
       } catch (ContainerNotFoundException e) {
         LOG.error("Container {} not found", c.getContainerID(), e);
       }
+      // As the container state can be changed by processing, eg open to closing
+      // etc, we should increment the report state after processing.
+      report.increment(c.getState());
     }
     report.setComplete();
     replicationQueue.set(newRepQueue);
