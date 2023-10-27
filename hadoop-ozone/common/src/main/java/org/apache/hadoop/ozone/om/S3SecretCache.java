@@ -36,6 +36,12 @@ public interface S3SecretCache {
   void invalidate(String id);
 
   /**
+   * Clears the cache, removing all entries, this is called when the
+   * doubleBuffer is flushed to the DB.
+   */
+  void clearCache();
+
+  /**
    * Get value from cache.
    * @param id cache secrect identifier.
    * @return Secret value or {@code null} if value doesn't exist.

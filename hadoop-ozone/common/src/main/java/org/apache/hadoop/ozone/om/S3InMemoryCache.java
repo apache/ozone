@@ -30,10 +30,8 @@ import java.time.temporal.TemporalUnit;
 public class S3InMemoryCache implements S3SecretCache {
   private final Cache<String, S3SecretValue> cache;
 
-  public S3InMemoryCache(Duration expireTime, long maxSize) {
+  public S3InMemoryCache() {
     cache = CacheBuilder.newBuilder()
-        .expireAfterWrite(expireTime)
-        .maximumSize(maxSize)
         .build();
   }
 
@@ -57,6 +55,13 @@ public class S3InMemoryCache implements S3SecretCache {
     cache.put(id, secret);
   }
 
+  /**
+   * Clears the cache, removing all entries.
+   */
+  public void clearCache() {
+    cache.invalidateAll();
+  }
+
   @Override
   public S3SecretValue get(String id) {
     return cache.getIfPresent(id);
@@ -66,23 +71,8 @@ public class S3InMemoryCache implements S3SecretCache {
    * Builder for {@link S3InMemoryCache}.
    */
   public static class S3InMemoryCacheBuilder {
-    private Duration expireTime;
-    private long maxSize;
-
-    @SuppressWarnings("checkstyle:HiddenField")
-    public S3InMemoryCacheBuilder setExpireTime(long expireTime,
-                                                TemporalUnit unit) {
-      this.expireTime = Duration.of(expireTime, unit);
-      return this;
-    }
-
-    public S3InMemoryCacheBuilder setMaxSize(long maxSize) {
-      this.maxSize = maxSize;
-      return this;
-    }
-
     public S3InMemoryCache build() {
-      return new S3InMemoryCache(expireTime, maxSize);
+      return new S3InMemoryCache();
     }
   }
 }
