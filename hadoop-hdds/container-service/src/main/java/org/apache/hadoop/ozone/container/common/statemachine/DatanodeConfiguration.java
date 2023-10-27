@@ -89,11 +89,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
-  static final long DISK_CHECK_MIN_GAP_DEFAULT =
-      Duration.ofMinutes(10).toMillis();
+  static final Duration DISK_CHECK_MIN_GAP_DEFAULT = Duration.ofMinutes(10);
 
-  static final long DISK_CHECK_TIMEOUT_DEFAULT =
-      Duration.ofMinutes(10).toMillis();
+  static final Duration DISK_CHECK_TIMEOUT_DEFAULT = Duration.ofMinutes(10);
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -210,7 +208,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
                           + "deletion. Unit could be defined with "
                           + "postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+  private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
   @Config(key = "recovering.container.scrubbing.service.interval",
       defaultValue = "1m",
@@ -222,8 +220,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
               "on Datanode periodically and deletes stale recovering " +
               "container Unit could be defined with postfix (ns,ms,s,m,h,d)."
   )
-  private long recoveringContainerScrubInterval =
-      Duration.ofMinutes(10).toMillis();
+  private Duration recoveringContainerScrubInterval = Duration.ofMinutes(10);
 
   /**
    * The maximum time to wait for acquiring the container lock when processing
@@ -243,21 +240,19 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       Duration.ofMillis(100).toMillis();
 
   public Duration getBlockDeletionInterval() {
-    return Duration.ofMillis(blockDeletionInterval);
+    return blockDeletionInterval;
   }
 
-  public void setRecoveringContainerScrubInterval(
-          Duration recoveringContainerScrubInterval) {
-    this.recoveringContainerScrubInterval =
-            recoveringContainerScrubInterval.toMillis();
+  public void setRecoveringContainerScrubInterval(Duration duration) {
+    recoveringContainerScrubInterval = duration;
   }
 
   public Duration getRecoveringContainerScrubInterval() {
-    return Duration.ofMillis(recoveringContainerScrubInterval);
+    return recoveringContainerScrubInterval;
   }
 
   public void setBlockDeletionInterval(Duration duration) {
-    this.blockDeletionInterval = duration.toMillis();
+    blockDeletionInterval = duration;
   }
 
   @Config(key = "block.deleting.limit.per.interval",
@@ -388,7 +383,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + " Datanode volume. Unit could be defined with"
           + " postfix (ns,ms,s,m,h,d)."
   )
-  private long diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
+  private Duration diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
 
   @Config(key = "disk.check.timeout",
       defaultValue = "10m",
@@ -399,7 +394,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + " then the disk is declared as failed. Unit could be defined with"
           + " postfix (ns,ms,s,m,h,d)."
   )
-  private long diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+  private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
   @Config(key = "chunk.data.validation.check",
       defaultValue = "false",
@@ -625,14 +620,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       }
     }
 
-    if (diskCheckMinGap < 0) {
+    if (diskCheckMinGap.isNegative()) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
           diskCheckMinGap, DISK_CHECK_MIN_GAP_DEFAULT);
       diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
     }
 
-    if (diskCheckTimeout < 0) {
+    if (diskCheckTimeout.isNegative()) {
       LOG.warn(DISK_CHECK_TIMEOUT_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
           diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
@@ -741,19 +736,19 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   }
 
   public Duration getDiskCheckMinGap() {
-    return Duration.ofMillis(diskCheckMinGap);
+    return diskCheckMinGap;
   }
 
   public void setDiskCheckMinGap(Duration duration) {
-    this.diskCheckMinGap = duration.toMillis();
+    diskCheckMinGap = duration;
   }
 
   public Duration getDiskCheckTimeout() {
-    return Duration.ofMillis(diskCheckTimeout);
+    return diskCheckTimeout;
   }
 
   public void setDiskCheckTimeout(Duration duration) {
-    this.diskCheckTimeout = duration.toMillis();
+    diskCheckTimeout = duration;
   }
 
   public int getBlockDeleteThreads() {
