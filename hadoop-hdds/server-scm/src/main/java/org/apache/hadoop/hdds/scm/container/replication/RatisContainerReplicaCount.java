@@ -413,12 +413,19 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   /**
    * For Ratis, this method is the same as isSufficientlyReplicated.
    * @param datanode Not used in this implementation
+   * @param nodeManager not used in this implementation
    * @return True if the container is sufficiently replicated and False
    *         otherwise.
    */
   @Override
-  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode) {
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager) {
     return isSufficientlyReplicated();
+  }
+
+  @Override
+  public boolean isHealthyEnoughForOffline() {
+    return isHealthy();
   }
 
   /**

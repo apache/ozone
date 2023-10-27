@@ -707,12 +707,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
         OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
         if (takeTemporaryToSnapshot) {
-          objectStore.deleteSnapshot(snapPath.getVolumeName(),
-              snapPath.getBucketName(), toSnapshot);
+          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, snapPath);
         }
         if (takeTemporaryFromSnapshot) {
-          objectStore.deleteSnapshot(snapPath.getVolumeName(),
-              snapPath.getBucketName(), fromSnapshot);
+          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, snapPath);
         }
       }
     }

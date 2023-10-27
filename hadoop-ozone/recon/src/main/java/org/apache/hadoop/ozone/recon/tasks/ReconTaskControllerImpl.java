@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -219,7 +220,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
-    executorService = Executors.newFixedThreadPool(threadCount);
+    executorService = Executors.newFixedThreadPool(threadCount,
+        new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
+            .build());
   }
 
   @Override

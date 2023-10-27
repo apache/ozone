@@ -73,7 +73,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
@@ -119,6 +119,13 @@ jobs:
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
           retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
@@ -172,7 +179,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 90
+    timeout-minutes: 30
     if: needs.build-info.outputs.needs-basic-check == 'true'
     strategy:
       matrix:
@@ -226,7 +233,7 @@ jobs:
       - build-info
       - basic
     runs-on: ubuntu-20.04
-    timeout-minutes: 90
+    timeout-minutes: 150
     if: needs.build-info.outputs.needs-unit-check == 'true'
     strategy:
       matrix:
@@ -320,6 +327,7 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
@@ -411,19 +419,33 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        uses: actions/download-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+        continue-on-error: true
       - name: Setup java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
-        if: matrix.profile != 'flaky'
         continue-on-error: true
-      - name: Execute flaky tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600
-        if: matrix.profile == 'flaky'
-        continue-on-error: true
+        run: |
+          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
+            export OZONE_REPO_CACHED=true
+          fi
+
+          args=
+          if [[ "${{ matrix.profile }}" == "flaky" ]]; then
+            args="-Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+          fi
+
+          hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
+
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}

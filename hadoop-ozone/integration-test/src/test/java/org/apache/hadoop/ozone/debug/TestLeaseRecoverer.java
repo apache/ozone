@@ -26,7 +26,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import picocli.CommandLine;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -60,7 +62,7 @@ public class TestLeaseRecoverer {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(120000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(120000));
 
   /**
    * Create a MiniDFSCluster for testing.

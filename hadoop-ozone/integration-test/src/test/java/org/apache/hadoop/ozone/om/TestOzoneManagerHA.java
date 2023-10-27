@@ -44,6 +44,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
@@ -52,6 +53,8 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
@@ -64,6 +67,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -198,13 +202,20 @@ public abstract class TestOzoneManagerHA {
     objectStore = client.getObjectStore();
   }
 
+  /**
+   * After restarting OMs we need to wait
+   * for a leader to be elected and ready.
+   */
+  @BeforeEach
+  protected void setup() throws Exception {
+    waitForLeaderToBeReady();
+  }
 
   /**
    * Reset cluster between tests.
    */
   @AfterEach
-  public void resetCluster()
-      throws IOException {
+  public void resetCluster() throws Exception {
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
@@ -470,4 +481,12 @@ public abstract class TestOzoneManagerHA {
     }
   }
 
+  protected void waitForLeaderToBeReady()
+      throws InterruptedException, TimeoutException {
+    // Wait for Leader Election timeout
+    int timeout = OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
+        .toIntExact(TimeUnit.MILLISECONDS);
+    GenericTestUtils.waitFor(() ->
+        getCluster().getOMLeader() != null, 500, timeout);
+  }
 }

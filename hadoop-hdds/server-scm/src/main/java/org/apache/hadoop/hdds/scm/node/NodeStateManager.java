@@ -196,8 +196,12 @@ public class NodeStateManager implements Runnable, Closeable {
         OZONE_SCM_STALENODE_INTERVAL + " should be less than" +
             OZONE_SCM_DEADNODE_INTERVAL);
     executorService = HadoopExecutors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("SCM Heartbeat Processing Thread - %d").build());
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat(
+                scmContext.threadNamePrefix() + "SCMHeartbeatProcessor-%d")
+            .build()
+    );
 
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions

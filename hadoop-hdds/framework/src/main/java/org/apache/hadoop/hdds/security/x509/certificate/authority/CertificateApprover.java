@@ -62,6 +62,7 @@ public interface CertificateApprover {
    * @param certificationRequest - Certification Request.
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
+   * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
    * @throws OperatorCreationException - on Error.
@@ -75,7 +76,8 @@ public interface CertificateApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId)
+      String clusterId,
+      String certSerialId)
       throws IOException, OperatorCreationException;
 
 

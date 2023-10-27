@@ -65,6 +65,11 @@ public class VolumeUsage implements SpaceUsageSource {
     return source.getAvailable() - getRemainingReserved();
   }
 
+  public long getAvailable(PrecomputedVolumeSpace precomputedVolumeSpace) {
+    long available = precomputedVolumeSpace.getAvailable();
+    return available - getRemainingReserved(precomputedVolumeSpace);
+  }
+
   @Override
   public long getUsedSpace() {
     return source.getUsedSpace();
@@ -89,8 +94,19 @@ public class VolumeUsage implements SpaceUsageSource {
     return Math.max(totalUsed - source.getUsedSpace(), 0L);
   }
 
+  private long getOtherUsed(PrecomputedVolumeSpace precomputedVolumeSpace) {
+    long totalUsed = precomputedVolumeSpace.getCapacity() -
+        precomputedVolumeSpace.getAvailable();
+    return Math.max(totalUsed - source.getUsedSpace(), 0L);
+  }
+
   private long getRemainingReserved() {
     return Math.max(reservedInBytes - getOtherUsed(), 0L);
+  }
+
+  private long getRemainingReserved(
+      PrecomputedVolumeSpace precomputedVolumeSpace) {
+    return Math.max(reservedInBytes - getOtherUsed(precomputedVolumeSpace), 0L);
   }
 
   public synchronized void start() {
@@ -144,5 +160,34 @@ public class VolumeUsage implements SpaceUsageSource {
     return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
         HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
 
+  }
+
+  /**
+   * Class representing precomputed space values of a volume.
+   * This class is intended to store precomputed values, such as capacity
+   * and available space of a volume, to avoid recalculating these
+   * values multiple times and to make method signatures simpler.
+   */
+  public static class PrecomputedVolumeSpace {
+    private final long capacity;
+    private final long available;
+
+    public PrecomputedVolumeSpace(long capacity, long available) {
+      this.capacity = capacity;
+      this.available = available;
+    }
+
+    public long getCapacity() {
+      return capacity;
+    }
+
+    public long getAvailable() {
+      return available;
+    }
+  }
+
+  public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
+    return new PrecomputedVolumeSpace(source.getCapacity(),
+        source.getAvailable());
   }
 }

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.tag.Flaky;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
@@ -218,7 +217,6 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
-  @Flaky("HDDS-5993")
   void cleanObjectsTest() {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());

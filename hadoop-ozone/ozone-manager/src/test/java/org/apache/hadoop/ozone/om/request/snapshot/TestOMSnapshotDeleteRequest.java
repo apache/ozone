@@ -217,10 +217,11 @@ public class TestOMSnapshotDeleteRequest {
     snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
     assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
-    // Expected -1 because no snapshot was created before.
     assertEquals(0, omMetrics.getNumSnapshotCreates());
+    // Expected -1 because no snapshot was created before.
     assertEquals(-1, omMetrics.getNumSnapshotActive());
     assertEquals(1, omMetrics.getNumSnapshotDeleted());
+    assertEquals(0, omMetrics.getNumSnapshotDeleteFails());
   }
 
   /**
@@ -246,6 +247,8 @@ public class TestOMSnapshotDeleteRequest {
     assertNotNull(omResponse.getDeleteSnapshotResponse());
     assertEquals(Status.FILE_NOT_FOUND, omResponse.getStatus());
     assertEquals(0, omMetrics.getNumSnapshotActive());
+    assertEquals(0, omMetrics.getNumSnapshotDeleted());
+    assertEquals(1, omMetrics.getNumSnapshotDeleteFails());
   }
 
   /**
@@ -312,6 +315,7 @@ public class TestOMSnapshotDeleteRequest {
     assertNotNull(snapshotInfo);
     assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
     assertEquals(0, omMetrics.getNumSnapshotActive());
+    assertEquals(1, omMetrics.getNumSnapshotDeleteFails());
   }
 
   private OMSnapshotDeleteRequest doPreExecute(

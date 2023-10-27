@@ -31,7 +31,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestName;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +59,7 @@ public class TestPeriodicVolumeChecker {
   public TestName testName = new TestName();
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(150);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(150));
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -87,7 +89,8 @@ public class TestPeriodicVolumeChecker {
 
     FakeTimer timer = new FakeTimer();
 
-    StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer);
+    StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer,
+        "");
 
     try {
       volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(

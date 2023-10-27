@@ -92,6 +92,28 @@ public class OMPerformanceMetrics {
   @Metric(about = "listKeys latency in nanoseconds")
   private MutableRate listKeysLatencyNs;
 
+  @Metric(about = "Validate request latency in nano seconds")
+  private MutableRate validateRequestLatencyNs;
+
+  @Metric(about = "Validate response latency in nano seconds")
+  private MutableRate validateResponseLatencyNs;
+
+  @Metric(about = "PreExecute latency in nano seconds")
+  private MutableRate preExecuteLatencyNs;
+
+  @Metric(about = "Ratis latency in nano seconds")
+  private MutableRate submitToRatisLatencyNs;
+
+  @Metric(about = "Convert om request to ratis request nano seconds")
+  private MutableRate createRatisRequestLatencyNs;
+
+  @Metric(about = "Convert ratis response to om response nano seconds")
+  private MutableRate createOmResoonseLatencyNs;
+
+  @Metric(about = "Ratis local command execution latency in nano seconds")
+  private MutableRate validateAndUpdateCacneLatencyNs;
+
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -159,5 +181,33 @@ public class OMPerformanceMetrics {
 
   public void addListKeysLatencyNs(long latencyInNs) {
     listKeysLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getValidateRequestLatencyNs() {
+    return validateRequestLatencyNs;
+  }
+
+  public MutableRate getValidateResponseLatencyNs() {
+    return validateResponseLatencyNs;
+  }
+
+  public MutableRate getPreExecuteLatencyNs() {
+    return preExecuteLatencyNs;
+  }
+
+  public MutableRate getSubmitToRatisLatencyNs() {
+    return submitToRatisLatencyNs;
+  }
+
+  public MutableRate getCreateRatisRequestLatencyNs() {
+    return createRatisRequestLatencyNs;
+  }
+
+  public MutableRate getCreateOmResponseLatencyNs() {
+    return createOmResoonseLatencyNs;
+  }
+
+  public MutableRate getValidateAndUpdateCacneLatencyNs() {
+    return validateAndUpdateCacneLatencyNs;
   }
 }

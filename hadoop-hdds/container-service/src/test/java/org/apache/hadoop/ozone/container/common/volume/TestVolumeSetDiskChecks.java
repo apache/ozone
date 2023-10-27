@@ -69,7 +69,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +85,7 @@ public class TestVolumeSetDiskChecks {
       TestVolumeSetDiskChecks.class);
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -323,7 +325,7 @@ public class TestVolumeSetDiskChecks {
     StateContext stateContext = new StateContext(
         new OzoneConfiguration(), DatanodeStateMachine
         .DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     stateContext.addEndpoint(scm1);
     when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
@@ -371,7 +373,7 @@ public class TestVolumeSetDiskChecks {
 
     DummyChecker(ConfigurationSource conf, Timer timer, int numBadVolumes)
         throws DiskErrorException {
-      super(conf, timer);
+      super(conf, timer, "");
       this.numBadVolumes = numBadVolumes;
     }
 

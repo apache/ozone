@@ -143,7 +143,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneBlockTokenSecretManager secretManager,
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String omID, OMMetrics omMetrics,
+      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
       boolean shouldSortDatanodes, UserInfo userInfo)
       throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
@@ -161,7 +161,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
               excludeList, clientMachine);
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
