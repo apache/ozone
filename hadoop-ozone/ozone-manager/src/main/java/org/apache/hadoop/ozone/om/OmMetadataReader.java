@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
@@ -250,6 +251,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             OMAction.LIST_STATUS, auditMap));
       }
     }
+  }
+
+  @Override
+  public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
+      boolean recursive, String startKey, long numEntries,
+      boolean allowPartialPrefixes) throws IOException {
+    List<OzoneFileStatus> ozoneFileStatuses =
+        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+
+    return ozoneFileStatuses.stream()
+        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .collect(Collectors.toList());
   }
   
   @Override
