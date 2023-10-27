@@ -98,7 +98,7 @@ public class SstFilteringService extends BackgroundService
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
     super("SstFilteringService", interval, unit, SST_FILTERING_CORE_POOL_SIZE,
-        serviceTimeout);
+        serviceTimeout, ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.snapshotLimitPerTask = configuration
         .getLong(SNAPSHOT_SST_DELETING_LIMIT_PER_TASK,

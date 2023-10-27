@@ -25,9 +25,10 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 
 /**
- * Annotation to mark test classes or methods with some intermittent failures.
- * These are handled separately from the normal tests.  (Not required to pass,
- * may be repeated automatically, etc.)
+ * Annotation to mark JUnit5 test classes or methods that exhibit intermittent
+ * issues.  These are run separately from the normal tests in CI.  In case of
+ * failure they may be repeated a few times.
+ * Usage: <code>@Flaky("HDDS-123")</code>
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)

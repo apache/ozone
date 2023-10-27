@@ -168,7 +168,7 @@ public class TestDeleteContainerCommandHandler {
 
   private static DeleteContainerCommandHandler createSubjectWithPoolSize(
       TestClock clock, int queueSize) {
-    return new DeleteContainerCommandHandler(1, clock, queueSize);
+    return new DeleteContainerCommandHandler(1, clock, queueSize, "");
   }
 
 }

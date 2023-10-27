@@ -281,8 +281,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         if (secConf.isTokenEnabled()) {
           SecretKeyProtocol secretKeyProtocol =
               HddsServerUtil.getSecretKeyClientForDatanode(conf);
-          secretKeyClient = DefaultSecretKeyClient.create(conf,
-              secretKeyProtocol);
+          secretKeyClient = DefaultSecretKeyClient.create(
+              conf, secretKeyProtocol, "");
           secretKeyClient.start(conf);
         }
       }
@@ -411,10 +411,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       break;
     case FAILURE:
       LOG.error("DN security initialization failed, case:{}.", response);
-      throw new RuntimeException("DN security initialization failed.");
-    case RECOVER:
-      LOG.error("DN security initialization failed, case:{}. OM certificate " +
-          "is missing.", response);
       throw new RuntimeException("DN security initialization failed.");
     default:
       LOG.error("DN security initialization failed. Init response: {}",
