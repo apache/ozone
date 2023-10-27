@@ -321,7 +321,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   public boolean isMissing() {
     Set<Integer> distinct = healthyReplicas();
     distinct.addAll(unHealthyIndexes.keySet());
-    return distinct.size() < repConfig.getData();
+    return containerInfo.getSequenceId() > 0 &&
+        distinct.size() < repConfig.getData();
   }
 
   private Set<Integer> healthyReplicas() {

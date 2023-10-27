@@ -70,7 +70,8 @@ public class ClosingContainerHandler extends AbstractCheck {
     boolean forceClose = containerInfo.getReplicationConfig()
         .getReplicationType() != ReplicationType.RATIS;
 
-    if (request.getContainerReplicas().isEmpty()) {
+    if (request.getContainerReplicas().isEmpty() &&
+        containerInfo.getSequenceId() > 0) {
       request.getReport().incrementAndSample(
           ReplicationManagerReport.HealthState.MISSING,
           containerInfo.containerID());

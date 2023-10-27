@@ -1762,7 +1762,9 @@ public class LegacyReplicationManager {
                                         ContainerInfo container,
                                         ReplicationManagerReport report) {
     if (replicas.size() == 0) {
-      report.incrementAndSample(HealthState.MISSING, container.containerID());
+      if (container.getSequenceId() > 0) {
+        report.incrementAndSample(HealthState.MISSING, container.containerID());
+      }
       report.incrementAndSample(HealthState.UNDER_REPLICATED,
               container.containerID());
       report.incrementAndSample(HealthState.MIS_REPLICATED,
