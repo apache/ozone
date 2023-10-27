@@ -252,6 +252,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     -->
     <enforced.java.version>[${javac.version},)</enforced.java.version>
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
+    <allow.junit4>true</allow.junit4>
 
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
@@ -1827,6 +1828,34 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <bannedImports>
                       <bannedImport>org.junit.Ignore</bannedImport>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-junit4-imports</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <skip>${allow.junit4}</skip>
+                <rules>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use JUnit5</reason>
+                    <bannedImports>
+                      <bannedImport>org.junit.After</bannedImport>
+                      <bannedImport>org.junit.AfterClass</bannedImport>
+                      <bannedImport>org.junit.Assert</bannedImport>
+                      <bannedImport>org.junit.Assume</bannedImport>
+                      <bannedImport>org.junit.Before</bannedImport>
+                      <bannedImport>org.junit.BeforeClass</bannedImport>
+                      <bannedImport>org.junit.ClassRule</bannedImport>
+                      <bannedImport>org.junit.ExpectedException</bannedImport>
+                      <bannedImport>org.junit.Rule</bannedImport>
+                      <bannedImport>org.junit.Test</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>
