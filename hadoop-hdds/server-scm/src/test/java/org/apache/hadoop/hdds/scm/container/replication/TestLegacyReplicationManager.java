@@ -393,6 +393,7 @@ public class TestLegacyReplicationManager {
     public void testClosingMissingContainer()
         throws IOException, InvalidStateTransitionException {
       final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+      container.setNumberOfKeys(10);
       final ContainerID id = container.containerID();
 
       containerStateManager.addContainer(container.getProtobuf());

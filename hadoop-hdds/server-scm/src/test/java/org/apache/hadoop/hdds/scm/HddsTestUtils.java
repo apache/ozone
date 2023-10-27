@@ -670,7 +670,6 @@ public final class HddsTestUtils {
       final HddsProtos.LifeCycleState state) {
     return getDefaultContainerInfoBuilder(state)
         .setPipelineID(randomPipelineID)
-        .setNumberOfKeys(10)
         .build();
   }
 
