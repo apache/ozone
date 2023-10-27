@@ -33,8 +33,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -471,7 +474,6 @@ public class TestRocksDBCheckpointDiffer {
           destSnapshot,
           srcSnapshotSstFiles,
           destSnapshotSstFiles,
-          rocksDBCheckpointDiffer.getForwardCompactionDAG(),
           actualSameSstFiles,
           actualDiffSstFiles);
     } catch (RuntimeException rtEx) {
@@ -850,7 +852,8 @@ public class TestRocksDBCheckpointDiffer {
                       sstFile -> new CompactionNode(sstFile,
                           UUID.randomUUID().toString(),
                           1000L,
-                          Long.parseLong(sstFile.substring(0, 6))
+                          Long.parseLong(sstFile.substring(0, 6)),
+                          null, null, null
                       ))
                   .collect(Collectors.toList()))
           .collect(Collectors.toList());
@@ -1517,5 +1520,304 @@ public class TestRocksDBCheckpointDiffer {
     try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
       fileOutputStream.write(context.getBytes(UTF_8));
     }
+  }
+
+  private final List<CompactionLogEntry> compactionLogEntryList = Arrays.asList(
+      new CompactionLogEntry(101, System.currentTimeMillis(),
+          Arrays.asList(
+              new CompactionFileInfo("000068", "/volume/bucket2",
+                  "/volume/bucket2", "bucketTable"),
+              new CompactionFileInfo("000057", "/volume/bucket1",
+                  "/volume/bucket1", "bucketTable")),
+          Collections.singletonList(
+              new CompactionFileInfo("000086", "/volume/bucket1",
+                  "/volume/bucket2", "bucketTable")),
+          null),
+      new CompactionLogEntry(178, System.currentTimeMillis(),
+          Arrays.asList(new CompactionFileInfo("000078",
+                  "/volume/bucket1/key-0000001411",
+                  "/volume/bucket2/key-0000099649",
+                  "keyTable"),
+              new CompactionFileInfo("000075",
+                  "/volume/bucket1/key-0000016536",
+                  "/volume/bucket2/key-0000098897",
+                  "keyTable"),
+              new CompactionFileInfo("000073",
+                  "/volume/bucket1/key-0000000730",
+                  "/volume/bucket2/key-0000097010",
+                  "keyTable"),
+              new CompactionFileInfo("000071",
+                  "/volume/bucket1/key-0000001820",
+                  "/volume/bucket2/key-0000097895",
+                  "keyTable"),
+              new CompactionFileInfo("000063",
+                  "/volume/bucket1/key-0000001016",
+                  "/volume/bucket1/key-0000099930",
+                  "keyTable")),
+          Collections.singletonList(new CompactionFileInfo("000081",
+              "/volume/bucket1/key-0000000730",
+              "/volume/bucket2/key-0000099649",
+              "keyTable")),
+          null
+      ),
+      new CompactionLogEntry(233, System.currentTimeMillis(),
+          Arrays.asList(
+              new CompactionFileInfo("000086", "/volume/bucket1",
+                  "/volume/bucket2", "bucketTable"),
+              new CompactionFileInfo("000088", "/volume/bucket3",
+                  "/volume/bucket3", "bucketTable")),
+          Collections.singletonList(
+              new CompactionFileInfo("000110", "/volume/bucket1",
+                  "/volume/bucket3", "bucketTable")
+          ),
+          null),
+      new CompactionLogEntry(256, System.currentTimeMillis(),
+          Arrays.asList(new CompactionFileInfo("000081",
+                  "/volume/bucket1/key-0000000730",
+                  "/volume/bucket2/key-0000099649",
+                  "keyTable"),
+              new CompactionFileInfo("000103",
+                  "/volume/bucket1/key-0000017460",
+                  "/volume/bucket3/key-0000097450",
+                  "keyTable"),
+              new CompactionFileInfo("000099",
+                  "/volume/bucket1/key-0000002310",
+                  "/volume/bucket3/key-0000098286",
+                  "keyTable"),
+              new CompactionFileInfo("000097",
+                  "/volume/bucket1/key-0000005965",
+                  "/volume/bucket3/key-0000099136",
+                  "keyTable"),
+              new CompactionFileInfo("000095",
+                  "/volume/bucket1/key-0000012424",
+                  "/volume/bucket3/key-0000083904",
+                  "keyTable")),
+          Collections.singletonList(new CompactionFileInfo("000106",
+              "/volume/bucket1/key-0000000730",
+              "/volume/bucket3/key-0000099136",
+              "keyTable")),
+          null),
+      new CompactionLogEntry(397, now(),
+          Arrays.asList(new CompactionFileInfo("000106",
+                  "/volume/bucket1/key-0000000730",
+                  "/volume/bucket3/key-0000099136",
+                  "keyTable"),
+              new CompactionFileInfo("000128",
+                  "/volume/bucket2/key-0000005031",
+                  "/volume/bucket3/key-0000084385",
+                  "keyTable"),
+              new CompactionFileInfo("000125",
+                  "/volume/bucket2/key-0000003491",
+                  "/volume/bucket3/key-0000088414",
+                  "keyTable"),
+              new CompactionFileInfo("000123",
+                  "/volume/bucket2/key-0000007390",
+                  "/volume/bucket3/key-0000094627",
+                  "keyTable"),
+              new CompactionFileInfo("000121",
+                  "/volume/bucket2/key-0000003232",
+                  "/volume/bucket3/key-0000094246",
+                  "keyTable")),
+          Collections.singletonList(new CompactionFileInfo("000131",
+              "/volume/bucket1/key-0000000730",
+              "/volume/bucket3/key-0000099136",
+              "keyTable")),
+          null
+      )
+  );
+
+  private static Map<String, String> columnFamilyToPrefixMap1 =
+      new HashMap<String, String>() {
+        {
+          put("keyTable", "/volume/bucket1/");
+          // Simply using bucketName instead of ID for the test.
+          put("directoryTable", "/volume/bucket1/");
+          put("fileTable", "/volume/bucket1/");
+        }
+      };
+
+  private static Map<String, String> columnFamilyToPrefixMap2 =
+      new HashMap<String, String>() {
+        {
+          put("keyTable", "/volume/bucket2/");
+          // Simply using bucketName instead of ID for the test.
+          put("directoryTable", "/volume/bucket2/");
+          put("fileTable", "/volume/bucket2/");
+        }
+      };
+
+  private static Map<String, String> columnFamilyToPrefixMap3 =
+      new HashMap<String, String>() {
+        {
+          put("keyTable", "/volume/bucket3/");
+          // Simply using bucketName instead of ID for the test.
+          put("directoryTable", "/volume/bucket3/");
+          put("fileTable", "/volume/bucket3/");
+        }
+      };
+
+  /**
+   * Test cases for testGetSSTDiffListWithoutDB.
+   */
+  private static Stream<Arguments> casesGetSSTDiffListWithoutDB2() {
+    return Stream.of(
+        Arguments.of("Test case 1.",
+            ImmutableSet.of("000081"),
+            ImmutableSet.of("000063"),
+            ImmutableSet.of("000063"),
+            ImmutableSet.of("000078", "000071", "000075", "000073"),
+            columnFamilyToPrefixMap1),
+        Arguments.of("Test case 2.",
+            ImmutableSet.of("000106"),
+            ImmutableSet.of("000081"),
+            ImmutableSet.of("000081"),
+            ImmutableSet.of("000099", "000103", "000097", "000095"),
+            columnFamilyToPrefixMap1),
+        Arguments.of("Test case 3.",
+            ImmutableSet.of("000106"),
+            ImmutableSet.of("000063"),
+            ImmutableSet.of("000063"),
+            ImmutableSet.of("000078", "000071", "000075", "000073", "000103",
+                "000099", "000097", "000095"),
+            columnFamilyToPrefixMap1),
+        Arguments.of("Test case 4.",
+            ImmutableSet.of("000131"),
+            ImmutableSet.of("000106"),
+            ImmutableSet.of("000106"),
+            ImmutableSet.of("000123", "000121", "000128", "000125"),
+            columnFamilyToPrefixMap2),
+        Arguments.of("Test case 5.",
+            ImmutableSet.of("000131"),
+            ImmutableSet.of("000081"),
+            ImmutableSet.of("000081"),
+            ImmutableSet.of("000123", "000121", "000128", "000125", "000103",
+                "000099", "000097", "000095"),
+            columnFamilyToPrefixMap2),
+        Arguments.of("Test case 6.",
+            ImmutableSet.of("000147", "000131", "000141"),
+            ImmutableSet.of("000131"),
+            ImmutableSet.of("000131"),
+            ImmutableSet.of("000147", "000141"),
+            columnFamilyToPrefixMap3),
+        Arguments.of("Test case 7.",
+            ImmutableSet.of("000147", "000131", "000141"),
+            ImmutableSet.of("000106"),
+            ImmutableSet.of("000106"),
+            ImmutableSet.of("000123", "000121", "000128", "000125", "000147",
+                "000141"),
+            columnFamilyToPrefixMap3)
+    );
+  }
+
+  /**
+   * Tests core SST diff list logic. Does not involve DB.
+   * Focuses on testing edge cases in internalGetSSTDiffList().
+   */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("casesGetSSTDiffListWithoutDB2")
+  public void testGetSSTDiffListWithoutDB2(
+      String description,
+      Set<String> srcSnapshotSstFiles,
+      Set<String> destSnapshotSstFiles,
+      Set<String> expectedSameSstFiles,
+      Set<String> expectedDiffSstFiles,
+      Map<String, String> columnFamilyToPrefixMap
+  ) {
+    compactionLogEntryList.forEach(entry ->
+        rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+
+    // Snapshot is used for logging purpose and short-circuiting traversal.
+    // Using gen 0 for this test.
+    DifferSnapshotInfo mockedSourceSnapshot = new DifferSnapshotInfo(
+        "/path/to/dbcp1", UUID.randomUUID(), 0L, columnFamilyToPrefixMap, null);
+    DifferSnapshotInfo mockedDestinationSnapshot = new DifferSnapshotInfo(
+        "/path/to/dbcp2", UUID.randomUUID(), 0L, columnFamilyToPrefixMap, null);
+
+    Set<String> actualSameSstFiles = new HashSet<>();
+    Set<String> actualDiffSstFiles = new HashSet<>();
+
+    rocksDBCheckpointDiffer.internalGetSSTDiffList(
+        mockedSourceSnapshot,
+        mockedDestinationSnapshot,
+        srcSnapshotSstFiles,
+        destSnapshotSstFiles,
+        actualSameSstFiles,
+        actualDiffSstFiles);
+
+    // Check same and different SST files result
+    Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
+    Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+  }
+
+  private static Stream<Arguments> shouldSkipNodeCases() {
+    List<Boolean> expectedResponse1 = Arrays.asList(true, false, true, false,
+        false, false, false, false, true, true, false, false, false, false,
+        false, true, true, true, true, true, false);
+    List<Boolean> expectedResponse2 = Arrays.asList(true, true, true, false,
+        false, false, false, false, true, true, false, false, false, false,
+        false, true, false, false, false, false, false);
+    List<Boolean> expectedResponse3 = Arrays.asList(true, true, true, true,
+        true, true, true, true, true, true, false, false, false, false, false,
+        true, false, false, false, false, false);
+    return Stream.of(
+        Arguments.of(columnFamilyToPrefixMap1, expectedResponse1),
+        Arguments.of(columnFamilyToPrefixMap2, expectedResponse2),
+        Arguments.of(columnFamilyToPrefixMap3, expectedResponse3));
+  }
+
+  @ParameterizedTest()
+  @MethodSource("shouldSkipNodeCases")
+  public void testShouldSkipNode(Map<String, String> columnFamilyToPrefixMap,
+                                 List<Boolean> expectedResponse) {
+    compactionLogEntryList.forEach(entry ->
+        rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+
+    List<Boolean> actualResponse = rocksDBCheckpointDiffer
+        .getCompactionNodeMap().values().stream()
+        .sorted(Comparator.comparing(CompactionNode::getFileName))
+        .map(node ->
+            rocksDBCheckpointDiffer.shouldSkipNode(node,
+                columnFamilyToPrefixMap))
+        .collect(Collectors.toList());
+
+    assertEquals(expectedResponse, actualResponse);
+  }
+
+  private static Stream<Arguments> shouldSkipNodeEdgeCases() {
+    CompactionNode node = new CompactionNode("fileName",
+        "snapshotId", 100, 100, "startKey", "endKey", "columnFamily");
+    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName",
+        "snapshotId", 100, 100, "startKey", "endKey", null);
+    CompactionNode nullStartKeyNode = new CompactionNode("fileName",
+        "snapshotId", 100, 100, null, "endKey", "columnFamily");
+    CompactionNode nullEndKeyNode = new CompactionNode("fileName",
+        "snapshotId", 100, 100, "startKey", null, "columnFamily");
+
+    return Stream.of(
+        Arguments.of(node, Collections.emptyMap(), false),
+        Arguments.of(node, columnFamilyToPrefixMap1, true),
+        Arguments.of(nullColumnFamilyNode, columnFamilyToPrefixMap1, false),
+        Arguments.of(nullStartKeyNode, columnFamilyToPrefixMap1, false),
+        Arguments.of(nullEndKeyNode, columnFamilyToPrefixMap1, false));
+  }
+
+  @ParameterizedTest()
+  @MethodSource("shouldSkipNodeEdgeCases")
+  public void testShouldSkipNodeEdgeCase(
+      CompactionNode node,
+      Map<String, String> columnFamilyToPrefixMap,
+      boolean expectedResponse
+  ) {
+    compactionLogEntryList.forEach(entry ->
+        rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+
+    assertEquals(expectedResponse, rocksDBCheckpointDiffer.shouldSkipNode(node,
+        columnFamilyToPrefixMap));
   }
 }

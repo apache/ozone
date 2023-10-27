@@ -97,6 +97,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
@@ -478,8 +479,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = getOzonePathKeyWithVolumeBucketNames(
-        omMetadataManager, volumeName, bucketName);
+    final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
+        volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
@@ -492,32 +493,6 @@ public final class OmSnapshotManager implements AutoCloseable {
             return null;
           });
     }
-  }
-
-  /**
-   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
-   * volume name and bucket name as a prefix in FSO deletedDirectoryTable.
-   * Follows:
-   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
-   * <p>
-   * Note: Currently, this is only intended to be a special use case in
-   * {@link OmSnapshotManager}. If this is used elsewhere, consider moving this
-   * to {@link OMMetadataManager}.
-   *
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @return /volumeId/bucketId/
-   *    e.g. /-9223372036854772480/-9223372036854771968/
-   */
-  @VisibleForTesting
-  public static String getOzonePathKeyWithVolumeBucketNames(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
-      String bucketName) throws IOException {
-
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
-    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
   @VisibleForTesting
