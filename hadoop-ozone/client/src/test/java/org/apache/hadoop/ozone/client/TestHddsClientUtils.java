@@ -51,7 +51,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-//import org.junit.Test;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -60,7 +59,7 @@ import org.junit.jupiter.api.Timeout;
  * parsing logic is in
  * {@link org.apache.hadoop.hdds.scm.client.HddsClientUtils}.
  */
-@Timeout(3)
+@Timeout(300)
 public class TestHddsClientUtils {
 
   /**
