@@ -471,6 +471,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
         .setIndexToTerm(this::getTermForIndex).setThreadPrefix(threadPrefix)
+        .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
         .build();

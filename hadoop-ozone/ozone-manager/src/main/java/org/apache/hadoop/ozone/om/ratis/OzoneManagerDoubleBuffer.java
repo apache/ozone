@@ -202,7 +202,8 @@ public final class OzoneManagerDoubleBuffer {
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
       Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
-      FlushNotifier flushNotifier, S3SecretManager s3SecretManager, String threadPrefix) {
+      FlushNotifier flushNotifier, S3SecretManager s3SecretManager,
+                                   String threadPrefix) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
@@ -294,6 +295,8 @@ public final class OzoneManagerDoubleBuffer {
   void flushTransactions() {
     while (isRunning.get() && canFlush()) {
       flushCurrentBuffer();
+      // Invalidate all the content in S3SecretManager cache.
+      s3SecretManager.clearS3Cache();
     }
   }
 

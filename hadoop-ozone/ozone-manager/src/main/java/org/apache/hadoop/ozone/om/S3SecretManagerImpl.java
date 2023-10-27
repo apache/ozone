@@ -108,6 +108,11 @@ public class S3SecretManagerImpl implements S3SecretManager {
   }
 
   @Override
+  public void clearS3Cache() {
+    clearCache();
+  }
+
+  @Override
   public <T> T doUnderLock(String lockId, S3SecretFunction<T> action)
       throws IOException {
     throw new UnsupportedOperationException(

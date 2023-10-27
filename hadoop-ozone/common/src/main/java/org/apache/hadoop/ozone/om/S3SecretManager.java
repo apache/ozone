@@ -61,6 +61,11 @@ public interface S3SecretManager {
   void revokeSecret(String kerberosId) throws IOException;
 
   /**
+   * Clear s3 secret cache when double buffer is flushed to the DB.
+   */
+  void clearS3Cache();
+
+  /**
    * Apply provided action under write lock.
    * @param lockId lock identifier.
    * @param action custom action.
@@ -107,4 +112,13 @@ public interface S3SecretManager {
       cache.invalidate(id);
     }
   }
+
+  default void clearCache() {
+    S3SecretCache cache = cache();
+    if (cache != null) {
+      LOG.info("Clearing S3 cache since DoubleBuffer is flushed to DB.");
+      cache.clearCache();
+    }
+  }
+
 }
