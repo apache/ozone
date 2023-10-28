@@ -1846,16 +1846,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <includeTestCode>true</includeTestCode>
                     <reason>Use JUnit5</reason>
                     <bannedImports>
-                      <bannedImport>org.junit.After</bannedImport>
-                      <bannedImport>org.junit.AfterClass</bannedImport>
-                      <bannedImport>org.junit.Assert</bannedImport>
-                      <bannedImport>org.junit.Assume</bannedImport>
-                      <bannedImport>org.junit.Before</bannedImport>
-                      <bannedImport>org.junit.BeforeClass</bannedImport>
-                      <bannedImport>org.junit.ClassRule</bannedImport>
-                      <bannedImport>org.junit.ExpectedException</bannedImport>
-                      <bannedImport>org.junit.Rule</bannedImport>
-                      <bannedImport>org.junit.Test</bannedImport>
+                      <bannedImport>org.junit.*</bannedImport>
+                      <bannedImport>static org.junit.*.*</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>
