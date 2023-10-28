@@ -34,6 +34,9 @@ import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
 
@@ -341,5 +344,13 @@ public class ReconUtils {
       index += 1;
     }
     return index;
+  }
+
+  public SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        HddsServerUtil.getReconDataNodeBindAddress(conf));
+    return builder.build();
   }
 }

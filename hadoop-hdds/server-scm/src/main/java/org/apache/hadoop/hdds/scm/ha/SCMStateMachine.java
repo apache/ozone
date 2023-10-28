@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
@@ -90,7 +91,7 @@ public class SCMStateMachine extends BaseStateMachine {
   private List<ManagedSecretKey> installingSecretKeys = null;
 
   private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
-  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean(false);
+  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean();
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
@@ -104,7 +105,11 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.info("Updated lastAppliedTermIndex {} with transactionInfo term and" +
           "Index", latestTrxInfo);
     }
-    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
+    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat(scm.threadNamePrefix() + "SCMInstallSnapshot-%d")
+            .build()
+    );
     isInitialized = true;
   }
 

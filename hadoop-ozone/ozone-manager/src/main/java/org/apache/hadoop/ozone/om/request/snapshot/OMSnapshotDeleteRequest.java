@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -116,7 +117,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false;
     boolean acquiredSnapshotLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -191,7 +192,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
       // No longer need to invalidate the entry in the snapshot cache here.
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotDeleteResponse(
           createErrorOMResponse(omResponse, exception));

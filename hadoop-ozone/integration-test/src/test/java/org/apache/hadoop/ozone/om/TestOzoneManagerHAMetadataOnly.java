@@ -96,7 +96,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
 
     createAndCheckVolume(volumeName);
@@ -114,7 +113,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   @Test
   public void testAllBucketOperations() throws Exception {
-
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     String bucketName = "volume" + RandomStringUtils.randomNumeric(5);
 

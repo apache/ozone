@@ -107,7 +107,7 @@ public class SCMBlockDeletingService extends BackgroundService
         TimeUnit.MILLISECONDS, BLOCK_DELETING_SERVICE_CORE_POOL_SIZE,
         conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS));
+            TimeUnit.MILLISECONDS), scmContext.threadNamePrefix());
 
     this.safemodeExitRunDelayMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,

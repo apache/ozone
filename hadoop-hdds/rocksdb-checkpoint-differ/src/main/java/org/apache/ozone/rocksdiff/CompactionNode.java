@@ -28,6 +28,9 @@ public class CompactionNode {
   private final long snapshotGeneration;
   private final long totalNumberOfKeys;
   private long cumulativeKeysReverseTraversal;
+  private final String startKey;
+  private final String endKey;
+  private final String columnFamily;
 
   /**
    * CompactionNode constructor.
@@ -36,12 +39,16 @@ public class CompactionNode {
    * @param numKeys Number of keys in the SST
    * @param seqNum Snapshot generation (sequence number)
    */
-  public CompactionNode(String file, String ssId, long numKeys, long seqNum) {
+  public CompactionNode(String file, String ssId, long numKeys, long seqNum,
+                        String startKey, String endKey, String columnFamily) {
     fileName = file;
     snapshotId = ssId;
     totalNumberOfKeys = numKeys;
     snapshotGeneration = seqNum;
     cumulativeKeysReverseTraversal = 0L;
+    this.startKey = startKey;
+    this.endKey = endKey;
+    this.columnFamily = columnFamily;
   }
 
   @Override
@@ -67,6 +74,18 @@ public class CompactionNode {
 
   public long getCumulativeKeysReverseTraversal() {
     return cumulativeKeysReverseTraversal;
+  }
+
+  public String getStartKey() {
+    return startKey;
+  }
+
+  public String getEndKey() {
+    return endKey;
+  }
+
+  public String getColumnFamily() {
+    return columnFamily;
   }
 
   public void setCumulativeKeysReverseTraversal(

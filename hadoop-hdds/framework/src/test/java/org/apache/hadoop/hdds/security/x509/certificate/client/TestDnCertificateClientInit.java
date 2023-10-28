@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
@@ -92,9 +94,10 @@ public class TestDnCertificateClientInit {
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
     certSerialId = x509Certificate.getSerialNumber().toString();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     dnCertificateClient =
         new DNCertificateClient(
-            securityConfig, null, null, certSerialId, null, null);
+            securityConfig, null, dn, certSerialId, null, null);
     dnKeyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(DN_COMPONENT));

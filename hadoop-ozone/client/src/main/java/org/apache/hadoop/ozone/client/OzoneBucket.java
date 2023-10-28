@@ -38,10 +38,12 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1226,8 +1228,9 @@ public class OzoneBucket extends WithMetadata {
 
       // Elements in statuses must be sorted after startKey,
       // which means they come after the keyPrefix.
-      List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-          delimiterKeyPrefix, false, startKey, listCacheSize);
+      List<OzoneFileStatusLight> statuses =
+          proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
+              startKey, listCacheSize, false);
 
       if (addedKeyPrefix) {
         // previous round already include the startKey, so remove it
@@ -1246,10 +1249,10 @@ public class OzoneBucket extends WithMetadata {
     }
 
     private List<OzoneKey> buildOzoneKeysFromFileStatus(
-        List<OzoneFileStatus> statuses) {
+        List<OzoneFileStatusLight> statuses) {
       return statuses.stream()
           .map(status -> {
-            OmKeyInfo keyInfo = status.getKeyInfo();
+            BasicOmKeyInfo keyInfo = status.getKeyInfo();
             String keyName = keyInfo.getKeyName();
             if (status.isDirectory()) {
               // add trailing slash to represent directory
@@ -1497,8 +1500,8 @@ public class OzoneBucket extends WithMetadata {
       startKey = startKey == null ? "" : startKey;
 
       // 1. Get immediate children of keyPrefix, starting with startKey
-      List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-          keyPrefix, false, startKey, listCacheSize, true);
+      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(volumeName,
+          name, keyPrefix, false, startKey, listCacheSize, true);
       boolean reachedLimitCacheSize = statuses.size() == listCacheSize;
 
       // 2. Special case: ListKey expects keyPrefix element should present in
@@ -1516,8 +1519,8 @@ public class OzoneBucket extends WithMetadata {
       // 4. Iterating over the resultStatuses list and add each key to the
       // resultList.
       for (int indx = 0; indx < statuses.size(); indx++) {
-        OzoneFileStatus status = statuses.get(indx);
-        OmKeyInfo keyInfo = status.getKeyInfo();
+        OzoneFileStatusLight status = statuses.get(indx);
+        BasicOmKeyInfo keyInfo = status.getKeyInfo();
         String keyName = keyInfo.getKeyName();
 
         OzoneKey ozoneKey;
@@ -1559,7 +1562,7 @@ public class OzoneBucket extends WithMetadata {
     }
 
     private void removeStartKeyIfExistsInStatusList(String startKey,
-        List<OzoneFileStatus> statuses) {
+        List<OzoneFileStatusLight> statuses) {
 
       if (!statuses.isEmpty()) {
         String firstElement = statuses.get(0).getKeyInfo().getKeyName();

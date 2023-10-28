@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -80,7 +81,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -159,6 +159,7 @@ public class ReconStorageContainerManagerFacade
   private ScheduledExecutorService scheduler;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
+  private final String threadNamePrefix;
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -172,8 +173,9 @@ public class ReconStorageContainerManagerFacade
       ReconContainerMetadataManager reconContainerMetadataManager,
       ReconUtils reconUtils,
       ReconSafeModeManager safeModeManager) throws IOException {
-    reconNodeDetails = getReconNodeDetails(conf);
-    this.eventQueue = new EventQueue();
+    reconNodeDetails = reconUtils.getReconNodeDetails(conf);
+    this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
+    this.eventQueue = new EventQueue(threadNamePrefix);
     eventQueue.setSilent(true);
     this.scmContext = new SCMContext.Builder()
         .setIsPreCheckComplete(true)
@@ -283,7 +285,8 @@ public class ReconStorageContainerManagerFacade
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(ozoneConfiguration);
     List<ThreadPoolExecutor> executors
-        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+        threadNamePrefix, queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
@@ -349,13 +352,6 @@ public class ReconStorageContainerManagerFacade
     return reconScmConfiguration;
   }
 
-  private SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {
-    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
-    builder.setDatanodeProtocolServerAddress(
-        HddsServerUtil.getReconDataNodeBindAddress(conf));
-    return builder.build();
-  }
-
   /**
    * Start the Recon SCM subsystems.
    */
@@ -366,7 +362,10 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    scheduler = Executors.newScheduledThreadPool(1);
+    scheduler = Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
+                "SyncSCMContainerInfo-%d")
+            .build());
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);

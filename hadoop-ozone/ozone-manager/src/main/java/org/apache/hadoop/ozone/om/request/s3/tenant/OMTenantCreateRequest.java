@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -247,7 +248,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
 
-    IOException exception = null;
+    Exception exception = null;
 
     try {
       // Check ACL: requires volume CREATE permission.
@@ -349,10 +350,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantCreateResponse(omResponse.build(),
           omVolumeArgs, volumeList, omDBTenantState);
 
-    } catch (IOException ex) {
-      omClientResponse = new OMTenantCreateResponse(
-          createErrorOMResponse(omResponse, ex));
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
+      omClientResponse = new OMTenantCreateResponse(
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

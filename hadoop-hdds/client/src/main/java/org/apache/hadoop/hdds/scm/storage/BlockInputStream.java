@@ -235,7 +235,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
     }
-    acquireClient();
+    try {
+      acquireClient();
+    } catch (IOException ioe) {
+      LOG.warn("Failed to acquire client for pipeline {}, block {}",
+          pipeline, blockID);
+      throw ioe;
+    }
     try {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Initializing BlockInputStream for get key to access {}",

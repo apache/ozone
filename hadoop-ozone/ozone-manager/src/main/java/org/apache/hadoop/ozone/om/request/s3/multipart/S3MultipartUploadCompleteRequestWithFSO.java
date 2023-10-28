@@ -151,7 +151,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
   @Override
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(
         createErrorOMResponse(omResponse, exception), getBucketLayout());

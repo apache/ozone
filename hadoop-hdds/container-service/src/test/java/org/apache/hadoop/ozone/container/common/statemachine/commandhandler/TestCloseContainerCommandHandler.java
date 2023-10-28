@@ -21,12 +21,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
@@ -71,7 +70,7 @@ public class TestCloseContainerCommandHandler {
   private ContainerController controller;
   private ContainerSet containerSet;
   private CloseContainerCommandHandler subject =
-      new CloseContainerCommandHandler(1, 1000);
+      new CloseContainerCommandHandler(1, 1000, "");
 
   private final ContainerLayoutVersion layout;
 
@@ -86,19 +85,15 @@ public class TestCloseContainerCommandHandler {
 
   @Before
   public void before() throws Exception {
-    context = mock(StateContext.class);
-    DatanodeStateMachine dnStateMachine = mock(DatanodeStateMachine.class);
-    when(dnStateMachine.getDatanodeDetails())
-        .thenReturn(randomDatanodeDetails());
-    when(context.getParent()).thenReturn(dnStateMachine);
-
+    OzoneConfiguration conf = new OzoneConfiguration();
+    context = ContainerTestUtils.getMockContext(randomDatanodeDetails(), conf);
     pipelineID = PipelineID.randomId();
 
     KeyValueContainerData data = new KeyValueContainerData(CONTAINER_ID,
         layout, GB,
         pipelineID.getId().toString(), null);
 
-    container = new KeyValueContainer(data, new OzoneConfiguration());
+    container = new KeyValueContainer(data, conf);
     containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
 

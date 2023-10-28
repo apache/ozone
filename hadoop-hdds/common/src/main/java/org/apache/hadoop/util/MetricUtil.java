@@ -31,7 +31,7 @@ public final class MetricUtil {
   private MetricUtil() {
   }
 
-  public static <T, E extends IOException> T captureLatencyNs(
+  public static <T, E extends Exception> T captureLatencyNs(
       MutableRate metric,
       CheckedSupplier<T, E> block) throws E {
     long start = Time.monotonicNowNanos();

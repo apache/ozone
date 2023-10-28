@@ -16,82 +16,49 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import org.apache.ozone.test.GenericTestUtils;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.function.Consumer;
-
 /**
- * Test for ResourceLimitCache.
+ * Test for ResourceCache.
  */
-public class TestResourceLimitCache {
+public class TestResourceCache {
 
   private static final String ANY_VALUE = "asdf";
 
   @Test
-  public void testResourceLimitCache()
-      throws InterruptedException, TimeoutException {
+  public void testResourceCache() throws InterruptedException {
+    AtomicLong count = new AtomicLong(0);
     Cache<Integer, String> resourceCache =
-        new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-            (k, v) -> new int[] {k}, 10);
+        new ResourceCache<>(
+            (k, v) -> (int) k, 10,
+            (P) -> {
+              if (P.wasEvicted()) {
+                count.incrementAndGet();
+              }
+            });
     resourceCache.put(6, "a");
     resourceCache.put(4, "a");
 
     // put should pass as key 4 will be overwritten
     resourceCache.put(4, "a");
 
-    // Create a future which blocks to put 1. Currently map has acquired 10
-    // permits out of 10
-    CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
-      try {
-        return resourceCache.put(1, "a");
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      return null;
-    });
-    Assertions.assertFalse(future.isDone());
-    Thread.sleep(100);
-    Assertions.assertFalse(future.isDone());
+    // put to cache with removing old element "6" as eviction FIFO
+    resourceCache.put(1, "a");
+    Assertions.assertNull(resourceCache.get(6));
+    Assertions.assertTrue(count.get() == 1);
 
-    // remove 4 so that permits are released for key 1 to be put. Currently map
-    // has acquired 6 permits out of 10
+    // add 5 should be success with no removal
+    resourceCache.put(5, "a");
+    Assertions.assertNotNull(resourceCache.get(4));
+
+    // remove and check queue
     resourceCache.remove(4);
-
-    GenericTestUtils.waitFor(future::isDone, 100, 1000);
-    // map has the key 1
-    Assertions.assertTrue(future.isDone());
-    Assertions.assertFalse(future.isCompletedExceptionally());
-    Assertions.assertNotNull(resourceCache.get(1));
-
-    // Create a future which blocks to put 4. Currently map has acquired 7
-    // permits out of 10
-    ExecutorService pool = Executors.newCachedThreadPool();
-    future = CompletableFuture.supplyAsync(() -> {
-      try {
-        return resourceCache.put(4, "a");
-      } catch (InterruptedException e) {
-        return null;
-      }
-    }, pool);
-    Assertions.assertFalse(future.isDone());
-    Thread.sleep(100);
-    Assertions.assertFalse(future.isDone());
-
-    // Shutdown the thread pool for putting key 4
-    pool.shutdownNow();
-    // Mark the future as cancelled
-    future.cancel(true);
-    // remove key 1 so currently map has acquired 6 permits out of 10
-    resourceCache.remove(1);
     Assertions.assertNull(resourceCache.get(4));
+    Assertions.assertTrue(count.get() == 1);
   }
 
   @Test
@@ -118,8 +85,8 @@ public class TestResourceLimitCache {
     // GIVEN
     final int maxSize = 3;
     Cache<Integer, String> resourceCache =
-        new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-            (k, v) -> new int[] {1}, maxSize);
+        new ResourceCache<>(
+            (k, v) -> 1, maxSize, null);
     for (int i = 1; i <= maxSize; ++i) {
       resourceCache.put(i, ANY_VALUE);
     }

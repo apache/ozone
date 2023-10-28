@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.debug;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -322,9 +322,8 @@ public class TestLDBCli {
   }
 
   private static Map<String, Object> toMap(Object obj) throws IOException {
-    // Have to use the same serializer (Gson) as DBScanner does.
-    // JsonUtils (ObjectMapper) parses object differently.
-    String json = new Gson().toJson(obj);
+    ObjectWriter objectWriter = DBScanner.JsonSerializationHelper.getWriter();
+    String json = objectWriter.writeValueAsString(obj);
     return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 
