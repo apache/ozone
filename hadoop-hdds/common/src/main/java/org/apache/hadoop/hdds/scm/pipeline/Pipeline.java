@@ -304,11 +304,11 @@ public final class Pipeline {
   }
 
   public List<DatanodeDetails> getNodesInOrder() {
-    if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
-      LOG.debug("Nodes in order is empty, delegate to getNodes");
-      return Collections.emptyList();
+    List<DatanodeDetails> nodesInOrder = this.nodesInOrder.get();
+    if (nodesInOrder == null || nodesInOrder.isEmpty()) {
+      LOG.debug("Nodes in order is empty");
     }
-    return nodesInOrder.get();
+    return nodesInOrder;
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
