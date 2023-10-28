@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.commons.collections.map.HashedMap;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
@@ -30,10 +31,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * State represents persisted data of one specific datanode.
  */
 public class MockDatanodeStorage {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(MockDatanodeStorage.class);
 
   private final Map<DatanodeBlockID, BlockData> blocks = new HashedMap();
   private final Map<Long, List<DatanodeBlockID>>
@@ -50,7 +56,56 @@ public class MockDatanodeStorage {
     this.exception = reason;
   }
 
+  private boolean isIncrementalChunkList(BlockData blockData) {
+    for (ContainerProtos.KeyValue kv : blockData.getMetadataList()) {
+      if (kv.getKey().equals("incremental")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
+    if (isIncrementalChunkList(blockData)) {
+      LOG.info("incremental chunk list");
+      putBlockIncremental(blockID, blockData);
+    } else {
+      LOG.info("full chunk list");
+      putBlockFull(blockID, blockData);
+    }
+  }
+
+  private ContainerProtos.KeyValue fullChunkKV =
+      ContainerProtos.KeyValue.newBuilder().setKey("full").setValue("").build();
+
+  private boolean isFullChunk(ChunkInfo chunkInfo) {
+    return (chunkInfo.getMetadataList().contains(fullChunkKV));
+  }
+
+  public void putBlockIncremental(DatanodeBlockID blockID, BlockData blockData) {
+    if (blocks.containsKey(blockID)) {
+      // block already exists. let's append the chunk list to it.
+      BlockData existing = blocks.get(blockID);
+      if (existing.getChunksCount() == 0) {
+        // empty chunk list. override it.
+        putBlockFull(blockID, blockData);
+      } else {
+        // if the last chunk in the existing block is full, append after it.
+        ChunkInfo chunkInfo = existing.getChunks(existing.getChunksCount()-1);
+        if (!isFullChunk(chunkInfo)) {
+          // otherwise, remove it and append
+          existing.getChunksList().remove(existing.getChunksCount()-1);
+        }
+        existing.getChunksList().addAll(blockData.getChunksList());
+      }
+      // TODO: verify the chunk list beginning/offset/len is sane
+    } else {
+      // the block does not exist yet, simply add it
+      putBlockFull(blockID, blockData);
+    }
+  }
+
+  public void putBlockFull(DatanodeBlockID blockID, BlockData blockData) {
     blocks.put(blockID, blockData);
     List<DatanodeBlockID> dnBlocks = containerBlocks
         .getOrDefault(blockID.getContainerID(), new ArrayList<>());
