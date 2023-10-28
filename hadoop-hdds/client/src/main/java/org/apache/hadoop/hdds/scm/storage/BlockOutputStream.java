@@ -121,6 +121,10 @@ public class BlockOutputStream extends OutputStream {
   private int currentBufferRemaining;
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
+  // last chunk holds the buffer from the last complete chunk
+  // so it may be different from currentBuffer
+  // we need this to calculate checksum
+  private ChunkBuffer lastChunkBuffer;
   private final Token<? extends TokenIdentifier> token;
   private int replicationIndex;
   private Pipeline pipeline;
@@ -160,6 +164,13 @@ public class BlockOutputStream extends OutputStream {
     }
     this.containerBlockData = BlockData.newBuilder().setBlockID(
         blkIDBuilder.build()).addMetadata(keyValue);
+    // tell DataNode I will send incremental chunk list
+    if (config.getIncrementalChunkList()) {
+      KeyValue incrkeyValue =
+          KeyValue.newBuilder().setKey("incremental").setValue("").build();
+      this.containerBlockData.addMetadata(incrkeyValue);
+    }
+    this.lastChunkBuffer = ChunkBuffer.allocate(config.getStreamBufferSize(), 0);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
@@ -185,6 +196,8 @@ public class BlockOutputStream extends OutputStream {
         config.getBytesPerChecksum());
     this.clientMetrics = clientMetrics;
     this.pipeline = pipeline;
+    this.lastChunkBuffer =
+        ChunkBuffer.allocate(config.getStreamBufferSize(), 0);
   }
 
   void refreshCurrentBuffer() {
@@ -507,6 +520,11 @@ public class BlockOutputStream extends OutputStream {
       handleInterruptedException(ex, false);
     }
     putFlushFuture(flushPos, flushFuture);
+
+    // remove any chunks in the containerBlockData list.
+    // since they are sent.
+    containerBlockData.clear();
+
     return flushFuture;
   }
 
@@ -701,6 +719,10 @@ public class BlockOutputStream extends OutputStream {
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
 
+    /*if (effectiveChunkSize == config.getStreamBufferSize()) { // 4MB
+      // full chunk
+    }*/
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
@@ -739,7 +761,9 @@ public class BlockOutputStream extends OutputStream {
             setIoException(ce);
             throw ce;
           });
-      containerBlockData.addChunks(chunkInfo);
+      updateContainerBlockData(chunk);
+      //containerBlockData.addChunks(chunkInfo);
+
       clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
       return validateFuture;
     } catch (IOException | ExecutionException e) {
@@ -749,6 +773,68 @@ public class BlockOutputStream extends OutputStream {
       handleInterruptedException(ex, false);
     }
     return null;
+  }
+
+  /**
+   * Update container block data, which is later sent to DataNodes via PutBlock,
+   * using the new chunks sent out via WriteChunk.
+   * @param chunk
+   * @throws OzoneChecksumException
+   */
+  private void updateContainerBlockData(ChunkBuffer chunk) throws OzoneChecksumException {
+    // Update lastChunkBuffer using the new chunk data.
+    // This is used to calculate checksum for the last partial chunk in
+    // containerBlockData which will used by PutBlock.
+
+    // if appending the chunk to last chunk buffer would exceed limit (4MB),
+    // drop the full chunk and leave the rest.
+    if (lastChunkBuffer.remaining() + chunk.remaining() > lastChunkBuffer.limit()) {
+      int remainingSize = lastChunkBuffer.remaining() + chunk.remaining() - lastChunkBuffer.limit();
+
+      // fill last chunk buffer to full
+      lastChunkBuffer.put(chunk, remainingSize, chunk.remaining() - remainingSize);
+      // create chunk info for lastChunkBuffer, which is full
+      ChunkInfo lastChunkInfo = createChunkInfo(lastChunkBuffer);
+      addToBlockData(lastChunkInfo);
+
+      lastChunkBuffer.clear();
+
+      lastChunkBuffer.put(chunk, remainingSize, chunk.remaining() - remainingSize);
+      // create chunk info for lastChunkBuffer, which is partial
+      ChunkInfo lastChunkInfo2 = createChunkInfo(lastChunkBuffer);
+      addToBlockData(lastChunkInfo2);
+    }
+  }
+
+  private ChunkInfo createChunkInfo(ChunkBuffer lastChunkBuffer)
+      throws OzoneChecksumException {
+    // create the chunk info to be sent in PutBlock.
+    ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer);
+    long revisedOffset = 0;
+    int revisedChunkSize = 0;
+    ChunkInfo revisedChunkInfo = ChunkInfo.newBuilder()
+        .setChunkName(blockID.get().getLocalID() + "_chunk_last")
+        .setOffset(revisedOffset)
+        .setLen(revisedChunkSize)
+        .setChecksumData(revisedChecksumData.getProtoBufMessage())
+        .build();
+    if (revisedChunkInfo.getLen() == config.getStreamBufferSize()) {
+      KeyValue keyValue =
+          KeyValue.newBuilder().setKey("full").setValue("").build();
+      revisedChunkInfo.getMetadataList().add(keyValue);
+    }
+    return revisedChunkInfo;
+  }
+
+  private void addToBlockData(ChunkInfo revisedChunkInfo) {
+    if (containerBlockData.getChunksCount() > 0) {
+      ChunkInfo lastChunkInBlockData = containerBlockData.getChunks(
+          containerBlockData.getChunksCount() - 1);
+      if (lastChunkInBlockData.getOffset() == revisedChunkInfo.getOffset()) {
+        containerBlockData.removeChunks(containerBlockData.getChunksCount() - 1);
+      }
+    }
+    containerBlockData.addChunks(revisedChunkInfo);
   }
 
   @VisibleForTesting

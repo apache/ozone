@@ -106,6 +106,22 @@ public interface ChunkBuffer {
     return put(b.asReadOnlyByteBuffer());
   }
 
+  default ChunkBuffer put(ChunkBuffer b, int offset, int length) {
+    int pos = 0;
+    for (ByteBuffer bb : b.asByteBufferList()) {
+      if (pos + bb.limit() < offset) {
+      } else if (pos + bb.limit() < offset + length) {
+        put(bb);
+      } else if (pos > offset + length) {
+        return this;
+      } else {
+        put(bb.array(), 0, length - pos);
+      }
+      pos += bb.limit();
+    }
+    return this;
+  }
+
   /**
    * Duplicate and then set the position and limit on the duplicated buffer.
    * The new limit cannot be larger than the limit of this buffer.
