@@ -150,7 +150,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public void connect() throws Exception {
     // connect to the closest node, if closest node doesn't exist, delegate to
-    // random node.
+    // first node, which is usually the leader in the pipeline.
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning

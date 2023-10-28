@@ -264,31 +264,6 @@ public final class Pipeline {
         "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
-  public DatanodeDetails getRandomNode() throws IOException {
-    return getRandomNode(null);
-  }
-
-  public DatanodeDetails getRandomNode(Set<DatanodeDetails> excluded)
-      throws IOException {
-    final Set<DatanodeDetails> actualExcluded =
-        excluded == null ? Collections.emptySet() : excluded;
-    if (nodeStatus.isEmpty()) {
-      throw new IOException(String.format("Pipeline=%s is empty", id));
-    }
-
-    List<DatanodeDetails> actualNodes = nodeStatus.keySet().stream()
-        .filter(node -> !actualExcluded.contains(node))
-        .collect(Collectors.toList());
-
-    if (actualNodes.size() == 0) {
-      throw new IOException(String.format(
-          "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
-    }
-    int randomNodePosition =
-        new SplittableRandom().nextInt(0, actualNodes.size());
-    return actualNodes.get(randomNodePosition);
-  }
-
   public DatanodeDetails getClosestNode() throws IOException {
     return getClosestNode(null);
   }
