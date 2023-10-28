@@ -300,7 +300,7 @@ public final class Pipeline {
     }
     if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
-      return getRandomNode(excluded);
+      return getFirstNode(excluded);
     }
     for (DatanodeDetails d : nodesInOrder.get()) {
       if (!excluded.contains(d)) {
@@ -333,7 +333,7 @@ public final class Pipeline {
   public List<DatanodeDetails> getNodesInOrder() {
     if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
-      return getNodes();
+      return Collections.emptyList();
     }
     return nodesInOrder.get();
   }

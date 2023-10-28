@@ -152,7 +152,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // connect to the closest node, if closest node doesn't exist, delegate to
     // random node.
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
-        this.pipeline.getRandomNode();
+        this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
     connectToDatanode(dn);
   }
@@ -381,7 +381,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
     if (datanodeList == null) {
-      if (topologyAwareRead) {
+      if (topologyAwareRead && !pipeline.getNodesInOrder().isEmpty()) {
         datanodeList = pipeline.getNodesInOrder();
       } else {
         datanodeList = pipeline.getNodes();
