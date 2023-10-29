@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -36,7 +35,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Class for handling OBS specific tasks.
@@ -48,20 +46,13 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithOBS.class);
 
-  private boolean enableFileSystemPaths;
 
-  public NSSummaryTaskWithOBS(ReconNamespaceSummaryManager
-                                  reconNamespaceSummaryManager,
-                              ReconOMMetadataManager
-                                  reconOMMetadataManager,
-                              OzoneConfiguration
-                                  ozoneConfiguration) {
+  public NSSummaryTaskWithOBS(
+      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+      ReconOMMetadataManager reconOMMetadataManager,
+      OzoneConfiguration ozoneConfiguration) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
-    // true if FileSystemPaths enabled
-    enableFileSystemPaths = ozoneConfiguration
-        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
 
@@ -80,7 +71,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           OmKeyInfo keyInfo = kv.getValue();
 
           // KeyTable entries belong to both Legacy and OBS buckets.
-          // Check bucket layout and if it's Legacy-FS
+          // Check bucket layout and if it's anything other than OBS,
           // continue to the next iteration.
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
@@ -118,38 +109,27 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   /**
    * KeyTable entries don't have the parentId set.
-   * In order to reuse the existing FSO methods that rely on
+   * In order to reuse the existing methods that rely on
    * the parentId, we have to set it explicitly.
+   * Note: For an OBS key, the parentId will always correspond to the ID of the
+   * OBS bucket in which it is located.
    *
    * @param keyInfo
    * @throws IOException
    */
-  private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
-    System.out.println("#### INSIDE NSSummaryTaskWithOBS #### ");
-    // keyPath: [key1-legacy]
-    // OM_KEY_PREFIX: /
-    System.out.println("keyName: " + keyInfo.getKeyName());
-    System.out.println("OM_KEY_PREFIX: " + OM_KEY_PREFIX);
-
+  private void setKeyParentID(OmKeyInfo keyInfo)
+      throws IOException {
     String bucketKey = getReconOMMetadataManager()
         .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-
-    // bucketKey: /s3v/legacy-bucket
-    System.out.println("bucketKey: " + bucketKey);
-
     OmBucketInfo parentBucketInfo =
         getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
-
-    System.out.println("parentBucketInfo: " + parentBucketInfo);
 
     if (parentBucketInfo != null) {
       keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
     } else {
       throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithOBS is null");
+          "NSSummaryTaskWithLegacy is null");
     }
-    System.out.println("#### GOING OUTSIDE NSSummaryTaskWithOBS #### ");
-
   }
 
 }
