@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -33,7 +34,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 
 /**
@@ -106,6 +110,98 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     LOG.info("Completed a reprocess run of NSSummaryTaskWithOBS");
     return true;
   }
+
+  public boolean processWithOBS(OMUpdateEventBatch events) {
+    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+
+    while (eventIterator.hasNext()) {
+      OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
+          eventIterator.next();
+      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+
+      // We only process updates on OM's KeyTable
+      String table = omdbUpdateEvent.getTable();
+      boolean updateOnKeyTable = table.equals(KEY_TABLE);
+      if (!updateOnKeyTable) {
+        continue;
+      }
+
+      String updatedKey = omdbUpdateEvent.getKey();
+
+      try {
+        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        Object value = keyTableUpdateEvent.getValue();
+        Object oldValue = keyTableUpdateEvent.getOldValue();
+        if (!(value instanceof OmKeyInfo)) {
+          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+              value.getClass().getName(), updatedKey);
+          continue;
+        }
+        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+
+        // KeyTable entries belong to both OBS and Legacy buckets.
+        // Check bucket layout and if it's anything other than OBS,
+        // continue to the next iteration.
+        String volumeName = updatedKeyInfo.getVolumeName();
+        String bucketName = updatedKeyInfo.getBucketName();
+        String bucketDBKey =
+            getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
+        // Get bucket info from bucket table
+        OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
+            .getSkipCache(bucketDBKey);
+
+        if (omBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
+          continue;
+        }
+
+        setKeyParentID(updatedKeyInfo);
+
+        switch (action) {
+        case PUT:
+          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+          break;
+        case DELETE:
+          handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+          break;
+        case UPDATE:
+          if (oldKeyInfo != null) {
+            // delete first, then put
+            setKeyParentID(oldKeyInfo);
+            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+          } else {
+            LOG.warn("Update event does not have the old keyInfo for {}.",
+                updatedKey);
+          }
+          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+          break;
+        default:
+          LOG.debug("Skipping DB update event: {}", action);
+        }
+
+        if (!checkAndCallFlushToDB(nsSummaryMap)) {
+          return false;
+        }
+      } catch (IOException ioEx) {
+        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
+            ioEx);
+        return false;
+      }
+      if (!checkAndCallFlushToDB(nsSummaryMap)) {
+        return false;
+      }
+    }
+
+    // Flush and commit left-out entries at the end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+      return false;
+    }
+
+    LOG.info("Completed a process run of NSSummaryTaskWithOBS");
+    return true;
+  }
+
 
   /**
    * KeyTable entries don't have the parentId set.
