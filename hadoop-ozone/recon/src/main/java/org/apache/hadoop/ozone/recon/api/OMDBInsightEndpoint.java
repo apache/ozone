@@ -24,10 +24,8 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -50,11 +48,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
@@ -161,149 +159,6 @@ public class OMDBInsightEndpoint {
    * }
    */
 
-  public void omTableIterator() {
-    Map<String, OmDirectoryInfo> directoryMap = readDirectoryTable();
-    Map<String, OmKeyInfo> fileMap = readFileTable();
-    Map<String, OmKeyInfo> keyMap = readKeyTable();
-    Map<ContainerKeyPrefix, Integer> containerMap = readContainerTable();
-    Map<String, NSSummary> nSSummaryMap = readNSSummaryTable();
-
-    String outputPath = "output/";
-    String directoryPath = outputPath + "directoryTable.txt";
-    String filePath = outputPath + "fileTable.txt";
-    String keyPath = outputPath + "keyTable.txt";
-    String containerPath = outputPath + "containerTable.txt";
-    String nSSummaryPath = outputPath + "nSSummaryTable.txt";
-
-    createOutputFolder(outputPath);
-
-    writeTableToFile(directoryPath, directoryMap, (key, value) ->
-        key + "  |  " + value.getObjectID() + "  |  " + value.getParentObjectID());
-
-    writeTableToFile(filePath, fileMap, (key, value) -> key);
-
-    writeTableToFile(keyPath, keyMap, (key, value) -> key + "  |  " + value.getKeyName());
-
-    writeTableToFile(containerPath, containerMap, (key, value) ->
-        key.getKeyPrefix() + "  |  " + key.getContainerId());
-
-//    writeTableToFile(nSSummaryPath, nSSummaryMap, (key, value) -> key + "  |  " + value.getDirName());
-  }
-
-  private void createOutputFolder(String outputPath) {
-    File outputFolder = new File(outputPath);
-    if (!outputFolder.exists()) {
-      boolean success = outputFolder.mkdirs();
-      if (!success) {
-        System.err.println("Failed to create output folder.");
-        return;
-      }
-    }
-  }
-
-
-  private <K, V> void writeTableToFile(String filePath, Map<K, V> table, TableEntryFormatter<K, V> formatter) {
-    File file = new File(filePath);
-    try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-      for (Map.Entry<K, V> entry : table.entrySet()) {
-        String key = entry.getKey().toString();
-        String value = formatter.format(entry.getKey(), entry.getValue());
-        writer.write(key + "  |  " + value + "\n");
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private interface TableEntryFormatter<K, V> {
-    String format(K key, V value);
-  }
-
-  private Map<String, NSSummary> readNSSummaryTable() {
-    Map<String, NSSummary> nSSummaryMap = new LinkedHashMap<>();
-    try (TableIterator<Long, ? extends Table.KeyValue<Long, NSSummary>> iterator =
-             reconNamespaceSummaryManager.getNSSummaryTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<Long, NSSummary> kv = iterator.next();
-        String key = kv.getKey().toString();
-        NSSummary value = kv.getValue();
-        nSSummaryMap.put(key, value);
-        System.out.println("key: " + key + " childDir: " + value.getChildDir() + " " + value.getDirName());
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return nSSummaryMap;
-  }
-
-  private Map<String, OmDirectoryInfo> readDirectoryTable() {
-    Map<String, OmDirectoryInfo> directoryMap = new LinkedHashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator =
-             omMetadataManager.getDirectoryTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> kv = iterator.next();
-        String key = kv.getKey();
-        OmDirectoryInfo value = kv.getValue();
-        directoryMap.put(key, value);
-        System.out.println("key: " + key + " value: " + value.getName() + " objectId : " + value.getObjectID());
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return directoryMap;
-  }
-
-  private Map<String, OmKeyInfo> readFileTable() {
-    Map<String, OmKeyInfo> fileMap = new LinkedHashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator =
-             omMetadataManager.getFileTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        String key = kv.getKey();
-        OmKeyInfo value = kv.getValue();
-        fileMap.put(key, value);
-        System.out.println("key: " + key + " value: " + value.getKeyName());
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return fileMap;
-  }
-
-  private Map<String, OmKeyInfo> readKeyTable() {
-    Map<String, OmKeyInfo> keyMap = new LinkedHashMap<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator =
-             omMetadataManager.getKeyTable(BucketLayout.LEGACY).iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        String key = kv.getKey();
-        OmKeyInfo value = kv.getValue();
-        keyMap.put(key, value);
-        System.out.println("key: " + key + " value: " + value.getKeyName());
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return keyMap;
-  }
-
-  private Map<ContainerKeyPrefix, Integer> readContainerTable() {
-    Map<ContainerKeyPrefix, Integer> containerMap = new LinkedHashMap<>();
-    try (TableIterator<ContainerKeyPrefix, ? extends Table.KeyValue<ContainerKeyPrefix, Integer>> containerIterator =
-             reconContainerMetadataManager.getContainerTableIterator()) {
-      while (containerIterator.hasNext()) {
-        Table.KeyValue<ContainerKeyPrefix, Integer> kv = containerIterator.next();
-        ContainerKeyPrefix key = kv.getKey();
-        Integer value = kv.getValue();
-        containerMap.put(key, value);
-        System.out.println("key: " + key + " value: " + value);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    return containerMap;
-  }
-
   @GET
   @Path("/open")
   public Response getOpenKeyInfo(
@@ -317,7 +172,6 @@ public class OMDBInsightEndpoint {
       @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_NON_FSO)
       @QueryParam(RECON_OPEN_KEY_INCLUDE_NON_FSO)
           boolean includeNonFso) {
-    omTableIterator();
     KeyInsightInfoResponse openKeyInsightInfo = new KeyInsightInfoResponse();
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();

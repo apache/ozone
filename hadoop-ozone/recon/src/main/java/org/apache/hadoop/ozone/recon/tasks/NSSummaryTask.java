@@ -101,7 +101,6 @@ public class NSSummaryTask implements ReconOmTask {
     boolean success;
     success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (success) {
-
       success = nsSummaryTaskWithLegacy.processWithLegacy(events);
     } else {
       LOG.error("processWithFSO failed.");
@@ -109,9 +108,8 @@ public class NSSummaryTask implements ReconOmTask {
     if (success) {
       success = nsSummaryTaskWithOBS.processWithOBS(events);
     } else {
-      LOG.error("processWithFSO failed.");
+      LOG.error("processWithOBS failed.");
     }
-
     return new ImmutablePair<>(getTaskName(), success);
   }
 
