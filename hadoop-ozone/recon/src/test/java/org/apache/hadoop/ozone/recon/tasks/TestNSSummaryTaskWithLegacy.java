@@ -739,6 +739,6 @@ public final class TestNSSummaryTaskWithLegacy {
   }
 
   private static BucketLayout getBucketLayout() {
-    return BucketLayout.OBJECT_STORE;
+    return BucketLayout.LEGACY;
   }
 }
