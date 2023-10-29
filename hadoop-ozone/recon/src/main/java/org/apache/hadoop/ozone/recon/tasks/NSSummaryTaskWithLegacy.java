@@ -233,13 +233,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           if (omBucketInfo.getBucketLayout()
               .isObjectStore(enableFileSystemPaths)) {
-            // For OBS buckets and Legacy buckets with enable file system paths
-            // set to TRUE, the only parent they can have is the bucket itself.
-            setParentObjectIDForBucket(keyInfo);
-            handlePutKeyEventForObjectStoreLayout(keyInfo, nsSummaryMap);
-            if (!checkAndCallFlushToDB(nsSummaryMap)) {
-              return false;
-            }
             continue;
           }
 
@@ -285,58 +278,39 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
     String[] keyPath = keyInfo.getKeyName().split(OM_KEY_PREFIX);
 
+    // If the path contains only one key then keyPath.length
+    // will be 1 and the parent will be a bucket.
+    // If the keyPath.length is greater than 1 then
+    // there is at least one directory.
     if (keyPath.length > 1) {
-      setParentObjectIDForDirectory(keyInfo, keyPath);
+      String[] dirs = Arrays.copyOf(keyPath, keyPath.length - 1);
+      String parentKeyName = String.join(OM_KEY_PREFIX, dirs);
+      parentKeyName += OM_KEY_PREFIX;
+      String fullParentKeyName =
+          getReconOMMetadataManager().getOzoneKey(keyInfo.getVolumeName(),
+              keyInfo.getBucketName(), parentKeyName);
+      OmKeyInfo parentKeyInfo = getReconOMMetadataManager()
+          .getKeyTable(BUCKET_LAYOUT)
+          .getSkipCache(fullParentKeyName);
+
+      if (parentKeyInfo != null) {
+        keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
+      } else {
+        throw new IOException("ParentKeyInfo for " +
+            "NSSummaryTaskWithLegacy is null");
+      }
     } else {
-      setParentObjectIDForBucket(keyInfo);
+      String bucketKey = getReconOMMetadataManager()
+          .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
+      OmBucketInfo parentBucketInfo =
+          getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
+
+      if (parentBucketInfo != null) {
+        keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
+      } else {
+        throw new IOException("ParentKeyInfo for " +
+            "NSSummaryTaskWithLegacy is null");
+      }
     }
   }
-
-  /**
-   * Set the parent object ID for a directory.
-   * @param keyInfo
-   * @param keyPath
-   * @throws IOException
-   */
-  private void setParentObjectIDForDirectory(OmKeyInfo keyInfo,
-                                             String[] keyPath)
-      throws IOException {
-    String[] dirs = Arrays.copyOf(keyPath, keyPath.length - 1);
-    String parentKeyName = String.join(OM_KEY_PREFIX, dirs);
-    parentKeyName += OM_KEY_PREFIX;
-    String fullParentKeyName =
-        getReconOMMetadataManager().getOzoneKey(keyInfo.getVolumeName(),
-            keyInfo.getBucketName(), parentKeyName);
-    OmKeyInfo parentKeyInfo = getReconOMMetadataManager()
-        .getKeyTable(BUCKET_LAYOUT)
-        .getSkipCache(fullParentKeyName);
-
-    if (parentKeyInfo != null) {
-      keyInfo.setParentObjectID(parentKeyInfo.getObjectID());
-    } else {
-      throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithLegacy is null");
-    }
-  }
-
-  /**
-   * Set the parent object ID for a bucket.
-   * @param keyInfo
-   * @throws IOException
-   */
-  private void setParentObjectIDForBucket(OmKeyInfo keyInfo)
-      throws IOException {
-    String bucketKey = getReconOMMetadataManager()
-        .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-    OmBucketInfo parentBucketInfo =
-        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
-
-    if (parentBucketInfo != null) {
-      keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
-    } else {
-      throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithLegacy is null");
-    }
-  }
-
 }

@@ -92,80 +92,13 @@ public class OBSBucketHandler extends BucketHandler {
   }
 
   /**
-   * KeyTable's key is in the format of "vol/bucket/keyName".
-   * Make use of RocksDB's order to seek to the prefix and avoid full iteration.
-   * Calculating DU only for keys. Skipping any directories and
-   * handling only direct keys.
-   *
-   * @param parentId
-   * @return total DU of direct keys under object
-   * @throws IOException
-   */
-  public long calculateDUUnderObject(long parentId)
-      throws IOException {
-    Table<String, OmKeyInfo> keyTable = getKeyTable();
-
-    long totalDU = 0L;
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
-
-    String seekPrefix = OM_KEY_PREFIX +
-        vol +
-        OM_KEY_PREFIX +
-        bucket +
-        OM_KEY_PREFIX;
-
-    NSSummary nsSummary = getReconNamespaceSummaryManager()
-        .getNSSummary(parentId);
-    // empty bucket
-    if (nsSummary == null) {
-      return 0;
-    }
-
-    if (omBucketInfo.getObjectID() != parentId) {
-      String dirName = nsSummary.getDirName();
-      seekPrefix += dirName;
-    }
-
-    String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-    iterator.seek(seekPrefix);
-    // handle direct keys
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
-      // since the RocksDB is ordered, seek until the prefix isn't matched
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
-
-      String[] keys = dbKey.split(OM_KEY_PREFIX);
-
-      // iteration moved to the next level
-      // and not handling direct keys
-      if (keys.length - seekKeys.length > 1) {
-        continue;
-      }
-
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        // skip directory markers, just include directKeys
-        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-          continue;
-        }
-        totalDU += keyInfo.getReplicatedSize();
-      }
-    }
-
-    return totalDU;
-  }
-
-  /**
    * This method handles disk usage of direct keys.
    *
-   * @param parentId       parent bucket
+   * @param parentId       parent OBS bucket
    * @param withReplica    if withReplica is enabled, set sizeWithReplica
    *                       for each direct key's DU
-   * @param listFile       if listFile is enabled, append key DU as a subpath
+   * @param listFile       if listFile is enabled, append key DU as a children
+   *                       keys
    * @param duData         the current DU data
    * @param normalizedPath the normalized path request
    * @return the total DU of all direct keys
@@ -190,12 +123,11 @@ public class OBSBucketHandler extends BucketHandler {
 
     NSSummary nsSummary = getReconNamespaceSummaryManager()
         .getNSSummary(parentId);
-    // empty bucket
+    // Handle the case of an empty bucket.
     if (nsSummary == null) {
       return 0;
     }
 
-    String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
     iterator.seek(seekPrefix);
 
     while (iterator.hasNext()) {
@@ -203,29 +135,16 @@ public class OBSBucketHandler extends BucketHandler {
       Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
       String dbKey = kv.getKey();
 
+      // Exit loop if the key doesn't match the seekPrefix.
       if (!dbKey.startsWith(seekPrefix)) {
         break;
       }
 
-      String[] keys = dbKey.split(OM_KEY_PREFIX);
-
-      // iteration moved to the next level
-      // and not handling direct keys
-      if (keys.length - seekKeys.length > 1) {
-        continue;
-      }
-
       OmKeyInfo keyInfo = kv.getValue();
       if (keyInfo != null) {
-        // skip directories by checking if they end with '/'
-        // just include directKeys
-        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-          continue;
-        }
         DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        String subpath = buildSubpath(normalizedPath,
-            keyInfo.getFileName());
-        diskUsage.setSubpath(subpath);
+        String objectName = keyInfo.getKeyName();
+        diskUsage.setSubpath(objectName);
         diskUsage.setKey(true);
         diskUsage.setSize(keyInfo.getDataSize());
 
@@ -234,7 +153,7 @@ public class OBSBucketHandler extends BucketHandler {
           keyDataSizeWithReplica += keyDU;
           diskUsage.setSizeWithReplica(keyDU);
         }
-        // list the key as a subpath
+        // List all the keys for the OBS bucket if requested.
         if (listFile) {
           duData.add(diskUsage);
         }
@@ -247,8 +166,17 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * Object stores do not support directories, hence return null.
    *
-   * @param names parsed path request in a list of names
-   * @return directory object ID
+   * @return null
+   */
+  public long calculateDUUnderObject(long parentId)
+      throws IOException {
+    return Long.parseLong(null);
+  }
+
+  /**
+   * Object stores do not support directories, hence return null.
+   *
+   * @return null
    */
   public long getDirObjectId(String[] names) throws IOException {
     return Long.parseLong(null);
@@ -257,18 +185,10 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * Object stores do not support directories, hence return null.
    *
-   * @param names  parsed path request in a list of names
-   * @param cutoff cannot be larger than the names' length. If equals,
-   *               return the directory object id for the whole path
-   * @return directory object ID
+   * @return null
    */
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
     return Long.parseLong(null);
-  }
-
-
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.OBJECT_STORE;
   }
 
 
@@ -280,7 +200,11 @@ public class OBSBucketHandler extends BucketHandler {
     return keyInfo;
   }
 
-  // In OBS buckets we don't have the concept of Directories
+  /**
+   * Object stores do not support directories, hence return null.
+   *
+   * @return null
+   */
   @Override
   public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
     return null;
@@ -290,6 +214,10 @@ public class OBSBucketHandler extends BucketHandler {
     Table keyTable =
         getOmMetadataManager().getKeyTable(getBucketLayout());
     return keyTable;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.OBJECT_STORE;
   }
 
 }

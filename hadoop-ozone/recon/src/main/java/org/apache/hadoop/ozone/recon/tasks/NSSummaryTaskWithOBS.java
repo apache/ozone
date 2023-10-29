@@ -90,8 +90,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           OmBucketInfo omBucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketDBKey);
 
-          if (!omBucketInfo.getBucketLayout()
-              .isObjectStore(enableFileSystemPaths)) {
+          if (omBucketInfo.getBucketLayout() != BucketLayout.OBJECT_STORE) {
             continue;
           }
 
