@@ -19,10 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
@@ -729,6 +726,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   private OMResponse handleError(OMResponse resp) throws OMException {
     if (resp.getStatus() != OK) {
+      if (true) {
+        System.out.println("***** _________stack trace d start _________***** " + this);
+        Arrays.stream(Thread.currentThread().getStackTrace()).forEach(s -> System.out.println(
+            "\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s
+                .getLineNumber() + ")"));
+        System.out.println("***** _________stack trace d end   _________***** " + this);
+      }
+
+
       throw new OMException(resp.getMessage(),
           ResultCodes.values()[resp.getStatus().ordinal()]);
     }

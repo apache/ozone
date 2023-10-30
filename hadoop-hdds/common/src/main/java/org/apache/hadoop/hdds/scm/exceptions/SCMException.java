@@ -138,5 +138,6 @@ public class SCMException extends IOException {
     TIMEOUT,
     CA_ROTATION_IN_PROGRESS,
     CA_ROTATION_IN_POST_PROGRESS,
+    RETRY_ALL_DN_IN_EXCLUDE_LIST,
   }
 }

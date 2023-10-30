@@ -20,10 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -43,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -221,6 +219,14 @@ public class KeyOutputStream extends OutputStream implements Syncable {
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
       throws IOException {
+    System.out.println("******** start trace e_______ ***************");
+    Arrays.stream(Thread.currentThread().getStackTrace())
+        .forEach(s -> System.out.println(
+            "\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s
+                .getLineNumber() + ")"));
+    System.out.println("********* end trace e________ **************");
+
+
     while (len > 0) {
       try {
         BlockOutputStreamEntry current =
@@ -244,8 +250,19 @@ public class KeyOutputStream extends OutputStream implements Syncable {
         len -= writtenLength;
         off += writtenLength;
       } catch (Exception e) {
-        markStreamClosed();
-        throw new IOException(e);
+        if ((e instanceof OMException && ((OMException) e).getResult() ==
+                OMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST)) {
+          System.out.println("************ qqqqqqq______a1, before dn exclude list clean up"
+              + blockOutputStreamEntryPool.getExcludeList().getDatanodes().size());
+          // clean dn from client's exclude list
+          blockOutputStreamEntryPool.getExcludeList().getDatanodes().clear();
+          System.out.println("************ qqqqqqq______a2, after: "
+              + blockOutputStreamEntryPool.getExcludeList().getDatanodes().size());
+          handleWrite(null, 0, len, true);
+        } else {
+          markStreamClosed();
+          throw new IOException(e);
+        }
       }
     }
   }
@@ -329,6 +346,17 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);
     }
+    System.out.println("*********_________b, failedServers/excludeList = "
+        + failedServers.size() + "/" + excludeList.getDatanodes().size());
+
+    if (true) {
+      System.out.println("***** stack trace b start ***** " + this);
+      Arrays.stream(Thread.currentThread().getStackTrace()).forEach(s -> System.out.println(
+          "\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s
+              .getLineNumber() + ")"));
+      System.out.println("***** stack trace b end *****" + this);
+    }
+
 
     // if the container needs to be excluded , add the container to the
     // exclusion list , otherwise add the pipeline to the exclusion list

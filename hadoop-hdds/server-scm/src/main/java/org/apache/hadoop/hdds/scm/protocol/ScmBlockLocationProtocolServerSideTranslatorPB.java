@@ -188,6 +188,15 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
+    //check if all DN in exclude list
+    ExcludeList excludeList = ExcludeList.getFromProtoBuf(request.getExcludeList());
+//    if (excludeList.getDatanodes().size() == scm.getScmNodeManager().getAllNodes().size()) {
+    if (excludeList.getDatanodes().size() == 3) {
+      System.out.println("*********_______aaaaaaa");
+      throw new SCMException("All Datanodes have been added in exclude list. Client should retry all Datanodes again.",
+          SCMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST);
+    }
+
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),

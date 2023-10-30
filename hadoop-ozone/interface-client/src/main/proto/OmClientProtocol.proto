@@ -518,6 +518,7 @@ enum Status {
     S3_SECRET_ALREADY_EXISTS = 92;
     
     INVALID_PATH = 93;
+    RETRY_ALL_DN_IN_EXCLUDE_LIST = 94;
 }
 
 /**

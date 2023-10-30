@@ -23,13 +23,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -153,15 +147,29 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
+      System.out.println("********* eeeeeee________ before scmClient allocateBlock");
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
               excludeList);
+      System.out.println("********* eeeeeee________ after scmClient allocateBlock");
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
         throw new OMException(ex.getMessage(),
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
+      } else if (ex.getResult()
+          .equals(SCMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST)) {
+        if (true) {
+          System.out.println("***** _________stack trace c start _________***** " + this);
+          Arrays.stream(Thread.currentThread().getStackTrace()).forEach(s -> System.out.println(
+              "\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s
+                  .getLineNumber() + ")"));
+          System.out.println("***** _________stack trace c end   _________***** " + this);
+        }
+
+        throw new OMException(ex.getMessage(),
+            OMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST);
       }
       throw ex;
     }

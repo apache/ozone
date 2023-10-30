@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -114,14 +115,30 @@ public class RatisBlockOutputStream extends BlockOutputStream
   @Override
   void putFlushFuture(long flushPos,
       CompletableFuture<ContainerCommandResponseProto> flushFuture) {
+    System.out.println("********* dragonfly______ putFlushFuture : " + flushPos);
+
+    System.out.println("******** start trace dragonfly______ ***************");
+    Arrays.stream(Thread.currentThread().getStackTrace())
+        .forEach(s -> System.out.println(
+            "\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s
+                .getLineNumber() + ")"));
+    System.out.println("********* end trace dragonfly______ **************");
+
+
     commitWatcher.getFutureMap().put(flushPos, flushFuture);
   }
 
   @Override
   void waitOnFlushFutures() throws InterruptedException, ExecutionException {
+    System.out.println("********** butterfly________ 1");
+
+
     // wait for all the transactions to complete
     CompletableFuture.allOf(commitWatcher.getFutureMap().values().toArray(
         new CompletableFuture[0])).get();
+
+    System.out.println("********** butterfly________ 2");
+
   }
 
   @Override

@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,6 +53,15 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
 
   @Override
   void releaseBuffers(long index) {
+
+    System.out.println("******** start trace d_______ ***************");
+    Arrays.stream(Thread.currentThread().getStackTrace())
+        .forEach(s -> System.out.println(
+            "\tat " + s.getClassName() + "." + s.getMethodName() + "(" + s.getFileName() + ":" + s
+                .getLineNumber() + ")"));
+    System.out.println("********* end trace d________ **************");
+
+
     long acked = 0;
     for (ChunkBuffer buffer : remove(index)) {
       acked += buffer.position();
@@ -69,7 +79,12 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
 
   ConcurrentMap<Long, CompletableFuture<
       ContainerCommandResponseProto>> getFutureMap() {
+
+    System.out.println("********* ffffffff______ fmap: " + futureMap.keySet().toArray());
+
     return futureMap;
+
+
   }
 
   @Override

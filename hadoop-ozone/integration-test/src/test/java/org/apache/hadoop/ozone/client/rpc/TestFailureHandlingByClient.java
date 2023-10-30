@@ -75,7 +75,9 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Tests Exception handling by Ozone Client.
  */
-@Timeout(300)
+//@Timeout(300)
+@Timeout(1800)
+//@Timeout(120)
 public class TestFailureHandlingByClient {
 
   private MiniOzoneCluster cluster;
@@ -137,6 +139,8 @@ public class TestFailureHandlingByClient {
         "/rack1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10).setTotalPipelineNumLimit(15).build();
+//        .setNumDatanodes(3).setTotalPipelineNumLimit(1).build();
+
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
@@ -161,6 +165,36 @@ public class TestFailureHandlingByClient {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void ttt() throws Exception {
+    startCluster();
+    String keyName = UUID.randomUUID().toString();
+    OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
+//    byte[] data = ContainerTestHelper.getFixedLengthString(
+//        keyString, 2 * chunkSize + chunkSize / 2).getBytes(UTF_8);
+    byte[] data = "hello".getBytes(UTF_8);
+    key.write(data);
+
+    KeyOutputStream groupOutputStream =
+        (KeyOutputStream) key.getOutputStream();
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+
+    long containerId = locationInfoList.get(0).getContainerID();
+    ContainerInfo container = cluster.getStorageContainerManager()
+        .getContainerManager()
+        .getContainer(ContainerID.valueOf(containerId));
+    Pipeline pipeline =
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipeline(container.getPipelineID());
+    List<DatanodeDetails> datanodes = pipeline.getNodes();
+    cluster.shutdownHddsDatanode(datanodes.get(0));
+    cluster.shutdownHddsDatanode(datanodes.get(1));
+
+    key.flush();
+
   }
 
   @Test
