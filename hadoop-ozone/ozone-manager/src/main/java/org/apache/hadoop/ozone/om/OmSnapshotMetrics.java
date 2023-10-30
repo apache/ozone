@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -37,6 +38,8 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
   }
 
   private static OmSnapshotMetrics instance;
+
+  @SuppressFBWarnings("DC_DOUBLECHECK")
   public static OmSnapshotMetrics getInstance() {
     if (instance != null) {
       return instance;
