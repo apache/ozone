@@ -185,7 +185,7 @@ public class TestContainerPlacement {
 
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     testDir = PathUtils.getTestDir(
         TestContainerPlacement.class);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,

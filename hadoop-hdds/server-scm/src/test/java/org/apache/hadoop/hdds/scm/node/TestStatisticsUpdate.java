@@ -91,7 +91,7 @@ public class TestStatisticsUpdate {
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
 
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(

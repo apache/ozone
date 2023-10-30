@@ -224,7 +224,7 @@ public class TestSCMNodeManager {
 
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       LayoutVersionManager versionManager =
@@ -510,7 +510,7 @@ public class TestSCMNodeManager {
 
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       //TODO: wait for heartbeat to be processed
@@ -535,7 +535,7 @@ public class TestSCMNodeManager {
 
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
     conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
@@ -572,7 +572,7 @@ public class TestSCMNodeManager {
     final int count = 10;
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
@@ -796,7 +796,7 @@ public class TestSCMNodeManager {
 
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         healthCheckInterval, MILLISECONDS);
@@ -1465,7 +1465,7 @@ public class TestSCMNodeManager {
     final int staleCount = 3000;
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100,
         MILLISECONDS);
@@ -1646,7 +1646,7 @@ public class TestSCMNodeManager {
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails datanodeDetails =
@@ -1674,7 +1674,7 @@ public class TestSCMNodeManager {
             versionManager.getMetadataLayoutVersion(),
             versionManager.getSoftwareLayoutVersion());
         nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
-        testClock.fastForward(Duration.ofSeconds(1/10));
+        testClock.fastForward(Duration.ofSeconds(1 / 10));
       }
 
       final long expectedScmUsed = usedPerHeartbeat * (heartbeatCount - 1);
