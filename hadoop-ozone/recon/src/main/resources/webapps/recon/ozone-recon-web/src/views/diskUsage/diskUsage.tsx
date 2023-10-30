@@ -18,7 +18,7 @@
 
 import React from 'react';
 import Plot from 'react-plotly.js';
-import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
+import {Row, Col, Icon, Button, Input, Menu, Dropdown, Tooltip} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
 import {showDataFetchError} from 'utils/common';
@@ -539,7 +539,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     return (
       <div className='du-container'>
         <div className='page-header'>
-          Disk Usage
+          Disk Usage&nbsp;&nbsp;
+          <Tooltip placement="rightTop" title="Shows Disk Usage information only for FSO buckets">
+            <Icon type='info-circle' />
+          </Tooltip>
         </div>
         <div className='content-div'>
           {isLoading ? <span><Icon type='loading'/> Loading...</span> : (
