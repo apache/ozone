@@ -56,6 +56,8 @@ public class TestNSSummaryTaskWithOBS {
   private static final String KEY_THREE = "dir1/dir2/key3";
   private static final String KEY_FOUR = "key4///////////";
   private static final String KEY_FIVE = "//////////";
+  private static final String KEY_SIX = "key6";
+  private static final String KEY_SEVEN = "key7";
 
   private static final String TEST_USER = "TestUser";
 
@@ -68,6 +70,8 @@ public class TestNSSummaryTaskWithOBS {
   private static final long KEY_FOUR_OBJECT_ID = 6L;
   private static final long KEY_THREE_OBJECT_ID = 8L;
   private static final long KEY_FIVE_OBJECT_ID = 9L;
+  private static final long KEY_SIX_OBJECT_ID = 10L;
+  private static final long KEY_SEVEN_OBJECT_ID = 11L;
 
 
   private static final long KEY_ONE_SIZE = 500L;
@@ -77,6 +81,8 @@ public class TestNSSummaryTaskWithOBS {
       ReconConstants.MAX_FILE_SIZE_UPPER_BOUND - 100L;
   private static final long KEY_FOUR_SIZE = 2050L;
   private static final long KEY_FIVE_SIZE = 100L;
+  private static final long KEY_SIX_SIZE = 6000L;
+  private static final long KEY_SEVEN_SIZE = 7000L;
 
   private static Set<Long> bucketOneAns = new HashSet<>();
   private static Set<Long> bucketTwoAns = new HashSet<>();
@@ -203,16 +209,6 @@ public class TestNSSummaryTaskWithOBS {
       }
     }
 
-    // Helper method to check if an array contains a specific value
-    private boolean contains(int[] arr, int value) {
-      for (int num : arr) {
-        if (num == value) {
-          return true;
-        }
-      }
-      return false;
-    }
-
     @Test
     public void testReprocessBucketDirs() {
       // None of the buckets have any child dirs because OBS is flat namespace.
@@ -220,6 +216,173 @@ public class TestNSSummaryTaskWithOBS {
       Set<Long> childDirBucketTwo = nsSummaryForBucket2.getChildDir();
       Assert.assertEquals(0, childDirBucketOne.size());
       Assert.assertEquals(0, childDirBucketTwo.size());
+    }
+
+  }
+
+  /**
+   * Nested class for testing NSSummaryTaskWithLegacy process.
+   */
+  @Nested
+  public class TestProcess {
+
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
+
+    private OMDBUpdateEvent keyEvent1;
+    private OMDBUpdateEvent keyEvent2;
+    private OMDBUpdateEvent keyEvent3;
+    private OMDBUpdateEvent keyEvent4;
+
+    @BeforeEach
+    public void setUp() throws IOException {
+      nSSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
+      nSSummaryTaskWithOBS.processWithOBS(processEventBatch());
+
+      nsSummaryForBucket1 =
+          reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
+      Assert.assertNotNull(nsSummaryForBucket1);
+      nsSummaryForBucket2 =
+          reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
+      Assert.assertNotNull(nsSummaryForBucket2);
+    }
+
+    private OMUpdateEventBatch processEventBatch() throws IOException {
+      // Test PUT Event.
+      // PUT Key6 in Bucket2.
+      String omPutKey =
+          OM_KEY_PREFIX + VOL
+              + OM_KEY_PREFIX + BUCKET_TWO +
+              OM_KEY_PREFIX + KEY_SIX;
+      OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_SIX,
+          KEY_SIX, KEY_SIX_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_SIX_SIZE);
+      keyEvent1 = new OMDBUpdateEvent.
+          OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(omPutKey)
+          .setValue(omPutKeyInfo)
+          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+              .getName())
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .build();
+      // PUT Key7 in Bucket1.
+      omPutKey =
+          OM_KEY_PREFIX + VOL
+              + OM_KEY_PREFIX + BUCKET_ONE +
+              OM_KEY_PREFIX + KEY_SEVEN;
+      omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_ONE, KEY_SEVEN,
+          KEY_SEVEN, KEY_SEVEN_OBJECT_ID, BUCKET_ONE_OBJECT_ID, KEY_SEVEN_SIZE);
+      keyEvent2 = new OMDBUpdateEvent.
+          OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(omPutKey)
+          .setValue(omPutKeyInfo)
+          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+              .getName())
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .build();
+
+      // Test DELETE Event.
+      // Delete Key1 in Bucket1.
+      String omDeleteKey =
+          OM_KEY_PREFIX + VOL
+              + OM_KEY_PREFIX + BUCKET_ONE +
+              OM_KEY_PREFIX + KEY_ONE;
+      OmKeyInfo omDeleteKeyInfo = buildOmKeyInfo(VOL, BUCKET_ONE, KEY_ONE,
+          KEY_ONE, KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID, KEY_ONE_SIZE);
+      keyEvent3 = new OMDBUpdateEvent.
+          OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(omDeleteKey)
+          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+              .getName())
+          .setValue(omDeleteKeyInfo)
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .build();
+
+      // Test UPDATE Event.
+      // Resize Key2 in Bucket1.
+      String omResizeKey =
+          OM_KEY_PREFIX + VOL
+              + OM_KEY_PREFIX + BUCKET_ONE +
+              OM_KEY_PREFIX + KEY_TWO;
+      OmKeyInfo oldOmResizeKeyInfo =
+          buildOmKeyInfo(VOL, BUCKET_ONE, KEY_TWO, KEY_TWO, KEY_TWO_OBJECT_ID,
+              BUCKET_ONE_OBJECT_ID, KEY_TWO_OLD_SIZE);
+      OmKeyInfo newOmResizeKeyInfo =
+          buildOmKeyInfo(VOL, BUCKET_ONE, KEY_TWO, KEY_TWO, KEY_TWO_OBJECT_ID,
+              BUCKET_ONE_OBJECT_ID, KEY_TWO_OLD_SIZE + 100);
+      keyEvent4 = new OMDBUpdateEvent.
+          OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(omResizeKey)
+          .setOldValue(oldOmResizeKeyInfo)
+          .setValue(newOmResizeKeyInfo)
+          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+              .getName())
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+          .build();
+
+      OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
+          new ArrayList<OMDBUpdateEvent>() {{
+            add(keyEvent1);
+            add(keyEvent2);
+            add(keyEvent3);
+            add(keyEvent4);
+          }});
+
+      return omUpdateEventBatch;
+    }
+
+    @Test
+    public void testProcessForCount() throws IOException {
+      Assert.assertNotNull(nsSummaryForBucket1);
+      Assert.assertEquals(3, nsSummaryForBucket1.getNumOfFiles());
+      Assert.assertNotNull(nsSummaryForBucket2);
+      Assert.assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
+
+      Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
+      Assert.assertEquals(0, childDirBucket1.size());
+      Set<Long> childDirBucket2 = nsSummaryForBucket2.getChildDir();
+      Assert.assertEquals(0, childDirBucket2.size());
+    }
+
+    @Test
+    public void testProcessForSize() throws IOException {
+      Assert.assertNotNull(nsSummaryForBucket1);
+      Assert.assertEquals(
+          KEY_THREE_SIZE + KEY_SEVEN_SIZE + KEY_TWO_OLD_SIZE + 100,
+          nsSummaryForBucket1.getSizeOfFiles());
+      Assert.assertNotNull(nsSummaryForBucket2);
+      Assert.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE,
+          nsSummaryForBucket2.getSizeOfFiles());
+    }
+
+
+    @Test
+    public void testProcessFileBucketSize() {
+      int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
+      int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket1.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket2.length);
+
+      // Check for 1's and 0's in fileDistBucket1
+      int[] expectedIndexes1 = {1, 3, 40};
+      for (int index = 0; index < fileDistBucket1.length; index++) {
+        if (contains(expectedIndexes1, index)) {
+          Assert.assertEquals(1, fileDistBucket1[index]);
+        } else {
+          Assert.assertEquals(0, fileDistBucket1[index]);
+        }
+      }
+
+      // Check for 1's and 0's in fileDistBucket2
+      int[] expectedIndexes2 = {0, 2, 3};
+      for (int index = 0; index < fileDistBucket2.length; index++) {
+        if (contains(expectedIndexes2, index)) {
+          Assert.assertEquals(1, fileDistBucket2[index]);
+        } else {
+          Assert.assertEquals(0, fileDistBucket2[index]);
+        }
+      }
     }
 
   }
@@ -340,6 +503,48 @@ public class TestNSSummaryTaskWithOBS {
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo1);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
+  }
+
+  /**
+   * Build a key info for put/update action.
+   * @param volume volume name
+   * @param bucket bucket name
+   * @param key key name
+   * @param fileName file name
+   * @param objectID object ID
+   * @param parentObjectId parent object ID
+   * @param dataSize file size
+   * @return the KeyInfo
+   */
+  private static OmKeyInfo buildOmKeyInfo(String volume,
+                                          String bucket,
+                                          String key,
+                                          String fileName,
+                                          long objectID,
+                                          long parentObjectId,
+                                          long dataSize) {
+    return new OmKeyInfo.Builder()
+        .setBucketName(bucket)
+        .setVolumeName(volume)
+        .setKeyName(key)
+        .setFileName(fileName)
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+        .setObjectID(objectID)
+        .setParentObjectID(parentObjectId)
+        .setDataSize(dataSize)
+        .build();
+  }
+
+  // Helper method to check if an array contains a specific value
+  private boolean contains(int[] arr, int value) {
+    for (int num : arr) {
+      if (num == value) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static BucketLayout getBucketLayout() {
