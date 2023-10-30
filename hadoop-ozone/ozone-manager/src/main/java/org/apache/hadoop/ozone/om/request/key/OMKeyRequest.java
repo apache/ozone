@@ -162,6 +162,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
         throw new OMException(ex.getMessage(),
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
+      } else if (ex.getResult()
+          .equals(SCMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST)) {
+        throw new OMException(ex.getMessage(),
+            OMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST);
       }
       throw ex;
     }

@@ -244,8 +244,15 @@ public class KeyOutputStream extends OutputStream implements Syncable {
         len -= writtenLength;
         off += writtenLength;
       } catch (Exception e) {
-        markStreamClosed();
-        throw new IOException(e);
+        if ((e instanceof OMException && ((OMException) e).getResult() ==
+            OMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST)) {
+          // clean up all datanodes from client's exclude list
+          blockOutputStreamEntryPool.getExcludeList().getDatanodes().clear();
+          handleWrite(null, 0, len, true);
+        } else {
+          markStreamClosed();
+          throw new IOException(e);
+        }
       }
     }
   }

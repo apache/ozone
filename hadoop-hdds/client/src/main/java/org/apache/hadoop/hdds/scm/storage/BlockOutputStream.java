@@ -546,6 +546,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       handleFlushInternal(close);
     } catch (ExecutionException e) {
+      failedServers.addAll(getPipeline().getNodes());
       handleExecutionException(e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
