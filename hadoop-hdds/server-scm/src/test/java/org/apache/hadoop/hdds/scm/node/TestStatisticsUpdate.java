@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.time.ZoneId;
+import java.time.Duration;
+import java.time.Instant;
 
 /**
  * Verifies the statics in NodeManager.
@@ -85,6 +89,10 @@ public class TestStatisticsUpdate {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant,zoneId);
+
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
         datanode1.getUuid(), datanode1.getUuidString(), 100, 10, 90, null);
@@ -129,11 +137,11 @@ public class TestStatisticsUpdate {
         .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
         .build();
     nodeManager.processHeartbeat(datanode2, layoutInfo);
-    Thread.sleep(1000);
+    testClock.fastForward(Duration.ofSeconds(1));
     nodeManager.processHeartbeat(datanode2, layoutInfo);
-    Thread.sleep(1000);
+    testClock.fastForward(Duration.ofSeconds(1));
     nodeManager.processHeartbeat(datanode2, layoutInfo);
-    Thread.sleep(1000);
+    testClock.fastForward(Duration.ofSeconds(1));
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
