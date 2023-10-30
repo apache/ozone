@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,12 +38,13 @@ import java.util.regex.Pattern;
 import org.mockito.Mockito;
 import picocli.CommandLine;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 
 /**
- * Unit tests to validate the DecommissionSubCommand class includes the
+ * Unit tests to validate the DecommissionStatusSubCommand class includes the
  * correct output when executed against a mock client.
  */
 public class TestDecommissionStatusSubCommand {
@@ -76,8 +77,8 @@ public class TestDecommissionStatusSubCommand {
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> getNodeDetails(2));
 
-    CommandLine decom = new CommandLine(decomCmd);
-    decom.parseArgs("host0", "host1");
+    CommandLine c = new CommandLine(decomCmd);
+    c.parseArgs("host0", "host1");
     decomCmd.execute(scmClient);
     cmd.execute(scmClient);
 
@@ -86,18 +87,18 @@ public class TestDecommissionStatusSubCommand {
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
-    p = Pattern.compile("^host0$", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host0\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
-    p = Pattern.compile("^host1$", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
     p = Pattern.compile("Decommission\\sStatus:\\s" +
         "DECOMMISSIONED\\s-\\s\\d\\snodes\n");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    Assert.assertFalse(m.find());
+    assertFalse(m.find());  // only decommissioning nodes are printed
   }
 
   @Test
@@ -138,6 +139,31 @@ public class TestDecommissionStatusSubCommand {
     assertTrue(m.find());
   }
 
+  @Test
+  public void testIdOptionWhenDecommissionStatus() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> nodes = getNodeDetails(2);
+    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+        .thenAnswer(invocation -> nodes);
+
+    CommandLine decom = new CommandLine(decomCmd);
+    decom.parseArgs("host0", "host1");
+    decomCmd.execute(scmClient);
+    UUID uuid = DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())
+        .getUuid();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--id",uuid.toString());
+    cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+  }
+
   private List<HddsProtos.Node> getNodeDetails(int n) {
     List<HddsProtos.Node> nodes = new ArrayList<>();
 
@@ -153,23 +179,9 @@ public class TestDecommissionStatusSubCommand {
       dnd.setUuid(UUID.randomUUID().toString());
 
       HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();
-      if (i == 0) {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.IN_SERVICE);
-        builder.addNodeStates(HddsProtos.NodeState.STALE);
-      } else if (i == 1) {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.DECOMMISSIONING);
-        builder.addNodeStates(HddsProtos.NodeState.DEAD);
-      } else if (i == 2) {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.IN_SERVICE);
-        builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
-      } else {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.IN_SERVICE);
-        builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
-      }
+      builder.addNodeOperationalStates(
+          HddsProtos.NodeOperationalState.IN_SERVICE);
+      builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       builder.setNodeID(dnd.build());
       nodes.add(builder.build());
     }
