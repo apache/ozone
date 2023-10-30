@@ -41,10 +41,15 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
     if (instance != null) {
       return instance;
     }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    instance = ms.register(SOURCE_NAME,
-        "Snapshot Manager Metrics",
-        new OmSnapshotMetrics());
+
+    synchronized (OmSnapshotMetrics.class) {
+      if (instance == null) {
+        MetricsSystem ms = DefaultMetricsSystem.instance();
+        instance = ms.register(SOURCE_NAME,
+            "Snapshot Manager Metrics",
+            new OmSnapshotMetrics());
+      }
+    }
     return instance;
   }
 
