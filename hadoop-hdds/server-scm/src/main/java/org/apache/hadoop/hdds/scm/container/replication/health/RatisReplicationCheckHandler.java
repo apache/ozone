@@ -95,7 +95,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           underHealth.isReplicatedOkAfterPending(),
           underHealth.isUnrecoverable(), underHealth.hasHealthyReplicas());
 
-      if (underHealth.isUnrecoverable() && container.getSequenceId() > 0) {
+      if (underHealth.isUnrecoverable()) {
         report.incrementAndSample(ReplicationManagerReport.HealthState.MISSING,
             container.containerID());
         return true;
@@ -169,9 +169,6 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
 
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
-    if (container.getSequenceId() == 0) {
-      return new ContainerHealthResult.HealthyResult(container);
-    }
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
     // Note that this setting is minReplicasForMaintenance. For EC the variable

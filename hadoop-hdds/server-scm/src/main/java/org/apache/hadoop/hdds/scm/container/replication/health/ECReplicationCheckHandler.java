@@ -113,9 +113,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
 
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
-    if (container.getSequenceId() == 0) {
-      return new ContainerHealthResult.HealthyResult(container);
-    }
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
     ECContainerReplicaCount replicaCount =

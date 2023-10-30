@@ -638,7 +638,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    */
   @Override
   public boolean isUnrecoverable() {
-    return container.getSequenceId() > 0 && getReplicas().isEmpty();
+    return getReplicas().isEmpty();
   }
 
   public UnderReplicatedHealthResult toUnderHealthResult() {
