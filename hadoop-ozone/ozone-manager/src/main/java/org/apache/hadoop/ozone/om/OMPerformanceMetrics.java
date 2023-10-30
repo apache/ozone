@@ -92,6 +92,12 @@ public class OMPerformanceMetrics {
   @Metric(about = "listKeys latency in nanoseconds")
   private MutableRate listKeysLatencyNs;
 
+  @Metric(about = "ACLs check latency in listkeys")
+  private MutableRate listKeysAclCheckLatencyNs;
+
+  @Metric(about = "listKeysResolveBucketLink latency nanoseconds")
+  private MutableRate listKeysResolveBucketLatencyNs;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -159,5 +165,11 @@ public class OMPerformanceMetrics {
 
   public void addListKeysLatencyNs(long latencyInNs) {
     listKeysLatencyNs.add(latencyInNs);
+  }
+  public MutableRate getListKeysAclCheckLatencyNs(){
+    return listKeysAclCheckLatencyNs;
+  }
+  public MutableRate getListKeysResolveBucketLatencyNs() {
+    return listKeysResolveBucketLatencyNs;
   }
 }
