@@ -152,7 +152,7 @@ public class TestDecommissionStatusSubCommand {
     UUID uuid = DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())
         .getUuid();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--id",uuid.toString());
+    c.parseArgs("--id", uuid.toString());
     cmd.execute(scmClient);
 
     Pattern p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
