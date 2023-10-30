@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.Assert;
@@ -632,9 +633,13 @@ public class TestSCMNodeManager {
           versionManager.getMetadataLayoutVersion(),
           versionManager.getSoftwareLayoutVersion());
 
+      long before = Time.now();
       long expiry = System.currentTimeMillis() / 1000 + 1000;
       nodeManager.setNodeOperationalState(dn,
           HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, expiry);
+      long after = Time.now();
+      assertTrue(nodeManager.getLastStateChangeTime(dn) >= before);
+      assertTrue(nodeManager.getLastStateChangeTime(dn) <= after);
 
       // If found mismatch, leader SCM fires a SetNodeOperationalStateCommand
       // to update the opState persisted in Datanode.

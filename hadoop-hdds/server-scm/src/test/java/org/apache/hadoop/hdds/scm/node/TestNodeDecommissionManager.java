@@ -37,6 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -149,6 +150,8 @@ public class TestNodeDecommissionManager {
       throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();
 
+    Assert.assertTrue(decom.getContainerMap().isEmpty());
+    Assert.assertTrue(decom.getPipelineMap().isEmpty());
     // Decommission 2 valid nodes
     decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress()));
@@ -157,10 +160,27 @@ public class TestNodeDecommissionManager {
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
 
+    // The nodes must have been added to the container and pipeline maps
+    Map<UUID, Integer> pipelineMap = decom.getPipelineMap();
+    Map<UUID, Map<HddsProtos.LifeCycleState, Long>> containerMap =
+        decom.getContainerMap();
+    Assert.assertTrue(containerMap.containsKey(dns.get(1)
+        .getUuid()));
+    Assert.assertTrue(containerMap.containsKey(dns.get(2)
+        .getUuid()));
+    Assert.assertTrue(pipelineMap.containsKey(dns.get(1)
+        .getUuid()));
+    Assert.assertTrue(pipelineMap.containsKey(dns.get(2)
+        .getUuid()));
+
     // Running the command again gives no error - nodes already decommissioning
     // are silently ignored.
     decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress()));
+    assertEquals(pipelineMap.get(dns.get(1).getUuid()),
+        decom.getPipelineMap().get(dns.get(1).getUuid()));
+    assertEquals(containerMap.get(dns.get(1).getUuid()),
+        decom.getContainerMap().get(dns.get(1).getUuid()));
 
     // Attempt to decommission dn(10) which has multiple hosts on the same IP
     // and we hardcoded ports to 3456, 4567, 5678
@@ -237,6 +257,8 @@ public class TestNodeDecommissionManager {
 
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(extraDN).getOperationalState());
+    Assert.assertTrue(decom.getContainerMap().containsKey(extraDN.getUuid()));
+    Assert.assertTrue(decom.getPipelineMap().containsKey(extraDN.getUuid()));
 
     decom.recommissionNodes(Arrays.asList(
         extraDN.getIpAddress() + ":" + ratisPort + 1));
