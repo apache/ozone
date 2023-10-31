@@ -36,7 +36,6 @@ public interface BlockManager {
    * @param container - Container for which block need to be added.
    * @param data - Block Data.
    * @return length of the Block.
-   * @throws IOException
    */
   long putBlock(Container container, BlockData data) throws IOException;
 
@@ -48,7 +47,6 @@ public interface BlockManager {
    * @param endOfBlock - The last putBlock call for this block (when
    *                     all the chunks are written and stream is closed)
    * @return length of the Block.
-   * @throws IOException
    */
   long putBlock(Container container, BlockData data, boolean endOfBlock)
       throws IOException;
@@ -59,7 +57,7 @@ public interface BlockManager {
    * @param container - Container from which block needs to be fetched.
    * @param blockID - BlockID of the Block.
    * @return Block Data.
-   * @throws IOException
+   * @throws StorageContainerException when BcsId is unknown or mismatched
    */
   BlockData getBlock(Container container, BlockID blockID)
       throws IOException;
@@ -69,7 +67,7 @@ public interface BlockManager {
    *
    * @param container - Container from which block need to be deleted.
    * @param blockID - ID of the block.
-   * @throws StorageContainerException
+   * @throws UnsupportedOperationException
    */
   void deleteBlock(Container container, BlockID blockID) throws IOException;
 

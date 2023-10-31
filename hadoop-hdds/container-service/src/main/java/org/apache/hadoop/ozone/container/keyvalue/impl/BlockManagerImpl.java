@@ -75,28 +75,11 @@ public class BlockManagerImpl implements BlockManager {
         StorageUnit.BYTES);
   }
 
-  /**
-   * Puts or overwrites a block.
-   *
-   * @param container - Container for which block need to be added.
-   * @param data - BlockData.
-   * @return length of the block.
-   * @throws IOException
-   */
   @Override
   public long putBlock(Container container, BlockData data) throws IOException {
     return putBlock(container, data, true);
   }
-  /**
-   * Puts or overwrites a block.
-   *
-   * @param container - Container for which block need to be added.
-   * @param data - BlockData.
-   * @param endOfBlock - The last putBlock call for this block (when
-   *                     all the chunks are written and stream is closed)
-   * @return length of the block.
-   * @throws IOException
-   */
+
   @Override
   public long putBlock(Container container, BlockData data,
       boolean endOfBlock) throws IOException {
@@ -222,14 +205,6 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  /**
-   * Gets an existing block.
-   *
-   * @param container - Container from which block needs to be fetched.
-   * @param blockID - BlockID of the block.
-   * @return Block Data.
-   * @throws IOException
-   */
   @Override
   public BlockData getBlock(Container container, BlockID blockID)
       throws IOException {
@@ -264,14 +239,6 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  /**
-   * Returns the last committed length of the block.
-   *
-   * @param container - Container from which block need to be fetched.
-   * @param blockID - BlockID of the block.
-   * @return length of the block.
-   * @throws IOException in case, the block key does not exist in db.
-   */
   @Override
   public long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException {
@@ -291,13 +258,6 @@ public class BlockManagerImpl implements BlockManager {
     return defaultReadBufferCapacity;
   }
 
-  /**
-   * Deletes an existing block.
-   *
-   * @param container - Container from which block need to be deleted.
-   * @param blockID - ID of the block.
-   * @throws StorageContainerException
-   */
   @Override
   public void deleteBlock(Container container, BlockID blockID) throws
       IOException {
@@ -307,14 +267,6 @@ public class BlockManagerImpl implements BlockManager {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * List blocks in a container.
-   *
-   * @param container - Container from which blocks need to be listed.
-   * @param startLocalID  - Key to start from, 0 to begin.
-   * @param count - Number of blocks to return.
-   * @return List of Blocks that match the criteria.
-   */
   @Override
   public List<BlockData> listBlock(Container container, long startLocalID, int
       count) throws IOException {
