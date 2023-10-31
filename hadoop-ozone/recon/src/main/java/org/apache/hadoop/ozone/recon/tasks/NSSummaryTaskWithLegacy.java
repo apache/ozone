@@ -115,12 +115,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           continue;
         }
 
-        setKeyParentID(updatedKeyInfo);
+//        setKeyParentID(updatedKeyInfo);
 
         if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
           switch (action) {
           case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
+                !enableFileSystemPaths);
             break;
 
           case DELETE:
@@ -130,13 +131,14 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
-              setKeyParentID(oldKeyInfo);
+//              setKeyParentID(oldKeyInfo);
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                   updatedKey);
             }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
+                !enableFileSystemPaths);
             break;
 
           default:
@@ -231,23 +233,30 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           OmBucketInfo omBucketInfo = omMetadataManager
               .getBucketTable().getSkipCache(bucketDBKey);
 
-          if (omBucketInfo.getBucketLayout()
-              .isObjectStore(enableFileSystemPaths)) {
+          // Skip if Bucket is not a Legacy bucket.
+          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
             continue;
           }
 
-          setKeyParentID(keyInfo);
+          if (enableFileSystemPaths) {
+            // The LEGACY bucket is a file system bucket.
+            setParentDirectoryId(keyInfo);
 
-          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-            OmDirectoryInfo directoryInfo =
-                new OmDirectoryInfo.Builder()
-                    .setName(keyInfo.getKeyName())
-                    .setObjectID(keyInfo.getObjectID())
-                    .setParentObjectID(keyInfo.getParentObjectID())
-                    .build();
-            handlePutDirEvent(directoryInfo, nsSummaryMap);
+            if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+              OmDirectoryInfo directoryInfo =
+                  new OmDirectoryInfo.Builder()
+                      .setName(keyInfo.getKeyName())
+                      .setObjectID(keyInfo.getObjectID())
+                      .setParentObjectID(keyInfo.getParentObjectID())
+                      .build();
+              handlePutDirEvent(directoryInfo, nsSummaryMap);
+            } else {
+              handlePutKeyEvent(keyInfo, nsSummaryMap,false);
+            }
           } else {
-            handlePutKeyEvent(keyInfo, nsSummaryMap);
+            // The LEGACY bucket is an object store bucket.
+            setParentBucketId(keyInfo);
+            handlePutKeyEvent(keyInfo, nsSummaryMap, true);
           }
           if (!checkAndCallFlushToDB(nsSummaryMap)) {
             return false;
@@ -275,7 +284,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
    * @param keyInfo
    * @throws IOException
    */
-  private void setKeyParentID(OmKeyInfo keyInfo) throws IOException {
+  private void setParentDirectoryId(OmKeyInfo keyInfo) throws IOException {
     String[] keyPath = keyInfo.getKeyName().split(OM_KEY_PREFIX);
 
     // If the path contains only one key then keyPath.length
@@ -300,17 +309,27 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             "NSSummaryTaskWithLegacy is null");
       }
     } else {
-      String bucketKey = getReconOMMetadataManager()
-          .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-      OmBucketInfo parentBucketInfo =
-          getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
+      setParentBucketId(keyInfo);
+    }
+  }
 
-      if (parentBucketInfo != null) {
-        keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
-      } else {
-        throw new IOException("ParentKeyInfo for " +
-            "NSSummaryTaskWithLegacy is null");
-      }
+  /**
+   * Set the parent object ID for a bucket.
+   *@paramkeyInfo
+   *@throwsIOException
+   */
+  private void setParentBucketId(OmKeyInfo keyInfo)
+      throws IOException {
+    String bucketKey = getReconOMMetadataManager()
+        .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
+    OmBucketInfo parentBucketInfo =
+        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
+
+    if (parentBucketInfo != null) {
+      keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
+    } else {
+      throw new IOException("ParentKeyInfo for " +
+          "NSSummaryTaskWithLegacy is null");
     }
   }
 }

@@ -212,6 +212,75 @@ public class LegacyBucketHandler extends BucketHandler {
       return 0;
     }
 
+    if (nsSummary.isObjectStore()) {
+      keyDataSizeWithReplica += handleDirectKeysForOBSLayout(
+          parentId, withReplica, listFile, duData, keyTable, seekPrefix );
+    } else {
+      keyDataSizeWithReplica += handleDirectKeysForFSOLayout(
+          parentId, withReplica, listFile, normalizedPath,duData, keyTable, seekPrefix, nsSummary);
+    }
+
+    return keyDataSizeWithReplica;
+  }
+
+
+  public long handleDirectKeysForOBSLayout(long parentId, boolean withReplica,
+                                           boolean listFile,
+                                           List<DUResponse.DiskUsage> duData,
+                                           Table<String, OmKeyInfo> keyTable,
+                                           String seekPrefix)
+      throws IOException {
+
+    long keyDataSizeWithReplica = 0L;
+
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator();
+
+    iterator.seek(seekPrefix);
+
+    while (iterator.hasNext()) {
+      // KeyName : OmKeyInfo-Object
+      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+      String dbKey = kv.getKey();
+
+      // Exit loop if the key doesn't match the seekPrefix.
+      if (!dbKey.startsWith(seekPrefix)) {
+        break;
+      }
+
+      OmKeyInfo keyInfo = kv.getValue();
+      if (keyInfo != null) {
+        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+        String objectName = keyInfo.getKeyName();
+        diskUsage.setSubpath(objectName);
+        diskUsage.setKey(true);
+        diskUsage.setSize(keyInfo.getDataSize());
+
+        if (withReplica) {
+          long keyDU = keyInfo.getReplicatedSize();
+          keyDataSizeWithReplica += keyDU;
+          diskUsage.setSizeWithReplica(keyDU);
+        }
+        // List all the keys for the OBS bucket if requested.
+        if (listFile) {
+          duData.add(diskUsage);
+        }
+      }
+    }
+
+    return keyDataSizeWithReplica;
+  }
+
+  public long handleDirectKeysForFSOLayout(long parentId, boolean withReplica,
+                                           boolean listFile,
+                                           String normalizedPath,
+                                           List<DUResponse.DiskUsage> duData,
+                                           Table<String, OmKeyInfo> keyTable,
+                                           String seekPrefix,
+                                           NSSummary nsSummary) throws IOException {
+
+    long keyDataSizeWithReplica = 0L;
+
     if (omBucketInfo.getObjectID() != parentId) {
       String dirName = nsSummary.getDirName();
       seekPrefix += dirName;
@@ -266,6 +335,7 @@ public class LegacyBucketHandler extends BucketHandler {
 
     return keyDataSizeWithReplica;
   }
+
 
   /**
    * Given a valid path request for a directory,
