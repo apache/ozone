@@ -149,7 +149,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       description = "Specifies the size of Key in bytes to be created. Full" +
           " name --keySize will be removed in later versions. You can" +
           " specify the size using data units like 'GB', 'MB', 'KB', etc.",
-      defaultValue = "10GB",
+      defaultValue = "10KB",
       converter = DataSizeConverter.class
   )
   private DataSize keySize;
