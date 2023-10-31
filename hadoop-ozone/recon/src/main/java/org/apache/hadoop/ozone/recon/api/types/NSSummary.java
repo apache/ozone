@@ -36,25 +36,22 @@ public class NSSummary {
   private int[] fileSizeBucket;
   private Set<Long> childDir;
   private String dirName;
-  private boolean isObjectStoreEntity;
 
   public NSSummary() {
     this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
-         new HashSet<>(), "", false);
+         new HashSet<>(), "");
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
                    int[] bucket,
                    Set<Long> childDir,
-                   String dirName,
-                   boolean isObjectStore) {
+                   String dirName) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
     this.dirName = dirName;
-    this.isObjectStoreEntity = isObjectStore;
   }
 
   public int getNumOfFiles() {
@@ -96,14 +93,6 @@ public class NSSummary {
 
   public void setDirName(String dirName) {
     this.dirName = removeTrailingSlashIfNeeded(dirName);
-  }
-
-  public boolean isObjectStore() {
-    return isObjectStoreEntity;
-  }
-
-  public void setIsObjectStore(boolean isObjectStoreEntity) {
-    this.isObjectStoreEntity = isObjectStoreEntity;
   }
 
   public void addChildDir(long childId) {

@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
-import org.apache.hadoop.hdds.utils.db.*;
+import org.apache.hadoop.hdds.utils.db.IntegerCodec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.ShortCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.hdds.utils.db.Codec;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -45,7 +49,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
   private final Codec<Short> shortCodec = ShortCodec.get();
   private final Codec<Long> longCodec = LongCodec.get();
   private final Codec<String> stringCodec = StringCodec.get();
-  private final Codec<Boolean> booleanCodec = BooleanCodec.get();
   // 1 int fields + 41-length int array
   // + 2 dummy field to track list size/dirName length
   private static final int NUM_OF_INTS =
@@ -61,13 +64,10 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     String dirName = object.getDirName();
     int stringLen = dirName.getBytes(StandardCharsets.UTF_8).length;
     int numOfChildDirs = childDirs.size();
-    boolean isObjectStoreEntity = object.isObjectStore();
     final int resSize = NUM_OF_INTS * Integer.BYTES
         + (numOfChildDirs + 1) * Long.BYTES // 1 long field + list size
         + Short.BYTES // 2 dummy shorts to track length
-        + stringLen // directory name length
-        + 0; // for isObjectStoreEntity as boolean
-
+        + stringLen; // directory name length
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
@@ -84,7 +84,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     }
     out.write(integerCodec.toPersistedFormat(stringLen));
     out.write(stringCodec.toPersistedFormat(dirName));
-    out.write(booleanCodec.toPersistedFormat(isObjectStoreEntity));
     return out.toByteArray();
   }
 
@@ -118,8 +117,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     assert (bytesRead == strLen);
     String dirName = stringCodec.fromPersistedFormat(buffer);
     res.setDirName(dirName);
-    boolean isObjectStoreEntity = in.readBoolean(); // Read boolean directly
-    res.setIsObjectStore(isObjectStoreEntity); // Set isObjectStoreEntity
     return res;
   }
 
@@ -131,7 +128,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     copy.setFileSizeBucket(object.getFileSizeBucket());
     copy.setChildDir(object.getChildDir());
     copy.setDirName(object.getDirName());
-    copy.setIsObjectStore(object.isObjectStore()); // Copy isObjectStoreEntity
     return copy;
   }
 }
