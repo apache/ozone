@@ -34,7 +34,7 @@ public interface BlockManager {
    * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
-   * @param data     - Block Data.
+   * @param data - Block Data.
    * @return length of the Block.
    * @throws IOException
    */
@@ -44,18 +44,19 @@ public interface BlockManager {
    * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
-   * @param data     - Block Data.
-   * @param incrKeyCount - Whether to increase container key count.
+   * @param data - Block Data.
+   * @param endOfBlock - The last putBlock call for this block (when
+   *                     all the chunks are written and stream is closed)
    * @return length of the Block.
    * @throws IOException
    */
-  long putBlock(Container container, BlockData data, boolean incrKeyCount)
+  long putBlock(Container container, BlockData data, boolean endOfBlock)
       throws IOException;
 
   /**
    * Gets an existing block.
    *
-   * @param container - Container from which block need to be get.
+   * @param container - Container from which block needs to be fetched.
    * @param blockID - BlockID of the Block.
    * @return Block Data.
    * @throws IOException
@@ -77,15 +78,19 @@ public interface BlockManager {
    *
    * @param container - Container from which blocks need to be listed.
    * @param startLocalID  - Block to start from, 0 to begin.
-   * @param count    - Number of blocks to return.
+   * @param count - Number of blocks to return.
    * @return List of Blocks that match the criteria.
    */
   List<BlockData> listBlock(Container container, long startLocalID, int count)
       throws IOException;
 
   /**
-   * Returns the last committed block length for the block.
-   * @param blockID blockId
+   * Returns last committed length of the block.
+   *
+   * @param container - Container from which block need to be fetched.
+   * @param blockID - BlockID of the block.
+   * @return length of the block.
+   * @throws IOException in case, the block key does not exist in db.
    */
   long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException;

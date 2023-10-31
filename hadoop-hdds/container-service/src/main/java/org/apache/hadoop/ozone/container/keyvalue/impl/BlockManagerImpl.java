@@ -79,7 +79,7 @@ public class BlockManagerImpl implements BlockManager {
    * Puts or overwrites a block.
    *
    * @param container - Container for which block need to be added.
-   * @param data     - BlockData.
+   * @param data - BlockData.
    * @return length of the block.
    * @throws IOException
    */
@@ -93,7 +93,7 @@ public class BlockManagerImpl implements BlockManager {
    * @param container - Container for which block need to be added.
    * @param data - BlockData.
    * @param endOfBlock - The last putBlock call for this block (when
-   *                   all the chunks are written and stream is closed)
+   *                     all the chunks are written and stream is closed)
    * @return length of the block.
    * @throws IOException
    */
@@ -225,9 +225,9 @@ public class BlockManagerImpl implements BlockManager {
   /**
    * Gets an existing block.
    *
-   * @param container - Container from which block need to be fetched.
+   * @param container - Container from which block needs to be fetched.
    * @param blockID - BlockID of the block.
-   * @return Key Data.
+   * @return Block Data.
    * @throws IOException
    */
   @Override
@@ -265,7 +265,7 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   /**
-   * Returns the length of the committed block.
+   * Returns the last committed length of the block.
    *
    * @param container - Container from which block need to be fetched.
    * @param blockID - BlockID of the block.
@@ -293,6 +293,10 @@ public class BlockManagerImpl implements BlockManager {
 
   /**
    * Deletes an existing block.
+   *
+   * @param container - Container from which block need to be deleted.
+   * @param blockID - ID of the block.
+   * @throws StorageContainerException
    */
   @Override
   public void deleteBlock(Container container, BlockID blockID) throws
@@ -308,7 +312,7 @@ public class BlockManagerImpl implements BlockManager {
    *
    * @param container - Container from which blocks need to be listed.
    * @param startLocalID  - Key to start from, 0 to begin.
-   * @param count    - Number of blocks to return.
+   * @param count - Number of blocks to return.
    * @return List of Blocks that match the criteria.
    */
   @Override
