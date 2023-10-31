@@ -150,10 +150,10 @@ public class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
-    long dataSize = CONTENT.length() + 1;
+    long dataSize = CONTENT.length();
 
     objectEndpoint.put(bucketName, keyName, dataSize, 0, null, body);
-    Assert.assertEquals(dataSize + 1, getKeyDataSize(keyName));
+    Assert.assertEquals(dataSize, getKeyDataSize(keyName));
   }
 
   @Test

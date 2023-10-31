@@ -36,6 +36,7 @@ import javax.ws.rs.core.Response;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -95,70 +96,6 @@ public class TestPartUpload {
   }
 
   @Test
-  public void testPartUploadStreamContentLength()
-      throws IOException, OS3Exception {
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    REST.setHeaders(headers);
-
-    String chunkedContent = "0a;chunk-signature=signature\r\n"
-        + "1234567890\r\n"
-        + "05;chunk-signature=signature\r\n"
-        + "abcde\r\n";
-    when(headers.getHeaderString("x-amz-content-sha256"))
-        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
-    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
-        .thenReturn("15");
-
-    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
-        OzoneConsts.KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-    String content = "Multipart Upload";
-    long contentLength = chunkedContent.length();
-
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(content.getBytes(UTF_8));
-    REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        contentLength, 1, uploadID,
-        new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
-    assertContentLength(uploadID, OzoneConsts.KEY, 15);
-  }
-
-  @Test
-  public void testPartUploadContentLength() throws IOException, OS3Exception {
-    // The contentLength specified when creating the Key should be the same as
-    // the Content-Length, the key Commit will compare the Content-Length with
-    // the actual length of the data written.
-
-    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
-        OzoneConsts.KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-    String content = "Multipart Upload";
-    long contentLength = content.length() + 1;
-
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(content.getBytes(UTF_8));
-    REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        contentLength, 1, uploadID, body);
-    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
-  }
-
-  private void assertContentLength(String uploadID, String key,
-      long contentLength) throws IOException {
-    OzoneMultipartUploadPartListParts parts =
-        client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
-            .listParts(key, uploadID, 0, 100);
-    Assert.assertEquals(1, parts.getPartInfoList().size());
-    Assert.assertEquals(contentLength,
-        parts.getPartInfoList().get(0).getSize());
-  }
-
-  @Test
   public void testPartUploadWithOverride() throws Exception {
 
     Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
@@ -203,5 +140,71 @@ public class TestPartUpload {
       assertEquals("NoSuchUpload", ex.getCode());
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
     }
+  }
+
+  @Test
+  public void testPartUploadStreamContentLength()
+      throws IOException, OS3Exception {
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    ObjectEndpoint objectEndpoint = new ObjectEndpoint();
+    objectEndpoint.setHeaders(headers);
+    objectEndpoint.setClient(client);
+    objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    objectEndpoint.setHeaders(headers);
+    String keyName = UUID.randomUUID().toString();
+
+    String chunkedContent = "0a;chunk-signature=signature\r\n"
+        + "1234567890\r\n"
+        + "05;chunk-signature=signature\r\n"
+        + "abcde\r\n";
+    when(headers.getHeaderString("x-amz-content-sha256"))
+        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
+        .thenReturn("15");
+
+    Response response = objectEndpoint.initializeMultipartUpload(
+        OzoneConsts.S3_BUCKET, keyName);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+    long contentLength = chunkedContent.length();
+
+    objectEndpoint.put(OzoneConsts.S3_BUCKET, keyName, contentLength, 1,
+        uploadID, new ByteArrayInputStream(chunkedContent.getBytes()));
+    assertContentLength(uploadID, keyName, 15);
+  }
+
+  @Test
+  public void testPartUploadContentLength() throws IOException, OS3Exception {
+    // The contentLength specified when creating the Key should be the same as
+    // the Content-Length, the key Commit will compare the Content-Length with
+    // the actual length of the data written.
+
+    String keyName = UUID.randomUUID().toString();
+    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        keyName);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+    String content = "Multipart Upload";
+    long contentLength = content.length();
+
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    REST.put(OzoneConsts.S3_BUCKET, keyName,
+        contentLength, 1, uploadID, body);
+    assertContentLength(uploadID, keyName, content.length());
+  }
+
+  private void assertContentLength(String uploadID, String key,
+      long contentLength) throws IOException {
+    OzoneMultipartUploadPartListParts parts =
+        client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+            .listParts(key, uploadID, 0, 100);
+    Assert.assertEquals(1, parts.getPartInfoList().size());
+    Assert.assertEquals(contentLength,
+        parts.getPartInfoList().get(0).getSize());
   }
 }
