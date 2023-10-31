@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
+import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -49,9 +50,11 @@ public class HadoopFsGenerator extends BaseFreonGenerator
   private String rootPath;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated files (in bytes)",
-      defaultValue = "10240")
-  private long fileSize;
+      description = "Size of the generated files. You can specify the size " +
+          "using data units like 'GB', 'MB', 'KB', etc.",
+      defaultValue = "10KB",
+      converter = DataSizeConverter.class)
+  private DataSize fileSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used store the generated key content",
@@ -95,7 +98,8 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     }
 
     contentGenerator =
-        new ContentGenerator(fileSize, bufferSize, copyBufferSize, flushOrSync);
+        new ContentGenerator(fileSize.toBytes(), bufferSize, copyBufferSize,
+            flushOrSync);
 
     timer = getMetrics().timer("file-create");
 

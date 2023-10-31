@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -96,9 +97,12 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   private String bucketName;
 
   @Option(names = {"-s", "--size"},
-      description = "The size in byte of a file for the Create File/Key op.",
-      defaultValue = "0")
-  private int dataSize;
+      description = "The size in byte of a file for the Create File/Key op. " +
+          "You can specify the size using data units like 'GB', 'MB', 'KB', " +
+          "etc.",
+      defaultValue = "0",
+      converter = DataSizeConverter.class)
+  private DataSize dataSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",
@@ -165,7 +169,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       mixedOperation = true;
     }
     init();
-    contentGenerator = new ContentGenerator(dataSize, bufferSize);
+    contentGenerator = new ContentGenerator(dataSize.toBytes(), bufferSize);
     omKeyArgsBuilder = ThreadLocal.withInitial(this::createKeyArgsBuilder);
     OzoneConfiguration conf = createOzoneConfiguration();
     replicationConfig = ReplicationConfig.getDefault(conf);
@@ -323,7 +327,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     case CREATE_KEY:
       keyName = getPath(counter);
       getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createKey(keyName, dataSize)) {
+        try (OutputStream stream = bucket.createKey(keyName,
+            dataSize.toBytes())) {
           contentGenerator.write(stream);
         }
         return null;
@@ -377,8 +382,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     case CREATE_FILE:
       keyName = getPath(counter);
       getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createFile(
-            keyName, dataSize, replicationConfig, true, false)) {
+        try (
+            OutputStream stream = bucket.createFile(keyName, dataSize.toBytes(),
+                replicationConfig, true, false)) {
           contentGenerator.write(stream);
         }
         return null;

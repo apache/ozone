@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -60,9 +61,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private String bucketName;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated key (in bytes)",
-      defaultValue = "10240")
-  private long keySize;
+      description = "Size of the generated key. You can specify the size " +
+          "using data units like 'GB', 'MB', 'KB', etc.",
+      defaultValue = "10KB",
+      converter = DataSizeConverter.class)
+  private DataSize keySize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",
@@ -97,7 +100,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    contentGenerator = new ContentGenerator(keySize, bufferSize);
+    contentGenerator = new ContentGenerator(keySize.toBytes(), bufferSize);
     metadata = new HashMap<>();
 
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
@@ -123,7 +126,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket.createKey(key, keySize,
+      try (OutputStream stream = bucket.createKey(key, keySize.toBytes(),
           replicationConfig, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
@@ -139,7 +142,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     timer.time(() -> {
       try (OzoneDataStreamOutput stream = bucket.createStreamKey(
-          key, keySize, conf, metadata)) {
+          key, keySize.toBytes(), conf, metadata)) {
         contentGenerator.write(stream);
       }
       return null;

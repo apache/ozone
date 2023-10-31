@@ -70,6 +70,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -146,10 +147,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
   @Option(
       names = {"--key-size", "--keySize"},
       description = "Specifies the size of Key in bytes to be created. Full" +
-          " name --keySize will be removed in later versions.",
-      defaultValue = "10240"
+          " name --keySize will be removed in later versions. You can" +
+          " specify the size using data units like 'GB', 'MB', 'KB', etc.",
+      defaultValue = "10GB",
+      converter = DataSizeConverter.class
   )
-  private long keySize = 10240;
+  private DataSize keySize;
 
   @Option(
       names = {"--validate-writes", "--validateWrites"},
@@ -302,7 +305,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     // Compute the common initial digest for all keys without their UUID
     if (validateWrites) {
       commonInitialMD = DigestUtils.getDigest(DIGEST_ALGORITHM);
-      for (long nrRemaining = keySize; nrRemaining > 0;
+      for (long nrRemaining = keySize.toBytes(); nrRemaining > 0;
           nrRemaining -= bufferSize) {
         int curSize = (int)Math.min(bufferSize, nrRemaining);
         commonInitialMD.update(keyValueBuffer, 0, curSize);
@@ -320,7 +323,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     LOG.info("Number of Volumes: {}.", numOfVolumes);
     LOG.info("Number of Buckets per Volume: {}.", numOfBuckets);
     LOG.info("Number of Keys per Bucket: {}.", numOfKeys);
-    LOG.info("Key size: {} bytes", keySize);
+    LOG.info("Key size: {} bytes", keySize.toBytes());
     LOG.info("Buffer size: {} bytes", bufferSize);
     LOG.info("validateWrites : {}", validateWrites);
     LOG.info("Number of Validate Threads: {}", numOfValidateThreads);
@@ -806,7 +809,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     try {
       try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
-        try (OzoneOutputStream os = bucket.createKey(keyName, keySize,
+        try (OzoneOutputStream os = bucket.createKey(keyName, keySize.toBytes(),
             replicationConfig, new HashMap<>())) {
           long keyCreationDuration = System.nanoTime() - keyCreateStart;
           histograms.get(FreonOps.KEY_CREATE.ordinal())
@@ -816,7 +819,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
           try (AutoCloseable writeScope = TracingUtil
               .createActivatedSpan("writeKeyData")) {
             long keyWriteStart = System.nanoTime();
-            for (long nrRemaining = keySize;
+            for (long nrRemaining = keySize.toBytes();
                  nrRemaining > 0; nrRemaining -= bufferSize) {
               int curSize = (int) Math.min(bufferSize, nrRemaining);
               os.write(keyValueBuffer, 0, curSize);
@@ -826,7 +829,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
             histograms.get(FreonOps.KEY_WRITE.ordinal())
                 .update(keyWriteDuration);
             keyWriteTime.getAndAdd(keyWriteDuration);
-            totalBytesWritten.getAndAdd(keySize);
+            totalBytesWritten.getAndAdd(keySize.toBytes());
             numberOfKeysAdded.getAndIncrement();
           }
         }
@@ -960,7 +963,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       this.numOfBuckets = RandomKeyGenerator.this.numOfBuckets;
       this.numOfKeys = RandomKeyGenerator.this.numOfKeys;
       this.numOfThreads = RandomKeyGenerator.this.numOfThreads;
-      this.keySize = RandomKeyGenerator.this.keySize;
+      this.keySize = RandomKeyGenerator.this.keySize.toBytes();
       this.bufferSize = RandomKeyGenerator.this.bufferSize;
       this.jobStartTime = Time.formatTime(RandomKeyGenerator.this.jobStartTime);
       replicationType = replicationConfig.getReplicationType().name();

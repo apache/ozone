@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Option;
 
 import java.io.IOException;
@@ -46,10 +47,12 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       LoggerFactory.getLogger(AbstractOmBucketReadWriteOps.class);
 
   @Option(names = {"-g", "--size"},
-      description = "Generated data size (in bytes) of each key/file to be " +
-          "written.",
-      defaultValue = "256")
-  private long sizeInBytes;
+      description = "Generated data size of each key/file to be written. " +
+          "You can specify the size using data units like 'GB', 'MB', 'KB', " +
+          "etc.",
+      defaultValue = "256B",
+      converter = DataSizeConverter.class)
+  private DataSize size;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used for generating the key/file content.",
@@ -103,7 +106,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     writeThreadCount = totalThreadCount - readThreadCount;
 
     display();
-    print("SizeInBytes: " + sizeInBytes);
+    print("SizeInBytes: " + size.toBytes());
     print("bufferSize: " + bufferSize);
     print("totalThreadCount: " + totalThreadCount);
     print("readThreadPercentage: " + readThreadPercentage);
@@ -114,7 +117,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     print("numOfWriteOperations: " + numOfWriteOperations);
 
     ozoneConfiguration = createOzoneConfiguration();
-    contentGenerator = new ContentGenerator(sizeInBytes, bufferSize);
+    contentGenerator = new ContentGenerator(size.toBytes(), bufferSize);
     timer = getMetrics().timer("om-bucket-read-write-ops");
 
     initialize(ozoneConfiguration);
@@ -223,6 +226,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
   protected abstract OutputStream create(String pathName) throws IOException;
 
   protected long getSizeInBytes() {
-    return sizeInBytes;
+    return size.toBytes();
   }
 }

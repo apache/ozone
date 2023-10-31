@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.container.stream.StreamingClient;
 import org.apache.hadoop.ozone.container.stream.StreamingServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.unit.DataSize;
 import picocli.CommandLine;
 
 import java.io.FileOutputStream;
@@ -61,9 +62,11 @@ public class StreamingGenerator extends BaseFreonGenerator
   private int numberOfFiles;
 
   @CommandLine.Option(names = {"--size"},
-      description = "Size of the generated files.",
-      defaultValue = "104857600")
-  private long fileSize;
+      description = "Size of the generated files. You can specify the size " +
+          "using data units like 'GB', 'MB', 'KB', etc.",
+      defaultValue = "100MB",
+      converter = DataSizeConverter.class)
+  private DataSize fileSize;
 
   private static final String SUB_DIR_NAME = "dir1";
 
@@ -91,8 +94,8 @@ public class StreamingGenerator extends BaseFreonGenerator
       }
       Path subDir = sourceDir.resolve(SUB_DIR_NAME);
       Files.createDirectories(subDir);
-      ContentGenerator contentGenerator = new ContentGenerator(fileSize,
-          1024);
+      ContentGenerator contentGenerator =
+          new ContentGenerator(fileSize.toBytes(), 1024);
 
       for (int i = 0; i < numberOfFiles; i++) {
         try (FileOutputStream out = new FileOutputStream(
