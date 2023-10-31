@@ -1911,6 +1911,15 @@
   </property>
 
   <property>
+    <name>ozone.client.ec.grpc.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone ec grpc client during write.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.unflushed.transaction.max.count</name>
     <value>10000</value>
     <tag>OZONE, OM</tag>

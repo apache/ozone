@@ -64,6 +64,8 @@
         </dependency>
     </dependencies>
     <properties>
+        <allow.junit4>false</allow.junit4>
+
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
     </properties>

@@ -162,6 +162,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -2209,10 +2210,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Stop service.
    */
-  public void stop() {
+  public boolean stop() {
     LOG.info("{}: Stopping Ozone Manager", omNodeDetails.getOMPrintInfo());
     if (isStopped()) {
-      return;
+      return false;
     }
     try {
       omState = State.STOPPED;
@@ -2270,9 +2271,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omhaMetrics != null) {
         OMHAMetrics.unRegister();
       }
+      return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
+    return false;
   }
 
   public void shutDown(String message) {
@@ -3640,6 +3643,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
+  public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
+      boolean recursive, String startKey, long numEntries,
+      boolean allowPartialPrefixes) throws IOException {
+    List<OzoneFileStatus> ozoneFileStatuses =
+        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+
+    return ozoneFileStatuses.stream()
+        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .collect(Collectors.toList());
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -4064,8 +4079,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * If ratis is not enabled, then it always returns true.
    */
   public boolean isLeaderReady() {
+    final OzoneManagerRatisServer ratisServer = omRatisServer;
     return !isRatisEnabled
-        || omRatisServer.checkLeaderStatus() == LEADER_AND_READY;
+        || (ratisServer != null &&
+            ratisServer.checkLeaderStatus() == LEADER_AND_READY);
   }
 
   /**

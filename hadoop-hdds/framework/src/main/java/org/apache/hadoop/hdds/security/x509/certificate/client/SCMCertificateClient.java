@@ -107,14 +107,12 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    *
    * @return CertificateSignRequest.Builder
    */
-  @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
-        + scmHostname;
+    String subject = SCM_SUB_CA_PREFIX + scmHostname;
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", scmHostname, scmId, cId, subject);
+        "subject:{}", scmHostname, scmId, cId, subject);
 
     return super.getCSRBuilder()
         .setSubject(subject)

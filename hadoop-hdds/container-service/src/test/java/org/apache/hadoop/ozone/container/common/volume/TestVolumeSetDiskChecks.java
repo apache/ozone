@@ -325,7 +325,7 @@ public class TestVolumeSetDiskChecks {
     StateContext stateContext = new StateContext(
         new OzoneConfiguration(), DatanodeStateMachine
         .DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     stateContext.addEndpoint(scm1);
     when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
@@ -373,7 +373,7 @@ public class TestVolumeSetDiskChecks {
 
     DummyChecker(ConfigurationSource conf, Timer timer, int numBadVolumes)
         throws DiskErrorException {
-      super(conf, timer);
+      super(conf, timer, "");
       this.numBadVolumes = numBadVolumes;
     }
 
