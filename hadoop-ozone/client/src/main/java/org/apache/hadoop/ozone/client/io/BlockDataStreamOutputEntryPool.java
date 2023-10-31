@@ -287,4 +287,8 @@ public class BlockDataStreamOutputEntryPool {
     }
     return totalDataLen;
   }
+
+  public long getDataSize() {
+    return keyArgs.getDataSize();
+  }
 }

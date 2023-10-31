@@ -117,6 +117,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
@@ -266,6 +267,8 @@ public class ObjectEndpoint extends EndpointBase {
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
+        length = Long.parseLong(
+            headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
       }
       long putLength = 0;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
@@ -821,6 +824,8 @@ public class ObjectEndpoint extends EndpointBase {
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
+        length = Long.parseLong(
+            headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
       }
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
@@ -842,6 +847,20 @@ public class ObjectEndpoint extends EndpointBase {
           return ObjectEndpointStreaming
               .createMultipartKey(ozoneBucket, key, length, partNumber,
                   uploadID, chunkSize, body);
+        }
+
+        copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+        if (copyHeader != null) {
+          String range =
+              headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
+          if (range != null) {
+            RangeHeader rangeHeader =
+                RangeHeaderParserUtil.parseRangeHeader(range, 0);
+            // When copy Range, the size of the target key is the
+            // length specified by COPY_SOURCE_HEADER_RANGE.
+            length = rangeHeader.getEndOffset() -
+                rangeHeader.getStartOffset() + 1;
+          }
         }
         ozoneOutputStream = getClientProtocol().createMultipartKey(
             volume.getName(), bucket, key, length, partNumber, uploadID);
