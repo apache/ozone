@@ -209,7 +209,7 @@ public class BucketEndpoint extends EndpointBase {
       OzoneKey next = ozoneKeyIterator.next();
       if (bucket.getBucketLayout().isFileSystemOptimized() &&
           StringUtils.isNotEmpty(prefix) &&
-          !next.getName().contains(prefix)) {
+          !next.getName().startsWith(prefix)) {
         // prefix has delimiter but key don't have
         // example prefix: dir1/ key: dir123
         continue;
