@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "npm"
+    directory: "hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "[Recon] Dependabot Package Upgrade: "
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    pull-request-branch-name:
+      separator: "-"
