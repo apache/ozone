@@ -41,7 +41,6 @@ jobs:
       - name: Checkout dependabot branch
         uses: actions/checkout@v4
         with:
-          repository: apache/ozone
           ref: ${{ github.event.pull_request.head.sha }}
           path: ozone
       - name: Delete the lockfile
