@@ -38,13 +38,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -278,12 +278,8 @@ public class TestKeyValueHandler {
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
       DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails())
-          .thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(
+          datanodeDetails, conf);
       KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
           context.getParent().getDatanodeDetails().getUuidString(), cset,
           volumeSet, metrics, c -> {

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -138,7 +139,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId(),
+              ozoneManager.getOMServiceId(),
               ozoneManager.getMetrics());
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
@@ -199,7 +200,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -303,7 +304,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumCreateFileFails();

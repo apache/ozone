@@ -336,6 +336,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private boolean checkContainersReplicatedOnNode(DatanodeDetails dn)
       throws NodeNotFoundException {
     int sufficientlyReplicated = 0;
+    int deleting = 0;
     int underReplicated = 0;
     int unhealthy = 0;
     List<ContainerID> underReplicatedIDs = new ArrayList<>();
@@ -346,6 +347,17 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
+
+        // If a container is deleted or deleting, and we have a replica on this
+        // datanode, just ignore it. It should not block decommission.
+        HddsProtos.LifeCycleState containerState
+            = replicaSet.getContainer().getState();
+        if (containerState == HddsProtos.LifeCycleState.DELETED
+            || containerState == HddsProtos.LifeCycleState.DELETING) {
+          deleting++;
+          continue;
+        }
+
         if (replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager)) {
           sufficientlyReplicated++;
         } else {
@@ -389,9 +401,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
             "in containerManager", cid, dn);
       }
     }
-    LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
-        "unhealthy containers",
-        dn, sufficientlyReplicated, underReplicated, unhealthy);
+    LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
+            "underReplicated and {} unhealthy containers",
+        dn, sufficientlyReplicated, deleting, underReplicated, unhealthy);
     containerStateByHost.put(dn.getHostName(),
         new ContainerStateInWorkflow(dn.getHostName(),
             sufficientlyReplicated,

@@ -135,11 +135,11 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getCertificate());
     client.close();
 
-    // Case 2: If key pair already exist than response should be RECOVER.
+    // Case 2: If key pair already exist than response should be GETCERT.
     client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
-    Assert.assertEquals(CertificateClient.InitResponse.RECOVER, client.init());
+    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());

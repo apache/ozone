@@ -183,6 +183,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY
       = "ozone.grpc.metrics.percentiles.intervals";
 
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
+      "ozone.client.ec.grpc.write.timeout";
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
+
   /**
    * Ozone administrator users delimited by comma.
    * If not set, only the user who launches an ozone service will be the

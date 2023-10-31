@@ -51,12 +51,12 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -83,7 +83,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneManagerPrepare.class);
 
-  public void setup() throws Exception {
+  private void initInstanceVariables() {
     cluster = getCluster();
     store = getObjectStore();
     clientProtocol = store.getClientProxy();
@@ -91,16 +91,25 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   /**
    * Make sure OM is out of Prepare state before executing individual tests.
-   * @throws Exception
    */
   @BeforeEach
-  public void initOM() throws Exception {
-    setup();
+  void setup() throws Exception {
+    initInstanceVariables();
+
     LOG.info("Waiting for OM leader election");
-    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
-        1000, 120_000);
+    waitForLeaderToBeReady();
     submitCancelPrepareRequest();
     assertClusterNotPrepared();
+  }
+
+  /**
+   * Reset cluster between tests.
+   */
+  @AfterEach
+  void resetCluster() throws Exception {
+    if (cluster != null) {
+      cluster.restartOzoneManager();
+    }
   }
 
   /**
@@ -202,7 +211,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // modified cluster.
     shutdown();
     init();
-    setup();
+    initInstanceVariables();
 
     String volumeName = VOLUME + UUID.randomUUID().toString();
     writeKeysAndWaitForLogs(volumeName, 10);

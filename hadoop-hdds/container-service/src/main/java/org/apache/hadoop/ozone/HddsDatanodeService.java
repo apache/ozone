@@ -412,10 +412,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     case FAILURE:
       LOG.error("DN security initialization failed, case:{}.", response);
       throw new RuntimeException("DN security initialization failed.");
-    case RECOVER:
-      LOG.error("DN security initialization failed, case:{}. OM certificate " +
-          "is missing.", response);
-      throw new RuntimeException("DN security initialization failed.");
     default:
       LOG.error("DN security initialization failed. Init response: {}",
           response);

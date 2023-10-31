@@ -22,6 +22,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -129,7 +130,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -268,7 +269,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_REQUEST);
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = getOmClientResponse(omResponse, exception);
@@ -288,7 +289,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
-      OMResponse.Builder omResponse, IOException exception) {
+      OMResponse.Builder omResponse, Exception exception) {
     return new S3MultipartUploadCompleteResponse(
         createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
@@ -328,7 +329,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       MultipartUploadCompleteRequest multipartUploadCompleteRequest,
       List<OzoneManagerProtocolProtos.Part> partsList,
       Map<String, String> auditMap, String volumeName,
-      String bucketName, String keyName, IOException exception,
+      String bucketName, String keyName, Exception exception,
       Result result) {
     auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString()
         .replaceAll("\\n", " "));

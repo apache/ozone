@@ -144,6 +144,7 @@ enum Type {
   ListKeysLight = 126;
   AbortExpiredMultiPartUploads = 127;
   SetSnapshotProperty = 128;
+  ListStatusLight = 129;
 }
 
 enum SafeMode {
@@ -397,6 +398,7 @@ message OMResponse {
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
+  optional ListStatusLightResponse           listStatusLightResponse       = 129;
 }
 
 enum Status {
@@ -507,6 +509,7 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
@@ -515,6 +518,8 @@ enum Status {
     UNAUTHORIZED = 91;
 
     S3_SECRET_ALREADY_EXISTS = 92;
+    
+    INVALID_PATH = 93;
 }
 
 /**
@@ -1126,12 +1131,24 @@ message OzoneFileStatusProto {
 
 }
 
+message OzoneFileStatusProtoLight {
+    optional string volumeName = 1;
+    optional string bucketName = 2;
+    optional BasicKeyInfo basicKeyInfo = 3;
+    optional uint64 blockSize = 4;
+    optional bool isDirectory = 5;
+}
+
 message GetFileStatusRequest {
     required KeyArgs keyArgs = 1;
 }
 
 message GetFileStatusResponse {
     required OzoneFileStatusProto status = 1;
+}
+
+message GetFileStatusLightResponse {
+    required OzoneFileStatusProtoLight status = 1;
 }
 
 message CreateDirectoryRequest {
@@ -1177,6 +1194,10 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+}
+
+message ListStatusLightResponse {
+    repeated OzoneFileStatusProtoLight statuses = 1;
 }
 
 message CreateKeyRequest {

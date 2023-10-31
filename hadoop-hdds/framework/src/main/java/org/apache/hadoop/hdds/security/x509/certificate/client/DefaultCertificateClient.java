@@ -584,7 +584,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
             .setConfiguration(securityConfig)
-            .addInetAddresses();
+            .addInetAddresses()
+            .setDigitalEncryption(true)
+            .setDigitalSignature(true);
     return builder;
   }
 
@@ -1312,8 +1314,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         securityConfig.getCertificateLocation(getComponentName())));
   }
 
-  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
-      throws IOException {
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
   }
 

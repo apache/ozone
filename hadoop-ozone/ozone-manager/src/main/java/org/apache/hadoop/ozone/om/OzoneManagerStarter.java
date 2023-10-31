@@ -190,8 +190,9 @@ public class OzoneManagerStarter extends GenericCli {
       om.start();
       ShutdownHookManager.get().addShutdownHook(() -> {
         try {
-          om.stop();
-          om.join();
+          if (om.stop()) {
+            om.join();
+          }
         } catch (Exception e) {
           LOG.error("Error during stop OzoneManager.", e);
         }
