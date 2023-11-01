@@ -38,12 +38,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 /**
  * This class manages the stream entries list and handles block allocation
  * from OzoneManager.
  */
-public class BlockDataStreamOutputEntryPool {
+public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutputEntryPool.class);
@@ -290,5 +291,10 @@ public class BlockDataStreamOutputEntryPool {
 
   public long getDataSize() {
     return keyArgs.getDataSize();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.keyArgs.getMetadata();
   }
 }

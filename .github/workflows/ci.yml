@@ -139,6 +139,7 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-compile == 'true'

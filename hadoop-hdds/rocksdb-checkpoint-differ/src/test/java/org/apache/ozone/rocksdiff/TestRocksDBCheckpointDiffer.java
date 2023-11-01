@@ -850,7 +850,6 @@ public class TestRocksDBCheckpointDiffer {
               sstFiles.stream()
                   .map(
                       sstFile -> new CompactionNode(sstFile,
-                          UUID.randomUUID().toString(),
                           1000L,
                           Long.parseLong(sstFile.substring(0, 6)),
                           null, null, null
@@ -1789,13 +1788,13 @@ public class TestRocksDBCheckpointDiffer {
 
   private static Stream<Arguments> shouldSkipNodeEdgeCases() {
     CompactionNode node = new CompactionNode("fileName",
-        "snapshotId", 100, 100, "startKey", "endKey", "columnFamily");
+        100, 100, "startKey", "endKey", "columnFamily");
     CompactionNode nullColumnFamilyNode = new CompactionNode("fileName",
-        "snapshotId", 100, 100, "startKey", "endKey", null);
+        100, 100, "startKey", "endKey", null);
     CompactionNode nullStartKeyNode = new CompactionNode("fileName",
-        "snapshotId", 100, 100, null, "endKey", "columnFamily");
+        100, 100, null, "endKey", "columnFamily");
     CompactionNode nullEndKeyNode = new CompactionNode("fileName",
-        "snapshotId", 100, 100, "startKey", null, "columnFamily");
+        100, 100, "startKey", null, "columnFamily");
 
     return Stream.of(
         Arguments.of(node, Collections.emptyMap(), false),

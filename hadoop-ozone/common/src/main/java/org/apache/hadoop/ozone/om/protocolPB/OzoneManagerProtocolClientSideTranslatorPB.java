@@ -808,6 +808,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
+        .addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
             .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
@@ -1585,6 +1586,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setIsMultipartKey(omKeyArgs.getIsMultipartKey())
         .setMultipartNumber(omKeyArgs.getMultipartUploadPartNumber())
         .setDataSize(omKeyArgs.getDataSize())
+        .addAllMetadata(KeyValueUtil.toProtobuf(omKeyArgs.getMetadata()))
         .addAllKeyLocations(locationInfoList.stream()
             // TODO use OM version?
             .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
