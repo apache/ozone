@@ -171,7 +171,7 @@ public class TestPartUpload {
     long contentLength = chunkedContent.length();
 
     objectEndpoint.put(OzoneConsts.S3_BUCKET, keyName, contentLength, 1,
-        uploadID, new ByteArrayInputStream(chunkedContent.getBytes()));
+        uploadID, new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
     assertContentLength(uploadID, keyName, 15);
   }
 
