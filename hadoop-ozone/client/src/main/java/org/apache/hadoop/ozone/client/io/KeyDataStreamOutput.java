@@ -87,7 +87,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
    * A mismatch will prevent the commit from succeeding.
    * This is essential for operations like S3 put to ensure atomicity.
    */
-  private boolean requiresAtomicWrite;
+  private boolean atomicKeyCreation;
 
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
@@ -118,7 +118,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
-      boolean requiresAtomicWrite
+      boolean atomicKeyCreation
   ) {
     super(HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval()));
@@ -139,7 +139,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     // encrypted bucket.
     this.writeOffset = 0;
     this.clientID = handler.getId();
-    this.requiresAtomicWrite = requiresAtomicWrite;
+    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -397,7 +397,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       if (!isException()) {
         Preconditions.checkArgument(writeOffset == offset);
       }
-      if (requiresAtomicWrite) {
+      if (atomicKeyCreation) {
         long expectedSize = blockDataStreamOutputEntryPool.getDataSize();
         Preconditions.checkArgument(expectedSize == offset,
             String.format("Expected: %d and actual %d write sizes do not match",
@@ -438,7 +438,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
-    private boolean requiresAtomicWrite = false;
+    private boolean atomicKeyCreation = false;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -491,8 +491,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       return this;
     }
 
-    public Builder setRequiresAtomicWrite(boolean atomicWrite) {
-      this.requiresAtomicWrite = atomicWrite;
+    public Builder setAtomicKeyCreation(boolean atomicKey) {
+      this.atomicKeyCreation = atomicKey;
       return this;
     }
 
@@ -509,7 +509,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion,
-          requiresAtomicWrite);
+          atomicKeyCreation);
     }
 
   }

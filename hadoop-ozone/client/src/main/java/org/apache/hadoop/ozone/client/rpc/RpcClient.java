@@ -1789,7 +1789,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(uploadID)
         .setIsMultipartKey(true)
-        .setRequiresAtomicWrite(isS3GRequest.get())
+        .setAtomicKeyCreation(isS3GRequest.get())
         .build();
     return createOutputStream(openKey, keyOutputStream);
   }
@@ -1806,7 +1806,7 @@ public class RpcClient implements ClientProtocol {
     final OpenKeySession openKey = newMultipartOpenKey(
         volumeName, bucketName, keyName, size, partNumber, uploadID);
     // Amazon S3 never adds partial objects, So for S3 requests we need to
-    // set RequiresAtomicWrite to true
+    // set atomicKeyCreation to true
     // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
@@ -1819,7 +1819,7 @@ public class RpcClient implements ClientProtocol {
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(conf.getObject(OzoneClientConfig.class))
-            .setRequiresAtomicWrite(isS3GRequest.get())
+            .setAtomicKeyCreation(isS3GRequest.get())
             .build();
     keyOutputStream
         .addPreallocateBlocks(
@@ -2223,7 +2223,7 @@ public class RpcClient implements ClientProtocol {
     final ReplicationConfig replicationConfig
         = openKey.getKeyInfo().getReplicationConfig();
     // Amazon S3 never adds partial objects, So for S3 requests we need to
-    // set RequiresAtomicWrite to true
+    // set atomicKeyCreation to true
     // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
@@ -2233,7 +2233,7 @@ public class RpcClient implements ClientProtocol {
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(conf.getObject(OzoneClientConfig.class))
-            .setRequiresAtomicWrite(isS3GRequest.get())
+            .setAtomicKeyCreation(isS3GRequest.get())
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -2315,7 +2315,7 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(conf.getObject(OzoneClientConfig.class))
-        .setRequiresAtomicWrite(isS3GRequest.get())
+        .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics);
   }
 

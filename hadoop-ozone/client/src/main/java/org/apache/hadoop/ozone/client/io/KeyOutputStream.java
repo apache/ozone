@@ -101,7 +101,7 @@ public class KeyOutputStream extends OutputStream
    * A mismatch will prevent the commit from succeeding.
    * This is essential for operations like S3 put to ensure atomicity.
    */
-  private boolean requiresAtomicWrite;
+  private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
       ContainerClientMetrics clientMetrics) {
@@ -151,7 +151,7 @@ public class KeyOutputStream extends OutputStream
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
       ContainerClientMetrics clientMetrics,
-      boolean requiresAtomicWrite
+      boolean atomicKeyCreation
   ) {
     this.config = config;
     this.replication = replicationConfig;
@@ -172,7 +172,7 @@ public class KeyOutputStream extends OutputStream
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
-    this.requiresAtomicWrite = requiresAtomicWrite;
+    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -565,7 +565,7 @@ public class KeyOutputStream extends OutputStream
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
-      if (requiresAtomicWrite) {
+      if (atomicKeyCreation) {
         long expectedSize = blockOutputStreamEntryPool.getDataSize();
         Preconditions.checkArgument(expectedSize == offset,
             String.format("Expected: %d and actual %d write sizes do not match",
@@ -607,7 +607,7 @@ public class KeyOutputStream extends OutputStream
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
     private ContainerClientMetrics clientMetrics;
-    private boolean requiresAtomicWrite = false;
+    private boolean atomicKeyCreation = false;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -694,8 +694,8 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
-    public Builder setRequiresAtomicWrite(boolean atomicWrite) {
-      this.requiresAtomicWrite = atomicWrite;
+    public Builder setAtomicKeyCreation(boolean atomicKey) {
+      this.atomicKeyCreation = atomicKey;
       return this;
     }
 
@@ -721,7 +721,7 @@ public class KeyOutputStream extends OutputStream
           isMultipartKey,
           unsafeByteBufferConversion,
           clientMetrics,
-          requiresAtomicWrite);
+          atomicKeyCreation);
     }
 
   }
