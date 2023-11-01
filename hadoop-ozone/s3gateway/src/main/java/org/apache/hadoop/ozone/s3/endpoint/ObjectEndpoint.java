@@ -357,7 +357,14 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } finally {
       if (output != null) {
-        output.close();
+        try {
+          output.close();
+        } catch (IllegalStateException ex) {
+          LOG.error(String.format(
+              "Data read has a different length than the expected," +
+                  " bucket %s, key %s", bucketName, keyPath), ex);
+          auditWriteFailure(s3GAction, ex);
+        }
       }
       if (auditSuccess) {
         AUDIT.logWriteSuccess(

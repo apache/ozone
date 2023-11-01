@@ -567,7 +567,7 @@ public class KeyOutputStream extends OutputStream
       }
       if (atomicKeyCreation) {
         long expectedSize = blockOutputStreamEntryPool.getDataSize();
-        Preconditions.checkArgument(expectedSize == offset,
+        Preconditions.checkState(expectedSize == offset,
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
