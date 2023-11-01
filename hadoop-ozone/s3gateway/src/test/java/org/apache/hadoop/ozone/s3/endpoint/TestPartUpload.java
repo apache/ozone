@@ -150,7 +150,6 @@ public class TestPartUpload {
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setClient(client);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    objectEndpoint.setHeaders(headers);
     String keyName = UUID.randomUUID().toString();
 
     String chunkedContent = "0a;chunk-signature=signature\r\n"
