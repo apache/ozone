@@ -61,7 +61,7 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   private final CacheStatsRecorder statsRecorder;
 
 
-  public FullTableCache() {
+  public FullTableCache(String threadNamePrefix) {
     // As for full table cache only we need elements to be inserted in sorted
     // manner, so that list will be easy. But look ups have log(N) time
     // complexity.
@@ -78,9 +78,11 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
     // Created a singleThreadExecutor, so one cleanup will be running at a
     // time.
-    ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("FullTableCache Cleanup Thread - %d").build();
-    executorService = Executors.newSingleThreadExecutor(build);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "FullTableCache-Cleanup-%d")
+        .build();
+    executorService = Executors.newSingleThreadExecutor(threadFactory);
 
     statsRecorder = new CacheStatsRecorder();
   }

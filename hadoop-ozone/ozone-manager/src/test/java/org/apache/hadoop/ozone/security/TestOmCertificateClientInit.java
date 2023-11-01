@@ -51,7 +51,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -155,7 +154,7 @@ public class TestOmCertificateClientInit {
     InitResponse response = omCertificateClient.init();
 
     if (pvtKeyPresent && pubKeyPresent && !certPresent) {
-      assertEquals(RECOVER, response);
+      assertEquals(GETCERT, response);
     } else {
       assertEquals(expectedResult, response);
     }

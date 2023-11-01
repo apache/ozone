@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.common;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -37,6 +38,7 @@ import org.junit.Assert;
 
 import javax.ws.rs.core.Response;
 
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.HashMap;
 
@@ -221,5 +223,13 @@ public class CommonUtils {
     Assert.assertEquals(HddsProtos.ReplicationType.STAND_ALONE,
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).
             getReplicationConfig().getReplicationType());
+  }
+
+  public SCMNodeDetails getReconNodeDetails() {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
+    return builder.build();
   }
 }

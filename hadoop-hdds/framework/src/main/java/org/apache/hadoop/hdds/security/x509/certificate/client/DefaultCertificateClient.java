@@ -121,6 +121,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String caCertId;
   private String rootCaCertId;
   private String component;
+  private final String threadNamePrefix;
   private List<String> pemEncodedCACerts = null;
   private Lock pemEncodedCACertsLock = new ReentrantLock();
   private KeyStoresFactory serverKeyStoresFactory;
@@ -133,12 +134,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private final Set<CertificateNotification> notificationReceivers;
   private RootCaRotationPoller rootCaRotationPoller;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected DefaultCertificateClient(
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
       Logger log,
       String certSerialId,
       String component,
+      String threadNamePrefix,
       Consumer<String> saveCertId,
       Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
@@ -148,6 +151,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
     this.component = component;
+    this.threadNamePrefix = threadNamePrefix;
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
@@ -193,10 +197,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  protected String threadNamePrefix() {
+    return threadNamePrefix;
+  }
+
   private void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
-          new HashSet<>(rootCaCertificates), scmSecurityClient);
+          new HashSet<>(rootCaCertificates), scmSecurityClient,
+          threadNamePrefix);
       rootCaRotationPoller.addRootCARotationProcessor(
           this::getRootCaRotationListener);
       rootCaRotationPoller.run();
@@ -575,7 +584,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
             .setConfiguration(securityConfig)
-            .addInetAddresses();
+            .addInetAddresses()
+            .setDigitalEncryption(true)
+            .setDigitalSignature(true);
     return builder;
   }
 
@@ -1303,8 +1314,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         securityConfig.getCertificateLocation(getComponentName())));
   }
 
-  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
-      throws IOException {
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
   }
 
@@ -1336,8 +1346,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     if (executorService == null) {
       executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-CertificateRenewerService")
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix + getComponentName()
+                  + "-CertificateRenewerService")
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(

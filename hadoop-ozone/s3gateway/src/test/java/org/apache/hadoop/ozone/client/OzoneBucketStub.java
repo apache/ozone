@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -176,7 +177,7 @@ public class OzoneBucketStub extends OzoneBucket {
     }
     ReplicationConfig finalReplicationCon = repConfig;
     ByteArrayOutputStream byteArrayOutputStream =
-        new ByteArrayOutputStream((int) size) {
+        new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
             keyContents.put(key, toByteArray());
@@ -193,6 +194,7 @@ public class OzoneBucketStub extends OzoneBucket {
             super.close();
           }
         };
+
     return new OzoneOutputStream(byteArrayOutputStream, null);
   }
 
@@ -255,7 +257,7 @@ public class OzoneBucketStub extends OzoneBucket {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       ByteBufferStreamOutput byteBufferStreamOutput =
-          new ByteBufferStreamOutput() {
+          new KeyMetadataAwareByteBufferStreamOutput(new HashMap<>()) {
             private final ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
 
             @Override
@@ -283,9 +285,6 @@ public class OzoneBucketStub extends OzoneBucket {
               buffer.put(bytes);
             }
 
-            @Override
-            public void flush() throws IOException {
-            }
           };
 
       return new OzoneDataStreamOutputStub(byteBufferStreamOutput, key + size);
@@ -422,7 +421,7 @@ public class OzoneBucketStub extends OzoneBucket {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
       ByteArrayOutputStream byteArrayOutputStream =
-          new ByteArrayOutputStream((int) size) {
+          new KeyMetadataAwareOutputStream((int) size, new HashMap<>()) {
             @Override
             public void close() throws IOException {
               Part part = new Part(key + size,
@@ -600,4 +599,63 @@ public class OzoneBucketStub extends OzoneBucket {
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
         () -> readKey(keyName), false));
   }
+
+  /**
+   * ByteArrayOutputStream stub with metadata.
+   */
+  public static class KeyMetadataAwareOutputStream extends ByteArrayOutputStream
+      implements KeyMetadataAware {
+    private Map<String, String> metadata;
+
+    public KeyMetadataAwareOutputStream(Map<String, String> metadata) {
+      super();
+      this.metadata = metadata;
+    }
+
+    public KeyMetadataAwareOutputStream(int size,
+                                        Map<String, String> metadata) {
+      super(size);
+      this.metadata = metadata;
+    }
+
+    @Override
+    public Map<String, String> getMetadata() {
+      return metadata;
+    }
+  }
+
+  /**
+   * ByteBufferOutputStream stub with metadata.
+   */
+  public static class KeyMetadataAwareByteBufferStreamOutput
+      implements KeyMetadataAware, ByteBufferStreamOutput {
+
+    private Map<String, String> metadata;
+
+    public KeyMetadataAwareByteBufferStreamOutput(
+        Map<String, String> metadata) {
+      this.metadata = metadata;
+    }
+
+    @Override
+    public void write(ByteBuffer buffer, int off, int len) throws IOException {
+
+    }
+
+    @Override
+    public void flush() throws IOException {
+
+    }
+
+    @Override
+    public void close() throws IOException {
+
+    }
+
+    @Override
+    public Map<String, String> getMetadata() {
+      return metadata;
+    }
+  }
+
 }

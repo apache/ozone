@@ -106,6 +106,8 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Run a full build
         run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests
         uses: actions/upload-artifact@v3
         with:
@@ -120,6 +122,13 @@ jobs:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -130,6 +139,7 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-compile == 'true'
@@ -162,6 +172,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
         env:
           OZONE_WITH_COVERAGE: false
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -205,6 +216,8 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
         continue-on-error: true
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
@@ -252,6 +265,8 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
         continue-on-error: true
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
@@ -412,19 +427,34 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        uses: actions/download-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+        continue-on-error: true
       - name: Setup java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
-        if: matrix.profile != 'flaky'
         continue-on-error: true
-      - name: Execute flaky tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600
-        if: matrix.profile == 'flaky'
-        continue-on-error: true
+        run: |
+          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
+            export OZONE_REPO_CACHED=true
+          fi
+
+          args=
+          if [[ "${{ matrix.profile }}" == "flaky" ]]; then
+            args="-Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+          fi
+
+          hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
@@ -481,6 +511,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         with:

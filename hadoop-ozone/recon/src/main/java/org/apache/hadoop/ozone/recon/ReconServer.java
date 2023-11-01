@@ -201,10 +201,6 @@ public class ReconServer extends GenericCli {
     case FAILURE:
       LOG.error("Recon security initialization failed, case:{}.", response);
       throw new RuntimeException("Recon security initialization failed.");
-    case RECOVER:
-      LOG.error("Recon security initialization failed. Recon certificate is " +
-          "missing.");
-      throw new RuntimeException("Recon security initialization failed.");
     default:
       LOG.error("Recon security initialization failed. Init response: {}",
           response);

@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -369,13 +370,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     ManagedRocksIterator iterator = null;
+    ManagedReadOptions readOptions = null;
+    ManagedSlice slice = null;
     try {
       if (containerId > 0L && schemaV3) {
         // Handle SchemaV3 DN DB
-        ManagedReadOptions readOptions = new ManagedReadOptions();
-        readOptions.setIterateUpperBound(new ManagedSlice(
+        readOptions = new ManagedReadOptions();
+        slice = new ManagedSlice(
             DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixBytes(
-                containerId + 1L)));
+                containerId + 1L));
+        readOptions.setIterateUpperBound(slice);
         iterator = new ManagedRocksIterator(
             rocksDB.get().newIterator(columnFamilyHandle, readOptions));
         iterator.get().seek(
@@ -389,9 +393,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
       return displayTable(iterator, columnFamilyDefinition, schemaV3);
     } finally {
-      if (iterator != null) {
-        iterator.close();
-      }
+      IOUtils.closeQuietly(iterator, readOptions, slice);
     }
   }
 

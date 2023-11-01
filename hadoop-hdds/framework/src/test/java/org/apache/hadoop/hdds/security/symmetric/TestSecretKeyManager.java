@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests cases for {@link SecretKeyManager} implementation.
  */
-public class SecretKeyManagerTest {
+public class TestSecretKeyManager {
   private static final Duration VALIDITY_DURATION = Duration.ofDays(3);
   private static final Duration ROTATION_DURATION = Duration.ofDays(1);
   private static final String ALGORITHM = "HmacSHA256";

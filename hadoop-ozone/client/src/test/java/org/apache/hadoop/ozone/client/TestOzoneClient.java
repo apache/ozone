@@ -35,10 +35,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
@@ -66,13 +66,13 @@ public class TestOzoneClient {
       throws Exception {
     try {
       eval.call();
-      Assert.fail("OMException is expected");
+      Assertions.fail("OMException is expected");
     } catch (OMException ex) {
-      Assert.assertEquals(code, ex.getResult());
+      Assertions.assertEquals(code, ex.getResult());
     }
   }
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     createNewClient(config, new SinglePipelineBlockAllocator(config));
@@ -99,7 +99,7 @@ public class TestOzoneClient {
     store = client.getObjectStore();
   }
 
-  @After
+  @AfterEach
   public void close() throws IOException {
     client.close();
   }
@@ -110,7 +110,7 @@ public class TestOzoneClient {
     String volumeName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    Assert.assertNotNull(volume);
+    Assertions.assertNotNull(volume);
     store.deleteVolume(volumeName);
     expectOmException(ResultCodes.VOLUME_NOT_FOUND,
         () -> store.getVolume(volumeName));
@@ -126,10 +126,11 @@ public class TestOzoneClient {
         .build();
     store.createVolume(volumeName, volumeArgs);
     OzoneVolume volume = store.getVolume(volumeName);
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
-    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
-    Assert.assertEquals("val1", volume.getMetadata().get("key1"));
-    Assert.assertEquals(volumeName, volume.getName());
+    Assertions.assertEquals(OzoneConsts.QUOTA_RESET,
+        volume.getQuotaInNamespace());
+    Assertions.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
+    Assertions.assertEquals("val1", volume.getMetadata().get("key1"));
+    Assertions.assertEquals(volumeName, volume.getName());
   }
 
   @Test
@@ -142,9 +143,9 @@ public class TestOzoneClient {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    Assertions.assertEquals(bucketName, bucket.getName());
+    Assertions.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assertions.assertFalse(volume.getCreationTime().isBefore(testStartTime));
   }
 
   @Test
@@ -162,14 +163,14 @@ public class TestOzoneClient {
       out.write(value.getBytes(UTF_8));
       out.close();
       OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
+      Assertions.assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      Assert.assertEquals(value.length(), is.read(fileContent));
+      Assertions.assertEquals(value.length(), is.read(fileContent));
       is.close();
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assertions.assertEquals(value, new String(fileContent, UTF_8));
+      Assertions.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assertions.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -219,7 +220,7 @@ public class TestOzoneClient {
         out.write(value.getBytes(UTF_8));
       }
       OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
+      Assertions.assertEquals(keyName, key.getName());
     }
   }
 
