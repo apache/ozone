@@ -514,6 +514,19 @@ public class TestLegacyReplicationManager {
     }
 
     @Test
+    public void testEmptyContainerWithNoReplicas() throws Exception {
+      final ContainerInfo container = createContainer(
+          LifeCycleState.CLOSED, 0, 0);
+      // No replicas
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1,
+          report.getStat(ReplicationManagerReport.HealthState.EMPTY));
+      Assertions.assertEquals(LifeCycleState.CLOSED, container.getState());
+    }
+
+    @Test
     public void testDeletionLimit() throws Exception {
       runTestLimit(0, 2, 0, 1,
               () -> runTestDeleteEmptyContainer(2));

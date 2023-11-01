@@ -499,6 +499,19 @@ public class LegacyReplicationManager {
           return;
         }
 
+        // If the container is empty and has no replicas, it is possible it was
+        // a container which stuck in the closing state which never got any
+        // replicas created on the datanodes. In this case, we don't have enough
+        // information to delete the container, so we just log it as EMPTY,
+        // leaving it as CLOSED and return true, otherwise, it will end up
+        // marked as missing by the under replication handling.
+        if (replicas.isEmpty()
+            && container.getState() == LifeCycleState.CLOSED
+            && container.getNumberOfKeys() == 0) {
+          report.incrementAndSample(HealthState.EMPTY, container.containerID());
+          return;
+        }
+
         /*
          * Check if the container is under replicated and take appropriate
          * action.
