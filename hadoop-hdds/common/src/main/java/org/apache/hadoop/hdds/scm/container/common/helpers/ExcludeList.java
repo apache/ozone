@@ -64,13 +64,13 @@ public class ExcludeList {
 
   public Set<DatanodeDetails> getDatanodes() {
     Set<DatanodeDetails> dns = new HashSet<>();
-    if (expiryTime > 0) {
+    if (getExpiryTime() > 0) {
       Iterator<Map.Entry<DatanodeDetails, Long>> iterator =
           datanodes.entrySet().iterator();
       while (iterator.hasNext()) {
         Map.Entry<DatanodeDetails, Long> entry = iterator.next();
         Long storedExpiryTime = entry.getValue();
-        if (clock.millis() > storedExpiryTime) {
+        if (isExpired(storedExpiryTime)) {
           iterator.remove(); // removing
         } else {
           dns.add(entry.getKey());
@@ -149,6 +149,14 @@ public class ExcludeList {
         ", containerIds = " + containerIds +
         ", pipelineIds = " + pipelineIds +
         '}';
+  }
+
+  public boolean isExpired(Long storedExpiryTime) {
+    return clock.millis() > storedExpiryTime;
+  }
+
+  public long getExpiryTime() {
+    return expiryTime;
   }
 
 }

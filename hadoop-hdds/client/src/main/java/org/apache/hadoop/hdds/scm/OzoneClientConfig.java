@@ -184,7 +184,7 @@ public class OzoneClientConfig {
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
       description = "Time after which an excluded node is reconsidered for" +
-          " writes in EC. If the value is zero, the node is excluded for the" +
+          " writes. If the value is zero, the node is excluded for the" +
           " life of the client",
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
@@ -348,6 +348,10 @@ public class OzoneClientConfig {
 
   public long getExcludeNodesExpiryTime() {
     return excludeNodesExpiryTime;
+  }
+
+  public void setExcludeNodesExpiryTime(long expiryTime) {
+    excludeNodesExpiryTime = expiryTime;
   }
 
   public int getBufferIncrement() {

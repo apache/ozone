@@ -90,7 +90,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
-  private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
+  private BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   private long clientID;
 
@@ -270,7 +270,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       // the buffers
       Preconditions.checkState(!retry || len <= config
           .getStreamBufferMaxSize());
-      int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
+      int dataWritten = getDataWritten(current, currentPos);
       writeLen = retry ? (int) len : dataWritten;
       // In retry path, the data written is already accounted in offset.
       if (!retry) {
@@ -709,4 +709,21 @@ public class KeyOutputStream extends OutputStream implements Syncable {
               + blockOutputStreamEntryPool.getKeyName());
     }
   }
+
+  protected BlockOutputStreamEntryPool getBlockOutputStreamEntryPool() {
+    return blockOutputStreamEntryPool;
+  }
+
+  protected void setBlockOutputStreamEntryPool(BlockOutputStreamEntryPool streamEntryPool) {
+    blockOutputStreamEntryPool = streamEntryPool;
+  }
+
+  public void setExcludeList(ExcludeList excludeList) {
+    blockOutputStreamEntryPool.setExcludeList(excludeList);
+  }
+
+  protected int getDataWritten(BlockOutputStreamEntry current, long currentPos) {
+    return (int) (current.getWrittenDataLength() - currentPos);
+  }
+
 }
