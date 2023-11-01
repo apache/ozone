@@ -153,7 +153,7 @@ public class GrpcOzoneManagerServer {
                 omServerConfig),
             new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
             new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics),
-            new OzoneManagerInterceptorGrpc()))
+            new GrpcOzoneManagerMetadataInterceptor()))
         .addTransportFilter(
             new GrpcMetricsServerTransportFilter(omS3gGrpcMetrics));
 

@@ -12,8 +12,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Optional;
 
-public class OzoneManagerInterceptorGrpc implements ServerInterceptor {
-
+public class GrpcOzoneManagerMetadataInterceptor implements ServerInterceptor {
   public static final Context.Key<String> CLIENT_ADDRESS_KEY =
       Context.key("clientAddressKey");
 
@@ -30,6 +29,4 @@ public class OzoneManagerInterceptorGrpc implements ServerInterceptor {
         Context.current().withValue(CLIENT_ADDRESS_KEY, clientAddress);
     return Contexts.interceptCall(context, serverCall, metadata, next);
   }
-
-
 }
