@@ -714,7 +714,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     return blockOutputStreamEntryPool;
   }
 
-  protected void setBlockOutputStreamEntryPool(BlockOutputStreamEntryPool streamEntryPool) {
+  protected void setBlockOutputStreamEntryPool(
+      BlockOutputStreamEntryPool streamEntryPool) {
     blockOutputStreamEntryPool = streamEntryPool;
   }
 
@@ -722,7 +723,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     blockOutputStreamEntryPool.setExcludeList(excludeList);
   }
 
-  protected int getDataWritten(BlockOutputStreamEntry current, long currentPos) {
+  protected int getDataWritten(BlockOutputStreamEntry current,
+                               long currentPos) {
     return (int) (current.getWrittenDataLength() - currentPos);
   }
 
