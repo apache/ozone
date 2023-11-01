@@ -69,7 +69,8 @@ public class EmptyContainerHandler extends AbstractCheck {
       replicationManager.updateContainerState(
           containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
       return true;
-    } else if (containerInfo.getNumberOfKeys() == 0 && replicas.isEmpty()) {
+    } else if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED
+        && containerInfo.getNumberOfKeys() == 0 && replicas.isEmpty()) {
       // If the container is empty and has no replicas, it is possible it was
       // a container which stuck in the closing state which never got any
       // replicas created on the datanodes. In this case, we don't have enough
