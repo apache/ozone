@@ -16,10 +16,9 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.PrintStream;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,14 +34,15 @@ import static org.mockito.Mockito.verify;
 /**
  * Tests for the Progressbar class for Freon.
  */
-@RunWith(MockitoJUnitRunner.class)
+//@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class TestProgressBar {
 
   private PrintStream stream;
   private AtomicLong numberOfKeysAdded;
   private LongSupplier currentValue;
 
-  @Before
+  @BeforeEach
   public void setupMock() {
     numberOfKeysAdded = new AtomicLong(0L);
     currentValue = numberOfKeysAdded::get;
