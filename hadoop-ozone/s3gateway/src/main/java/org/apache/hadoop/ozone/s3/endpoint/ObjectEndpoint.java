@@ -889,8 +889,13 @@ public class ObjectEndpoint extends EndpointBase {
                   uploadID, chunkSize, (DigestInputStream) body);
         }
 
-        copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
         if (copyHeader != null) {
+          Pair<String, String> result = parseSourceHeader(copyHeader);
+          String sourceBucket = result.getLeft();
+          String sourceKey = result.getRight();
+
+          OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
+              volume.getName(), sourceBucket, sourceKey);
           String range =
               headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
           if (range != null) {
@@ -900,19 +905,11 @@ public class ObjectEndpoint extends EndpointBase {
             // length specified by COPY_SOURCE_HEADER_RANGE.
             length = rangeHeader.getEndOffset() -
                 rangeHeader.getStartOffset() + 1;
+          } else {
+            length = sourceKeyDetails.getDataSize();
           }
-        }
-        ozoneOutputStream = getClientProtocol().createMultipartKey(
-            volume.getName(), bucket, key, length, partNumber, uploadID);
-
-        if (copyHeader != null) {
-          Pair<String, String> result = parseSourceHeader(copyHeader);
-
-          String sourceBucket = result.getLeft();
-          String sourceKey = result.getRight();
-
-          OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
-              volume.getName(), sourceBucket, sourceKey);
+          ozoneOutputStream = getClientProtocol().createMultipartKey(
+              volume.getName(), bucket, key, length, partNumber, uploadID);
           Long sourceKeyModificationTime = sourceKeyDetails
               .getModificationTime().toEpochMilli();
           String copySourceIfModifiedSince =
@@ -925,9 +922,6 @@ public class ObjectEndpoint extends EndpointBase {
           }
 
           try (OzoneInputStream sourceObject = sourceKeyDetails.getContent()) {
-
-            String range =
-                headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
             long copyLength;
             if (range != null) {
               RangeHeader rangeHeader =
@@ -951,6 +945,8 @@ public class ObjectEndpoint extends EndpointBase {
           }
         } else {
           getMetrics().updatePutKeyMetadataStats(startNanos);
+          ozoneOutputStream = getClientProtocol().createMultipartKey(
+              volume.getName(), bucket, key, length, partNumber, uploadID);
           long putLength = IOUtils.copyLarge(body, ozoneOutputStream);
           ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
               .getMetadata().put("ETag", DatatypeConverter.printHexBinary(
