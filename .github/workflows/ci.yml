@@ -106,6 +106,8 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Run a full build
         run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests
         uses: actions/upload-artifact@v3
         with:
@@ -137,6 +139,7 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-compile == 'true'
@@ -169,6 +172,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
         env:
           OZONE_WITH_COVERAGE: false
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -212,6 +216,8 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
         continue-on-error: true
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
@@ -259,6 +265,8 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
         continue-on-error: true
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
@@ -445,7 +453,8 @@ jobs:
           fi
 
           hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
-
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
@@ -502,6 +511,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         with:

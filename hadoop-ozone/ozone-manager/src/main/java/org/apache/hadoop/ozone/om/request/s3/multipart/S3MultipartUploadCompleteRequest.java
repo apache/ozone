@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -252,7 +253,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 .setVolume(requestedVolume)
                 .setBucket(requestedBucket)
                 .setKey(keyName)
-                .setHash(DigestUtils.sha256Hex(keyName)));
+                .setHash(omKeyInfo.getMetadata().get("ETag")));
 
         long volumeId = omMetadataManager.getVolumeId(volumeName);
         long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
@@ -390,7 +391,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo())
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
-          .setAcls(dbOpenKeyInfo.getAcls());
+          .setAcls(dbOpenKeyInfo.getAcls())
+          .addMetadata("ETag",
+              multipartUploadedKeyHash(partKeyInfoMap));
       // Check if db entry has ObjectID. This check is required because
       // it is possible that between multipart key uploads and complete,
       // we had an upgrade.
@@ -418,6 +421,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.updateLocationInfoList(partLocationInfos, true, true);
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
+      omKeyInfo.getMetadata().put("ETag",
+          multipartUploadedKeyHash(partKeyInfoMap));
     }
     omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
     return omKeyInfo;
@@ -633,4 +638,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  private String multipartUploadedKeyHash(
+      OmMultipartKeyInfo.PartKeyInfoMap partsList) {
+    StringBuffer keysConcatenated = new StringBuffer();
+    for (PartKeyInfo partKeyInfo: partsList) {
+      keysConcatenated.append(KeyValueUtil.getFromProtobuf(partKeyInfo
+          .getPartKeyInfo().getMetadataList()).get("ETag"));
+    }
+    return DigestUtils.md5Hex(keysConcatenated.toString()) + "-"
+        + partsList.size();
+  }
+
 }

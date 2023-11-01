@@ -18,15 +18,12 @@
  */
 package org.apache.hadoop.ozone.om;
 
-
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -36,23 +33,21 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
-import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
 
 /**
  * When snapshots are taken, an entire snapshot of the
@@ -82,18 +77,6 @@ public class SstFilteringService extends BackgroundService
   private AtomicLong snapshotFilteredCount;
 
   private AtomicBoolean running;
-
-  // Note: This filter only works till snapshots are readable only.
-  // In the future, if snapshots are changed to writable as well,
-  // this will need to be revisited.
-  static final BooleanTriFunction<String, String, String, Boolean>
-      FILTER_FUNCTION =
-          (first, last, prefix) -> {
-            String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
-            String lastBucketKey = RocksDiffUtils.constructBucketKey(last);
-            return RocksDiffUtils
-                .isKeyWithPrefixPresent(prefix, firstBucketKey, lastBucketKey);
-          };
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -192,8 +175,10 @@ public class SstFilteringService extends BackgroundService
             LOG.debug("Processing snapshot {} to filter relevant SST Files",
                 snapShotTableKey);
 
-            List<Pair<String, String>> prefixPairs = constructPrefixPairs(
-                snapshotInfo);
+            Map<String, String> columnFamilyNameToPrefixMap =
+                getColumnFamilyToKeyPrefixMap(ozoneManager.getMetadataManager(),
+                    snapshotInfo.getVolumeName(),
+                    snapshotInfo.getBucketName());
 
             try (
                 ReferenceCounted<IOmMetadataReader, SnapshotCache>
@@ -205,7 +190,7 @@ public class SstFilteringService extends BackgroundService
               RocksDatabase db = rdbStore.getDb();
               try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
                   .lock()) {
-                db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+                db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
               }
             } catch (OMException ome) {
               // FILE_NOT_FOUND is obtained when the snapshot is deleted
@@ -238,42 +223,7 @@ public class SstFilteringService extends BackgroundService
       // nothing to return here
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
-
-    /**
-     * @param snapshotInfo
-     * @return a list of pairs (tableName,keyPrefix).
-     * @throws IOException
-     */
-    private List<Pair<String, String>> constructPrefixPairs(
-        SnapshotInfo snapshotInfo) throws IOException {
-      String volumeName = snapshotInfo.getVolumeName();
-      String bucketName = snapshotInfo.getBucketName();
-
-      long volumeId = ozoneManager.getMetadataManager().getVolumeId(volumeName);
-      // TODO : HDDS-6984  buckets can be deleted via ofs
-      //  handle deletion of bucket case.
-      long bucketId =
-          ozoneManager.getMetadataManager().getBucketId(volumeName, bucketName);
-
-      String filterPrefix =
-          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
-              + OM_KEY_PREFIX;
-
-      String filterPrefixFSO =
-          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId
-              + OM_KEY_PREFIX;
-
-      List<Pair<String, String>> prefixPairs = new ArrayList<>();
-      prefixPairs
-          .add(Pair.of(OmMetadataManagerImpl.KEY_TABLE, filterPrefix));
-      prefixPairs.add(
-          Pair.of(OmMetadataManagerImpl.DIRECTORY_TABLE, filterPrefixFSO));
-      prefixPairs
-          .add(Pair.of(OmMetadataManagerImpl.FILE_TABLE, filterPrefixFSO));
-      return prefixPairs;
-    }
   }
-
 
   @Override
   public BackgroundTaskQueue getTasks() {

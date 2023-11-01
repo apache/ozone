@@ -88,7 +88,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
       OzoneConfiguration configuration) {
-    super(KeyDeletingService.class.getSimpleName(), interval, unit,
+    super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
         DIR_DELETING_CORE_POOL_SIZE, serviceTimeout, ozoneManager, null);
     this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,

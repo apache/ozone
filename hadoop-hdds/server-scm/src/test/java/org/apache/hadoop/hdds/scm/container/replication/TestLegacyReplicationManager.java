@@ -948,6 +948,19 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.deleteContainerCommand));
+
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.QUASI_CLOSED));
+      Assertions.assertEquals(1, report.getStat(
+          ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+      Assertions.assertEquals(0, report.getStat(
+          ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+      // Even though we have extra replicas, we are deliberately keeping them
+      // since they are unique. This does not count as over-replication.
+      Assertions.assertEquals(0, report.getStat(
+          ReplicationManagerReport.HealthState.OVER_REPLICATED));
+      Assertions.assertEquals(1, report.getStat(
+          ReplicationManagerReport.HealthState.UNHEALTHY));
     }
 
     /**

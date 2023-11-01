@@ -35,6 +35,8 @@ import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -286,7 +288,8 @@ public class TestPermissionCheck {
     objectEndpoint.setOzoneConfiguration(conf);
 
     try {
-      objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
+      objectEndpoint.put("bucketName", "keyPath", 1024, 0, null,
+          new ByteArrayInputStream(new byte[]{}));
       Assert.fail("Should fail");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception);

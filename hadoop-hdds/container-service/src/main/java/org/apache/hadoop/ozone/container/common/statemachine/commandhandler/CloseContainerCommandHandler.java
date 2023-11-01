@@ -65,13 +65,14 @@ public class CloseContainerCommandHandler implements CommandHandler {
    * Constructs a ContainerReport handler.
    */
   public CloseContainerCommandHandler(
-      int threadPoolSize, int queueSize) {
+      int threadPoolSize, int queueSize, String threadNamePrefix) {
     executor = new ThreadPoolExecutor(
-            threadPoolSize, threadPoolSize,
-            0L, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(queueSize),
-            new ThreadFactoryBuilder()
-                .setNameFormat("CloseContainerThread-%d").build());
+        threadPoolSize, threadPoolSize,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "CloseContainerThread-%d")
+            .build());
   }
 
   /**

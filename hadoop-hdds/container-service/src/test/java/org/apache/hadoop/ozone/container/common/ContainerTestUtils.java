@@ -110,7 +110,7 @@ public final class ContainerTestUtils {
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
     return new EndpointStateMachine(address, rpcClient,
-        new LegacyHadoopConfigurationSource(conf));
+        new LegacyHadoopConfigurationSource(conf), "");
   }
 
   public static OzoneContainer getOzoneContainer(
