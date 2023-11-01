@@ -516,6 +516,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   static String getClientAddress() {
     String clientMachine = Server.getRemoteAddress();
     if (clientMachine == null) { //not a RPC client
+      clientMachine = OzoneManagerInterceptorGrpc.CLIENT_ADDRESS_KEY.get();
+    }
+    if (clientMachine == null) { //not gRPC client
       clientMachine = "";
     }
     return clientMachine;

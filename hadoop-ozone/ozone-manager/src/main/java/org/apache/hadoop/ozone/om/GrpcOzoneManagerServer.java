@@ -152,7 +152,8 @@ public class GrpcOzoneManagerServer {
                 delegationTokenMgr,
                 omServerConfig),
             new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
-            new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
+            new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics),
+            new OzoneManagerInterceptorGrpc()))
         .addTransportFilter(
             new GrpcMetricsServerTransportFilter(omS3gGrpcMetrics));
 
