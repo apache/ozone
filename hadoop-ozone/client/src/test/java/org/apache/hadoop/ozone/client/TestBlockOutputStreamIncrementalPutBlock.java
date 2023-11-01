@@ -3,7 +3,6 @@ package org.apache.hadoop.ozone.client;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -11,7 +10,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,17 +24,14 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 
 @RunWith(Parameterized.class)
 public class TestBlockOutputStreamIncrementalPutBlock {
   private OzoneClient client;
   private ObjectStore store;
-  private OzoneVolume volume;
   private RpcClient rpcClient;
 
   private String keyName = UUID.randomUUID().toString();
@@ -110,7 +105,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       ByteBuffer readBuffer = ByteBuffer.allocate(size);
       is.read(readBuffer);
-      assertEquals(0, readBuffer.compareTo(byteBuffer));
+      assertArrayEquals(readBuffer.array(), byteBuffer.array());
     }
   }
 
@@ -133,7 +128,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       ByteBuffer readBuffer = ByteBuffer.allocate(size);
       is.read(readBuffer);
-      assertEquals(0, readBuffer.compareTo(byteBuffer));
+      assertArrayEquals(readBuffer.array(), byteBuffer.array());
     }
   }
 }

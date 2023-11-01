@@ -46,7 +46,7 @@ public class MockDatanodeStorage {
       containerBlocks = new HashedMap();
   private final Map<BlockID, String> fullBlockData = new HashMap<>();
 
-  private final Map<String, ChunkInfo> chunks = new HashMap<>();
+  //private final Map<String, ChunkInfo> chunks = new HashMap<>();
 
   private final Map<String, ByteString> data = new HashMap<>();
 
@@ -132,31 +132,65 @@ public class MockDatanodeStorage {
     if (exception != null) {
       throw exception;
     }
-    data.put(createKey(blockID, chunkInfo),
-        ByteString.copyFrom(bytes.toByteArray()));
-    chunks.put(createKey(blockID, chunkInfo), chunkInfo);
+    String blockKey = createKey(blockID);
+    ByteString block;
+    if (data.containsKey(blockKey)) {
+      block = data.get(blockKey);
+      assert block.size() == chunkInfo.getOffset();
+      block.concat(bytes);
+    } else {
+      assert chunkInfo.getOffset() == 0;
+      data.put(blockKey, bytes);
+    }
+
+
+
+    //data.put(createKey(blockID, chunkInfo),
+    //    ByteString.copyFrom(bytes.toByteArray()));
+    //chunks.put(createKey(blockID, chunkInfo), chunkInfo);
     fullBlockData
         .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
             fullBlockData.getOrDefault(blockID, "")
                 .concat(bytes.toStringUtf8()));
   }
 
-  public ChunkInfo readChunkInfo(
+  /*public ChunkInfo readChunkInfo(
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo) {
     return chunks.get(createKey(blockID, chunkInfo));
+  }*/
+  public ChunkInfo readChunkInfo(
+      DatanodeBlockID blockID,
+      ChunkInfo chunkInfo) {
+    BlockData blockData = getBlock(blockID);
+    for (ChunkInfo info : blockData.getChunksList()) {
+      if (info.getLen() == chunkInfo.getLen() && info.getOffset() == chunkInfo.getOffset()){
+        return info;
+      }
+    }
+    throw new AssertionError("chunk " + chunkInfo + " not found");
   }
 
   public ByteString readChunkData(
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo) {
-    return data.get(createKey(blockID, chunkInfo));
-
+    //return data.get(createKey(blockID, chunkInfo));
+    LOG.info("readChunkData: blockID=" + createKey(blockID) +
+        " chunkInfo offset=" + chunkInfo.getOffset() +
+        " chunkInfo len=" + chunkInfo.getLen());
+    ByteString str = data.get(createKey(blockID)).substring(
+        (int)chunkInfo.getOffset(),
+        (int)chunkInfo.getOffset() + (int)chunkInfo.getLen());
+    return str;
   }
 
-  private String createKey(DatanodeBlockID blockId, ChunkInfo chunkInfo) {
+  /*private String createKey(DatanodeBlockID blockId, ChunkInfo chunkInfo) {
     return blockId.getContainerID() + "_" + blockId.getLocalID() + "_"
         + chunkInfo.getChunkName() + "_" + chunkInfo.getOffset();
+  }*/
+
+  private String createKey(DatanodeBlockID blockId) {
+    return blockId.getContainerID() + "_" + blockId.getLocalID();
   }
 
   public Map<String, ByteString> getAllBlockData() {
