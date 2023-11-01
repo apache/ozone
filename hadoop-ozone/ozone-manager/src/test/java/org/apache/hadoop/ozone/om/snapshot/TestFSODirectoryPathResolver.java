@@ -127,6 +127,8 @@ public class TestFSODirectoryPathResolver {
         new FSODirectoryPathResolver(prefix, 1,
             getMockedDirectoryInfoTable(prefix, dirMap));
     Set<Long> objIds = Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L);
+    Set<Long> invalidObjIds = Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L,
+        19L);
     Map<Long, Path> absolutePathMap = fsoDirectoryPathResolver
         .getAbsolutePathForObjectIDs(Optional.of(objIds));
 
@@ -143,7 +145,7 @@ public class TestFSODirectoryPathResolver {
     // Invalid Obj Id 19 with dirInfo dir19 which is not present in the bucket.
     Assertions.assertThrows(IllegalArgumentException.class,
         () -> fsoDirectoryPathResolver.getAbsolutePathForObjectIDs(
-            Optional.of(Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L, 19L))),
+            Optional.of(invalidObjIds)),
         "Dir object Ids required but not found in bucket: [19]");
   }
 
