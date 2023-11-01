@@ -71,16 +71,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   public boolean processWithLegacy(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    ReconOMMetadataManager metadataManager = getReconOMMetadataManager();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends
-          WithParentObjectId> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
+          eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
 
       // we only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
-      boolean updateOnKeyTable = table.equals(KEY_TABLE);
-      if (!updateOnKeyTable) {
+
+      if (!table.equals(KEY_TABLE)) {
         continue;
       }
 
@@ -90,104 +91,26 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
+
         if (!(value instanceof OmKeyInfo)) {
           LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
               value.getClass().getName(), updatedKey);
           continue;
         }
+
         OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
         OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
 
-        // KeyTable entries belong to both Legacy and OBS buckets.
-        // Check bucket layout and if it's OBS
-        // continue to the next iteration.
-        // Check just for the current KeyInfo.
-        String volumeName = updatedKeyInfo.getVolumeName();
-        String bucketName = updatedKeyInfo.getBucketName();
-        String bucketDBKey = getReconOMMetadataManager()
-            .getBucketKey(volumeName, bucketName);
-        // Get bucket info from bucket table
-        OmBucketInfo omBucketInfo = getReconOMMetadataManager()
-            .getBucketTable().getSkipCache(bucketDBKey);
-
-        if (omBucketInfo.getBucketLayout()
-            .isObjectStore(enableFileSystemPaths)) {
+        if (!isBucketLayoutValid(metadataManager, updatedKeyInfo)) {
           continue;
         }
 
-//        setKeyParentID(updatedKeyInfo);
-
-        if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-          switch (action) {
-          case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                !enableFileSystemPaths);
-            break;
-
-          case DELETE:
-            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-
-          case UPDATE:
-            if (oldKeyInfo != null) {
-              // delete first, then put
-//              setKeyParentID(oldKeyInfo);
-              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-            } else {
-              LOG.warn("Update event does not have the old keyInfo for {}.",
-                  updatedKey);
-            }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                !enableFileSystemPaths);
-            break;
-
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
-          }
+        if (enableFileSystemPaths) {
+          processWithFileSystemLayout(updatedKeyInfo, oldKeyInfo, action,
+              nsSummaryMap);
         } else {
-          OmDirectoryInfo updatedDirectoryInfo =
-              new OmDirectoryInfo.Builder()
-                  .setName(updatedKeyInfo.getKeyName())
-                  .setObjectID(updatedKeyInfo.getObjectID())
-                  .setParentObjectID(updatedKeyInfo.getParentObjectID())
-                  .build();
-
-          OmDirectoryInfo oldDirectoryInfo = null;
-
-          if (oldKeyInfo != null) {
-            oldDirectoryInfo =
-                new OmDirectoryInfo.Builder()
-                    .setName(oldKeyInfo.getKeyName())
-                    .setObjectID(oldKeyInfo.getObjectID())
-                    .setParentObjectID(oldKeyInfo.getParentObjectID())
-                    .build();
-          }
-
-          switch (action) {
-          case PUT:
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
-
-          case DELETE:
-            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
-
-          case UPDATE:
-            if (oldDirectoryInfo != null) {
-              // delete first, then put
-              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-            } else {
-              LOG.warn("Update event does not have the old dirInfo for {}.",
-                  updatedKey);
-            }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
-
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                omdbUpdateEvent.getAction());
-          }
+          processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
+              nsSummaryMap);
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
@@ -208,6 +131,103 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
+  private void processWithFileSystemLayout(OmKeyInfo updatedKeyInfo,
+                                           OmKeyInfo oldKeyInfo,
+                                           OMDBUpdateEvent.OMDBUpdateAction action,
+                                           Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    setParentDirectoryId(updatedKeyInfo);
+
+    if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+      switch (action) {
+      case PUT:
+        handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+        break;
+
+      case DELETE:
+        handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+        break;
+
+      case UPDATE:
+        if (oldKeyInfo != null) {
+          setParentDirectoryId(oldKeyInfo);
+          handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+        } else {
+          LOG.warn("Update event does not have the old keyInfo for {}.",
+              updatedKeyInfo.getKeyName());
+        }
+        handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+        break;
+      }
+    } else {
+      OmDirectoryInfo updatedDirectoryInfo = new OmDirectoryInfo.Builder()
+          .setName(updatedKeyInfo.getKeyName())
+          .setObjectID(updatedKeyInfo.getObjectID())
+          .setParentObjectID(updatedKeyInfo.getParentObjectID())
+          .build();
+
+      OmDirectoryInfo oldDirectoryInfo = null;
+
+      if (oldKeyInfo != null) {
+        oldDirectoryInfo =
+            new OmDirectoryInfo.Builder()
+                .setName(oldKeyInfo.getKeyName())
+                .setObjectID(oldKeyInfo.getObjectID())
+                .setParentObjectID(oldKeyInfo.getParentObjectID())
+                .build();
+      }
+
+      switch (action) {
+      case PUT:
+        handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+        break;
+
+      case DELETE:
+        handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+        break;
+
+      case UPDATE:
+        if (oldDirectoryInfo != null) {
+          handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+        } else {
+          LOG.warn("Update event does not have the old dirInfo for {}.",
+              updatedKeyInfo.getKeyName());
+        }
+        handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+        break;
+      }
+    }
+  }
+
+  private void processWithObjectStoreLayout(OmKeyInfo updatedKeyInfo,
+                                            OmKeyInfo oldKeyInfo,
+                                            OMDBUpdateEvent.OMDBUpdateAction action,
+                                            Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    setParentBucketId(updatedKeyInfo);
+
+    switch (action) {
+    case PUT:
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      break;
+
+    case DELETE:
+      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+      break;
+
+    case UPDATE:
+      if (oldKeyInfo != null) {
+        setParentBucketId(oldKeyInfo);
+        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+      } else {
+        LOG.warn("Update event does not have the old keyInfo for {}.",
+            updatedKeyInfo.getKeyName());
+      }
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      break;
+    }
+  }
+
   public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
@@ -225,16 +245,8 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           // KeyTable entries belong to both Legacy and OBS buckets.
           // Check bucket layout and if it's OBS
           // continue to the next iteration.
-          String volumeName = keyInfo.getVolumeName();
-          String bucketName = keyInfo.getBucketName();
-          String bucketDBKey = omMetadataManager
-              .getBucketKey(volumeName, bucketName);
-          // Get bucket info from bucket table
-          OmBucketInfo omBucketInfo = omMetadataManager
-              .getBucketTable().getSkipCache(bucketDBKey);
-
-          // Skip if Bucket is not a Legacy bucket.
-          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+          if (!isBucketLayoutValid((ReconOMMetadataManager) omMetadataManager,
+              keyInfo)) {
             continue;
           }
 
@@ -251,12 +263,12 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                       .build();
               handlePutDirEvent(directoryInfo, nsSummaryMap);
             } else {
-              handlePutKeyEvent(keyInfo, nsSummaryMap,false);
+              handlePutKeyEvent(keyInfo, nsSummaryMap);
             }
           } else {
             // The LEGACY bucket is an object store bucket.
             setParentBucketId(keyInfo);
-            handlePutKeyEvent(keyInfo, nsSummaryMap, true);
+            handlePutKeyEvent(keyInfo, nsSummaryMap);
           }
           if (!checkAndCallFlushToDB(nsSummaryMap)) {
             return false;
@@ -332,4 +344,30 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           "NSSummaryTaskWithLegacy is null");
     }
   }
+
+  /**
+   * Check if the bucket layout is LEGACY.
+   * @param metadataManager
+   * @param keyInfo
+   * @return
+   */
+  private boolean isBucketLayoutValid(ReconOMMetadataManager metadataManager,
+                                      OmKeyInfo keyInfo)
+      throws IOException {
+    String volumeName = keyInfo.getVolumeName();
+    String bucketName = keyInfo.getBucketName();
+    String bucketDBKey = metadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        metadataManager.getBucketTable().getSkipCache(bucketDBKey);
+
+    if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+      LOG.debug(
+          "Skipping processing for bucket {} as bucket layout is not LEGACY",
+          bucketName);
+      return false;
+    }
+
+    return true;
+  }
+
 }

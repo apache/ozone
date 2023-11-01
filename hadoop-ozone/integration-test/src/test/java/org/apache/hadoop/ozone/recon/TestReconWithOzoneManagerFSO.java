@@ -124,7 +124,7 @@ public class TestReconWithOzoneManagerFSO {
     OzoneStorageContainerManager reconSCM =
             cluster.getReconServer().getReconStorageContainerManager();
     NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
-            omMetadataManagerInstance, reconSCM);
+            omMetadataManagerInstance, reconSCM,new OzoneConfiguration());
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();

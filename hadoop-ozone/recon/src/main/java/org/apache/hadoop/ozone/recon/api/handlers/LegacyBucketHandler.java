@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -51,6 +53,8 @@ public class LegacyBucketHandler extends BucketHandler {
   private final String vol;
   private final String bucket;
   private final OmBucketInfo omBucketInfo;
+  private final OzoneConfiguration configuration;
+  private final boolean enableFileSystemPaths;
 
   public LegacyBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
@@ -62,6 +66,10 @@ public class LegacyBucketHandler extends BucketHandler {
     this.omBucketInfo = bucketInfo;
     this.vol = omBucketInfo.getVolumeName();
     this.bucket = omBucketInfo.getBucketName();
+    this.configuration = new OzoneConfiguration();
+    this.enableFileSystemPaths = configuration
+        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
   /**
@@ -212,58 +220,181 @@ public class LegacyBucketHandler extends BucketHandler {
       return 0;
     }
 
-    if (nsSummary.isObjectStore()) {
-      keyDataSizeWithReplica += handleDirectKeysForOBSLayout(
-          parentId, withReplica, listFile, duData, keyTable, seekPrefix );
-    } else {
+    if (enableFileSystemPaths) {
       keyDataSizeWithReplica += handleDirectKeysForFSOLayout(
-          parentId, withReplica, listFile, normalizedPath,duData, keyTable, seekPrefix, nsSummary);
+          parentId, withReplica, listFile, normalizedPath, duData, keyTable,
+          seekPrefix, nsSummary);
+    } else {
+      keyDataSizeWithReplica += handleDirectKeysForOBSLayout(
+          parentId, withReplica, listFile, duData, keyTable, seekPrefix);
     }
 
     return keyDataSizeWithReplica;
   }
 
 
+//  public long handleDirectKeysForOBSLayout(long parentId, boolean withReplica,
+//                                           boolean listFile,
+//                                           List<DUResponse.DiskUsage> duData,
+//                                           Table<String, OmKeyInfo> keyTable,
+//                                           String seekPrefix)
+//      throws IOException {
+//
+//    long keyDataSizeWithReplica = 0L;
+//
+//    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+//             iterator = keyTable.iterator()) {
+//      iterator.seek(seekPrefix);
+//
+//      while (iterator.hasNext()) {
+//        // KeyName : OmKeyInfo-Object
+//        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+//        String dbKey = kv.getKey();
+//
+//        // Exit loop if the key doesn't match the seekPrefix.
+//        if (!dbKey.startsWith(seekPrefix)) {
+//          break;
+//        }
+//
+//        OmKeyInfo keyInfo = kv.getValue();
+//        if (keyInfo != null) {
+//          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+//          String objectName = keyInfo.getKeyName();
+//          diskUsage.setSubpath(objectName);
+//          diskUsage.setKey(true);
+//          diskUsage.setSize(keyInfo.getDataSize());
+//
+//          if (withReplica) {
+//            long keyDU = keyInfo.getReplicatedSize();
+//            keyDataSizeWithReplica += keyDU;
+//            diskUsage.setSizeWithReplica(keyDU);
+//          }
+//          // List all the keys for the OBS bucket if requested.
+//          if (listFile) {
+//            duData.add(diskUsage);
+//          }
+//        }
+//      }
+//    }
+//
+//    return keyDataSizeWithReplica;
+//  }
+
+//  public long handleDirectKeysForFSOLayout(long parentId, boolean withReplica,
+//                                           boolean listFile,
+//                                           String normalizedPath,
+//                                           List<DUResponse.DiskUsage> duData,
+//                                           Table<String, OmKeyInfo> keyTable,
+//                                           String seekPrefix,
+//                                           NSSummary nsSummary)
+//      throws IOException {
+//
+//    long keyDataSizeWithReplica = 0L;
+//
+//    if (omBucketInfo.getObjectID() != parentId) {
+//      String dirName = nsSummary.getDirName();
+//      seekPrefix += dirName;
+//    }
+//    String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
+//    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+//             iterator = keyTable.iterator()) {
+//
+//      iterator.seek(seekPrefix);
+//
+//      while (iterator.hasNext()) {
+//        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+//        String dbKey = kv.getKey();
+//
+//        if (!dbKey.startsWith(seekPrefix)) {
+//          break;
+//        }
+//
+//        String[] keys = dbKey.split(OM_KEY_PREFIX);
+//
+//        // iteration moved to the next level
+//        // and not handling direct keys
+//        if (keys.length - seekKeys.length > 1) {
+//          continue;
+//        }
+//
+//        OmKeyInfo keyInfo = kv.getValue();
+//        if (keyInfo != null) {
+//          // skip directory markers, just include directKeys
+//          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+//            continue;
+//          }
+//          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+//          String subpath = buildSubpath(normalizedPath,
+//              keyInfo.getFileName());
+//          diskUsage.setSubpath(subpath);
+//          diskUsage.setKey(true);
+//          diskUsage.setSize(keyInfo.getDataSize());
+//
+//          if (withReplica) {
+//            long keyDU = keyInfo.getReplicatedSize();
+//            keyDataSizeWithReplica += keyDU;
+//            diskUsage.setSizeWithReplica(keyDU);
+//          }
+//          // list the key as a subpath
+//          if (listFile) {
+//            duData.add(diskUsage);
+//          }
+//        }
+//      }
+//    }
+//
+//    return keyDataSizeWithReplica;
+//  }
+
+  // Create a method to generate DUResponse.DiskUsage objects
+  private DUResponse.DiskUsage createDiskUsage(OmKeyInfo keyInfo, boolean withReplica, boolean listFile, List<DUResponse.DiskUsage> duData) {
+    DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+    String objectName = keyInfo.getKeyName();
+    diskUsage.setSubpath(objectName);
+    diskUsage.setKey(true);
+    diskUsage.setSize(keyInfo.getDataSize());
+
+    if (withReplica) {
+      long keyDU = keyInfo.getReplicatedSize();
+      diskUsage.setSizeWithReplica(keyDU);
+    }
+
+    if (listFile) {
+      duData.add(diskUsage);
+    }
+
+    return diskUsage;
+  }
+
+  // Update your existing methods to use the new createDiskUsage method
   public long handleDirectKeysForOBSLayout(long parentId, boolean withReplica,
                                            boolean listFile,
                                            List<DUResponse.DiskUsage> duData,
                                            Table<String, OmKeyInfo> keyTable,
                                            String seekPrefix)
       throws IOException {
-
     long keyDataSizeWithReplica = 0L;
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
 
-    iterator.seek(seekPrefix);
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
+      iterator.seek(seekPrefix);
 
-    while (iterator.hasNext()) {
-      // KeyName : OmKeyInfo-Object
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
 
-      // Exit loop if the key doesn't match the seekPrefix.
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
-
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        String objectName = keyInfo.getKeyName();
-        diskUsage.setSubpath(objectName);
-        diskUsage.setKey(true);
-        diskUsage.setSize(keyInfo.getDataSize());
-
-        if (withReplica) {
-          long keyDU = keyInfo.getReplicatedSize();
-          keyDataSizeWithReplica += keyDU;
-          diskUsage.setSizeWithReplica(keyDU);
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
         }
-        // List all the keys for the OBS bucket if requested.
-        if (listFile) {
-          duData.add(diskUsage);
+
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          createDiskUsage(keyInfo, withReplica, listFile, duData);
+          if (withReplica) {
+            long keyDU = keyInfo.getReplicatedSize();
+            keyDataSizeWithReplica += keyDU;
+          }
         }
       }
     }
@@ -277,8 +408,8 @@ public class LegacyBucketHandler extends BucketHandler {
                                            List<DUResponse.DiskUsage> duData,
                                            Table<String, OmKeyInfo> keyTable,
                                            String seekPrefix,
-                                           NSSummary nsSummary) throws IOException {
-
+                                           NSSummary nsSummary)
+      throws IOException {
     long keyDataSizeWithReplica = 0L;
 
     if (omBucketInfo.getObjectID() != parentId) {
@@ -286,8 +417,8 @@ public class LegacyBucketHandler extends BucketHandler {
       seekPrefix += dirName;
     }
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             iterator = keyTable.iterator()) {
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
 
       iterator.seek(seekPrefix);
 
@@ -313,21 +444,10 @@ public class LegacyBucketHandler extends BucketHandler {
           if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
             continue;
           }
-          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-          String subpath = buildSubpath(normalizedPath,
-              keyInfo.getFileName());
-          diskUsage.setSubpath(subpath);
-          diskUsage.setKey(true);
-          diskUsage.setSize(keyInfo.getDataSize());
-
+          createDiskUsage(keyInfo, withReplica, listFile, duData);
           if (withReplica) {
             long keyDU = keyInfo.getReplicatedSize();
             keyDataSizeWithReplica += keyDU;
-            diskUsage.setSizeWithReplica(keyDU);
-          }
-          // list the key as a subpath
-          if (listFile) {
-            duData.add(diskUsage);
           }
         }
       }

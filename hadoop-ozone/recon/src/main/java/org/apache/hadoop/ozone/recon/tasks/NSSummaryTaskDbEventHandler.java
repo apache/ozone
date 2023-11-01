@@ -87,7 +87,7 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
-      NSSummary> nsSummaryMap, boolean isObjectStore) throws IOException {
+      NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
@@ -110,7 +110,6 @@ public class NSSummaryTaskDbEventHandler {
 
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
-    nsSummary.setIsObjectStore(isObjectStore);
     nsSummaryMap.put(parentObjectId, nsSummary);
   }
 

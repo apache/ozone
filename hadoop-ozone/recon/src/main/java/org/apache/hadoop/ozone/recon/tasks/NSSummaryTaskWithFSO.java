@@ -92,7 +92,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
           switch (action) {
           case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, true);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           case DELETE:
@@ -107,7 +107,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                       updatedKey);
             }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, true);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
             break;
 
           default:
@@ -194,7 +194,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
-          handlePutKeyEvent(keyInfo, nsSummaryMap, true);
+          handlePutKeyEvent(keyInfo, nsSummaryMap);
           if (!checkAndCallFlushToDB(nsSummaryMap)) {
             return false;
           }
