@@ -20,7 +20,11 @@ package org.apache.hadoop.ozone.audit.parser;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.slf4j.Logger;
@@ -188,8 +192,9 @@ public class TestAuditParser {
       execute(args1, "");
       fail("No exception thrown.");
     } catch (Exception e) {
-      assertTrue(e.getMessage()
-          .contains("java.lang.ArrayIndexOutOfBoundsException: Array index out of range: 5"));
+      assertTrue(e.getMessage().contains(
+        "java.lang.ArrayIndexOutOfBoundsException: Array index out of range: 5"
+      ));
     }
   }
 
