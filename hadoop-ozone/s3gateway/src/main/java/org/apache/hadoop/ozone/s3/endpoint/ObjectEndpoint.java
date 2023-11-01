@@ -206,6 +206,7 @@ public class ObjectEndpoint extends EndpointBase {
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html for
    * more details.
    */
+  @SuppressWarnings("checkstyle:MethodLength")
   @PUT
   public Response put(
       @PathParam("bucket") String bucketName,
