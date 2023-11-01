@@ -92,6 +92,10 @@ public class TestContainerPlacement {
   private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
   private NodeManager nodeManager;
+  private final Clock clock;
+  public TestContainerPlacement() {
+    this.clock = Clock.system(ZoneId.systemDefault());
+  }
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -183,7 +187,7 @@ public class TestContainerPlacement {
     final long used = 2L * OzoneConsts.GB;
     final long remaining = capacity - used;
 
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     testDir = PathUtils.getTestDir(

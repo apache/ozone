@@ -52,6 +52,7 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collections;
 import java.time.ZoneId;
@@ -65,6 +66,10 @@ public class TestStatisticsUpdate {
 
   private NodeManager nodeManager;
   private NodeReportHandler nodeReportHandler;
+  private final Clock clock;
+  public TestStatisticsUpdate() {
+    this.clock = Clock.system(ZoneId.systemDefault());
+  }
 
   @BeforeEach
   void setup(@TempDir File testDir)
@@ -89,7 +94,7 @@ public class TestStatisticsUpdate {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -125,10 +126,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,6 +144,8 @@ public class TestSCMNodeManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSCMNodeManager.class);
 
+//  @Mock
+  private final Clock clock;
   private File testDir;
   private StorageContainerManager scm;
   private SCMContext scmContext;
@@ -157,6 +163,10 @@ public class TestSCMNodeManager {
       toLayoutVersionProto(MAX_LV + 1, MAX_LV + 1);
   private static final LayoutVersionProto CORRECT_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV, MAX_LV);
+
+  public TestSCMNodeManager() {
+    this.clock = Clock.system(ZoneId.systemDefault());
+  }
 
   @BeforeEach
   public void setup() {
@@ -222,7 +232,7 @@ public class TestSCMNodeManager {
   public void testScmHeartbeat()
       throws IOException, InterruptedException, AuthenticationException {
 
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 
@@ -508,7 +518,7 @@ public class TestSCMNodeManager {
   public void testScmNoHeartbeats()
       throws IOException, InterruptedException, AuthenticationException {
 
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 
@@ -533,7 +543,7 @@ public class TestSCMNodeManager {
   public void testScmShutdown()
       throws IOException, InterruptedException, AuthenticationException {
 
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
@@ -570,7 +580,7 @@ public class TestSCMNodeManager {
       throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     final int count = 10;
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 
@@ -794,7 +804,7 @@ public class TestSCMNodeManager {
     final int deadNodeInterval = 6; // seconds
     ScheduledFuture schedFuture;
 
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
@@ -1463,7 +1473,7 @@ public class TestSCMNodeManager {
       AuthenticationException {
     final int healthyCount = 3000;
     final int staleCount = 3000;
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
@@ -1644,7 +1654,7 @@ public class TestSCMNodeManager {
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
-    Instant initialInstant = Instant.now();
+    Instant initialInstant = clock.instant();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 
