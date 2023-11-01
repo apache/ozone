@@ -221,153 +221,29 @@ public class LegacyBucketHandler extends BucketHandler {
     }
 
     if (enableFileSystemPaths) {
-      keyDataSizeWithReplica += handleDirectKeysForFSOLayout(
-          parentId, withReplica, listFile, normalizedPath, duData, keyTable,
-          seekPrefix, nsSummary);
+      keyDataSizeWithReplica +=
+          handleDirectKeysForFSOLayout(parentId, withReplica, listFile, duData,
+              keyTable, seekPrefix, nsSummary);
     } else {
-      keyDataSizeWithReplica += handleDirectKeysForOBSLayout(
-          parentId, withReplica, listFile, duData, keyTable, seekPrefix);
+      keyDataSizeWithReplica +=
+          handleDirectKeysForOBSLayout(withReplica, listFile, duData, keyTable,
+              seekPrefix);
     }
 
     return keyDataSizeWithReplica;
   }
 
-
-//  public long handleDirectKeysForOBSLayout(long parentId, boolean withReplica,
-//                                           boolean listFile,
-//                                           List<DUResponse.DiskUsage> duData,
-//                                           Table<String, OmKeyInfo> keyTable,
-//                                           String seekPrefix)
-//      throws IOException {
-//
-//    long keyDataSizeWithReplica = 0L;
-//
-//    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-//             iterator = keyTable.iterator()) {
-//      iterator.seek(seekPrefix);
-//
-//      while (iterator.hasNext()) {
-//        // KeyName : OmKeyInfo-Object
-//        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-//        String dbKey = kv.getKey();
-//
-//        // Exit loop if the key doesn't match the seekPrefix.
-//        if (!dbKey.startsWith(seekPrefix)) {
-//          break;
-//        }
-//
-//        OmKeyInfo keyInfo = kv.getValue();
-//        if (keyInfo != null) {
-//          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-//          String objectName = keyInfo.getKeyName();
-//          diskUsage.setSubpath(objectName);
-//          diskUsage.setKey(true);
-//          diskUsage.setSize(keyInfo.getDataSize());
-//
-//          if (withReplica) {
-//            long keyDU = keyInfo.getReplicatedSize();
-//            keyDataSizeWithReplica += keyDU;
-//            diskUsage.setSizeWithReplica(keyDU);
-//          }
-//          // List all the keys for the OBS bucket if requested.
-//          if (listFile) {
-//            duData.add(diskUsage);
-//          }
-//        }
-//      }
-//    }
-//
-//    return keyDataSizeWithReplica;
-//  }
-
-//  public long handleDirectKeysForFSOLayout(long parentId, boolean withReplica,
-//                                           boolean listFile,
-//                                           String normalizedPath,
-//                                           List<DUResponse.DiskUsage> duData,
-//                                           Table<String, OmKeyInfo> keyTable,
-//                                           String seekPrefix,
-//                                           NSSummary nsSummary)
-//      throws IOException {
-//
-//    long keyDataSizeWithReplica = 0L;
-//
-//    if (omBucketInfo.getObjectID() != parentId) {
-//      String dirName = nsSummary.getDirName();
-//      seekPrefix += dirName;
-//    }
-//    String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-//    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-//             iterator = keyTable.iterator()) {
-//
-//      iterator.seek(seekPrefix);
-//
-//      while (iterator.hasNext()) {
-//        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-//        String dbKey = kv.getKey();
-//
-//        if (!dbKey.startsWith(seekPrefix)) {
-//          break;
-//        }
-//
-//        String[] keys = dbKey.split(OM_KEY_PREFIX);
-//
-//        // iteration moved to the next level
-//        // and not handling direct keys
-//        if (keys.length - seekKeys.length > 1) {
-//          continue;
-//        }
-//
-//        OmKeyInfo keyInfo = kv.getValue();
-//        if (keyInfo != null) {
-//          // skip directory markers, just include directKeys
-//          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
-//            continue;
-//          }
-//          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-//          String subpath = buildSubpath(normalizedPath,
-//              keyInfo.getFileName());
-//          diskUsage.setSubpath(subpath);
-//          diskUsage.setKey(true);
-//          diskUsage.setSize(keyInfo.getDataSize());
-//
-//          if (withReplica) {
-//            long keyDU = keyInfo.getReplicatedSize();
-//            keyDataSizeWithReplica += keyDU;
-//            diskUsage.setSizeWithReplica(keyDU);
-//          }
-//          // list the key as a subpath
-//          if (listFile) {
-//            duData.add(diskUsage);
-//          }
-//        }
-//      }
-//    }
-//
-//    return keyDataSizeWithReplica;
-//  }
-
-  // Create a method to generate DUResponse.DiskUsage objects
-  private DUResponse.DiskUsage createDiskUsage(OmKeyInfo keyInfo, boolean withReplica, boolean listFile, List<DUResponse.DiskUsage> duData) {
-    DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-    String objectName = keyInfo.getKeyName();
-    diskUsage.setSubpath(objectName);
-    diskUsage.setKey(true);
-    diskUsage.setSize(keyInfo.getDataSize());
-
-    if (withReplica) {
-      long keyDU = keyInfo.getReplicatedSize();
-      diskUsage.setSizeWithReplica(keyDU);
-    }
-
-    if (listFile) {
-      duData.add(diskUsage);
-    }
-
-    return diskUsage;
-  }
-
-  // Update your existing methods to use the new createDiskUsage method
-  public long handleDirectKeysForOBSLayout(long parentId, boolean withReplica,
+  /**
+   * This method handles disk usage of direct keys for OBS layout.
+   * @param withReplica if withReplica is enabled, set sizeWithReplica
+   * @param listFile if listFile is enabled, append key DU as a subpath
+   * @param duData the current DU data
+   * @param keyTable the key table
+   * @param seekPrefix the seek prefix used to position the iterator
+   * @return the total DU of all direct keys
+   * @throws IOException
+   */
+  public long handleDirectKeysForOBSLayout(boolean withReplica,
                                            boolean listFile,
                                            List<DUResponse.DiskUsage> duData,
                                            Table<String, OmKeyInfo> keyTable,
@@ -402,9 +278,20 @@ public class LegacyBucketHandler extends BucketHandler {
     return keyDataSizeWithReplica;
   }
 
+  /**
+   * This method handles disk usage of direct keys for OBS layout.
+   * @param parentId parent directory/bucket
+   * @param withReplica if withReplica is enabled, set sizeWithReplica
+   * @param listFile if listFile is enabled, append key DU as a subpath
+   * @param duData the current DU data
+   * @param keyTable the key table
+   * @param seekPrefix the seek prefix used to position the iterator
+   * @param nsSummary of the parent directory/bucket
+   * @return the total DU of all direct keys
+   * @throws IOException
+   */
   public long handleDirectKeysForFSOLayout(long parentId, boolean withReplica,
                                            boolean listFile,
-                                           String normalizedPath,
                                            List<DUResponse.DiskUsage> duData,
                                            Table<String, OmKeyInfo> keyTable,
                                            String seekPrefix,
@@ -418,7 +305,8 @@ public class LegacyBucketHandler extends BucketHandler {
     }
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
     try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = keyTable.iterator()) {
 
       iterator.seek(seekPrefix);
 
@@ -454,6 +342,34 @@ public class LegacyBucketHandler extends BucketHandler {
     }
 
     return keyDataSizeWithReplica;
+  }
+
+  /**
+   * This method handles disk usage calculation for legacy buckets.
+   * @param keyInfo the key info
+   * @param withReplica if withReplica is enabled, set sizeWithReplica
+   * @param listFile if listFile is enabled, append key DU as a subpath
+   */
+  private DUResponse.DiskUsage createDiskUsage(OmKeyInfo keyInfo,
+                                         boolean withReplica,
+                                         boolean listFile,
+                                         List<DUResponse.DiskUsage> duData) {
+    DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+    String objectName = keyInfo.getKeyName();
+    diskUsage.setSubpath(objectName);
+    diskUsage.setKey(true);
+    diskUsage.setSize(keyInfo.getDataSize());
+
+    if (withReplica) {
+      long keyDU = keyInfo.getReplicatedSize();
+      diskUsage.setSizeWithReplica(keyDU);
+    }
+
+    if (listFile) {
+      duData.add(diskUsage);
+    }
+
+    return diskUsage;
   }
 
 
