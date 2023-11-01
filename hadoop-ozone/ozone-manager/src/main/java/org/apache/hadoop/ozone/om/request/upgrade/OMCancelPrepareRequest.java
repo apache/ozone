@@ -80,7 +80,10 @@ public class OMCancelPrepareRequest extends OMClientRequest {
 
       // Deletes on disk marker file, does not update DB and therefore does
       // not update cache.
-      ozoneManager.getPrepareState().cancelPrepare();
+      if (!ozoneManager.isRatisEnabled()) {
+        LOG.warn("cancel prepare is no-op in the current non-ha setup!");
+        ozoneManager.getPrepareState().cancelPrepare();
+      }
       ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
       LOG.info("OM {} prepare state cancelled at log index {}. Returning " +
@@ -91,6 +94,9 @@ public class OMCancelPrepareRequest extends OMClientRequest {
           ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, e));
+    } finally {
+      addResponseToDoubleBuffer(transactionLogIndex, response,
+          ozoneManagerDoubleBufferHelper);
     }
 
     return response;

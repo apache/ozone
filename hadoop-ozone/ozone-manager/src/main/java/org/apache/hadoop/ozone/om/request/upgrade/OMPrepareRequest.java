@@ -84,6 +84,10 @@ public class OMPrepareRequest extends OMClientRequest {
         Duration.of(args.getTxnApplyCheckIntervalSeconds(), ChronoUnit.SECONDS);
 
     try {
+      if (!ozoneManager.isRatisEnabled()) {
+        LOG.warn("prepare is no-op in the current non-ha setup!");
+        transactionLogIndex = -1;
+      }
       // Create response.
       PrepareResponse omResponse = PrepareResponse.newBuilder()
               .setTxnID(transactionLogIndex)
@@ -97,25 +101,27 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
-      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      RaftServer.Division division =
-          omRatisServer.getServer()
-              .getDivision(omRatisServer.getRaftGroup().getGroupId());
+      if (!ozoneManager.isRatisEnabled()) {
+        OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+        RaftServer.Division division =
+            omRatisServer.getServer()
+                .getDivision(omRatisServer.getRaftGroup().getGroupId());
 
-      // Wait for outstanding double buffer entries to flush to disk,
-      // so they will not be purged from the log before being persisted to
-      // the DB.
-      // Since the response for this request was added to the double buffer
-      // already, once this index reaches the state machine, we know all
-      // transactions have been flushed.
-      waitForLogIndex(transactionLogIndex, ozoneManager, division,
-          flushTimeout, flushCheckInterval);
-      takeSnapshotAndPurgeLogs(transactionLogIndex, division);
+        // Wait for outstanding double buffer entries to flush to disk,
+        // so they will not be purged from the log before being persisted to
+        // the DB.
+        // Since the response for this request was added to the double buffer
+        // already, once this index reaches the state machine, we know all
+        // transactions have been flushed.
+        waitForLogIndex(transactionLogIndex, ozoneManager, division,
+            flushTimeout, flushCheckInterval);
+        takeSnapshotAndPurgeLogs(transactionLogIndex, division);
 
-      // Save prepare index to a marker file, so if the OM restarts,
-      // it will remain in prepare mode as long as the file exists and its
-      // log indices are >= the one in the file.
-      ozoneManager.getPrepareState().finishPrepare(transactionLogIndex);
+        // Save prepare index to a marker file, so if the OM restarts,
+        // it will remain in prepare mode as long as the file exists and its
+        // log indices are >= the one in the file.
+        ozoneManager.getPrepareState().finishPrepare(transactionLogIndex);
+      }
 
       LOG.info("OM {} prepared at log index {}. Returning response {} with " +
           "log index {}", ozoneManager.getOMNodeId(), transactionLogIndex,
@@ -145,6 +151,9 @@ public class OMPrepareRequest extends OMClientRequest {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+    } finally {
+      addResponseToDoubleBuffer(transactionLogIndex, response,
+          ozoneManagerDoubleBufferHelper);
     }
 
     return response;

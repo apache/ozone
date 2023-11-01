@@ -101,6 +101,10 @@ public class PrepareSubCommand implements Callable<Void> {
     OzoneManagerProtocol client = parent.createOmClient(omServiceId);
     long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
         txnApplyCheckIntervalSeconds);
+    if (prepareTxnId == -1) {
+      System.out.println("prepare is no-op in the current non-ha setup!");
+      return null;
+    }
     System.out.println("Ozone Manager Prepare Request successfully returned " +
         "with Transaction Id : [" + prepareTxnId + "].");
 
