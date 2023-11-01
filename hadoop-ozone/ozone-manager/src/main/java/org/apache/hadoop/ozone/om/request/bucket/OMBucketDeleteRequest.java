@@ -144,9 +144,11 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
       // Check if bucket does not contain incomplete MPUs
       if (omMetadataManager.containsIncompleteMPUs(volumeName, bucketName)) {
-        LOG.debug("bucket: {} still has incomplete multipart uploads",
-            bucketName);
-        throw new OMException("Bucket still has incomplete multipart uploads",
+        LOG.debug("Volume '{}', Bucket '{}' can't be deleted when it has " +
+                "incomplete multipart uploads", volumeName, bucketName);
+        throw new OMException(
+            "Volume " + volumeName + ", Bucket " + bucketName + " can't be " +
+                "deleted when it has incomplete multipart uploads",
             ResultCodes.BUCKET_NOT_EMPTY);
       }
 
