@@ -192,9 +192,8 @@ public class TestAuditParser {
       execute(args1, "");
       fail("No exception thrown.");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("java.lang." +
-          "ArrayIndexOutOfBoundsException: Array index out of range: 5"
-      ));
+      assertTrue(e.getCause() instanceof ArrayIndexOutOfBoundsException);
+      assertTrue(e.getMessage().contains(": 5"));
     }
   }
 
