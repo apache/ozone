@@ -95,7 +95,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -381,9 +380,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNotNull(blockTable
+      Assert.assertNotNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNotNull(metadataTable
+      Assert.assertNotNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -403,9 +402,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNull(blockTable
+      Assert.assertNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNull(metadataTable
+      Assert.assertNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }

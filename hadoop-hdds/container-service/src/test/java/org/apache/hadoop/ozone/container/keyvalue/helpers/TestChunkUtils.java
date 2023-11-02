@@ -72,7 +72,7 @@ public class TestChunkUtils {
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "concurrent");
     try {
-      long len = data.limit();
+      final int len = data.limit();
       long offset = 0;
       File file = tempFile.toFile();
       ChunkUtils.writeData(file, data, offset, len, null, true);
@@ -168,7 +168,7 @@ public class TestChunkUtils {
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {
       File file = tempFile.toFile();
-      long len = data.limit();
+      final int len = data.limit();
       long offset = 0;
       ChunkUtils.writeData(file, data, offset, len, null, true);
 

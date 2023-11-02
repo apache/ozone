@@ -230,7 +230,7 @@ public class FilePerChunkStrategy implements ChunkManager {
     }
 
     long len = info.getLen();
-    long bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
+    final int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
     ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,

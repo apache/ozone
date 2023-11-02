@@ -117,7 +117,7 @@ public interface ChunkManager {
     return null;
   }
 
-  static long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
+  static int getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
       long defaultReadBufferCapacity) {
     long bufferCapacity = 0;
     if (chunkInfo.isReadDataIntoSingleBuffer()) {
@@ -143,6 +143,13 @@ public interface ChunkManager {
       bufferCapacity = chunkInfo.getLen();
     }
 
-    return bufferCapacity;
+    if (bufferCapacity > Integer.MAX_VALUE) {
+      throw new IllegalStateException("Integer overflow:"
+          + " bufferCapacity = " + bufferCapacity
+          + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE
+          + ", defaultReadBufferCapacity=" + defaultReadBufferCapacity
+          + ", chunkInfo=" + chunkInfo);
+    }
+    return Math.toIntExact(bufferCapacity);
   }
 }
