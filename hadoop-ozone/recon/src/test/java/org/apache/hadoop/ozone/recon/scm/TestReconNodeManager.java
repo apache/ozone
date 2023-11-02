@@ -33,6 +33,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -90,6 +93,9 @@ public class TestReconNodeManager {
 
   @Test
   public void testReconNodeDB() throws IOException, NodeNotFoundException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
@@ -97,7 +103,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, testClock);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());
@@ -166,7 +172,7 @@ public class TestReconNodeManager {
     eventQueue.close();
     reconNodeManager.close();
     reconNodeManager = new ReconNodeManager(conf, scmStorageConfig, eventQueue,
-        clusterMap, nodeTable, versionManager);
+        clusterMap, nodeTable, versionManager, testClock);
 
     // Verify that the node information was persisted and loaded back.
     assertEquals(1, reconNodeManager.getAllNodes().size());
@@ -176,6 +182,9 @@ public class TestReconNodeManager {
 
   @Test
   public void testUpdateNodeOperationalStateFromScm() throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
@@ -183,7 +192,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, testClock);
 
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -210,6 +219,9 @@ public class TestReconNodeManager {
 
   @Test
   public void testDatanodeUpdate() throws IOException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
@@ -217,7 +229,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, testClock);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());

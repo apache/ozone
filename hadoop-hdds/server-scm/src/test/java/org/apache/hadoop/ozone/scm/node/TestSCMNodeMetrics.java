@@ -71,7 +71,7 @@ public class TestSCMNodeMetrics {
   public static void setup() throws Exception {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration source = new OzoneConfiguration();
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =

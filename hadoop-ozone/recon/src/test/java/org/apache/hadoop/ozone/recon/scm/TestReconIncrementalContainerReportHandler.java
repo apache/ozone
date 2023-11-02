@@ -72,7 +72,7 @@ public class TestReconIncrementalContainerReportHandler
   public void testProcessICR() throws IOException, NodeNotFoundException {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
@@ -100,7 +100,8 @@ public class TestReconIncrementalContainerReportHandler
         .thenReturn(maxLayoutVersion());
 
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager, testClock);
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager,
+            testClock);
 
     nodeManager.register(datanodeDetails, null, null);
 

@@ -90,7 +90,7 @@ public class AbstractReconContainerManagerTest {
   public void setUp(@TempDir File tempDir) throws Exception {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
@@ -109,7 +109,7 @@ public class AbstractReconContainerManagerTest {
     when(layoutVersionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, scmContext, layoutVersionManager,testClock);
+        eventQueue, clusterMap, scmContext, layoutVersionManager, testClock);
     pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf,
         nodeManager,

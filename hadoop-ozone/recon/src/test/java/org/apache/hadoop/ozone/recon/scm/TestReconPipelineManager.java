@@ -110,7 +110,7 @@ public class TestReconPipelineManager {
     // Get 3 OPEN pipelines from SCM.
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     List<Pipeline> pipelinesFromScm = getPipelines(3);
 
     // Recon has 2 pipelines in ALLOCATED state. (1 is valid and 1 is obsolete)
@@ -143,7 +143,8 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager, testClock);
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager,
+            testClock);
 
     try (ReconPipelineManager reconPipelineManager =
              ReconPipelineManager.newReconPipelineManager(
