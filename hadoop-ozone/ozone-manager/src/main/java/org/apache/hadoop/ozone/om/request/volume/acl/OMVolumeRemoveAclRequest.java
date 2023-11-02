@@ -113,12 +113,12 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException ex) {
+      Exception ex) {
     return new OMVolumeAclOpResponse(createErrorOMResponse(omResponse, ex));
   }
 
   @Override
-  void onComplete(Result result, IOException ex, long trxnLogIndex,
+  void onComplete(Result result, Exception ex, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:

@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test cases for {@link LocalSecretKeyStore}.
  */
-public class LocalSecretKeyStoreTest {
+public class TestLocalKeyStore {
   private SecretKeyStore secretKeyStore;
   private Path testSecretFile;
 

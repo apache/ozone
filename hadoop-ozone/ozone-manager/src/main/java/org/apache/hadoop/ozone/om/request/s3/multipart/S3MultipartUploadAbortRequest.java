@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -112,7 +113,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     ozoneManager.getMetrics().incNumAbortMultipartUploads();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     String multipartKey = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -190,7 +191,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = getOmClientResponse(exception, omResponse);
@@ -228,7 +229,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  protected OMClientResponse getOmClientResponse(IOException exception,
+  protected OMClientResponse getOmClientResponse(Exception exception,
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,

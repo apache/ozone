@@ -151,6 +151,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.ProtobufUtils;
@@ -374,14 +375,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) throws IOException {
-    OMClientRequest omClientRequest = null;
-    OMClientResponse omClientResponse = null;
-    omClientRequest =
+    OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    omClientResponse = omClientRequest
-        .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
-            ozoneManagerDoubleBuffer::add);
-    return omClientResponse;
+    return captureLatencyNs(
+        impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
+        () -> omClientRequest.validateAndUpdateCache(getOzoneManager(),
+            transactionLogIndex, ozoneManagerDoubleBuffer::add));
   }
 
   @Override

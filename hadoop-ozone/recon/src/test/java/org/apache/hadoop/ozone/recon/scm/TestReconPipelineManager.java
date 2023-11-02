@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -145,9 +146,12 @@ public class TestReconPipelineManager {
                  eventQueue,
                  scmhaManager,
                  scmContext)) {
+      StorageContainerManager mock = mock(StorageContainerManager.class);
+      Mockito.when(mock.getScmNodeDetails())
+          .thenReturn(mock(SCMNodeDetails.class));
       scmContext = new SCMContext.Builder().setIsInSafeMode(true)
               .setLeader(true).setIsPreCheckComplete(true)
-              .setSCM(mock(StorageContainerManager.class)).build();
+              .setSCM(mock).build();
       reconPipelineManager.setScmContext(scmContext);
       reconPipelineManager.addPipeline(validPipeline);
       reconPipelineManager.addPipeline(invalidPipeline);

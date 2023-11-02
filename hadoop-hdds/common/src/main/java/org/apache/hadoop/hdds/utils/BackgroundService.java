@@ -53,6 +53,12 @@ public abstract class BackgroundService {
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
+    this(serviceName, interval, unit, threadPoolSize, serviceTimeout, "");
+  }
+
+  public BackgroundService(String serviceName, long interval,
+      TimeUnit unit, int threadPoolSize, long serviceTimeout,
+      String threadNamePrefix) {
     this.interval = interval;
     this.unit = unit;
     this.serviceName = serviceName;
@@ -62,7 +68,7 @@ public abstract class BackgroundService {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setThreadFactory(r -> new Thread(threadGroup, r))
         .setDaemon(true)
-        .setNameFormat(serviceName + "#%d")
+        .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
     exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(
         threadPoolSize, threadFactory);

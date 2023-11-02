@@ -58,6 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -130,7 +131,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     ozoneManager.getMetrics().incNumInitiateMultipartUploads();
     boolean acquiredBucketLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
     Result result = null;
@@ -238,7 +239,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   .build(), multipartKeyInfo, omKeyInfo, getBucketLayout());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponse(
@@ -261,7 +262,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   protected void logResult(OzoneManager ozoneManager,
       MultipartInfoInitiateRequest multipartInfoInitiateRequest,
       Map<String, String> auditMap, String volumeName, String bucketName,
-      String keyName, IOException exception, Result result) {
+      String keyName, Exception exception, Result result) {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
