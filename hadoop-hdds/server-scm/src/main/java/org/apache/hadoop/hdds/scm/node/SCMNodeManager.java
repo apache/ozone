@@ -74,6 +74,7 @@ import org.slf4j.LoggerFactory;
 import javax.management.ObjectName;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -130,7 +131,7 @@ public class SCMNodeManager implements NodeManager {
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
-
+  private final Clock clock;
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
    * consistent view of the node state.
@@ -146,7 +147,8 @@ public class SCMNodeManager implements NodeManager {
                         EventPublisher eventPublisher,
                         NetworkTopology networkTopology,
                         SCMContext scmContext,
-                        HDDSLayoutVersionManager layoutVersionManager) {
+                        HDDSLayoutVersionManager layoutVersionManager,
+                        Clock clock) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager, scmContext);
@@ -176,6 +178,7 @@ public class SCMNodeManager implements NodeManager {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
     this.scmContext = scmContext;
+    this.clock = clock;
   }
 
   private void registerMXBean() {

@@ -142,7 +142,7 @@ public class TestSCMNodeManager {
       LoggerFactory.getLogger(TestSCMNodeManager.class);
 
 //  @Mock
-  private final Clock clock;
+//  private final Clock clock;
   private File testDir;
   private StorageContainerManager scm;
   private SCMContext scmContext;
@@ -161,9 +161,9 @@ public class TestSCMNodeManager {
   private static final LayoutVersionProto CORRECT_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV, MAX_LV);
 
-  public TestSCMNodeManager() {
-    this.clock = Clock.system(ZoneId.systemDefault());
-  }
+//  public TestSCMNodeManager() {
+//    this.clock = Clock.system(ZoneId.systemDefault());
+//  }
 
   @BeforeEach
   public void setup() {
@@ -228,8 +228,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmHeartbeat()
       throws IOException, InterruptedException, AuthenticationException {
-
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 
@@ -514,8 +513,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmNoHeartbeats()
       throws IOException, InterruptedException, AuthenticationException {
-
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
 
@@ -539,8 +537,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmShutdown()
       throws IOException, InterruptedException, AuthenticationException {
-
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
@@ -575,11 +572,11 @@ public class TestSCMNodeManager {
   @Test
   public void testScmHealthyNodeCount()
       throws IOException, InterruptedException, AuthenticationException {
-    OzoneConfiguration conf = getConf();
-    final int count = 10;
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
+    OzoneConfiguration conf = getConf();
+    final int count = 10;
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
@@ -801,7 +798,7 @@ public class TestSCMNodeManager {
     final int deadNodeInterval = 6; // seconds
     ScheduledFuture schedFuture;
 
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
@@ -900,6 +897,9 @@ public class TestSCMNodeManager {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
 
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         healthCheckInterval, MILLISECONDS);
@@ -915,7 +915,7 @@ public class TestSCMNodeManager {
     nodeManagerContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        nodeManagerContext, lvm);
+        nodeManagerContext, lvm, testClock);
 
     // Regardless of SCM's finalization checkpoint, datanodes with higher MLV
     // than SCM should not be found in the cluster.
@@ -940,6 +940,9 @@ public class TestSCMNodeManager {
   // Currently invoked by testProcessLayoutVersion.
   public void testProcessLayoutVersionLowerMlv(FinalizationCheckpoint
       currentCheckpoint) throws IOException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
@@ -950,7 +953,7 @@ public class TestSCMNodeManager {
     nodeManagerContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        nodeManagerContext, lvm);
+        nodeManagerContext, lvm, testClock);
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,
@@ -984,6 +987,9 @@ public class TestSCMNodeManager {
   @Test
   public void testProcessCommandQueueReport()
       throws IOException, NodeNotFoundException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
@@ -992,7 +998,7 @@ public class TestSCMNodeManager {
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        SCMContext.emptyContext(), lvm);
+        SCMContext.emptyContext(), lvm, testClock);
     LayoutVersionProto layoutInfo = toLayoutVersionProto(
         lvm.getMetadataLayoutVersion(), lvm.getSoftwareLayoutVersion());
 
@@ -1470,7 +1476,8 @@ public class TestSCMNodeManager {
       AuthenticationException {
     final int healthyCount = 3000;
     final int staleCount = 3000;
-    Instant initialInstant = clock.instant();
+
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration conf = getConf();
@@ -1646,14 +1653,14 @@ public class TestSCMNodeManager {
     final int nodeCount = 1;
     final int interval = 100;
 
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
         MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
-    Instant initialInstant = clock.instant();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails datanodeDetails =

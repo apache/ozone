@@ -92,10 +92,6 @@ public class TestContainerPlacement {
   private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
   private NodeManager nodeManager;
-  private final Clock clock;
-  public TestContainerPlacement() {
-    this.clock = Clock.system(ZoneId.systemDefault());
-  }
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -141,6 +137,9 @@ public class TestContainerPlacement {
    */
 
   SCMNodeManager createNodeManager(OzoneConfiguration config) {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     EventQueue eventQueue = new EventQueue();
     eventQueue.addHandler(SCMEvents.NEW_NODE,
         Mockito.mock(NewNodeHandler.class));
@@ -159,7 +158,7 @@ public class TestContainerPlacement {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     SCMNodeManager scmNodeManager = new SCMNodeManager(config, storageConfig,
-        eventQueue, null, SCMContext.emptyContext(), versionManager);
+        eventQueue, null, SCMContext.emptyContext(), versionManager, testClock);
     return scmNodeManager;
   }
 
@@ -187,7 +186,7 @@ public class TestContainerPlacement {
     final long used = 2L * OzoneConsts.GB;
     final long remaining = capacity - used;
 
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
     testDir = PathUtils.getTestDir(

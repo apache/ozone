@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -55,6 +57,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+
+import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -104,6 +108,9 @@ public class TestReconPipelineManager {
   public void testInitialize() throws IOException, TimeoutException {
 
     // Get 3 OPEN pipelines from SCM.
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant,zoneId);
     List<Pipeline> pipelinesFromScm = getPipelines(3);
 
     // Recon has 2 pipelines in ALLOCATED state. (1 is valid and 1 is obsolete)
@@ -136,7 +143,7 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager, testClock);
 
     try (ReconPipelineManager reconPipelineManager =
              ReconPipelineManager.newReconPipelineManager(
@@ -179,7 +186,9 @@ public class TestReconPipelineManager {
 
   @Test
   public void testAddPipeline() throws IOException, TimeoutException {
-
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant,zoneId);
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
@@ -190,7 +199,7 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager, testClock);
 
     ReconPipelineManager reconPipelineManager =
         ReconPipelineManager.newReconPipelineManager(

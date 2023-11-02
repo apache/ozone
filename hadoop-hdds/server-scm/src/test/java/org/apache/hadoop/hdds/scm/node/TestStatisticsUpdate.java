@@ -66,10 +66,6 @@ public class TestStatisticsUpdate {
 
   private NodeManager nodeManager;
   private NodeReportHandler nodeReportHandler;
-  private final Clock clock;
-  public TestStatisticsUpdate() {
-    this.clock = Clock.system(ZoneId.systemDefault());
-  }
 
   @BeforeEach
   void setup(@TempDir File testDir)
@@ -92,12 +88,11 @@ public class TestStatisticsUpdate {
   @Test
   public void testStatisticsUpdate() throws Exception {
     //GIVEN
-    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
-    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
-    Instant initialInstant = clock.instant();
+    Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     TestClock testClock = new TestClock(initialInstant, zoneId);
-
+    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
         datanode1.getUuid(), datanode1.getUuidString(), 100, 10, 90, null);

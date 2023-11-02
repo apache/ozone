@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.scm.node;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,6 +50,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,7 +69,9 @@ public class TestSCMNodeMetrics {
 
   @BeforeAll
   public static void setup() throws Exception {
-
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant,zoneId);
     OzoneConfiguration source = new OzoneConfiguration();
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =
@@ -79,7 +84,7 @@ public class TestSCMNodeMetrics {
         .thenReturn(maxLayoutVersion());
     nodeManager = new SCMNodeManager(source, config, publisher,
         new NetworkTopologyImpl(source), SCMContext.emptyContext(),
-            versionManager);
+            versionManager, testClock);
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")
