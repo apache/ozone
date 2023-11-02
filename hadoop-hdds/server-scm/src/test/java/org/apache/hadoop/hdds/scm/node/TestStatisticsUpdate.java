@@ -141,7 +141,7 @@ public class TestStatisticsUpdate {
         .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
         .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
         .build();
-    for(int i=0;i<4;i++){
+    for (int i = 0; i < 4; i++) {
       nodeManager.processHeartbeat(datanode2, layoutInfo);
       testClock.fastForward(Duration.ofSeconds(1));
     }
