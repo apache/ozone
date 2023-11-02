@@ -172,10 +172,10 @@ public class UpgradeTask {
       result.success();
       return result;
     }).whenComplete((r, e) -> {
+      final File hddsRootDir = r.getHddsVolume().getHddsRootDir();
+      final File file = UpgradeUtils.getVolumeMigrateFile(r.getHddsVolume());
       // touch a flag file
       if (e == null) {
-        final File hddsRootDir = r.getHddsVolume().getHddsRootDir();
-        final File file = UpgradeUtils.getVolumeMigrateFile(r.getHddsVolume());
         try {
           UpgradeUtils.touchFile(file);
         } catch (IOException ioe) {
@@ -184,7 +184,11 @@ public class UpgradeTask {
         }
       }
       if (volumeUpgradeLockFile.exists()) {
-        volumeUpgradeLockFile.delete();
+        boolean deleted = volumeUpgradeLockFile.delete();
+        if (!deleted) {
+          LOG.warn("Delete upgrade lock file {} on volume {} fail.", file,
+              hddsRootDir);
+        }
       }
     });
   }

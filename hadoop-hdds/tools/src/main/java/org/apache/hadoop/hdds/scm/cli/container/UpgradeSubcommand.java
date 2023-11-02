@@ -37,6 +37,8 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.File;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -131,14 +133,15 @@ public class UpgradeSubcommand implements Callable<Void> {
     }
 
     if (!yes) {
-      Scanner scanner = new Scanner(System.in);
+      Scanner scanner = new Scanner(new InputStreamReader(
+          System.in, StandardCharsets.UTF_8));
       System.out.println(
           "The volume db store, will be automatically backup," +
               " should you continue to upgrade?");
       boolean confirm = scanner.next().trim().equals("yes");
       scanner.close();
       if (!confirm) {
-        System.exit(0);
+        return null;
       }
     }
 

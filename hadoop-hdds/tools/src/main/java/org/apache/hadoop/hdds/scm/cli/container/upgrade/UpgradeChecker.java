@@ -122,30 +122,17 @@ public class UpgradeChecker {
   }
 
   public Map<File, Exception> dbBackup(List<File> dbPaths) {
-    List<CompletableFuture<Void>> futures = new ArrayList<>();
     Map<File, Exception> failDBDir = new ConcurrentHashMap<>();
-
     for (File dbPath : dbPaths) {
-      final CompletableFuture<Void> future =
-          CompletableFuture.runAsync(() -> {
-            try {
-              final File backup =
-                  new File(dbPath.getParentFile(), dbPath.getName() + ".bak");
-              backup.mkdir();
-              FileUtils.copyDirectory(dbPath, backup, true);
-            } catch (IOException e) {
-              failDBDir.put(dbPath, e);
-              e.printStackTrace();
-            }
-          });
-      futures.add(future);
-    }
-
-    try {
-      CompletableFuture
-          .allOf(futures.toArray(new CompletableFuture[futures.size()])).get();
-    } catch (InterruptedException | ExecutionException e) {
-      Thread.currentThread().interrupt();
+      try {
+        final File backup =
+            new File(dbPath.getParentFile(), dbPath.getName() + ".bak");
+        if (backup.exists() || backup.mkdir()) {
+          FileUtils.copyDirectory(dbPath, backup, true);
+        }
+      } catch (IOException e) {
+        failDBDir.put(dbPath, e);
+      }
     }
     return failDBDir;
   }

@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -57,6 +58,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -119,14 +121,22 @@ public class TestOzoneContainerUpgradeShell {
     startCluster();
   }
 
+  public List<OzoneConfiguration> getDatanodeConfigs() {
+    List<OzoneConfiguration> configList = new ArrayList<>();
+    for (HddsDatanodeService datanodeService : cluster.getHddsDatanodes()) {
+      OzoneConfiguration datanodeConf = datanodeService.getConf();
+      configList.add(datanodeConf);
+    }
+    return configList;
+  }
 
   @Test
-  public void testNormalContainer() throws Exception {
+  public void testNormalContainerUpgrade() throws Exception {
     ContainerInfo containerInfo = writeKeyAndCloseContainer();
-
+    List<OzoneConfiguration> datanodeConfigs = getDatanodeConfigs();
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
     DatanodeDetails dni = hddsDatanodeService.getDatanodeDetails();
-    OzoneConfiguration datanodeConf = hddsDatanodeService.getConf();
+    OzoneConfiguration datanodeConf = datanodeConfigs.get(0);
 
     // create volume rocksdb
     OzoneConfiguration newConf = new OzoneConfiguration(datanodeConf);
@@ -134,9 +144,7 @@ public class TestOzoneContainerUpgradeShell {
     hddsDatanodeService.setConfiguration(newConf);
     cluster.restartHddsDatanode(dni, true);
 
-
     nodeOperationalStateToMaintenance(dni, datanodeConf);
-
 
     shutdownCluster();
 
@@ -145,15 +153,19 @@ public class TestOzoneContainerUpgradeShell {
     CommandLine commandLine = upgradeCommand();
 
     String[] args = new String[]{"upgrade", "--yes"};
-//        new String[] {"--db=" + dbPath, "scan", "--cf", "keyTable"};
     int exitCode = commandLine.execute(args);
+    Assertions.assertEquals(0, exitCode);
 
-    System.out.println("command exit " + exitCode);
+    //
+    OzoneConfiguration datanode2Conf = datanodeConfigs.get(1);
+    UpgradeSubcommand.setOzoneConfiguration(datanode2Conf);
+    String[] args2 = new String[]{"upgrade", "--yes"};
+    int exit2Code = commandLine.execute(args2);
 
-    System.out.println("-----base dir: " + cluster.getBaseDir());
 
-    System.out.println("-----container info: " + containerInfo);
-    LOG.info("Test Close container {}", containerInfo);
+    Assertions.assertEquals(0, exit2Code);
+
+
   }
 
   private CommandLine upgradeCommand() {
@@ -228,17 +240,6 @@ public class TestOzoneContainerUpgradeShell {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-
-    System.out.println("---idFile: " + idFile.getAbsolutePath());
-
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
-  }
-
-  /**
-   * shutdown MiniOzoneCluster.
-   */
-  @AfterAll
-  public static void shutdown() {
-
   }
 }
