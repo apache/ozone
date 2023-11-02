@@ -98,7 +98,7 @@ public class ReconNodeManager extends SCMNodeManager {
                           HDDSLayoutVersionManager scmLayoutVersionManager,
                           Clock clock) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
-        SCMContext.emptyContext(), scmLayoutVersionManager,clock);
+        SCMContext.emptyContext(), scmLayoutVersionManager, clock);
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
         HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;

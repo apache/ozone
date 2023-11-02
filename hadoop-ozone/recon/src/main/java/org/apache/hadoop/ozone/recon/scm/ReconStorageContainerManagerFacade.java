@@ -172,7 +172,7 @@ public class ReconStorageContainerManagerFacade
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
       ReconUtils reconUtils,
-      ReconSafeModeManager safeModeManager,Clock clock) throws IOException {
+      ReconSafeModeManager safeModeManager, Clock clock) throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
     this.eventQueue = new EventQueue(threadNamePrefix);
@@ -196,7 +196,7 @@ public class ReconStorageContainerManagerFacade
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),
-            this.scmLayoutVersionManager,clock);
+            this.scmLayoutVersionManager, clock);
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,

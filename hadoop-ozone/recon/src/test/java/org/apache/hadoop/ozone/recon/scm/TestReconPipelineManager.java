@@ -189,7 +189,7 @@ public class TestReconPipelineManager {
   public void testAddPipeline() throws IOException, TimeoutException {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
@@ -200,7 +200,8 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager, testClock);
+        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager,
+            testClock);
 
     ReconPipelineManager reconPipelineManager =
         ReconPipelineManager.newReconPipelineManager(
