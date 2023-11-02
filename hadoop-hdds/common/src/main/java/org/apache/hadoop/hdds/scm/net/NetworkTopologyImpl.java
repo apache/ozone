@@ -754,7 +754,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       List<? extends Node> nodes, int activeLen) {
     /** Sort weights for the nodes array */
     if (reader == null) {
-      return nodes;
+      return null;
     }
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
