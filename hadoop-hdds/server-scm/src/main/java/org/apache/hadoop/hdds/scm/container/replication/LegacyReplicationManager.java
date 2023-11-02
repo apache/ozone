@@ -508,6 +508,9 @@ public class LegacyReplicationManager {
         if (replicas.isEmpty()
             && container.getState() == LifeCycleState.CLOSED
             && container.getNumberOfKeys() == 0) {
+          LOG.debug("Container {} appears empty and is closed, but cannot be " +
+              "deleted because it has no replicas. Marking as EMPTY.",
+              container);
           report.incrementAndSample(HealthState.EMPTY, container.containerID());
           return;
         }
