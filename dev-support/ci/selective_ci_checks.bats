@@ -297,6 +297,19 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
+@test "draft CI workflow change" {
+  export PR_DRAFT=true
+  run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
+
+  assert_output -p 'basic-checks=[]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "CI workflow change (ci.yaml)" {
   run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
 
