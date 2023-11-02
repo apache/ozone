@@ -421,6 +421,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.updateLocationInfoList(partLocationInfos, true, true);
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
+      omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
       omKeyInfo.getMetadata().put("ETag",
           multipartUploadedKeyHash(partKeyInfoMap));
     }
