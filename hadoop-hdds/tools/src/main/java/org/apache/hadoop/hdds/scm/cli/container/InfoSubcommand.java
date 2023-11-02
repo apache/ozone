@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,12 +91,14 @@ public class InfoSubcommand extends ScmSubcommand {
       if (container.getPipeline().size() != 0) {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
-                container.getPipeline(), replicas);
+                container.getPipeline(), replicas,
+                container.getContainerInfo().getPipelineID());
         LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       } else {
         ContainerWithoutDatanodes wrapper =
             new ContainerWithoutDatanodes(container.getContainerInfo(),
-                container.getPipeline(), replicas);
+                container.getPipeline(), replicas,
+                container.getContainerInfo().getPipelineID());
         LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       }
     } else {
@@ -105,9 +108,17 @@ public class InfoSubcommand extends ScmSubcommand {
           && spec.root().userObject() instanceof GenericParentCommand
           && ((GenericParentCommand) spec.root().userObject()).isVerbose();
       if (verbose) {
-        LOG.info("Pipeline Info: {}", container.getPipeline());
+        Pipeline pipeline = null;
+        try {
+          pipeline = scmClient.getPipeline(
+              container.getContainerInfo().getPipelineID().getProtobuf());
+        } catch (PipelineNotFoundException pnfe) {
+          // Pipeline not found.
+        }
+        LOG.info("Pipeline Info: {}", pipeline == null ? "Pipeline Not Found" : pipeline.getId());
       } else {
-        LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+        LOG.info("Pipeline id: {}",
+            container.getContainerInfo().getPipelineID());
       }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
@@ -149,12 +160,14 @@ public class InfoSubcommand extends ScmSubcommand {
     private ContainerInfo containerInfo;
     private Pipeline pipeline;
     private List<ContainerReplicaInfo> replicas;
+    private PipelineID writePipelineID;
 
     ContainerWithPipelineAndReplicas(ContainerInfo container, Pipeline pipeline,
-                                     List<ContainerReplicaInfo> replicas) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
       this.containerInfo = container;
       this.pipeline = pipeline;
       this.replicas = replicas;
+      this.writePipelineID = pipelineID;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -175,12 +188,14 @@ public class InfoSubcommand extends ScmSubcommand {
     private ContainerInfo containerInfo;
     private PipelineWithoutDatanodes pipeline;
     private List<ContainerReplicaInfo> replicas;
+    private PipelineID writePipelineId;
 
     ContainerWithoutDatanodes(ContainerInfo container, Pipeline pipeline,
-                                     List<ContainerReplicaInfo> replicas) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
       this.containerInfo = container;
       this.pipeline = new PipelineWithoutDatanodes(pipeline);
       this.replicas = replicas;
+      this.writePipelineId = pipelineID;
     }
 
     public ContainerInfo getContainerInfo() {
