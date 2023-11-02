@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeManager;
 import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -38,6 +37,7 @@ import picocli.CommandLine.Command;
 
 import java.io.File;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -57,6 +57,9 @@ public class UpgradeSubcommand implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(UpgradeSubcommand.class);
+
+  @CommandLine.Spec
+  private static CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Option(names = {"--volume"},
       required = false,
@@ -80,7 +83,8 @@ public class UpgradeSubcommand implements Callable<Void> {
         upgradeChecker.checkDatanodeNotStarted();
     final boolean dnNotStarted = pair.getKey();
     if (!dnNotStarted) {
-      printAndExit(pair.getValue());
+      out().println(pair.getValue());
+      return null;
     }
 
     final Pair<Integer, Integer> layoutVersion =
@@ -92,12 +96,13 @@ public class UpgradeSubcommand implements Callable<Void> {
 
     if (metadataLayoutVersion < needLayoutVersion ||
         softwareLayoutVersion < needLayoutVersion) {
-      printAndExit(String.format(
+      out().println(String.format(
           "Please upgrade your software version, no less than %s," +
               " current metadata layout version is %d," +
               " software layout version is %d",
           HDDSLayoutFeature.DATANODE_SCHEMA_V3.name(),
           metadataLayoutVersion, softwareLayoutVersion));
+      return null;
     }
 
     if (!Strings.isNullOrEmpty(volume)) {
@@ -111,9 +116,10 @@ public class UpgradeSubcommand implements Callable<Void> {
         dnDetail.getPersistedOpState();
 
     if (!opState.equals(HddsProtos.NodeOperationalState.IN_MAINTENANCE)) {
-      printAndExit("This command requires the datanode's " +
+      out().println("This command requires the datanode's " +
           "NodeOperationalState to be IN_MAINTENANCE, currently is " +
           opState);
+      return null;
     }
 
     List<HddsVolume> allVolume =
@@ -122,13 +128,15 @@ public class UpgradeSubcommand implements Callable<Void> {
     final List<File> volumeDBPath = upgradeChecker.getVolumeDBPath(allVolume);
 
     if (volumeDBPath.isEmpty()) {
-      printAndExit("No volume db store exists, need finalizae data node.");
+      out().println("No volume db store exists, need finalizae data node.");
+      return null;
     }
 
     for (HddsVolume hddsVolume : allVolume) {
       if (UpgradeChecker.checkAlreadyMigrate(hddsVolume)) {
-        printAndExit("Volume " + hddsVolume.getVolumeRootDir() +
+        out().println("Volume " + hddsVolume.getVolumeRootDir() +
             " it's already upgraded, skip it.");
+        return null;
       }
     }
 
@@ -153,8 +161,9 @@ public class UpgradeSubcommand implements Callable<Void> {
           backupExceptions.keySet().stream().map(File::getAbsolutePath)
               .distinct().toArray());
 
-      printAndExit("Db store path: " + backupFailDbPath +
+      out().println("Db store path: " + backupFailDbPath +
           " backup fail, please check.");
+      return null;
     }
 
     // do upgrade
@@ -169,10 +178,17 @@ public class UpgradeSubcommand implements Callable<Void> {
   }
 
   private OzoneConfiguration getConfiguration() {
+    if (ozoneConfiguration == null) {
+      ozoneConfiguration = new OzoneConfiguration();
+    }
     return ozoneConfiguration;
   }
 
-  private static void printAndExit(String str) {
-    ExitUtils.terminate(-1, str, LOG);
+  private static PrintWriter err() {
+    return spec.commandLine().getErr();
+  }
+
+  private static PrintWriter out() {
+    return spec.commandLine().getOut();
   }
 }

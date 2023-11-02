@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -132,7 +131,7 @@ public class TestOzoneContainerUpgradeShell {
 
   @Test
   public void testNormalContainerUpgrade() throws Exception {
-    ContainerInfo containerInfo = writeKeyAndCloseContainer();
+    writeKeyAndCloseContainer();
     List<OzoneConfiguration> datanodeConfigs = getDatanodeConfigs();
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
     DatanodeDetails dni = hddsDatanodeService.getDatanodeDetails();
@@ -148,29 +147,32 @@ public class TestOzoneContainerUpgradeShell {
 
     shutdownCluster();
 
+    // datanode1 test check all pass & upgrade success
     UpgradeSubcommand.setOzoneConfiguration(datanodeConf);
-
-    CommandLine commandLine = upgradeCommand();
+    StringWriter stdout = new StringWriter();
+    PrintWriter pstdout = new PrintWriter(stdout);
+    CommandLine commandLine = upgradeCommand(pstdout);
 
     String[] args = new String[]{"upgrade", "--yes"};
     int exitCode = commandLine.execute(args);
     Assertions.assertEquals(0, exitCode);
 
-    //
+    // datanode2 NodeOperationalState is IN_SERVICE upgrade fail.
     OzoneConfiguration datanode2Conf = datanodeConfigs.get(1);
     UpgradeSubcommand.setOzoneConfiguration(datanode2Conf);
-    String[] args2 = new String[]{"upgrade", "--yes"};
-    int exit2Code = commandLine.execute(args2);
+    StringWriter stdout2 = new StringWriter();
+    PrintWriter pstdout2 = new PrintWriter(stdout2);
+    CommandLine commandLine2 = upgradeCommand(pstdout2);
 
+    String[] args2 = new String[]{"upgrade", "--yes"};
+    int exit2Code = commandLine2.execute(args2);
 
     Assertions.assertEquals(0, exit2Code);
-
-
+    String cmdOut = stdout2.toString();
+    Assertions.assertTrue(cmdOut.contains("IN_MAINTENANCE"));
   }
 
-  private CommandLine upgradeCommand() {
-    StringWriter stdout = new StringWriter();
-    PrintWriter pstdout = new PrintWriter(stdout);
+  private CommandLine upgradeCommand(PrintWriter pstdout) {
     return new CommandLine(new ContainerCommands()).setOut(pstdout);
   }
 
@@ -237,9 +239,9 @@ public class TestOzoneContainerUpgradeShell {
       OzoneConfiguration config) throws IOException {
     dnDetails.setPersistedOpState(
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
-    String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
+    String idFilePath = HddsServerUtil.getDatanodeIdFilePath(config);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
+    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, config);
   }
 }
