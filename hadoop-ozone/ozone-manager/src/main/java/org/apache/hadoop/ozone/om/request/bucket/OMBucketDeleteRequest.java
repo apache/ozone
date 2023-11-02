@@ -147,8 +147,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         LOG.debug("Volume '{}', Bucket '{}' can't be deleted when it has " +
                 "incomplete multipart uploads", volumeName, bucketName);
         throw new OMException(
-            "Volume " + volumeName + ", Bucket " + bucketName + " can't be " +
-                "deleted when it has incomplete multipart uploads",
+            String.format("Volume %s, Bucket %s can't be deleted when it " +
+                "has incomplete multipart uploads", volumeName, bucketName),
             ResultCodes.BUCKET_NOT_EMPTY);
       }
 
