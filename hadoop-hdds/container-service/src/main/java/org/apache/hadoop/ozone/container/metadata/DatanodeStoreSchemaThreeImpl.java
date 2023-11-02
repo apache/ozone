@@ -49,6 +49,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.NO_SUCH_BLOCK_ERR_MSG;
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
@@ -255,17 +257,25 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             blockData.getChunks().get(blockData.getChunks().size() - 1);
         Preconditions.checkState(
             lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
-                == lastChunk.getChunks().get(0).getOffset(), "chunk offset does not match");
+                == lastChunk.getChunks().get(0).getOffset(),
+            "chunk offset does not match");
         blockData.addChunk(lastChunk.getChunks().get(0));
-        blockData.setBlockCommitSequenceId(lastChunk.getBlockCommitSequenceId());
+        blockData.setBlockCommitSequenceId(
+            lastChunk.getBlockCommitSequenceId());
       }
     }
 
     return blockData;
   }
   private static boolean isPartialChunkList(BlockData data) {
-    if (data.getMetadata().containsKey("incremental")) {
-      return true;
+    return data.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST);
+  }
+
+  private static boolean isFullChunk(ContainerProtos.ChunkInfo chunkInfo) {
+    for (ContainerProtos.KeyValue kv: chunkInfo.getMetadataList()) {
+      if (kv.getKey().equals(FULL_CHUNK)) {
+        return true;
+      }
     }
     return false;
   }
@@ -273,9 +283,11 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
   // if eob or if the last chunk is full,
   private static boolean shouldAppendLastChunk(boolean endOfBlock,
       BlockData data) {
-    if (endOfBlock) return true;
+    if (endOfBlock) {
+      return true;
+    }
     Preconditions.checkState(data.getChunks().size() > 0);
-    if (data.getChunks().get(data.getChunks().size() - 1).getLen() == 4 * 1024 * 1024) {
+    if (isFullChunk(data.getChunks().get(data.getChunks().size() - 1))) {
       return true;
     }
     return false;
@@ -321,22 +333,23 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             batch, containerData.getBlockKey(localID),
             data);
       } else {
+        int lastChunkIndex = data.getChunks().size() - 1;
         // received more than one chunk this time
         List<ContainerProtos.ChunkInfo> lastChunkInfo =
             Collections.singletonList(
-                data.getChunks().get(data.getChunks().size() -1));
+                data.getChunks().get(lastChunkIndex));
         BlockData blockData = getBlockDataTable().get(
             containerData.getBlockKey(localID));
         if (blockData == null) {
           // if the block does not exist in the block data table
           blockData = data;
           ContainerProtos.ChunkInfo lastPartialChunk =
-              data.getChunks().get(data.getChunks().size() -1);
+              data.getChunks().get(lastChunkIndex);
           blockData.removeChunk(lastPartialChunk);
         } else {
           // if the block exists in the block data table,
           // append chunks till except the last one (supposedly partial)
-          for (int i = 0; i < data.getChunks().size() - 1; i++) {
+          for (int i = 0; i < lastChunkIndex; i++) {
             blockData.addChunk(data.getChunks().get(i));
           }
         }

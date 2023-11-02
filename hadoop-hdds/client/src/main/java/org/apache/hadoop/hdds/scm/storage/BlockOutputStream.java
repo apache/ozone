@@ -80,6 +80,8 @@ public class BlockOutputStream extends OutputStream {
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
+  public static final String INCREMENTAL_CHUNK_LIST = "incremental";
+  public static final String FULL_CHUNK = "full";
 
   private AtomicReference<BlockID> blockID;
   private final AtomicReference<ChunkInfo> previousChunkInfo
@@ -169,12 +171,12 @@ public class BlockOutputStream extends OutputStream {
     // tell DataNode I will send incremental chunk list
     if (config.getIncrementalChunkList()) {
       KeyValue incrkeyValue =
-          KeyValue.newBuilder().setKey("incremental").setValue("").build();
+          KeyValue.newBuilder()
+              .setKey(INCREMENTAL_CHUNK_LIST)
+              .build();
       this.containerBlockData.addMetadata(incrkeyValue);
     }
-    //this.lastChunkBuffer = ChunkBuffer.allocate(config.getStreamBufferSize(), 0);
     this.lastChunkBuffer = ByteBuffer.allocate(config.getStreamBufferSize());
-    this.lastChunkBuffer.mark(); // set mark to zero
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
@@ -786,7 +788,8 @@ public class BlockOutputStream extends OutputStream {
    * @param chunk
    * @throws OzoneChecksumException
    */
-  private void updateContainerBlockData(ChunkBuffer chunk) throws OzoneChecksumException {
+  private void updateContainerBlockData(ChunkBuffer chunk)
+      throws OzoneChecksumException {
     // Update lastChunkBuffer using the new chunk data.
     // This is used to calculate checksum for the last partial chunk in
     // containerBlockData which will used by PutBlock.
@@ -802,18 +805,18 @@ public class BlockOutputStream extends OutputStream {
     // drop the full chunk and leave the rest.
     if (lastChunkBuffer.position() + chunk.remaining() <=
             config.getStreamBufferSize()) {
-      fillByteBufferUntilFull(chunk, 0, chunk.remaining());
+      appendLastChunkBuffer(chunk, 0, chunk.remaining());
     } else {
       int remainingBufferSize =
           lastChunkBuffer.capacity() - lastChunkBuffer.position();
-      fillByteBufferUntilFull(chunk, 0, remainingBufferSize);
+      appendLastChunkBuffer(chunk, 0, remainingBufferSize);
 
       // create chunk info for lastChunkBuffer, which is full
       ChunkInfo lastChunkInfo = createChunkInfo();
       addToBlockData(lastChunkInfo);
 
       lastChunkBuffer.clear();
-      fillByteBufferUntilFull(chunk, remainingBufferSize,
+      appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
     }
     // create chunk info for lastChunkBuffer, which is partial
@@ -821,14 +824,13 @@ public class BlockOutputStream extends OutputStream {
     addToBlockData(lastChunkInfo2);
   }
 
-  private void fillByteBufferUntilFull(ChunkBuffer chunkBuffer, int offset, int length) {
+  private void appendLastChunkBuffer(ChunkBuffer chunkBuffer, int offset,
+      int length) {
     int pos = 0;
     int uncopied = length;
     for (ByteBuffer bb : chunkBuffer.asByteBufferList()) {
-      if (pos + bb.remaining() <= offset) {
-        // skip
-      } else {
-        int copyStart = offset < pos ? 0: offset - pos;
+      if (pos + bb.remaining() > offset) {
+        int copyStart = offset < pos ? 0 : offset - pos;
         int copyLen = Math.min(uncopied, bb.remaining());
         lastChunkBuffer.put(bb.array(), copyStart, copyLen);
 
@@ -861,18 +863,19 @@ public class BlockOutputStream extends OutputStream {
     int revisedChunkSize = lastChunkBuffer.remaining();
     long revisedOffset = calculateNextFullChunkOffset();
     // create the chunk info to be sent in PutBlock.
-    ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer);
+    ChecksumData revisedChecksumData =
+        checksum.computeChecksum(lastChunkBuffer);
 
-    long chunkIndex = revisedOffset / config.getStreamBufferSize();
+    long chunkID = revisedOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()
-        .setChunkName(blockID.get().getLocalID() + "_chunk_" + chunkIndex)
+        .setChunkName(blockID.get().getLocalID() + "_chunk_" + chunkID)
         .setOffset(revisedOffset)
         .setLen(revisedChunkSize)
         .setChecksumData(revisedChecksumData.getProtoBufMessage());
     // if full chunk
     if (revisedChunkSize == config.getStreamBufferSize()) {
       KeyValue keyValue =
-          KeyValue.newBuilder().setKey("full").setValue("").build();
+          KeyValue.newBuilder().setKey(FULL_CHUNK).build();
       revisedChunkInfo.addMetadata(keyValue);
     }
     return revisedChunkInfo.build();

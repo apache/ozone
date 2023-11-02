@@ -34,6 +34,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.storage.BlockOutputStream.FULL_CHUNK;
+import static org.apache.hadoop.hdds.scm.storage.BlockOutputStream.INCREMENTAL_CHUNK_LIST;
+
 /**
  * State represents persisted data of one specific datanode.
  */
@@ -58,7 +61,7 @@ public class MockDatanodeStorage {
 
   private boolean isIncrementalChunkList(BlockData blockData) {
     for (ContainerProtos.KeyValue kv : blockData.getMetadataList()) {
-      if (kv.getKey().equals("incremental")) {
+      if (kv.getKey().equals(INCREMENTAL_CHUNK_LIST)) {
         return true;
       }
     }
@@ -76,13 +79,14 @@ public class MockDatanodeStorage {
   }
 
   private ContainerProtos.KeyValue fullChunkKV =
-      ContainerProtos.KeyValue.newBuilder().setKey("full").setValue("").build();
+      ContainerProtos.KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
   private boolean isFullChunk(ChunkInfo chunkInfo) {
     return (chunkInfo.getMetadataList().contains(fullChunkKV));
   }
 
-  public void putBlockIncremental(DatanodeBlockID blockID, BlockData blockData) {
+  public void putBlockIncremental(
+      DatanodeBlockID blockID, BlockData blockData) {
     if (blocks.containsKey(blockID)) {
       // block already exists. let's append the chunk list to it.
       BlockData existing = blocks.get(blockID);
@@ -90,11 +94,12 @@ public class MockDatanodeStorage {
         // empty chunk list. override it.
         putBlockFull(blockID, blockData);
       } else {
+        int lastChunkIndex = existing.getChunksCount() - 1;
         // if the last chunk in the existing block is full, append after it.
-        ChunkInfo chunkInfo = existing.getChunks(existing.getChunksCount()-1);
+        ChunkInfo chunkInfo = existing.getChunks(lastChunkIndex);
         if (!isFullChunk(chunkInfo)) {
           // otherwise, remove it and append
-          existing.getChunksList().remove(existing.getChunksCount()-1);
+          existing.getChunksList().remove(lastChunkIndex);
         }
         existing.getChunksList().addAll(blockData.getChunksList());
       }
@@ -137,34 +142,25 @@ public class MockDatanodeStorage {
     if (data.containsKey(blockKey)) {
       block = data.get(blockKey);
       assert block.size() == chunkInfo.getOffset();
-      block.concat(bytes);
+      data.put(blockKey, block.concat(bytes));
     } else {
       assert chunkInfo.getOffset() == 0;
       data.put(blockKey, bytes);
     }
 
-
-
-    //data.put(createKey(blockID, chunkInfo),
-    //    ByteString.copyFrom(bytes.toByteArray()));
-    //chunks.put(createKey(blockID, chunkInfo), chunkInfo);
     fullBlockData
         .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
             fullBlockData.getOrDefault(blockID, "")
                 .concat(bytes.toStringUtf8()));
   }
 
-  /*public ChunkInfo readChunkInfo(
-      DatanodeBlockID blockID,
-      ChunkInfo chunkInfo) {
-    return chunks.get(createKey(blockID, chunkInfo));
-  }*/
   public ChunkInfo readChunkInfo(
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo) {
     BlockData blockData = getBlock(blockID);
     for (ChunkInfo info : blockData.getChunksList()) {
-      if (info.getLen() == chunkInfo.getLen() && info.getOffset() == chunkInfo.getOffset()){
+      if (info.getLen() == chunkInfo.getLen() &&
+          info.getOffset() == chunkInfo.getOffset()) {
         return info;
       }
     }

@@ -548,8 +548,10 @@ public class KeyValueHandler extends Handler {
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
       boolean incrementalChunkList =
-          request.getVersion() >= ClientVersion.INCREMENTAL_CHUNK_LIST_SUPPORT.toProtoValue();
-      blockManager.putBlock(kvContainer, blockData, endOfBlock, incrementalChunkList);
+          request.getVersion() >=
+              ClientVersion.INCREMENTAL_CHUNK_LIST_SUPPORT.toProtoValue();
+      blockManager.putBlock(kvContainer, blockData, endOfBlock,
+          incrementalChunkList);
 
       blockDataProto = blockData.getProtoBufMessage();
 
