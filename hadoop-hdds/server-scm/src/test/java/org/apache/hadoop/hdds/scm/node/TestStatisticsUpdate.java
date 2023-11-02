@@ -141,10 +141,13 @@ public class TestStatisticsUpdate {
         .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
         .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
         .build();
-    for (int i = 0; i < 4; i++) {
-      nodeManager.processHeartbeat(datanode2, layoutInfo);
-      testClock.fastForward(Duration.ofSeconds(1));
-    }
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    testClock.fastForward(Duration.ofSeconds(1));
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    testClock.fastForward(Duration.ofSeconds(1));
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    testClock.fastForward(Duration.ofSeconds(1));
+    nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
     Assertions.assertEquals(200L, stat.getCapacity().get());
