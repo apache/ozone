@@ -392,12 +392,7 @@ public class BlockOutputStreamEntryPool {
       Preconditions.checkNotNull(omClient);
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
-      try {
-        allocateNewBlock();
-      } catch (Exception ex) {
-        currentStreamIndex--;
-        throw ex;
-      }
+      allocateNewBlock();
     }
     // in theory, this condition should never violate due the check above
     // still do a sanity check.
