@@ -92,7 +92,7 @@ public class OMPerformanceMetrics {
   @Metric(about = "listKeys latency in nanoseconds")
   private MutableRate listKeysLatencyNs;
 
-  @Metric(about = "ACLs check latency in listkeys")
+  @Metric(about = "ACLs check latency in listKeys")
   private MutableRate listKeysAclCheckLatencyNs;
 
   @Metric(about = "listKeysResolveBucketLink latency nanoseconds")
