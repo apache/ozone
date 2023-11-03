@@ -57,7 +57,7 @@ public interface BlockManager {
    * @param container - Container from which block needs to be fetched.
    * @param blockID - BlockID of the Block.
    * @return Block Data.
-   * @throws StorageContainerException when BcsId is unknown or mismatched
+   * @throws IOException when BcsId is unknown or mismatched
    */
   BlockData getBlock(Container container, BlockID blockID)
       throws IOException;
@@ -67,7 +67,6 @@ public interface BlockManager {
    *
    * @param container - Container from which block need to be deleted.
    * @param blockID - ID of the block.
-   * @throws UnsupportedOperationException
    */
   void deleteBlock(Container container, BlockID blockID) throws IOException;
 

@@ -258,6 +258,14 @@ public class BlockManagerImpl implements BlockManager {
     return defaultReadBufferCapacity;
   }
 
+  /**
+   * Deletes an existing block.
+   * As Deletion is handled by BlockDeletingService,
+   * UnsupportedOperationException is thrown always
+   *
+   * @param container - Container from which block need to be deleted.
+   * @param blockID - ID of the block.
+   */
   @Override
   public void deleteBlock(Container container, BlockID blockID) throws
       IOException {
