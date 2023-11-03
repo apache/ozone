@@ -173,8 +173,12 @@ public class BlockManagerImpl implements BlockManager {
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
-        Preconditions.checkState(!data.getChunks().isEmpty(),
-            "empty chunk list unexpected");
+        //Preconditions.checkState(!data.getChunks().isEmpty(),
+        //    "empty chunk list unexpected");
+        /*if (data.getChunks().isEmpty()) {
+          //LOG.error("unexpected empty chunk");
+          assert endOfBlock;
+        }*/
 
         // If the block does not exist in the pendingPutBlockCache of the
         // container, then check the DB to ascertain if it exists or not.

@@ -286,7 +286,9 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     if (endOfBlock) {
       return true;
     }
-    Preconditions.checkState(data.getChunks().size() > 0);
+    if (data.getChunks().isEmpty()) {
+      return true;
+    }
     if (isFullChunk(data.getChunks().get(data.getChunks().size() - 1))) {
       return true;
     }
