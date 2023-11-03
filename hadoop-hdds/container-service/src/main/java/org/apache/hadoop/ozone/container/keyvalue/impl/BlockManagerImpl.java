@@ -59,7 +59,7 @@ public class BlockManagerImpl implements BlockManager {
       "Unable to find the block.";
 
   // Default Read Buffer capacity when Checksum is not present
-  private final long defaultReadBufferCapacity;
+  private final int defaultReadBufferCapacity;
 
   /**
    * Constructs a Block Manager.
@@ -69,7 +69,7 @@ public class BlockManagerImpl implements BlockManager {
   public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
-    this.defaultReadBufferCapacity = (long) config.getStorageSize(
+    this.defaultReadBufferCapacity = (int) config.getStorageSize(
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -287,7 +287,7 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
-  public long getDefaultReadBufferCapacity() {
+  public int getDefaultReadBufferCapacity() {
     return defaultReadBufferCapacity;
   }
 

@@ -90,7 +90,7 @@ public interface BlockManager {
   long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException;
 
-  long getDefaultReadBufferCapacity();
+  int getDefaultReadBufferCapacity();
 
   /**
    * Shutdown ContainerManager.

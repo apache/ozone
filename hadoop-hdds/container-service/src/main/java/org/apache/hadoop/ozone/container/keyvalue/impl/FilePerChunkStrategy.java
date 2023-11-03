@@ -68,7 +68,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
   private final boolean doSyncWrite;
   private final BlockManager blockManager;
-  private final long defaultReadBufferCapacity;
+  private final int defaultReadBufferCapacity;
   private final VolumeSet volumeSet;
 
   public FilePerChunkStrategy(boolean sync, BlockManager manager,
@@ -229,8 +229,8 @@ public class FilePerChunkStrategy implements ChunkManager {
       possibleFiles.add(finalChunkFile);
     }
 
-    long len = info.getLen();
-    long bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
+    int len = (int) info.getLen();
+    int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
     ByteBuffer[] dataBuffers = BufferUtils.assignByteBuffers(len,

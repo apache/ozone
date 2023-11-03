@@ -39,8 +39,8 @@ public final class BufferUtils {
    * @param totalLen total length of all ByteBuffers
    * @param bufferCapacity max capacity of each ByteBuffer
    */
-  public static ByteBuffer[] assignByteBuffers(long totalLen,
-      long bufferCapacity) {
+  public static ByteBuffer[] assignByteBuffers(int totalLen,
+      int bufferCapacity) {
     Preconditions.checkArgument(totalLen > 0, "Buffer Length should be a " +
         "positive integer.");
     Preconditions.checkArgument(bufferCapacity > 0, "Buffer Capacity should " +
@@ -52,13 +52,13 @@ public final class BufferUtils {
     int buffersAllocated = 0;
     // For each ByteBuffer (except the last) allocate bufferLen of capacity
     for (int i = 0; i < numBuffers - 1; i++) {
-      dataBuffers[i] = ByteBuffer.allocate((int) bufferCapacity);
+      dataBuffers[i] = ByteBuffer.allocate(bufferCapacity);
       buffersAllocated += bufferCapacity;
     }
     // For the last ByteBuffer, allocate as much space as is needed to fit
     // remaining bytes
     dataBuffers[numBuffers - 1] = ByteBuffer.allocate(
-        (int) (totalLen - buffersAllocated));
+        (totalLen - buffersAllocated));
     return dataBuffers;
   }
 
