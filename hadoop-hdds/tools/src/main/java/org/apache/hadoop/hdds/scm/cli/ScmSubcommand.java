@@ -31,10 +31,6 @@ public abstract class ScmSubcommand implements Callable<Void> {
   @CommandLine.Mixin
   private ScmOption scmOption;
 
-  public ScmOption getScmOption() {
-    return scmOption;
-  }
-
   protected abstract void execute(ScmClient client) throws IOException;
 
   @Override
