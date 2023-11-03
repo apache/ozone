@@ -152,8 +152,6 @@ public class TestOMDBUpdatesHandler {
   public void testDelete() throws Exception {
     // Write 1 volume, 1 key into source and target OM DBs.
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");
-    String nonExistVolumeKey = omMetadataManager
-        .getVolumeKey("nonExistingVolume");
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
             .setVolume("sampleVol")
