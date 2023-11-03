@@ -834,7 +834,6 @@ public final class OmUtils {
         count++;
       }
     }
-    // Return omInfoList if count ==1 or count >=1
     return omInfoList;
   }
 

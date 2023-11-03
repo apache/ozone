@@ -45,9 +45,8 @@
     </tbody>
 </table>
 
-<h4 ng-show="$ctrl.overview.jmx.RatisRoles[0] == 'Exception: Not a Leader' || $ctrl.overview.jmx.RatisRoles[0] == 'IO-Exception Occurred' || $ctrl.overview.jmx.RatisRoles[0] == 'Ratis Disabled'">Exception: {{$ctrl.overview.jmx.RatisRoles[0]}}</h4>
-<div ng-hide="$ctrl.overview.jmx.RatisRoles[0] == 'Exception: Not a Leader' || $ctrl.overview.jmx.RatisRoles[0] == 'IO-Exception Occurred' || $ctrl.overview.jmx.RatisRoles[0] == 'Ratis Disabled'">
-<div ng-show="$ctrl.overview.jmx.RatisRoles.length > 0">
+<h4 ng-show="$ctrl.overview.jmx.RatisRoles.length == 1 && $ctrl.overview.jmx.RatisRoles[0].length == 1">Exception: {{$ctrl.overview.jmx.RatisRoles[0]}}</h4>
+<div ng-show="$ctrl.overview.jmx.RatisRoles.length > 1">
     <h2>OM Roles (HA)</h2>
     <table class="table table-striped table-bordered" class="col-md-6">
         <thead>
@@ -74,7 +73,7 @@
         </tbody>
     </table>
 </div>
-</div>
+
 
 <h2>Meta-Data Volume Information</h2>
 <table class="table table-bordered table-striped" class="col-md-6">
