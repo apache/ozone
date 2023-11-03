@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -34,7 +35,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.storage.BlockOutputStream.FULL_CHUNK;
 import static org.apache.hadoop.hdds.scm.storage.BlockOutputStream.INCREMENTAL_CHUNK_LIST;
 
 /**
@@ -44,7 +44,7 @@ public class MockDatanodeStorage {
   public static final Logger LOG =
       LoggerFactory.getLogger(MockDatanodeStorage.class);
 
-  private final Map<DatanodeBlockID, BlockData> blocks = new HashedMap();
+  private final Map<BlockID, BlockData> blocks = new HashedMap();
   private final Map<Long, List<DatanodeBlockID>>
       containerBlocks = new HashedMap();
   private final Map<BlockID, String> fullBlockData = new HashMap<>();
@@ -68,6 +68,11 @@ public class MockDatanodeStorage {
     return false;
   }
 
+  private BlockID toBlockID(DatanodeBlockID datanodeBlockID) {
+    return new BlockID(datanodeBlockID.getContainerID(),
+        datanodeBlockID.getLocalID());
+  }
+
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
     if (isIncrementalChunkList(blockData)) {
       LOG.info("incremental chunk list");
@@ -78,18 +83,21 @@ public class MockDatanodeStorage {
     }
   }
 
-  private ContainerProtos.KeyValue fullChunkKV =
-      ContainerProtos.KeyValue.newBuilder().setKey(FULL_CHUNK).build();
+  private static final ContainerProtos.KeyValue FULL_CHUNK =
+      ContainerProtos.KeyValue.newBuilder()
+          .setKey(BlockOutputStream.FULL_CHUNK)
+          .build();
 
   private boolean isFullChunk(ChunkInfo chunkInfo) {
-    return (chunkInfo.getMetadataList().contains(fullChunkKV));
+    return (chunkInfo.getMetadataList().contains(FULL_CHUNK));
   }
 
   public void putBlockIncremental(
       DatanodeBlockID blockID, BlockData blockData) {
-    if (blocks.containsKey(blockID)) {
+    BlockID id = toBlockID(blockID);
+    if (blocks.containsKey(id)) {
       // block already exists. let's append the chunk list to it.
-      BlockData existing = blocks.get(blockID);
+      BlockData existing = blocks.get(id);
       if (existing.getChunksCount() == 0) {
         // empty chunk list. override it.
         putBlockFull(blockID, blockData);
@@ -111,7 +119,8 @@ public class MockDatanodeStorage {
   }
 
   public void putBlockFull(DatanodeBlockID blockID, BlockData blockData) {
-    blocks.put(blockID, blockData);
+    BlockID id = toBlockID(blockID);
+    blocks.put(id, blockData);
     List<DatanodeBlockID> dnBlocks = containerBlocks
         .getOrDefault(blockID.getContainerID(), new ArrayList<>());
     dnBlocks.add(blockID);
@@ -119,14 +128,24 @@ public class MockDatanodeStorage {
   }
 
   public BlockData getBlock(DatanodeBlockID blockID) {
-    return blocks.get(blockID);
+    BlockID id = toBlockID(blockID);
+    //assert blocks.containsKey(blockID);
+    if (!blocks.containsKey(id)) {
+      StringBuilder sb = new StringBuilder();
+      for (BlockID bid : blocks.keySet()) {
+        sb.append(bid).append("\n");
+      }
+      throw new AssertionError("blockID " + id +
+          " not found in blocks. Available block ID: \n" + sb);
+    }
+    return blocks.get(id);
   }
 
   public List<BlockData> listBlock(long containerID) {
     List<DatanodeBlockID> datanodeBlockIDS = containerBlocks.get(containerID);
     List<BlockData> listBlocksData = new ArrayList<>();
     for (DatanodeBlockID dBlock : datanodeBlockIDS) {
-      listBlocksData.add(blocks.get(dBlock));
+      listBlocksData.add(blocks.get(toBlockID(dBlock)));
     }
     return listBlocksData;
   }
@@ -150,7 +169,7 @@ public class MockDatanodeStorage {
 
     fullBlockData
         .put(new BlockID(blockID.getContainerID(), blockID.getLocalID()),
-            fullBlockData.getOrDefault(blockID, "")
+            fullBlockData.getOrDefault(toBlockID(blockID), "")
                 .concat(bytes.toStringUtf8()));
   }
 
