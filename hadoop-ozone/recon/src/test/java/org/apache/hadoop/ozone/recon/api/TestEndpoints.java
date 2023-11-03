@@ -122,6 +122,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -168,8 +169,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
     datanodeDetails.setHostName(HOST1);
@@ -222,7 +224,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         any(OzoneConfiguration.class))).thenReturn(
         commonUtils.getReconNodeDetails());
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))

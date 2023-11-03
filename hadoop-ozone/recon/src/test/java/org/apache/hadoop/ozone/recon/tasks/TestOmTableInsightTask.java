@@ -37,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -75,8 +76,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
   private void initializeInjector() throws IOException {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     globalStatsDao = getDao(GlobalStatsDao.class);
     omTableInsightTask = new OmTableInsightTask(
         globalStatsDao, getConfiguration(), reconOMMetadataManager);

@@ -68,18 +68,18 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -100,12 +100,12 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -114,8 +114,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestContainerEndpoint {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  public Path temporaryFolder;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerEndpoint.class);
@@ -167,11 +167,12 @@ public class TestContainerEndpoint {
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
@@ -205,7 +206,7 @@ public class TestContainerEndpoint {
         .getContainerStateManager();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
@@ -759,7 +760,7 @@ public class TestContainerEndpoint {
         new HashSet<>(Arrays.asList("host2", "host3", "host4")));
     List<ContainerHistory> containerReplicas = container.getReplicas();
     containerReplicas.forEach(history -> {
-      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
+      Assertions.assertTrue(datanodes.contains(history.getDatanodeHost()));
     });
   }
 
@@ -838,7 +839,7 @@ public class TestContainerEndpoint {
         new HashSet<>(Arrays.asList("host2", "host3", "host4")));
     List<ContainerHistory> containerReplicas = missing.get(0).getReplicas();
     containerReplicas.forEach(history -> {
-      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
+      assertTrue(datanodes.contains(history.getDatanodeHost()));
     });
 
     List<UnhealthyContainerMetadata> overRep = records
@@ -997,23 +998,23 @@ public class TestContainerEndpoint {
     Set<String> datanodes = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             u1.toString(), u2.toString(), u3.toString(), u4.toString())));
-    Assert.assertEquals(4, histories.size());
+    assertEquals(4, histories.size());
     histories.forEach(history -> {
-      Assert.assertTrue(datanodes.contains(history.getDatanodeUuid()));
+      assertTrue(datanodes.contains(history.getDatanodeUuid()));
       if (history.getDatanodeUuid().equals(u1.toString())) {
-        Assert.assertEquals("host1", history.getDatanodeHost());
-        Assert.assertEquals(1L, history.getFirstSeenTime());
-        Assert.assertEquals(5L, history.getLastSeenTime());
+        assertEquals("host1", history.getDatanodeHost());
+        assertEquals(1L, history.getFirstSeenTime());
+        assertEquals(5L, history.getLastSeenTime());
       }
     });
 
     // Check getLatestContainerHistory
     List<ContainerHistory> hist1 = reconContainerManager
         .getLatestContainerHistory(1L, 10);
-    Assert.assertTrue(hist1.size() <= 10);
+    assertTrue(hist1.size() <= 10);
     // Descending order by last report timestamp
     for (int i = 0; i < hist1.size() - 1; i++) {
-      Assert.assertTrue(hist1.get(i).getLastSeenTime()
+      assertTrue(hist1.get(i).getLastSeenTime()
           >= hist1.get(i + 1).getLastSeenTime());
     }
   }
@@ -1513,14 +1514,14 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.DELETE);
     Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
-    Assert.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
 
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.CLEANUP);
     containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assert.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1562,7 +1563,7 @@ public class TestContainerEndpoint {
 
     Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assert.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1606,7 +1607,7 @@ public class TestContainerEndpoint {
 
     Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assert.assertEquals(2, containerIDs.size());
+    assertEquals(2, containerIDs.size());
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
