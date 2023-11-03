@@ -71,7 +71,7 @@ public final class CodecTestUtil {
 
     // serialize to CodecBuffer
     final CodecBuffer codecBuffer = codec.toCodecBuffer(
-        original, CodecBuffer::allocateHeap);
+        original, CodecBuffer.Allocator.getHeap());
     Assertions.assertEquals(array.length, codecBuffer.readableBytes());
     final ByteBuffer byteBuffer = codecBuffer.asReadOnlyByteBuffer();
     Assertions.assertEquals(array.length, byteBuffer.remaining());

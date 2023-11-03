@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -54,7 +55,8 @@ import java.util.UUID;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput extends AbstractDataStreamOutput {
+public class KeyDataStreamOutput extends AbstractDataStreamOutput
+    implements KeyMetadataAware {
 
   private OzoneClientConfig config;
 
@@ -398,6 +400,11 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockDataStreamOutputEntryPool.getExcludeList();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockDataStreamOutputEntryPool.getMetadata();
   }
 
   /**

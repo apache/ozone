@@ -551,9 +551,6 @@ function calculate_test_types_to_run() {
 function set_outputs() {
     # print results outside the group to increase visibility
 
-    if [[ -n "${BASIC_CHECKS}" ]]; then
-        initialization::ga_output needs-basic-checks "true"
-    fi
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"
 
@@ -591,8 +588,8 @@ fi
 
 
 get_changed_files
-run_all_tests_if_environment_files_changed
 check_if_tests_are_needed_at_all
+run_all_tests_if_environment_files_changed
 
 get_count_all_files
 get_count_compose_files

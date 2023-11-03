@@ -167,13 +167,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
-    chunkExecutors = createChunkExecutors(conf);
+    String threadNamePrefix = datanodeDetails.threadNamePrefix();
+    chunkExecutors = createChunkExecutors(conf, threadNamePrefix);
     nodeFailureTimeoutMs =
-            conf.getObject(DatanodeRatisServerConfig.class)
-                    .getFollowerSlownessTimeout();
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getFollowerSlownessTimeout();
     shouldDeleteRatisLogDirectory =
-            conf.getObject(DatanodeRatisServerConfig.class)
-                    .shouldDeleteRatisLogDirectory();
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .shouldDeleteRatisLogDirectory();
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -215,7 +216,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutors, this, conf);
+        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
   private void setUpRatisStream(RaftProperties properties) {
@@ -245,7 +246,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @SuppressWarnings("checkstyle:methodlength")
-  private RaftProperties newRaftProperties() {
+  public RaftProperties newRaftProperties() {
     final RaftProperties properties = new RaftProperties();
 
     // Set rpc type
@@ -920,7 +921,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
-      ConfigurationSource conf) {
+      ConfigurationSource conf, String threadNamePrefix) {
     // TODO create single pool with N threads if using non-incremental chunks
     final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys
@@ -936,7 +937,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
-          .setNameFormat("ChunkWriter-" + i + "-%d")
+          .setNameFormat(threadNamePrefix + "ChunkWriter-" + i + "-%d")
           .build();
       BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,

@@ -108,7 +108,7 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
   private final FlushNotifier flushNotifier;
-
+  private final String threadPrefix;
   /**
    * function which will get term associated with the transaction index.
    */
@@ -125,6 +125,8 @@ public final class OzoneManagerDoubleBuffer {
     private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
+    private String threadPrefix = "";
+
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -162,6 +164,11 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
+    public Builder setThreadPrefix(String prefix) {
+      this.threadPrefix = prefix;
+      return this;
+    }
+
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
         Preconditions.checkNotNull(rs, "When ratis is enabled, " +
@@ -178,15 +185,16 @@ public final class OzoneManagerDoubleBuffer {
 
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
           isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount,
-          flushNotifier);
+          flushNotifier, threadPrefix);
     }
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
       Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
-      FlushNotifier flushNotifier) {
+      FlushNotifier flushNotifier, String threadPrefix) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
@@ -202,11 +210,11 @@ public final class OzoneManagerDoubleBuffer {
         OzoneManagerDoubleBufferMetrics.create();
     this.indexToTerm = indexToTerm;
     this.flushNotifier = flushNotifier;
-
+    this.threadPrefix = threadPrefix;
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
     daemon = new Daemon(this::flushTransactions);
-    daemon.setName("OMDoubleBufferFlushThread");
+    daemon.setName(threadPrefix + "OMDoubleBufferFlushThread");
     daemon.start();
   }
 

@@ -42,6 +42,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -52,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -98,6 +102,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
@@ -142,11 +147,13 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusLightResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.ProtobufUtils;
@@ -216,6 +223,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getListKeysRequest(), request.getVersion());
         responseBuilder.setListKeysResponse(listKeysResponse);
         break;
+      case ListKeysLight:
+        ListKeysLightResponse listKeysLightResponse = listKeysLight(
+            request.getListKeysRequest());
+        responseBuilder.setListKeysLightResponse(listKeysLightResponse);
+        break;
       case ListTrash:
         ListTrashResponse listTrashResponse = listTrash(
             request.getListTrashRequest(), request.getVersion());
@@ -260,6 +272,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListStatusResponse listStatusResponse =
             listStatus(request.getListStatusRequest(), request.getVersion());
         responseBuilder.setListStatusResponse(listStatusResponse);
+        break;
+      case ListStatusLight:
+        ListStatusLightResponse listStatusLightResponse =
+            listStatusLight(request.getListStatusRequest(),
+                request.getVersion());
+        responseBuilder.setListStatusLightResponse(listStatusLightResponse);
         break;
       case GetAcl:
         GetAclResponse getAclResponse =
@@ -365,14 +383,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) throws IOException {
-    OMClientRequest omClientRequest = null;
-    OMClientResponse omClientResponse = null;
-    omClientRequest =
+    OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    omClientResponse = omClientRequest
-        .validateAndUpdateCache(getOzoneManager(), transactionLogIndex,
-            ozoneManagerDoubleBuffer::add);
-    return omClientResponse;
+    return captureLatencyNs(
+        impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
+        () -> omClientRequest.validateAndUpdateCache(getOzoneManager(),
+            transactionLogIndex, ozoneManagerDoubleBuffer::add));
   }
 
   @Override
@@ -671,16 +687,34 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListKeysResponse.Builder resp =
         ListKeysResponse.newBuilder();
 
-    List<OmKeyInfo> keys = impl.listKeys(
+    ListKeysResult listKeysResult = impl.listKeys(
         request.getVolumeName(),
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
         request.getCount());
-    for (OmKeyInfo key : keys) {
+    for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
+    resp.setIsTruncated(listKeysResult.isTruncated());
+    return resp.build();
+  }
 
+  private ListKeysLightResponse listKeysLight(ListKeysRequest request)
+      throws IOException {
+    ListKeysLightResponse.Builder resp =
+        ListKeysLightResponse.newBuilder();
+
+    ListKeysLightResult listKeysLightResult = impl.listKeysLight(
+        request.getVolumeName(),
+        request.getBucketName(),
+        request.getStartKey(),
+        request.getPrefix(),
+        request.getCount());
+    for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
+      resp.addBasicKeyInfo(key.getProtobuf());
+    }
+    resp.setIsTruncated(listKeysLightResult.isTruncated());
     return resp.build();
   }
 
@@ -1150,6 +1184,32 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
     return listStatusResponseBuilder.build();
+  }
+
+  private ListStatusLightResponse listStatusLight(
+      ListStatusRequest request, int clientVersion) throws IOException {
+    KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .setSortDatanodesInPipeline(false)
+        .setLatestVersionLocation(true)
+        .setHeadOp(keyArgs.getHeadOp())
+        .build();
+    boolean allowPartialPrefixes =
+        request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    List<OzoneFileStatusLight> statuses =
+        impl.listStatusLight(omKeyArgs, request.getRecursive(),
+            request.getStartKey(), request.getNumEntries(),
+            allowPartialPrefixes);
+    ListStatusLightResponse.Builder
+        listStatusLightResponseBuilder =
+        ListStatusLightResponse.newBuilder();
+    for (OzoneFileStatusLight status : statuses) {
+      listStatusLightResponseBuilder.addStatuses(status.getProtobuf());
+    }
+    return listStatusLightResponseBuilder.build();
   }
 
   @RequestFeatureValidator(

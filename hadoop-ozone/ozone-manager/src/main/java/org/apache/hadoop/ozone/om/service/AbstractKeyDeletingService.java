@@ -86,7 +86,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   public AbstractKeyDeletingService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient) {
-    super(serviceName, interval, unit, threadPoolSize, serviceTimeout);
+    super(serviceName, interval, unit, threadPoolSize, serviceTimeout,
+        ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.scmClient = scmClient;
     this.deletedDirsCount = new AtomicLong(0);
@@ -394,7 +395,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
-      int remainingBufLimit) {
+      int remainingBufLimit, KeyManager keyManager) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -408,7 +409,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         PurgePathRequest request = prepareDeleteDirRequest(
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
-            getOzoneManager().getKeyManager());
+            keyManager);
         if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
             request.getSerializedSize())) {
           // ignore further add request

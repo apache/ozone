@@ -130,4 +130,18 @@ public class OmMultipartUpload {
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
   }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    return other instanceof OmMultipartUpload && uploadId.equals(
+        ((OmMultipartUpload)other).getUploadId());
+  }
+
+  @Override
+  public int hashCode() {
+    return uploadId.hashCode();
+  }
 }

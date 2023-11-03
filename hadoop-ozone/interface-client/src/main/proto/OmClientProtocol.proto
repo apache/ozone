@@ -141,6 +141,10 @@ enum Type {
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
+  ListKeysLight = 126;
+  AbortExpiredMultiPartUploads = 127;
+  SetSnapshotProperty = 128;
+  ListStatusLight = 129;
 }
 
 enum SafeMode {
@@ -272,6 +276,9 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+
+  optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
+  optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
 }
 
 message OMResponse {
@@ -388,6 +395,10 @@ message OMResponse {
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional ListKeysLightResponse             listKeysLightResponse         = 126;
+  optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
+  optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
+  optional ListStatusLightResponse           listStatusLightResponse       = 129;
 }
 
 enum Status {
@@ -498,6 +509,7 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
@@ -506,6 +518,8 @@ enum Status {
     UNAUTHORIZED = 91;
 
     S3_SECRET_ALREADY_EXISTS = 92;
+    
+    INVALID_PATH = 93;
 }
 
 /**
@@ -1085,6 +1099,16 @@ message KeyInfo {
     optional bool isFile = 19;
 }
 
+message BasicKeyInfo {
+    optional string keyName = 1;
+    optional uint64 dataSize = 2;
+    optional uint64 creationTime = 3;
+    optional uint64 modificationTime = 4;
+    optional hadoop.hdds.ReplicationType type = 5;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
+}
+
 message DirectoryInfo {
     required string name = 1;
     required uint64 creationTime = 2;
@@ -1107,12 +1131,24 @@ message OzoneFileStatusProto {
 
 }
 
+message OzoneFileStatusProtoLight {
+    optional string volumeName = 1;
+    optional string bucketName = 2;
+    optional BasicKeyInfo basicKeyInfo = 3;
+    optional uint64 blockSize = 4;
+    optional bool isDirectory = 5;
+}
+
 message GetFileStatusRequest {
     required KeyArgs keyArgs = 1;
 }
 
 message GetFileStatusResponse {
     required OzoneFileStatusProto status = 1;
+}
+
+message GetFileStatusLightResponse {
+    required OzoneFileStatusProtoLight status = 1;
 }
 
 message CreateDirectoryRequest {
@@ -1158,6 +1194,10 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+}
+
+message ListStatusLightResponse {
+    repeated OzoneFileStatusProtoLight statuses = 1;
 }
 
 message CreateKeyRequest {
@@ -1358,6 +1398,12 @@ message ListKeysRequest {
 
 message ListKeysResponse {
     repeated KeyInfo keyInfo = 2;
+    optional bool isTruncated = 3;
+}
+
+message ListKeysLightResponse {
+    repeated BasicKeyInfo basicKeyInfo = 1;
+    optional bool isTruncated = 2;
 }
 
 message CommitKeyRequest {
@@ -1559,6 +1605,24 @@ message MultipartUploadAbortRequest {
 message MultipartUploadAbortResponse {
 
 }
+
+message MultipartUploadsExpiredAbortRequest {
+  repeated ExpiredMultipartUploadsBucket expiredMultipartUploadsPerBucket = 1;
+}
+
+message ExpiredMultipartUploadsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated ExpiredMultipartUploadInfo multipartUploads = 3;
+}
+
+message ExpiredMultipartUploadInfo {
+  required string name = 1;
+}
+
+message MultipartUploadsExpiredAbortResponse {
+}
+
 message MultipartUploadListPartsRequest {
     required string volume = 1;
     required string bucket = 2;
@@ -1819,6 +1883,16 @@ message SnapshotPurgeRequest {
   repeated string updatedSnapshotDBKey = 2;
 }
 
+message SetSnapshotPropertyRequest {
+  optional SnapshotProperty snapshotProperty = 1;
+}
+
+message SnapshotProperty {
+  optional string snapshotKey = 1;
+  optional uint64 exclusiveSize = 2;
+  optional uint64 exclusiveReplicatedSize = 3;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1901,6 +1975,10 @@ message SnapshotMoveDeletedKeysResponse {
 }
 
 message SnapshotPurgeResponse {
+
+}
+
+message SetSnapshotPropertyResponse {
 
 }
 

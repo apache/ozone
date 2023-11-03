@@ -61,6 +61,7 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numContainerNotOpenVerifyFailures;
   private @Metric MutableCounterLong numDataCacheMiss;
   private @Metric MutableCounterLong numDataCacheHit;
+  private @Metric MutableCounterLong numEvictedCacheCount;
 
   private @Metric MutableRate applyTransactionNs;
   private @Metric MutableRate writeStateMachineDataNs;
@@ -223,6 +224,9 @@ public class CSMMetrics {
 
   public void incNumDataCacheHit() {
     numDataCacheHit.incr();
+  }
+  public void incNumEvictedCacheCount() {
+    numEvictedCacheCount.incr();
   }
 
   public void unRegister() {

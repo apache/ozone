@@ -234,6 +234,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${io.grpc.version}</version>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>com.fasterxml.uuid</groupId>
+      <artifactId>java-uuid-generator</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

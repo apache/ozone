@@ -44,8 +44,11 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -55,12 +58,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -71,6 +70,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -79,13 +79,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * Tests snapshot background services.
  */
 @Timeout(5000)
+@Flaky("HDDS-9455")
 public class TestSnapshotBackgroundServices {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -404,36 +405,48 @@ public class TestSnapshotBackgroundServices {
         cluster.getOzoneManager(leaderOM.getOMNodeId());
     Assertions.assertEquals(leaderOM, newFollowerOM);
 
-    // Prepare baseline data for compaction logs
-    String currentCompactionLogPath = newLeaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getCurrentCompactionLogPath();
-    Assertions.assertNotNull(currentCompactionLogPath);
-    int lastIndex = currentCompactionLogPath.lastIndexOf(OM_KEY_PREFIX);
-    String compactionLogsPath = currentCompactionLogPath
-        .substring(0, lastIndex);
-    File compactionLogsDir = new File(compactionLogsPath);
-    Assertions.assertNotNull(compactionLogsDir);
-    File[] files = compactionLogsDir.listFiles();
-    Assertions.assertNotNull(files);
-    int numberOfLogFiles = files.length;
-    long contentLength;
-    Path currentCompactionLog = Paths.get(currentCompactionLogPath);
-    try (BufferedReader bufferedReader =
-             Files.newBufferedReader(currentCompactionLog)) {
-      contentLength = bufferedReader.lines()
-          .mapToLong(String::length)
-          .reduce(0L, Long::sum);
+    List<CompactionLogEntry> compactionLogEntriesOnPreviousLeader =
+        getCompactionLogEntries(leaderOM);
+
+    List<CompactionLogEntry> compactionLogEntriesOnNewLeader =
+        getCompactionLogEntries(newLeaderOM);
+    Assertions.assertEquals(compactionLogEntriesOnPreviousLeader,
+        compactionLogEntriesOnNewLeader);
+
+    Assertions.assertEquals(leaderOM.getMetadataManager().getStore()
+            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
+            .stream().map(CompactionNode::getFileName).collect(toSet()),
+        newLeaderOM.getMetadataManager().getStore()
+            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
+            .stream().map(CompactionNode::getFileName).collect(toSet()));
+    Assertions.assertEquals(leaderOM.getMetadataManager().getStore()
+            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
+            .stream().map(edge ->
+                edge.source().getFileName() + "-" + edge.target().getFileName())
+            .collect(toSet()),
+        newLeaderOM.getMetadataManager().getStore()
+            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
+            .stream().map(edge ->
+                edge.source().getFileName() + "-" + edge.target().getFileName())
+            .collect(toSet()));
+
+    confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(newLeaderOM);
+  }
+
+  private List<CompactionLogEntry> getCompactionLogEntries(OzoneManager om)
+      throws IOException {
+    List<CompactionLogEntry> compactionLogEntries = new ArrayList<>();
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, CompactionLogEntry>>
+             iterator = om.getMetadataManager().getCompactionLogTable()
+        .iterator()) {
+      iterator.seekToFirst();
+
+      while (iterator.hasNext()) {
+        compactionLogEntries.add(iterator.next().getValue());
+      }
     }
-
-    checkIfCompactionLogsGetAppendedByForcingCompaction(newLeaderOM,
-        compactionLogsDir, numberOfLogFiles, contentLength,
-        currentCompactionLog);
-
-    confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
-        newLeaderOM);
+    return compactionLogEntries;
   }
 
   @Test
@@ -544,28 +557,6 @@ public class TestSnapshotBackgroundServices {
           sstBackupDir.listFiles()).length;
       return numberOfSstFiles > newNumberOfSstFiles;
     }, 1000, 10000);
-  }
-
-  private static void checkIfCompactionLogsGetAppendedByForcingCompaction(
-      OzoneManager ozoneManager,
-      File compactionLogsDir, int numberOfLogFiles,
-      long contentLength, Path currentCompactionLog)
-      throws IOException {
-    ozoneManager.getMetadataManager()
-        .getStore()
-        .compactDB();
-    File[] files = compactionLogsDir.listFiles();
-    Assertions.assertNotNull(files);
-    int newNumberOfLogFiles = files.length;
-    long newContentLength;
-    try (BufferedReader bufferedReader =
-             Files.newBufferedReader(currentCompactionLog)) {
-      newContentLength = bufferedReader.lines()
-          .mapToLong(String::length)
-          .reduce(0L, Long::sum);
-    }
-    Assertions.assertTrue(numberOfLogFiles < newNumberOfLogFiles
-        || contentLength < newContentLength);
   }
 
   private static File getSstBackupDir(OzoneManager ozoneManager) {

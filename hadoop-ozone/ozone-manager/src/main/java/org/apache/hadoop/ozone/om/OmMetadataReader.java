@@ -30,10 +30,14 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
@@ -43,6 +47,7 @@ import org.slf4j.Logger;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -155,7 +160,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     final OmKeyArgs resolvedVolumeArgs;
     if (assumeS3Context) {
-      S3VolumeContext context = ozoneManager.getS3VolumeContext();
+      S3VolumeContext context = ozoneManager.getS3VolumeContext(true);
       s3VolumeContext = java.util.Optional.of(context);
       resolvedVolumeArgs = args.toBuilder()
           .setVolumeName(context.getOmVolumeArgs().getVolume())
@@ -247,6 +252,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
     }
   }
+
+  @Override
+  public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
+      boolean recursive, String startKey, long numEntries,
+      boolean allowPartialPrefixes) throws IOException {
+    List<OzoneFileStatus> ozoneFileStatuses =
+        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+
+    return ozoneFileStatuses.stream()
+        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .collect(Collectors.toList());
+  }
   
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
@@ -305,7 +322,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
+  public ListKeysResult listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
     long startNanos = Time.monotonicNowNanos();
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(
@@ -338,6 +355,21 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
       perfMetrics.addListKeysLatencyNs(Time.monotonicNowNanos() - startNanos);
     }
+  }
+
+  @Override
+  public ListKeysLightResult listKeysLight(String volumeName,
+                                            String bucketName,
+                                            String startKey, String keyPrefix,
+                                            int maxKeys) throws IOException {
+    ListKeysResult listKeysResult =
+        listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+    List<OmKeyInfo> keys = listKeysResult.getKeys();
+    List<BasicOmKeyInfo> basicKeysList =
+        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+            .collect(Collectors.toList());
+
+    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
 
   /**

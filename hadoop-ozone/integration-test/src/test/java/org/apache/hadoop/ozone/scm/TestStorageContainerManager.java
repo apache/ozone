@@ -77,7 +77,11 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
+import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -87,8 +91,14 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
+import org.apache.ozone.test.FlakyTest;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -98,7 +108,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
@@ -125,6 +137,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
@@ -151,7 +164,7 @@ public class TestStorageContainerManager {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(900);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(900));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -180,85 +193,80 @@ public class TestStorageContainerManager {
   public void testRpcPermission() throws Exception {
     // Test with default configuration
     OzoneConfiguration defaultConf = new OzoneConfiguration();
-    testRpcPermissionWithConf(defaultConf, "unknownUser", true);
+    testRpcPermissionWithConf(defaultConf, any -> false, "unknownUser");
 
     // Test with ozone.administrators defined in configuration
+    String admins = "adminUser1, adminUser2";
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    ozoneConf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS,
-        "adminUser1, adminUser2");
+    ozoneConf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS, admins);
     // Non-admin user will get permission denied.
-    testRpcPermissionWithConf(ozoneConf, "unknownUser", true);
     // Admin user will pass the permission check.
-    testRpcPermissionWithConf(ozoneConf, "adminUser2", false);
+    testRpcPermissionWithConf(ozoneConf, admins::contains,
+        "unknownUser", "adminUser2");
   }
 
   private void testRpcPermissionWithConf(
-      OzoneConfiguration ozoneConf, String fakeRemoteUsername,
-      boolean expectPermissionDenied) throws Exception {
+      OzoneConfiguration ozoneConf,
+      Predicate<String> isAdmin,
+      String... usernames) throws Exception {
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConf).build();
-    cluster.waitForClusterToBeReady();
     try {
-
-      SCMClientProtocolServer mockClientServer = Mockito.spy(
-          cluster.getStorageContainerManager().getClientProtocolServer());
-
-      mockRemoteUser(UserGroupInformation.createRemoteUser(fakeRemoteUsername));
-
-      try {
-        mockClientServer.deleteContainer(
-            ContainerTestHelper.getTestContainerID());
-        fail("Operation should fail, expecting an IOException here.");
-      } catch (Exception e) {
-        if (expectPermissionDenied) {
-          verifyPermissionDeniedException(e, fakeRemoteUsername);
-        } else {
-          // If passes permission check, it should fail with
-          // container not exist exception.
-          Assert.assertTrue(e instanceof ContainerNotFoundException);
-        }
-      }
-
-      try {
-        ContainerWithPipeline container2 = mockClientServer
-            .allocateContainer(SCMTestUtils.getReplicationType(ozoneConf),
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
-        if (expectPermissionDenied) {
-          fail("Operation should fail, expecting an IOException here.");
-        } else {
-          Assert.assertEquals(1, container2.getPipeline().getNodes().size());
-        }
-      } catch (Exception e) {
-        verifyPermissionDeniedException(e, fakeRemoteUsername);
-      }
-
-      try {
-        ContainerWithPipeline container3 = mockClientServer
-            .allocateContainer(SCMTestUtils.getReplicationType(ozoneConf),
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
-        if (expectPermissionDenied) {
-          fail("Operation should fail, expecting an IOException here.");
-        } else {
-          Assert.assertEquals(1, container3.getPipeline().getNodes().size());
-        }
-      } catch (Exception e) {
-        verifyPermissionDeniedException(e, fakeRemoteUsername);
-      }
-
-      try {
-        mockClientServer.getContainer(
-            ContainerTestHelper.getTestContainerID());
-        fail("Operation should fail, expecting an IOException here.");
-      } catch (Exception e) {
-        if (expectPermissionDenied) {
-          verifyPermissionDeniedException(e, fakeRemoteUsername);
-        } else {
-          // If passes permission check, it should fail with
-          // key not exist exception.
-          Assert.assertTrue(e instanceof ContainerNotFoundException);
-        }
+      cluster.waitForClusterToBeReady();
+      for (String username : usernames) {
+        testRpcPermission(cluster, username,
+            !isAdmin.test(username));
       }
     } finally {
       cluster.shutdown();
+    }
+  }
+
+  private void testRpcPermission(MiniOzoneCluster cluster,
+      String fakeRemoteUsername, boolean expectPermissionDenied) {
+    SCMClientProtocolServer mockClientServer = Mockito.spy(
+        cluster.getStorageContainerManager().getClientProtocolServer());
+
+    mockRemoteUser(UserGroupInformation.createRemoteUser(fakeRemoteUsername));
+
+    try {
+      mockClientServer.deleteContainer(
+          ContainerTestHelper.getTestContainerID());
+      fail("Operation should fail, expecting an IOException here.");
+    } catch (Exception e) {
+      if (expectPermissionDenied) {
+        verifyPermissionDeniedException(e, fakeRemoteUsername);
+      } else {
+        // If passes permission check, it should fail with
+        // container not exist exception.
+        Assert.assertTrue(e instanceof ContainerNotFoundException);
+      }
+    }
+
+    try {
+      ContainerWithPipeline container2 = mockClientServer.allocateContainer(
+          HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+      if (expectPermissionDenied) {
+        fail("Operation should fail, expecting an IOException here.");
+      } else {
+        Assert.assertEquals(1, container2.getPipeline().getNodes().size());
+      }
+    } catch (Exception e) {
+      verifyPermissionDeniedException(e, fakeRemoteUsername);
+    }
+
+    try {
+      mockClientServer.getContainer(
+          ContainerTestHelper.getTestContainerID());
+      fail("Operation should fail, expecting an IOException here.");
+    } catch (Exception e) {
+      if (expectPermissionDenied) {
+        verifyPermissionDeniedException(e, fakeRemoteUsername);
+      } else {
+        // If passes permission check, it should fail with
+        // key not exist exception.
+        Assert.assertTrue(e instanceof ContainerNotFoundException);
+      }
     }
   }
 
@@ -365,6 +373,86 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 1000, 20000);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @Test
+  public void testOldDNRegistersToReInitialisedSCM() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    MiniOzoneCluster cluster =
+        MiniOzoneCluster.newBuilder(conf).setHbInterval(1000)
+            .setHbProcessorInterval(3000).setNumDatanodes(1)
+            .setClusterId(UUID.randomUUID().toString()).build();
+    cluster.waitForClusterToBeReady();
+
+    try {
+      HddsDatanodeService datanode = cluster.getHddsDatanodes().get(0);
+      StorageContainerManager scm = cluster.getStorageContainerManager();
+      scm.stop();
+
+      // re-initialise SCM with new clusterID
+
+      GenericTestUtils.deleteDirectory(
+          new File(scm.getScmStorageConfig().getStorageDir()));
+      String newClusterId = UUID.randomUUID().toString();
+      StorageContainerManager.scmInit(scm.getConfiguration(), newClusterId);
+      scm = HddsTestUtils.getScmSimple(scm.getConfiguration());
+
+      DatanodeStateMachine dsm = datanode.getDatanodeStateMachine();
+      Assert.assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
+          dsm.getContext().getState());
+      // DN Endpoint State has already gone through GetVersion and Register,
+      // so it will be in HEARTBEAT state.
+      for (EndpointStateMachine endpoint : dsm.getConnectionManager()
+          .getValues()) {
+        Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
+            endpoint.getState());
+      }
+      GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
+          GenericTestUtils.LogCapturer.captureLogs(
+              SCMDatanodeHeartbeatDispatcher.LOG);
+      LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
+      GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
+          GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
+      GenericTestUtils.LogCapturer versionEndPointTaskLog =
+          GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
+      // Initially empty
+      Assert.assertTrue(scmDnHBDispatcherLog.getOutput().isEmpty());
+      Assert.assertTrue(versionEndPointTaskLog.getOutput().isEmpty());
+      // start the new SCM
+      scm.start();
+      // Initially DatanodeStateMachine will be in Running state
+      Assert.assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
+          dsm.getContext().getState());
+      // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
+      // command to DN to re-register. Wait for SCM to send re-register command
+      String expectedLog = String.format(
+          "SCM received heartbeat from an unregistered datanode %s. "
+              + "Asking datanode to re-register.",
+          datanode.getDatanodeDetails());
+      GenericTestUtils.waitFor(
+          () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
+          5000);
+      ExitUtil.disableSystemExit();
+      // As part of processing response for re-register, DN EndpointStateMachine
+      // goes to GET-VERSION state which checks if there is already existing
+      // version file on the DN & if the clusterID matches with that of the SCM
+      // In this case, it won't match and gets InconsistentStorageStateException
+      // and DN shuts down.
+      String expectedLog2 = "Received SCM notification to register."
+          + " Interrupt HEARTBEAT and transit to GETVERSION state.";
+      GenericTestUtils.waitFor(
+          () -> heartbeatEndpointTaskLog.getOutput().contains(expectedLog2),
+          100, 5000);
+      GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
+          5000);
+      Assert.assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
+          dsm.getContext().getState());
+      Assert.assertTrue(versionEndPointTaskLog.getOutput().contains(
+          "org.apache.hadoop.ozone.common" +
+              ".InconsistentStorageStateException: Mismatched ClusterIDs"));
     } finally {
       cluster.shutdown();
     }
@@ -710,7 +798,7 @@ public class TestStorageContainerManager {
   /**
    * Test datanode heartbeat well processed with a 4-layer network topology.
    */
-  @Test(timeout = 180000)
+  @Test
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmId = UUID.randomUUID().toString();
@@ -896,6 +984,7 @@ public class TestStorageContainerManager {
   }
 
   @Test
+  @Category(FlakyTest.class) @Flaky("HDDS-8470")
   public void testContainerReportQueueTakingMoreTime() throws Exception {
     EventQueue eventQueue = new EventQueue();
     List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>

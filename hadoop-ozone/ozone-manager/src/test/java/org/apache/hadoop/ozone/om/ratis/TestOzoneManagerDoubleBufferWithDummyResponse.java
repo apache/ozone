@@ -30,6 +30,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -66,6 +69,9 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   private long term = 1L;
 
   @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
+  @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Before
@@ -97,7 +103,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
    * check OM DB bucket table has 100 entries or not. In addition checks
    * flushed transaction count is matching with expected count or not.
    */
-  @Test(timeout = 300_000)
+  @Test
   public void testDoubleBufferWithDummyResponse() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     int bucketCount = 100;

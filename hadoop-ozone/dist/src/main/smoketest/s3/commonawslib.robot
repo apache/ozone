@@ -49,6 +49,11 @@ Execute AWSS3Cli
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
+Execute AWSS3CliDebug
+    [Arguments]       ${command}
+    ${output} =       Execute                     aws --debug s3 --endpoint ${ENDPOINT_URL} ${command}
+    [return]          ${output}
+
 Install aws cli
     ${rc}              ${output} =                 Run And Return Rc And Output           which aws
     Return From Keyword If    '${rc}' == '0'

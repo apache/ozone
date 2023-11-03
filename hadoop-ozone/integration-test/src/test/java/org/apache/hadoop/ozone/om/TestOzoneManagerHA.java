@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
 
@@ -52,6 +51,8 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
@@ -64,6 +65,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -179,9 +181,7 @@ public abstract class TestOzoneManagerHA {
 
     conf.setFromObject(omHAConfig);
 
-    /**
-     * config for key deleting service.
-     */
+    // config for key deleting service.
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
 
@@ -196,18 +196,6 @@ public abstract class TestOzoneManagerHA {
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
-  }
-
-
-  /**
-   * Reset cluster between tests.
-   */
-  @AfterEach
-  public void resetCluster()
-      throws IOException {
-    if (cluster != null) {
-      cluster.restartOzoneManager();
-    }
   }
 
   /**
@@ -240,7 +228,7 @@ public abstract class TestOzoneManagerHA {
   protected OzoneBucket setupBucket() throws Exception {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
     String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + UUID.randomUUID();
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -470,4 +458,12 @@ public abstract class TestOzoneManagerHA {
     }
   }
 
+  protected void waitForLeaderToBeReady()
+      throws InterruptedException, TimeoutException {
+    // Wait for Leader Election timeout
+    int timeout = OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
+        .toIntExact(TimeUnit.MILLISECONDS);
+    GenericTestUtils.waitFor(() ->
+        getCluster().getOMLeader() != null, 500, timeout);
+  }
 }

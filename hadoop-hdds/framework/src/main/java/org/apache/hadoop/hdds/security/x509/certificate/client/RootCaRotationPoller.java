@@ -60,12 +60,13 @@ public class RootCaRotationPoller implements Runnable, Closeable {
 
   public RootCaRotationPoller(SecurityConfig securityConfig,
       Set<X509Certificate> initiallyKnownRootCaCerts,
-      SCMSecurityProtocolClientSideTranslatorPB scmSecureClient) {
+      SCMSecurityProtocolClientSideTranslatorPB scmSecureClient,
+      String threadNamePrefix) {
     this.scmSecureClient = scmSecureClient;
     this.knownRootCerts = initiallyKnownRootCaCerts;
     poller = Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setNameFormat(
-                this.getClass().getSimpleName())
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + getClass().getSimpleName())
             .setDaemon(true).build());
     pollingInterval = securityConfig.getRootCaCertificatePollingInterval();
     rootCARotationProcessors = new ArrayList<>();
