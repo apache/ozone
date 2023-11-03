@@ -183,7 +183,7 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(4, events.size());
+    assertEquals(2, events.size());
 
     OMDBUpdateEvent keyEvent = events.get(0);
     assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE, keyEvent.getAction());
@@ -197,18 +197,8 @@ public class TestOMDBUpdatesHandler {
     OmVolumeArgs volumeInfo = (OmVolumeArgs) volEvent.getValue();
     assertEquals("sampleVol", volumeInfo.getVolume());
 
-    // Assert the values of non existent keys are set to null.
-    OMDBUpdateEvent nonExistKey = events.get(2);
-    assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE,
-        nonExistKey.getAction());
-    assertEquals("/sampleVol/bucketOne/key_two", nonExistKey.getKey());
-    assertNull(nonExistKey.getValue());
-
-    OMDBUpdateEvent nonExistVolume = events.get(3);
-    assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE,
-        nonExistVolume.getAction());
-    assertEquals(nonExistVolumeKey, nonExistVolume.getKey());
-    assertNull(nonExistVolume.getValue());
+    // Assert for non existent keys, no events will be captured and handled.
+    assertEquals(2, events.size());
   }
 
   @Test
