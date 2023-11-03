@@ -26,3 +26,12 @@ updates:
         update-types: ["version-update:semver-major"]
     pull-request-branch-name:
       separator: "-"
+
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "[Java] Dependabot Package Upgrade: "
+    pull-request-branch-name:
+      separator: "-"
