@@ -40,7 +40,6 @@ import org.jooq.impl.DSL;
 import org.jooq.impl.DefaultConfiguration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -54,7 +53,7 @@ import com.google.inject.Provider;
  */
 public class AbstractReconSqlDBTest {
 
-  public Path temporaryFolder;
+  private Path temporaryFolder;
 
   private Injector injector;
   private DSLContext dslContext;
@@ -62,10 +61,10 @@ public class AbstractReconSqlDBTest {
 
   public AbstractReconSqlDBTest() {
     try {
-      temporaryFolder = Files.createTempDirectory("JunitConfig");//System.getProperty("java.io.tmpdir"));
-      //temporaryFolder.create();
+      temporaryFolder = Files.createTempDirectory("JunitConfig");
       configurationProvider =
-          new DerbyDataSourceConfigurationProvider(Files.createDirectory(temporaryFolder.resolve("Config")).toFile());
+          new DerbyDataSourceConfigurationProvider(Files.createDirectory(
+              temporaryFolder.resolve("Config")).toFile());
     } catch (IOException e) {
       Assertions.fail();
     }
@@ -73,7 +72,7 @@ public class AbstractReconSqlDBTest {
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
     try {
-      temporaryFolder = Files.createTempDirectory("JunitConfig");//System.getProperty("java.io.tmpdir"));
+      temporaryFolder = Files.createTempDirectory("JunitConfig");
       Files.createDirectory(temporaryFolder.resolve("ConfigProvider"));
       configurationProvider = provider;
     } catch (IOException e) {

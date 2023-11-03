@@ -71,7 +71,7 @@ import static org.mockito.Mockito.when;
 public class TestTriggerDBSyncEndpoint {
 
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
   private ReconTestInjector reconTestInjector;
   private CommonUtils commonUtils;
 

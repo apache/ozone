@@ -90,7 +90,7 @@ import java.util.concurrent.Callable;
  */
 public class TestOpenContainerCount {
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
 
   private NodeEndpoint nodeEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;

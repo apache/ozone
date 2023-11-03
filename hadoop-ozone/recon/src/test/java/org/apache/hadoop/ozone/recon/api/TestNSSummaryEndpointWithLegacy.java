@@ -112,7 +112,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestNSSummaryEndpointWithLegacy {
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;

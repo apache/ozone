@@ -49,7 +49,7 @@ import static org.mockito.Mockito.mock;
 public class TestFeaturesEndPoint {
 
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
   private FeaturesEndpoint featuresEndPoint;
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;

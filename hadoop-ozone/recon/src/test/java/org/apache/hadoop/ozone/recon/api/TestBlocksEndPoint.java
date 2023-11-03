@@ -64,7 +64,7 @@ import static org.mockito.Mockito.mock;
 public class TestBlocksEndPoint {
 
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
 
   private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private ReconContainerManager reconContainerManager;

@@ -115,7 +115,7 @@ import static org.mockito.Mockito.when;
 public class TestContainerEndpoint {
 
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerEndpoint.class);

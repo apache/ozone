@@ -111,7 +111,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestNSSummaryEndpointWithFSO {
   @TempDir
-  public Path temporaryFolder;
+  private Path temporaryFolder;
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
@@ -356,7 +356,8 @@ public class TestNSSummaryEndpointWithFSO {
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
-        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir"))
+            .toFile());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProviderWithFSO();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
