@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -55,6 +59,8 @@ public class ContainerImporter {
   private final MutableVolumeSet volumeSet;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long containerSize;
+  
+  private final Set<Long> importContainerProgress = new HashSet<>();
 
   public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
       ContainerController controller,
@@ -76,13 +82,31 @@ public class ContainerImporter {
       HddsVolume hddsVolume, CopyContainerCompression compression)
       throws IOException {
 
-    HddsVolume targetVolume = hddsVolume;
-    if (targetVolume == null) {
-      targetVolume = chooseNextVolume();
+    synchronized (this) {
+      if (containerSet.getContainer(containerID) != null) {
+        LOG.warn("Container already exists with container Id {}", containerID);
+        throw new StorageContainerException("Container already exists " +
+            "with container Id " + containerID,
+            ContainerProtos.Result.CONTAINER_EXISTS);
+      }
+      if (importContainerProgress.contains(containerID)) {
+        LOG.warn("Container import in progress with container Id {}",
+            containerID);
+        throw new StorageContainerException("Container " +
+            "import in progress with container Id " + containerID,
+            ContainerProtos.Result.CONTAINER_EXISTS);
+      } else {
+        importContainerProgress.add(containerID);
+      }
     }
-    try {
-      KeyValueContainerData containerData;
 
+    try {
+      HddsVolume targetVolume = hddsVolume;
+      if (targetVolume == null) {
+        targetVolume = chooseNextVolume();
+      }
+
+      KeyValueContainerData containerData;
       TarContainerPacker packer = new TarContainerPacker(compression);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
@@ -99,6 +123,7 @@ public class ContainerImporter {
         containerSet.addContainer(container);
       }
     } finally {
+      importContainerProgress.remove(containerID);
       try {
         Files.delete(tarFilePath);
       } catch (Exception ex) {

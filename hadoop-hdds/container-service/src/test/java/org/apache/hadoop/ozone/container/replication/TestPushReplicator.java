@@ -17,9 +17,28 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.Timeout;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
@@ -39,6 +59,8 @@ import static org.apache.commons.io.output.NullOutputStream.NULL_OUTPUT_STREAM;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -124,6 +146,100 @@ class TestPushReplicator {
     // THEN
     assertEquals(Status.FAILED, task.getStatus());
     output.assertClosedExactlyOnce();
+  }
+
+  @Test
+  void importSameContainerWhenAlreadyImport() throws Exception {
+    long containerId = 1;
+    // crate container
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    ContainerController controllerMock = mock(ContainerController.class);
+    // create containerImporter object
+    ContainerSet containerSet = new ContainerSet(0);
+    containerSet.addContainer(container);
+    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    ContainerImporter containerImporter = new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet);
+    // run import async first time having delay
+    File tarFile = new File("dummy.tar");
+    // second import should fail immediately
+    try {
+      containerImporter.importContainer(containerId, tarFile.toPath(),
+          null, NO_COMPRESSION);
+      assertFalse(true, "exception should occur");
+    } catch (StorageContainerException ex) {
+      assertTrue(ex.getResult().equals(
+          ContainerProtos.Result.CONTAINER_EXISTS));
+    }
+  }
+
+  @Test
+  void importSameContainerWhenFirstInProgress() throws Exception {
+    long containerId = 1;
+    // crate container
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    // mock controller for return container data with delay
+    ContainerController controllerMock = mock(ContainerController.class);
+    when(controllerMock.importContainer(any(), any(), any()))
+        .thenAnswer((invocation) -> {
+          Thread.sleep(5000);
+          return container;
+        });
+    // create containerImporter object
+    ContainerSet containerSet = new ContainerSet(0);
+    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    ContainerImporter containerImporter = new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet);
+    // run import async first time having delay
+    File tarFile = containerTarFile(containerId, containerData);
+    CompletableFuture.runAsync(() -> {
+      try {
+        containerImporter.importContainer(containerId, tarFile.toPath(),
+            null, NO_COMPRESSION);
+      } catch (Exception ex) {
+        // do nothing
+      }
+    });
+    Thread.sleep(1000);
+    // run import second time and should fail immediately as
+    // first import in progress
+    try {
+      containerImporter.importContainer(containerId, tarFile.toPath(),
+          null, NO_COMPRESSION);
+      assertFalse(true, "exception should occur");
+    } catch (StorageContainerException ex) {
+      assertTrue(ex.getResult().equals(
+          ContainerProtos.Result.CONTAINER_EXISTS));
+    }
+  }
+
+  private File containerTarFile(
+      long containerId, ContainerData containerData) throws IOException {
+    TemporaryFolder tempFolder = new TemporaryFolder();
+    tempFolder.create();
+    File yamlFile = tempFolder.newFile("container.yaml");
+    ContainerDataYaml.createContainerFile(
+        ContainerProtos.ContainerType.KeyValueContainer, containerData,
+        yamlFile);
+    File tarFile = tempFolder.newFile(
+        ContainerUtils.getContainerTarName(containerId));
+    try (FileOutputStream output = new FileOutputStream(tarFile)) {
+      TarArchiveOutputStream archive = new TarArchiveOutputStream(output);
+      ArchiveEntry entry = archive.createArchiveEntry(yamlFile,
+          "container.yaml");
+      archive.putArchiveEntry(entry);
+      try (InputStream input = new FileInputStream(yamlFile)) {
+        IOUtils.copy(input, archive);
+      }
+      archive.closeArchiveEntry();
+    }
+    return tarFile;
   }
 
   private static long randomContainerID() {
