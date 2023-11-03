@@ -15,7 +15,7 @@
 name: dependabot-ci
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [opened, synchronize]
 concurrency:
   group: dependabot-ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
