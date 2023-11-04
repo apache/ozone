@@ -12,6 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# This workflow runs some acceptance test(s) multiple times concurrently.
+# Specify the test by either:
+# * "Test Suite", which should be ones of the existing suites from regular CI,
+#   e.g. "cert-rotation", or
+# * "Test Filter", which is a regex pattern applied to filter test script's path
+#   (examples: "ozone-csi", "test-vault.sh", "ozone/test-ec.sh", "test-.*-rotation.sh")
+
 name: repeat-acceptance-test
 on:
   workflow_dispatch:
