@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.File;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +61,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,10 +99,13 @@ public class TestPipelinePlacementPolicy {
 
   @BeforeEach
   public void init() throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     cluster = initTopology();
     // start with nodes with rack awareness.
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, testClock);
     conf = SCMTestUtils.getConf();
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
@@ -184,6 +190,9 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testChooseNodeWithSingleNodeRack() throws IOException {
     // There is only one node on 3 racks altogether.
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (Node node : SINGLE_NODE_RACK) {
       DatanodeDetails datanode = overwriteLocationInNode(
@@ -191,7 +200,7 @@ public class TestPipelinePlacementPolicy {
       datanodes.add(datanode);
     }
     MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
-        datanodes, false, datanodes.size());
+        datanodes, false, datanodes.size(), testClock);
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(localNodeManager)
@@ -221,6 +230,9 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testChooseNodeNotEnoughSpace() throws IOException {
     // There is only one node on 3 racks altogether.
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (Node node : SINGLE_NODE_RACK) {
       DatanodeDetails datanode = overwriteLocationInNode(
@@ -228,7 +240,7 @@ public class TestPipelinePlacementPolicy {
       datanodes.add(datanode);
     }
     MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
-        datanodes, false, datanodes.size());
+        datanodes, false, datanodes.size(), testClock);
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(localNodeManager)
@@ -473,9 +485,12 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicyOK() {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, testClock);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
 
@@ -526,9 +541,12 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, testClock);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
 
@@ -607,6 +625,9 @@ public class TestPipelinePlacementPolicy {
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     cluster = initTopology();
 
     List<DatanodeDetails> dns = new ArrayList<>();
@@ -620,7 +641,7 @@ public class TestPipelinePlacementPolicy {
         .createDatanodeDetails("host4", "/rack2"));
 
     nodeManager = new MockNodeManager(cluster, dns,
-        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT, testClock);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
     return dns;

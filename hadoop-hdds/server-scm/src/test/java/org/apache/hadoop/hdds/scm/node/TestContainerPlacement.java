@@ -95,6 +95,9 @@ public class TestContainerPlacement {
 
   @BeforeEach
   public void setUp() throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     conf = getConf();
     testDir = GenericTestUtils.getTestDir(
         TestContainerPlacement.class.getSimpleName() + UUID.randomUUID());
@@ -104,7 +107,7 @@ public class TestContainerPlacement {
     scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(

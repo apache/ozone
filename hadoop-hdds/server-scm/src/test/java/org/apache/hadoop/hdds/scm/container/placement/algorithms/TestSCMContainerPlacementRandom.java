@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,6 +55,9 @@ public class TestSCMContainerPlacementRandom {
   public void chooseDatanodes() throws SCMException {
     //given
     OzoneConfiguration conf = new OzoneConfiguration();
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     // We are using small units here
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
@@ -61,7 +67,7 @@ public class TestSCMContainerPlacementRandom {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
@@ -161,6 +167,9 @@ public class TestSCMContainerPlacementRandom {
   public void testIsValidNode() throws SCMException {
     //given
     OzoneConfiguration conf = new OzoneConfiguration();
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     // We are using small units here
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
@@ -170,7 +179,7 @@ public class TestSCMContainerPlacementRandom {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),

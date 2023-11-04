@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,7 +62,10 @@ public class TestSimplePipelineProvider {
 
   @BeforeEach
   public void init() throws Exception {
-    nodeManager = new MockNodeManager(true, 10);
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
         TestSimplePipelineProvider.class.getSimpleName() + UUID.randomUUID());

@@ -59,6 +59,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -114,6 +115,7 @@ public class MockNodeManager implements NodeManager {
   private int numHealthyDisksPerDatanode;
   private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
+  private final Clock clock;
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -129,8 +131,10 @@ public class MockNodeManager implements NodeManager {
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
-                         boolean initializeFakeNodes, int nodeCount) {
+                         boolean initializeFakeNodes, int nodeCount,
+                          Clock clock) {
     this.clusterMap = clusterMap;
+    this.clock = clock;
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
         DatanodeDetails node = nodes.get(x);
@@ -153,9 +157,10 @@ public class MockNodeManager implements NodeManager {
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
-  public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
+  public MockNodeManager(boolean initializeFakeNodes, int nodeCount,
+                          Clock clock) {
     this(new NetworkTopologyImpl(new OzoneConfiguration()), new ArrayList<>(),
-        initializeFakeNodes, nodeCount);
+        initializeFakeNodes, nodeCount, clock);
   }
 
   public MockNodeManager(List<DatanodeUsageInfo> nodes)
@@ -280,7 +285,7 @@ public class MockNodeManager implements NodeManager {
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto());
+            UpgradeUtils.defaultLayoutVersionProto(), clock);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();

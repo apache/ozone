@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
@@ -47,6 +48,8 @@ import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -81,6 +84,9 @@ public class TestECOverReplicationHandler {
   @BeforeEach
   public void setup() throws NodeNotFoundException, NotLeaderException,
       CommandTargetOverloadedException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     staleNode = null;
 
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -99,7 +105,7 @@ public class TestECOverReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
-    NodeManager nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10, testClock);
     OzoneConfiguration conf = SCMTestUtils.getConf();
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil

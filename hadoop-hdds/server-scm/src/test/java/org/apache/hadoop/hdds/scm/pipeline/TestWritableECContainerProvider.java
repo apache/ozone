@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoos
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -50,6 +51,8 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -101,6 +104,9 @@ public class TestWritableECContainerProvider {
 
   @BeforeEach
   void setup(@TempDir File testDir) throws IOException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     repConfig = new ECReplicationConfig(3, 2);
     conf = new OzoneConfiguration();
 
@@ -111,7 +117,7 @@ public class TestWritableECContainerProvider {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
 

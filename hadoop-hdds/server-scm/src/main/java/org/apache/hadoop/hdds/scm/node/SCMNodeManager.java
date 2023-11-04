@@ -151,7 +151,7 @@ public class SCMNodeManager implements NodeManager {
                         Clock clock) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext);
+        layoutVersionManager, scmContext,clock);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
@@ -566,7 +566,7 @@ public class SCMNodeManager implements NodeManager {
 
         try {
           SCMCommand<?> command = new SetNodeOperationalStateCommand(
-              Time.monotonicNow(),
+              clock.millis(),
               scmStatus.getOperationalState(),
               scmStatus.getOpStateExpiryEpochSeconds());
           command.setTerm(scmContext.getTermOfLeader());

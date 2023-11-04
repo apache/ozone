@@ -34,6 +34,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +62,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private final Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
+  private final Clock clock;
 
   /**
    * Constructs DatanodeInfo from DatanodeDetails.
@@ -69,10 +71,10 @@ public class DatanodeInfo extends DatanodeDetails {
    * @param layoutInfo Details about the LayoutVersionProto
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
-        LayoutVersionProto layoutInfo) {
+        LayoutVersionProto layoutInfo, Clock clock) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
-    this.lastHeartbeatTime = Time.monotonicNow();
+    this.lastHeartbeatTime = clock.millis();
     lastKnownLayoutVersion = toLayoutVersionProto(
         layoutInfo != null ? layoutInfo.getMetadataLayoutVersion() : 0,
         layoutInfo != null ? layoutInfo.getSoftwareLayoutVersion() : 0);
@@ -80,13 +82,14 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
+    this.clock = clock;
   }
 
   /**
    * Updates the last heartbeat time with current time.
    */
   public void updateLastHeartbeatTime() {
-    updateLastHeartbeatTime(Time.monotonicNow());
+    updateLastHeartbeatTime(clock.millis());
   }
 
   /**
@@ -162,7 +165,7 @@ public class DatanodeInfo extends DatanodeDetails {
 
     try {
       lock.writeLock().lock();
-      lastStatsUpdatedTime = Time.monotonicNow();
+      lastStatsUpdatedTime = clock.millis();
       failedVolumeCount = failedCount;
       storageReports = reports;
     } finally {
@@ -179,7 +182,7 @@ public class DatanodeInfo extends DatanodeDetails {
       List<MetadataStorageReportProto> reports) {
     try {
       lock.writeLock().lock();
-      lastStatsUpdatedTime = Time.monotonicNow();
+      lastStatsUpdatedTime = clock.millis();
       metadataStorageReports = reports;
     } finally {
       lock.writeLock().unlock();

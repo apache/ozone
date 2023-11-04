@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,6 +75,9 @@ public class TestOneReplicaPipelineSafeModeRule {
 
   private void setup(int nodes, int pipelineFactorThreeCount,
       int pipelineFactorOneCount) throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -84,7 +88,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     List<ContainerInfo> containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(1));
-    mockNodeManager = new MockNodeManager(true, nodes);
+    mockNodeManager = new MockNodeManager(true, nodes, testClock);
 
     eventQueue = new EventQueue();
     serviceManager = new SCMServiceManager();

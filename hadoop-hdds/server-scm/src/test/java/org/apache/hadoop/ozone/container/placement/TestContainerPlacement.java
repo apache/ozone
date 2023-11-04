@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.container.placement;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -30,6 +32,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
@@ -61,13 +64,16 @@ public class TestContainerPlacement {
   @Test
   public void testCapacityPlacementYieldsBetterDataDistribution() throws
       SCMException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     final int opsCount = 200 * 1000;
     final int nodesRequired = 3;
     Random random = new Random();
 
     // The nature of init code in MockNodeManager yields similar clusters.
-    MockNodeManager nodeManagerCapacity = new MockNodeManager(true, 100);
-    MockNodeManager nodeManagerRandom = new MockNodeManager(true, 100);
+    MockNodeManager nodeManagerCapacity = new MockNodeManager(true, 100, testClock);
+    MockNodeManager nodeManagerRandom = new MockNodeManager(true, 100, testClock);
     DescriptiveStatistics beforeCapacity =
         computeStatistics(nodeManagerCapacity);
     DescriptiveStatistics beforeRandom = computeStatistics(nodeManagerRandom);

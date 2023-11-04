@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +75,9 @@ public class TestContainerManagerImpl {
 
   @BeforeEach
   public void setUp() throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
@@ -79,7 +85,7 @@ public class TestContainerManagerImpl {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     final PipelineManager pipelineManager =

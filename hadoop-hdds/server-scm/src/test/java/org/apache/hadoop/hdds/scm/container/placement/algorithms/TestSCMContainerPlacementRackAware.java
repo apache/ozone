@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,6 +92,9 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   private void setup(int datanodeCount) {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     //initialize network topology instance
     conf = new OzoneConfiguration();
     // We are using small units here
@@ -111,7 +117,7 @@ public class TestSCMContainerPlacementRackAware {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
@@ -442,6 +448,9 @@ public class TestSCMContainerPlacementRackAware {
   @MethodSource("numDatanodes")
   public void testDatanodeWithDefaultNetworkLocation(int datanodeCount)
       throws SCMException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     setup(datanodeCount);
     String hostname = "node";
     List<DatanodeInfo> dnInfoList = new ArrayList<>();
@@ -454,7 +463,7 @@ public class TestSCMContainerPlacementRackAware {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getUuid(), "/data1-" + dnInfo.getUuidString(),

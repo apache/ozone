@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -59,6 +60,7 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -94,8 +96,11 @@ public class TestContainerReportHandler {
   @BeforeEach
   public void setup() throws IOException, InvalidStateTransitionException,
       TimeoutException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
         TestContainerReportHandler.class.getSimpleName() + UUID.randomUUID());
@@ -103,7 +108,7 @@ public class TestContainerReportHandler {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     containerStateManager = ContainerStateManagerImpl.newBuilder()

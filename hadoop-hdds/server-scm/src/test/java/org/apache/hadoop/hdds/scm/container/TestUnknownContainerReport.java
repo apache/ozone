@@ -22,6 +22,8 @@ import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Iterator;
 import java.util.UUID;
 
@@ -52,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,8 +77,11 @@ public class TestUnknownContainerReport {
 
   @BeforeEach
   public void setup() throws IOException {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
-    this.nodeManager = new MockNodeManager(true, 10);
+    this.nodeManager = new MockNodeManager(true, 10, testClock);
     this.containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
         TestUnknownContainerReport.class.getSimpleName() + UUID.randomUUID());

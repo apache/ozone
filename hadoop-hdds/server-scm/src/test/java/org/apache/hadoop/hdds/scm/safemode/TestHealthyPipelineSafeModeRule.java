@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +49,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -59,6 +62,9 @@ public class TestHealthyPipelineSafeModeRule {
   @Test
   public void testHealthyPipelineSafeModeRuleWithNoPipelines()
       throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     EventQueue eventQueue = new EventQueue();
     SCMServiceManager serviceManager = new SCMServiceManager();
     SCMContext scmContext = SCMContext.emptyContext();
@@ -69,7 +75,7 @@ public class TestHealthyPipelineSafeModeRule {
             TestHealthyPipelineSafeModeRule.class.getName() +
                     UUID.randomUUID());
     OzoneConfiguration config = new OzoneConfiguration();
-    MockNodeManager nodeManager = new MockNodeManager(true, 0);
+    MockNodeManager nodeManager = new MockNodeManager(true, 0, testClock);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     // enable pipeline check
     config.setBoolean(
@@ -111,6 +117,9 @@ public class TestHealthyPipelineSafeModeRule {
 
   @Test
   public void testHealthyPipelineSafeModeRuleWithPipelines() throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     String storageDir = GenericTestUtils.getTempPath(
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 
@@ -124,7 +133,7 @@ public class TestHealthyPipelineSafeModeRule {
     // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
     // stale and last one is dead, and this repeats. So for a 12 node, 9
     // healthy, 2 stale and one dead.
-    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    MockNodeManager nodeManager = new MockNodeManager(true, 12, testClock);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     // enable pipeline check
     config.setBoolean(
@@ -208,6 +217,9 @@ public class TestHealthyPipelineSafeModeRule {
   @Test
   public void testHealthyPipelineSafeModeRuleWithMixedPipelines()
       throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     String storageDir = GenericTestUtils.getTempPath(
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
@@ -223,7 +235,7 @@ public class TestHealthyPipelineSafeModeRule {
     // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
     // stale and last one is dead, and this repeats. So for a 12 node, 9
     // healthy, 2 stale and one dead.
-    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    MockNodeManager nodeManager = new MockNodeManager(true, 12, testClock);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     // enable pipeline check
     config.setBoolean(

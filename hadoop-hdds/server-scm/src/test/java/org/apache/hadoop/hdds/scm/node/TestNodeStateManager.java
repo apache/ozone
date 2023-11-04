@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -92,6 +95,9 @@ public class TestNodeStateManager {
     };
     // Make NodeStateManager behave as if SCM has completed finalization,
     // unless a test changes the value of this variable.
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE);
@@ -105,7 +111,7 @@ public class TestNodeStateManager {
     Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
         .thenReturn(scmSlv);
     nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
-        scmContext);
+        scmContext, testClock);
   }
 
   @Test

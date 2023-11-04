@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
@@ -80,6 +81,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,6 +111,9 @@ public class TestBlockManager {
 
   @BeforeEach
   public void setUp(@TempDir Path tempDir) throws Exception {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     conf = SCMTestUtils.getConf();
     numContainerPerOwnerInPipeline = conf.getInt(
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
@@ -122,7 +127,7 @@ public class TestBlockManager {
 
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     scmHAManager = SCMHAManagerStub.getInstance(true);
 
     eventQueue = new EventQueue();

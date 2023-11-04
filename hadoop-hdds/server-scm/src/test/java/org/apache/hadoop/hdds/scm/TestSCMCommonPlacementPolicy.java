@@ -32,12 +32,15 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.mockito.Mockito;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -61,7 +64,10 @@ public class TestSCMCommonPlacementPolicy {
 
   @BeforeEach
   public void setup() {
-    nodeManager = new MockNodeManager(true, 10);
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant, zoneId);
+    nodeManager = new MockNodeManager(true, 10, testClock);
     conf = SCMTestUtils.getConf();
   }
 
