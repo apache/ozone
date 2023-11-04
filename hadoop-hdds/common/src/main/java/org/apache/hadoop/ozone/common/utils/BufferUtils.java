@@ -49,16 +49,16 @@ public final class BufferUtils {
     int numBuffers = getNumberOfBins(totalLen, bufferCapacity);
 
     ByteBuffer[] dataBuffers = new ByteBuffer[numBuffers];
-    long allocatedLen = 0;
+    long buffersAllocated = 0;
     // For each ByteBuffer (except the last) allocate bufferLen of capacity
     for (int i = 0; i < numBuffers - 1; i++) {
       dataBuffers[i] = ByteBuffer.allocate(bufferCapacity);
-      allocatedLen += bufferCapacity;
+      buffersAllocated += bufferCapacity;
     }
     // For the last ByteBuffer, allocate as much space as is needed to fit
     // remaining bytes
     dataBuffers[numBuffers - 1] = ByteBuffer.allocate(
-        Math.toIntExact(totalLen - allocatedLen));
+        Math.toIntExact(totalLen - buffersAllocated));
     return dataBuffers;
   }
 
