@@ -54,9 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.time.ZoneId;
 import java.time.Duration;
-import java.time.Instant;
 
 /**
  * Verifies the statics in NodeManager.
@@ -87,9 +85,7 @@ public class TestStatisticsUpdate {
   @Test
   public void testStatisticsUpdate() throws Exception {
     //GIVEN
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
 

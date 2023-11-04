@@ -19,8 +19,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.io.File;
@@ -89,9 +87,7 @@ public class TestPipelinePlacementFactory {
   private void setupRacks(int datanodeCount, int nodesPerRack,
                           boolean firstRackLessNode)
       throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
     NodeSchema[] schemas = new NodeSchema[]

@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -55,9 +53,7 @@ public class TestSCMContainerPlacementRandom {
   public void chooseDatanodes() throws SCMException {
     //given
     OzoneConfiguration conf = new OzoneConfiguration();
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     // We are using small units here
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
@@ -167,9 +163,7 @@ public class TestSCMContainerPlacementRandom {
   public void testIsValidNode() throws SCMException {
     //given
     OzoneConfiguration conf = new OzoneConfiguration();
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     // We are using small units here
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);

@@ -44,8 +44,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.TestClock;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -67,9 +65,7 @@ public class SimpleMockNodeManager implements NodeManager {
   private Map<UUID, Set<ContainerID>> containerMap = new ConcurrentHashMap<>();
 
   public void register(DatanodeDetails dd, NodeStatus status) {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
     nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null, testClock));

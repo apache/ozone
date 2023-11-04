@@ -33,8 +33,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,9 +91,7 @@ public class TestReconNodeManager {
 
   @Test
   public void testReconNodeDB() throws IOException, NodeNotFoundException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
@@ -183,9 +179,7 @@ public class TestReconNodeManager {
 
   @Test
   public void testUpdateNodeOperationalStateFromScm() throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
@@ -221,9 +215,7 @@ public class TestReconNodeManager {
 
   @Test
   public void testDatanodeUpdate() throws IOException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -50,9 +48,7 @@ public class TestNodeStateMap {
 
   @BeforeEach
   public void setUp() {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     map = new NodeStateMap(testClock);
   }
 

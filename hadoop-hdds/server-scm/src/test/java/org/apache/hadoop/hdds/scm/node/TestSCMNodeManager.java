@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -140,8 +138,6 @@ public class TestSCMNodeManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSCMNodeManager.class);
 
-//  @Mock
-//  private final Clock clock;
   private File testDir;
   private StorageContainerManager scm;
   private SCMContext scmContext;
@@ -159,10 +155,6 @@ public class TestSCMNodeManager {
       toLayoutVersionProto(MAX_LV + 1, MAX_LV + 1);
   private static final LayoutVersionProto CORRECT_LAYOUT_PROTO =
       toLayoutVersionProto(MAX_LV, MAX_LV);
-
-//  public TestSCMNodeManager() {
-//    this.clock = Clock.system(ZoneId.systemDefault());
-//  }
 
   @BeforeEach
   public void setup() {
@@ -227,9 +219,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmHeartbeat()
       throws IOException, InterruptedException, AuthenticationException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       LayoutVersionManager versionManager =
@@ -512,9 +502,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmNoHeartbeats()
       throws IOException, InterruptedException, AuthenticationException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       //TODO: wait for heartbeat to be processed
@@ -536,9 +524,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmShutdown()
       throws IOException, InterruptedException, AuthenticationException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = getConf();
     conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
@@ -571,9 +557,7 @@ public class TestSCMNodeManager {
   @Test
   public void testScmHealthyNodeCount()
       throws IOException, InterruptedException, AuthenticationException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = getConf();
     final int count = 10;
 
@@ -797,9 +781,7 @@ public class TestSCMNodeManager {
     final int deadNodeInterval = 6; // seconds
     ScheduledFuture schedFuture;
 
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         healthCheckInterval, MILLISECONDS);
@@ -896,9 +878,7 @@ public class TestSCMNodeManager {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
 
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         healthCheckInterval, MILLISECONDS);
@@ -939,9 +919,7 @@ public class TestSCMNodeManager {
   // Currently invoked by testProcessLayoutVersion.
   public void testProcessLayoutVersionLowerMlv(FinalizationCheckpoint
       currentCheckpoint) throws IOException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
@@ -986,9 +964,7 @@ public class TestSCMNodeManager {
   @Test
   public void testProcessCommandQueueReport()
       throws IOException, NodeNotFoundException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
@@ -1476,9 +1452,7 @@ public class TestSCMNodeManager {
     final int healthyCount = 3000;
     final int staleCount = 3000;
 
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100,
         MILLISECONDS);
@@ -1652,9 +1626,7 @@ public class TestSCMNodeManager {
     final int nodeCount = 1;
     final int interval = 100;
 
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
         MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);

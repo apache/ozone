@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.LinkedList;
 import java.util.List;
@@ -88,9 +87,7 @@ public class AbstractReconContainerManagerTest {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");

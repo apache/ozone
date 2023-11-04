@@ -45,8 +45,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -95,9 +93,7 @@ public class TestNodeStateManager {
     };
     // Make NodeStateManager behave as if SCM has completed finalization,
     // unless a test changes the value of this variable.
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE);

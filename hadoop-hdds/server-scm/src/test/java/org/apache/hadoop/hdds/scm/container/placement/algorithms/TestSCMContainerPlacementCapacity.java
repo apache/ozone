@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,9 +52,7 @@ import static org.mockito.Mockito.when;
 public class TestSCMContainerPlacementCapacity {
   @Test
   public void chooseDatanodes() throws SCMException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     //given
     OzoneConfiguration conf = new OzoneConfiguration();
     // We are using small units here

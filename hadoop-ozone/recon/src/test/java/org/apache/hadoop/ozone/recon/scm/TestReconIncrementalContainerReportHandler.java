@@ -30,8 +30,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -70,9 +68,7 @@ public class TestReconIncrementalContainerReportHandler
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =

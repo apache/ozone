@@ -47,8 +47,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -179,9 +177,7 @@ public class TestSCMContainerPlacementRackScatter {
    * @param datanodeDetails the datanode to setup
    */
   private void setupDatanode(DatanodeDetails datanodeDetails) {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     datanodes.add(datanodeDetails);
     cluster.add(datanodeDetails);
     DatanodeInfo datanodeInfo = new DatanodeInfo(
@@ -488,9 +484,7 @@ public class TestSCMContainerPlacementRackScatter {
   @MethodSource("numDatanodes")
   public void testDatanodeWithDefaultNetworkLocation(int datanodeCount)
       throws SCMException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     setup(datanodeCount);
     String hostname = "node";
     List<DatanodeInfo> dnInfoList = new ArrayList<>();

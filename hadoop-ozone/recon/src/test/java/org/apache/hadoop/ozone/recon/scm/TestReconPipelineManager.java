@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -108,9 +106,7 @@ public class TestReconPipelineManager {
   public void testInitialize() throws IOException, TimeoutException {
 
     // Get 3 OPEN pipelines from SCM.
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     List<Pipeline> pipelinesFromScm = getPipelines(3);
 
     // Recon has 2 pipelines in ALLOCATED state. (1 is valid and 1 is obsolete)
@@ -187,9 +183,7 @@ public class TestReconPipelineManager {
 
   @Test
   public void testAddPipeline() throws IOException, TimeoutException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();

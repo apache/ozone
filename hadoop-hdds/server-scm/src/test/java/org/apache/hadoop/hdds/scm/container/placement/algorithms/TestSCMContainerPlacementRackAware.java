@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -92,9 +90,7 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   private void setup(int datanodeCount) {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     //initialize network topology instance
     conf = new OzoneConfiguration();
     // We are using small units here
@@ -448,9 +444,7 @@ public class TestSCMContainerPlacementRackAware {
   @MethodSource("numDatanodes")
   public void testDatanodeWithDefaultNetworkLocation(int datanodeCount)
       throws SCMException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     setup(datanodeCount);
     String hostname = "node";
     List<DatanodeInfo> dnInfoList = new ArrayList<>();

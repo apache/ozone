@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -96,6 +95,7 @@ public class TestContainerPlacement {
   @BeforeEach
   public void setUp() throws Exception {
     conf = getConf();
+
     testDir = GenericTestUtils.getTestDir(
         TestContainerPlacement.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -137,9 +137,7 @@ public class TestContainerPlacement {
    */
 
   SCMNodeManager createNodeManager(OzoneConfiguration config) {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     EventQueue eventQueue = new EventQueue();
     eventQueue.addHandler(SCMEvents.NEW_NODE,
         Mockito.mock(NewNodeHandler.class));
@@ -186,9 +184,7 @@ public class TestContainerPlacement {
     final long used = 2L * OzoneConsts.GB;
     final long remaining = capacity - used;
 
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
+    TestClock testClock = TestClock.newInstance();
     testDir = PathUtils.getTestDir(
         TestContainerPlacement.class);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
