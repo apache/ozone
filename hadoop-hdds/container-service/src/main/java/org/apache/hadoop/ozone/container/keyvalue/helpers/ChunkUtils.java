@@ -32,13 +32,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -189,7 +189,7 @@ public final class ChunkUtils {
     final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len,
         bufferCapacity);
     readMethod.accept(buffers);
-    return ChunkBuffer.wrap(Lists.newArrayList(buffers));
+    return ChunkBuffer.wrap(Arrays.asList(buffers));
   }
 
   /**
