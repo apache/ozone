@@ -54,12 +54,14 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestClock;
 import org.assertj.core.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -115,7 +117,6 @@ public class MockNodeManager implements NodeManager {
   private int numHealthyDisksPerDatanode;
   private int numRaftLogDisksPerDatanode;
   private int numPipelinePerDatanode;
-  private final Clock clock;
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -131,10 +132,8 @@ public class MockNodeManager implements NodeManager {
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
-                         boolean initializeFakeNodes, int nodeCount,
-                          Clock clock) {
+                         boolean initializeFakeNodes, int nodeCount) {
     this.clusterMap = clusterMap;
-    this.clock = clock;
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
         DatanodeDetails node = nodes.get(x);
@@ -157,10 +156,9 @@ public class MockNodeManager implements NodeManager {
         NUM_PIPELINE_PER_METADATA_DISK;
   }
 
-  public MockNodeManager(boolean initializeFakeNodes, int nodeCount,
-                          Clock clock) {
+  public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
     this(new NetworkTopologyImpl(new OzoneConfiguration()), new ArrayList<>(),
-        initializeFakeNodes, nodeCount, clock);
+        initializeFakeNodes, nodeCount);
   }
 
   public MockNodeManager(List<DatanodeUsageInfo> nodes)
@@ -280,12 +278,15 @@ public class MockNodeManager implements NodeManager {
   @Override
   public List<DatanodeDetails> getNodes(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
+    Instant initialInstant = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    TestClock testClock = new TestClock(initialInstant,zoneId);
     if (nodestate == HEALTHY) {
       // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto(), clock);
+            UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();

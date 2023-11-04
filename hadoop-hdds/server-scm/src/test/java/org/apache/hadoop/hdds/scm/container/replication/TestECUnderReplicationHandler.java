@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +53,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -129,10 +126,7 @@ public class TestECUnderReplicationHandler {
   @BeforeEach
   public void setup() throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
-    nodeManager = new MockNodeManager(true, 10, testClock) {
+    nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
         return new NodeStatus(
@@ -379,16 +373,13 @@ public class TestECUnderReplicationHandler {
   @Test
   public void testUnderReplicationWithDecomIndexAndMaintOnSameIndex()
       throws IOException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     Set<ContainerReplica> availableReplicas = new LinkedHashSet<>();
     ContainerReplica deadMaintenance =
         createContainerReplica(container.containerID(),
             1, IN_MAINTENANCE, CLOSED);
     availableReplicas.add(deadMaintenance);
 
-    nodeManager = new MockNodeManager(true, 10, testClock) {
+    nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
         if (dd.equals(deadMaintenance.getDatanodeDetails())) {

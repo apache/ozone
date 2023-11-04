@@ -19,8 +19,6 @@
 package org.apache.hadoop.hdds.scm.node.states;
 
 import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -40,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.ozone.test.TestClock;
 
 /**
  * Maintains the state of datanodes in SCM. This class should only be used by

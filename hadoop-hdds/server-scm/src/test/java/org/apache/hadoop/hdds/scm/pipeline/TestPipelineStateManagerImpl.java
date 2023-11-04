@@ -79,7 +79,7 @@ public class TestPipelineStateManagerImpl {
         conf, new SCMDBDefinition());
 
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
-    NodeManager nodeManager = new MockNodeManager(true, 10, testClock);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
 
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))

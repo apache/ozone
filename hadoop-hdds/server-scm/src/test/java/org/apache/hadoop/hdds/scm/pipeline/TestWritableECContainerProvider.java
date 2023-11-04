@@ -104,9 +104,6 @@ public class TestWritableECContainerProvider {
 
   @BeforeEach
   void setup(@TempDir File testDir) throws IOException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     repConfig = new ECReplicationConfig(3, 2);
     conf = new OzoneConfiguration();
 
@@ -117,7 +114,7 @@ public class TestWritableECContainerProvider {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10, testClock);
+    nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
 

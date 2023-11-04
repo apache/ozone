@@ -77,11 +77,8 @@ public class TestUnknownContainerReport {
 
   @BeforeEach
   public void setup() throws IOException {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
-    this.nodeManager = new MockNodeManager(true, 10, testClock);
+    this.nodeManager = new MockNodeManager(true, 10);
     this.containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
         TestUnknownContainerReport.class.getSimpleName() + UUID.randomUUID());

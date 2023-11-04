@@ -21,8 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,7 +57,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -244,13 +241,10 @@ public class TestSCMSafeModeManager {
   @Test
   public void testFailWithIncorrectValueForHealthyPipelinePercent()
       throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     try {
       OzoneConfiguration conf = createConf(100,
           0.9);
-      MockNodeManager mockNodeManager = new MockNodeManager(true, 10, testClock);
+      MockNodeManager mockNodeManager = new MockNodeManager(true, 10);
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
@@ -274,13 +268,10 @@ public class TestSCMSafeModeManager {
   @Test
   public void testFailWithIncorrectValueForOneReplicaPipelinePercent()
       throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     try {
       OzoneConfiguration conf = createConf(0.9,
           200);
-      MockNodeManager mockNodeManager = new MockNodeManager(true, 10, testClock);
+      MockNodeManager mockNodeManager = new MockNodeManager(true, 10);
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
@@ -303,13 +294,10 @@ public class TestSCMSafeModeManager {
 
   @Test
   public void testFailWithIncorrectValueForSafeModePercent() throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     try {
       OzoneConfiguration conf = createConf(0.9, 0.1);
       conf.setDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT, -1.0);
-      MockNodeManager mockNodeManager = new MockNodeManager(true, 10, testClock);
+      MockNodeManager mockNodeManager = new MockNodeManager(true, 10);
       PipelineManager pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
@@ -335,9 +323,6 @@ public class TestSCMSafeModeManager {
       int containerCount, int nodeCount, int pipelineCount,
       double healthyPipelinePercent, double oneReplicaPercent)
       throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
 
     OzoneConfiguration conf = createConf(healthyPipelinePercent,
         oneReplicaPercent);
@@ -345,7 +330,7 @@ public class TestSCMSafeModeManager {
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(containerCount));
 
-    MockNodeManager mockNodeManager = new MockNodeManager(true, nodeCount, testClock);
+    MockNodeManager mockNodeManager = new MockNodeManager(true, nodeCount);
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(
             conf,
@@ -595,15 +580,12 @@ public class TestSCMSafeModeManager {
 
   @Test
   public void testSafeModePipelineExitRule() throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
     String storageDir = GenericTestUtils.getTempPath(
         TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
     try {
-      MockNodeManager nodeManager = new MockNodeManager(true, 3, testClock);
+      MockNodeManager nodeManager = new MockNodeManager(true, 3);
       config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
       // enable pipeline check
       config.setBoolean(
@@ -657,9 +639,6 @@ public class TestSCMSafeModeManager {
   @Test
   public void testPipelinesNotCreatedUntilPreCheckPasses()
       throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     int numOfDns = 5;
     // enable pipeline check
     config.setBoolean(
@@ -668,7 +647,7 @@ public class TestSCMSafeModeManager {
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         true);
 
-    MockNodeManager nodeManager = new MockNodeManager(true, numOfDns, testClock);
+    MockNodeManager nodeManager = new MockNodeManager(true, numOfDns);
     String storageDir = GenericTestUtils.getTempPath(
         TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
