@@ -68,9 +68,6 @@ public class TestPipelineStateManagerImpl {
 
   @BeforeEach
   public void init() throws Exception {
-    Instant initialInstant = Instant.now();
-    ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant, zoneId);
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
         TestPipelineStateManagerImpl.class.getSimpleName() + UUID.randomUUID());

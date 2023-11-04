@@ -280,7 +280,7 @@ public class MockNodeManager implements NodeManager {
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     if (nodestate == HEALTHY) {
       // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();

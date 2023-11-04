@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoos
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,8 +50,6 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

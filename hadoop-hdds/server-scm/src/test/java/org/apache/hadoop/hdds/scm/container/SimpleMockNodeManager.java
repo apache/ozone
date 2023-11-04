@@ -69,7 +69,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public void register(DatanodeDetails dd, NodeStatus status) {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
     nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null, testClock));

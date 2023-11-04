@@ -91,7 +91,7 @@ public class TestPipelinePlacementFactory {
       throws Exception {
     Instant initialInstant = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
-    TestClock testClock = new TestClock(initialInstant,zoneId);
+    TestClock testClock = new TestClock(initialInstant, zoneId);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
     NodeSchema[] schemas = new NodeSchema[]
