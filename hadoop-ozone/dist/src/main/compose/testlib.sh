@@ -48,7 +48,7 @@ all_tests_in_immediate_child_dirs() {
 ## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-    tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" || echo "")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
@@ -63,7 +63,7 @@ find_tests(){
       exit 1
     fi
   elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
-    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
 
     if [[ -z "${tests}" ]]; then
       echo "No tests found for filter ${OZONE_TEST_SELECTOR}"
