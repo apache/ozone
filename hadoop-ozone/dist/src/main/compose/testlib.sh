@@ -64,6 +64,11 @@ find_tests(){
     fi
   elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
     tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
+
+    if [[ -z "${tests}" ]]; then
+      echo "No tests found for filter ${OZONE_TEST_SELECTOR}"
+      exit 1
+    fi
   else
     tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
