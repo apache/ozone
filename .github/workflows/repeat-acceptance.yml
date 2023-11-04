@@ -113,7 +113,7 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/hdds*
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
-  run-test:
+  acceptance:
     needs:
       - prepare-job
       - build
