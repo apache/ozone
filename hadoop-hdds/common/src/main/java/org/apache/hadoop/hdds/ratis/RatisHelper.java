@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -87,6 +88,11 @@ public final class RatisHelper {
 
   private static final RaftGroup EMPTY_GROUP = RaftGroup.valueOf(DUMMY_GROUP_ID,
       Collections.emptyList());
+
+  // Used for OM/SCM HA transfer leadership
+  @VisibleForTesting
+  public static final int NEUTRAL_PRIORITY = 1;
+  private static final int HIGHER_PRIORITY = 2;
 
   private RatisHelper() {
   }
@@ -520,7 +526,8 @@ public final class RatisHelper {
       for (RaftPeer peer : raftGroup.getPeers()) {
         peersWithNewPriorities.add(
             RaftPeer.newBuilder(peer)
-                .setPriority(peer.getId().equals(targetPeerId) ? 2 : 1)
+                .setPriority(peer.getId().equals(targetPeerId) ?
+                    HIGHER_PRIORITY : NEUTRAL_PRIORITY)
                 .build()
         );
       }
@@ -545,6 +552,39 @@ public final class RatisHelper {
             targetPeerId, reply);
         throw new IOException(reply.getException());
       }
+    } finally {
+      // Raft peers priorities need to be reset regardless of the result
+      // of transfer leadership
+      resetPriorities(conf, raftGroup, tlsConfig);
+    }
+  }
+
+  private static void resetPriorities(ConfigurationSource conf,
+      RaftGroup raftGroup, GrpcTlsConfig tlsConfig) {
+    List<RaftPeer> resetPeers = new ArrayList<>();
+    for (RaftPeer peer : raftGroup.getPeers()) {
+      resetPeers.add(
+          RaftPeer.newBuilder(peer)
+              .setPriority(NEUTRAL_PRIORITY)
+              .build()
+      );
+    }
+    LOG.info("Resetting Raft peers priorities after transfer leadership");
+    try (RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
+        null, raftGroup, createRetryPolicy(conf), tlsConfig, conf)) {
+      RaftClientReply reply = raftClient.admin().setConfiguration(resetPeers);
+      if (reply.isSuccess()) {
+        LOG.info("Successfully reset priorities for division: {}",
+            resetPeers);
+      } else {
+        LOG.warn("Failed to reset priorities for division: {}." +
+            " Ratis reply: {}", resetPeers, reply);
+      }
+    } catch (IOException e) {
+      LOG.error("Exception thrown when trying to reset priorities for " +
+              "division {}: ", resetPeers, e);
+      // Exception is not re-thrown to not mask the main transfer leadership
+      // error
     }
   }
 }
