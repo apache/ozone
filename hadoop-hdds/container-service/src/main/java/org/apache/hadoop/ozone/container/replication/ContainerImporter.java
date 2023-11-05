@@ -81,14 +81,14 @@ public class ContainerImporter {
   public void importContainer(long containerID, Path tarFilePath,
       HddsVolume hddsVolume, CopyContainerCompression compression)
       throws IOException {
+    if (containerSet.getContainer(containerID) != null) {
+      LOG.warn("Container already exists with container Id {}", containerID);
+      throw new StorageContainerException("Container already exists " +
+          "with container Id " + containerID,
+          ContainerProtos.Result.CONTAINER_EXISTS);
+    }
 
     synchronized (this) {
-      if (containerSet.getContainer(containerID) != null) {
-        LOG.warn("Container already exists with container Id {}", containerID);
-        throw new StorageContainerException("Container already exists " +
-            "with container Id " + containerID,
-            ContainerProtos.Result.CONTAINER_EXISTS);
-      }
       if (importContainerProgress.contains(containerID)) {
         LOG.warn("Container import in progress with container Id {}",
             containerID);
@@ -123,7 +123,9 @@ public class ContainerImporter {
         containerSet.addContainer(container);
       }
     } finally {
-      importContainerProgress.remove(containerID);
+      synchronized (this) {
+        importContainerProgress.remove(containerID);
+      }
       try {
         Files.delete(tarFilePath);
       } catch (Exception ex) {
