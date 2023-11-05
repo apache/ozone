@@ -51,7 +51,7 @@ Delete bucket with incomplete multipart uploads
     ${initiate_result} =       Execute AWSS3APICli     create-multipart-upload --bucket ${bucket} --key incomplete-multipartkey
     ${uploadID} =              Execute and checkrc     echo '${initiate_result}' | jq -r '.UploadId'    0
                                Should contain          ${initiate_result}    ${bucket}
-                               Should contain          ${initiate_result}    incomplete-multipartKey
+                               Should contain          ${initiate_result}    incomplete-multipartkey
                                Should contain          ${initiate_result}    UploadId
 
     # bucket deletion should fail since there is still incomplete multipart upload
