@@ -120,6 +120,8 @@ public class InfoSubcommand extends ScmSubcommand {
         LOG.info("Pipeline id: {}",
             container.getContainerInfo().getPipelineID());
       }
+      LOG.info("Write PipelineId: {}",
+          container.getContainerInfo().getPipelineID().getId());
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
@@ -181,6 +183,11 @@ public class InfoSubcommand extends ScmSubcommand {
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
     }
+
+    public PipelineID getWritePipelineID() {
+      return writePipelineID;
+    }
+
   }
 
   private static class ContainerWithoutDatanodes {
@@ -208,6 +215,10 @@ public class InfoSubcommand extends ScmSubcommand {
 
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
+    }
+
+    public PipelineID getWritePipelineId() {
+      return writePipelineId;
     }
   }
 
