@@ -25,7 +25,6 @@ import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -76,7 +75,6 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
   private final int maxRetry;
   private final ContainerManager containerManager;
   private final Lock lock;
-  private final Map<Long, Integer> transactionToRetryCountMap;
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
@@ -103,7 +101,6 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
     this.containerManager = containerManager;
     this.lock = new ReentrantLock();
 
-    transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
         .newBuilder()
         .setConfiguration(conf)
@@ -117,9 +114,7 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
     this.metrics = metrics;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
-            containerManager, scmContext, transactionToRetryCountMap, metrics,
-            lock,
-            scmCommandTimeoutMs);
+            containerManager, scmContext, metrics, lock, scmCommandTimeoutMs);
   }
 
   @Override
@@ -164,25 +159,7 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
       throws IOException {
     lock.lock();
     try {
-      ArrayList<Long> txIDsToUpdate = new ArrayList<>();
-      for (Long txID : txIDs) {
-        int currentCount =
-            transactionToRetryCountMap.getOrDefault(txID, 0);
-        if (currentCount > maxRetry) {
-          continue;
-        } else {
-          currentCount += 1;
-          if (currentCount > maxRetry) {
-            txIDsToUpdate.add(txID);
-          }
-          transactionToRetryCountMap.put(txID, currentCount);
-        }
-      }
-
-      if (!txIDsToUpdate.isEmpty()) {
-        deletedBlockLogStateManager
-            .increaseRetryCountOfTransactionInDB(txIDsToUpdate);
-      }
+      transactionStatusManager.incrementRetryCount(txIDs, maxRetry);
     } finally {
       lock.unlock();
     }
@@ -201,9 +178,7 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
       }
-      for (Long txID: txIDs) {
-        transactionToRetryCountMap.computeIfPresent(txID, (key, value) -> 0);
-      }
+      transactionStatusManager.resetRetryCount(txIDs);
       return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
           new ArrayList<>(new HashSet<>(txIDs)));
     } finally {
@@ -276,7 +251,6 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
    *  leader.
    */
   public void onBecomeLeader() {
-    transactionToRetryCountMap.clear();
     transactionStatusManager.clear();
   }
 
@@ -325,7 +299,8 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
       Map<UUID, Map<Long, CmdStatus>> commandStatus) {
     DeletedBlocksTransaction updatedTxn =
         DeletedBlocksTransaction.newBuilder(tx)
-            .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
+            .setCount(transactionStatusManager.getOrDefaultRetryCount(
+              tx.getTxID(), 0))
             .build();
     for (ContainerReplica replica : replicas) {
       DatanodeDetails details = replica.getDatanodeDetails();
