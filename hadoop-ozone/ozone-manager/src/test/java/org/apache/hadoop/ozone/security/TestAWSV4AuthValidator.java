@@ -25,6 +25,9 @@ import java.util.Collection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * Tests AWS V4 Auth Validator.
+ */
 public class TestAWSV4AuthValidator {
 
   private String strToSign;
@@ -73,12 +76,12 @@ public class TestAWSV4AuthValidator {
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testValidateRequest(String strToSign, String signature,
-                                  String awsAccessKey, Boolean result) {
-    this.strToSign = strToSign;
-    this.signature = signature;
-    this.awsAccessKey = awsAccessKey;
-    this.result = result;
+  public void testValidateRequest(String stringToSign, String sign,
+                                  String accessKey, Boolean testResult) {
+    this.strToSign = stringToSign;
+    this.signature = sign;
+    this.awsAccessKey = accessKey;
+    this.result = testResult;
     assertEquals(result, AWSV4AuthValidator.validateRequest(
             strToSign, signature, awsAccessKey));
   }

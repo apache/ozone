@@ -54,11 +54,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Timeout(300)
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
  * dummy response class.
  */
+@Timeout(300)
 public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
   private OMMetadataManager omMetadataManager;

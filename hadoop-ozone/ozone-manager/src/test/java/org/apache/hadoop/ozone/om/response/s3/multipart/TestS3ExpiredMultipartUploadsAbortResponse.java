@@ -48,6 +48,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Tests S3 Expired Multipart Upload Abort Responses.
+ */
 public class TestS3ExpiredMultipartUploadsAbortResponse
     extends TestS3MultipartResponse {
 
@@ -73,8 +76,8 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAddToDBBatchWithEmptyParts(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     String volumeName = UUID.randomUUID().toString();
 
     Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToAbort =
@@ -116,8 +119,8 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAddToDBBatchWithNonEmptyParts(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     String volumeName = UUID.randomUUID().toString();
 
     Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToAbort =
@@ -179,8 +182,8 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAddToDBBatchWithErrorResponse(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     String volumeName = UUID.randomUUID().toString();
 
     Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToAbort =

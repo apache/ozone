@@ -55,6 +55,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static java.util.Collections.singletonMap;
 
+/**
+ * This class tests the Bucket Manager Implementation using Mockito.
+ */
 @ExtendWith(MockitoExtension.class)
 public class TestBucketManagerImpl {
 

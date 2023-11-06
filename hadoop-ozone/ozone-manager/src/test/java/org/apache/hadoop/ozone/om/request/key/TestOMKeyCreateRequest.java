@@ -71,6 +71,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
+/**
+ * This class tests the OM Key Create Request.
+ */
 public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   public static Collection<Object[]> data() {

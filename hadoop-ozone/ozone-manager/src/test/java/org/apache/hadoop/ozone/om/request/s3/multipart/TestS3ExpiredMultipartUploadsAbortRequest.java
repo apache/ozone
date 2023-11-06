@@ -89,8 +89,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAbortMPUsNotInTable(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
 
@@ -111,8 +111,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAbortSubsetOfMPUs(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume1 = UUID.randomUUID().toString();
     final String volume2 = UUID.randomUUID().toString();
     final String bucket1 = UUID.randomUUID().toString();
@@ -164,8 +164,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAbortMPUsWithHigherUpdateID(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
 
@@ -241,8 +241,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
    */
   @ParameterizedTest
   @MethodSource("bucketLayouts")
-  public void testAbortOrphanMPUs(BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+  public void testAbortOrphanMPUs(BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
 
@@ -268,8 +268,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
    */
   @ParameterizedTest
   @MethodSource("bucketLayouts")
-  public void testMetrics(BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+  public void testMetrics(BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
     final String key = UUID.randomUUID().toString();

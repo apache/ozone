@@ -38,6 +38,9 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addBucketToDB;
 
+/**
+ * Tests the OM Response when open keys are deleted.
+ */
 public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   private static final long KEY_LENGTH = 100;
   private BucketLayout bucketLayout;
@@ -61,8 +64,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAddToDBBatchWithEmptyBlocks(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
@@ -93,8 +96,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAddToDBBatchWithNonEmptyBlocks(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
@@ -136,8 +139,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testAddToDBBatchWithErrorResponse(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);

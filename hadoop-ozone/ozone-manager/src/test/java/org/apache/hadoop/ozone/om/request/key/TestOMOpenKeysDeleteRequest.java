@@ -53,6 +53,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+/**
+ * This class tests the OM Open Keys Delete Request.
+ */
 public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
   private BucketLayout bucketLayout;
@@ -82,8 +85,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testDeleteOpenKeysNotInTable(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     List<Pair<Long, OmKeyInfo>> openKeys =
@@ -103,8 +106,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testDeleteSubsetOfOpenKeys(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume1 = UUID.randomUUID().toString();
     final String volume2 = UUID.randomUUID().toString();
     final String bucket1 = UUID.randomUUID().toString();
@@ -168,8 +171,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testDeleteSameKeyNameDifferentClient(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
     final String key = UUID.randomUUID().toString();
@@ -200,8 +203,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   public void testDeleteKeyWithHigherUpdateID(
-      BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
 
@@ -266,8 +269,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    */
   @ParameterizedTest
   @MethodSource("bucketLayouts")
-  public void testMetrics(BucketLayout bucketLayout) throws Exception {
-    this.bucketLayout = bucketLayout;
+  public void testMetrics(BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
     final String key = UUID.randomUUID().toString();
