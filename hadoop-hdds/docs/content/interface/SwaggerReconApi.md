@@ -21,5 +21,5 @@ layout: swagger-page
   limitations under the License.
 -->
 
-{{< swagger-ui url="/swagger-resources/recon-api.yaml" >}}
+{{< swagger-ui url="/docs/egde/swagger-resources/recon-api.yaml" >}}
 
