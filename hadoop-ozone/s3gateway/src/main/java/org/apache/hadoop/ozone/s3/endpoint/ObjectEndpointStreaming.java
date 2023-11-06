@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
@@ -145,18 +144,19 @@ final class ObjectEndpointStreaming {
                                             String uploadID, int chunkSize,
                                             DigestInputStream body)
       throws IOException, OS3Exception {
-    OzoneDataStreamOutput streamOutput = null;
     String eTag;
     S3GatewayMetrics metrics = S3GatewayMetrics.create();
     try {
-      streamOutput = ozoneBucket
-          .createMultipartStreamKey(key, length, partNumber, uploadID);
-      long putLength =
-          writeToStreamOutput(streamOutput, body, chunkSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
-          .toLowerCase();
-      ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
-      metrics.incPutKeySuccessLength(putLength);
+      try (OzoneDataStreamOutput streamOutput = ozoneBucket
+          .createMultipartStreamKey(key, length, partNumber, uploadID)) {
+        long putLength =
+            writeToStreamOutput(streamOutput, body, chunkSize, length);
+        metrics.incPutKeySuccessLength(putLength);
+        ((KeyMetadataAware)streamOutput).getMetadata().put("ETag",
+            DatatypeConverter.printHexBinary(
+            body.getMessageDigest().digest()).toLowerCase());
+        eTag = streamOutput.getCommitUploadPartInfo().getPartName();
+      }
     } catch (OMException ex) {
       if (ex.getResult() ==
           OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
@@ -167,13 +167,6 @@ final class ObjectEndpointStreaming {
             ozoneBucket.getName() + "/" + key);
       }
       throw ex;
-    } finally {
-      if (streamOutput != null) {
-        streamOutput.close();
-        OmMultipartCommitUploadPartInfo commitUploadPartInfo =
-            streamOutput.getCommitUploadPartInfo();
-        eTag = commitUploadPartInfo.getPartName();
-      }
     }
     return Response.ok().header("ETag", eTag).build();
   }
