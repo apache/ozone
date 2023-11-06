@@ -61,7 +61,7 @@ export class DetailPanel extends React.Component<IRightDrawerProps> {
           style={{position: 'absolute'}}
           onClose={this.onClose}
         >
-          <Table dataSource={content}>
+          <Table dataSource={content} locale={{filterTitle: ""}}>
             <Column title='Property' dataIndex='key'/>
             <Column title='Value' dataIndex='value'/>
           </Table>

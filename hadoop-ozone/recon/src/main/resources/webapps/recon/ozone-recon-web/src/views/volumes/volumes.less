@@ -16,19 +16,32 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
-}
+.volumes-container {
+  .content-div {
+    .pipeline-container {
+      margin-bottom: 5px;
+    }
+  }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Volumes': 'Volumes',
-  '/Buckets': 'Buckets',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage', 
-  '/Heatmap': 'Heatmap',
-  '/Om':'Om',
-};
+  .filter-block { 
+    font-size: 14px;
+    font-weight: normal;
+    display: inline-block;
+    margin-left: 20px;
+  }
+  
+  .multi-select-container {
+    padding-left: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    min-width: 200px;
+    z-index: 99;
+  }
+
+  .limit-block {
+    font-size: 14px;
+    font-weight: normal;
+    display: inline-block;
+    margin-left: 20px;
+  }
+}

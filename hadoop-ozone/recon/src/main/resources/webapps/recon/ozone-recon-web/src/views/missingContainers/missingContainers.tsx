@@ -335,7 +335,8 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         <Table
           loading={containerKeys.loading} dataSource={dataSource}
           columns={KEY_TABLE_COLUMNS} pagination={paginationConfig}
-          rowKey='uid'/>
+          rowKey='uid'
+          locale={{filterTitle: ""}}/>
       );
     }
 
@@ -373,7 +374,8 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         loading={loading}
         pagination={paginationConfig} rowKey='containerID'
         expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
-        onExpandedRowsChange={this.onRowExpandChange}/>
+        onExpandedRowsChange={this.onRowExpandChange}
+        locale={{filterTitle: ""}}/>
     }
 
     return (

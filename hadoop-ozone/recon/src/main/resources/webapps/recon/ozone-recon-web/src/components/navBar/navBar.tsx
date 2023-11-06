@@ -98,6 +98,16 @@ class NavBar extends React.Component<INavBarProps> {
             <span>Overview</span>
             <Link to='/Overview'/>
           </Menu.Item>
+          <Menu.Item key='/Volumes'>
+            <Icon type='inbox'/>
+            <span>Volumes</span>
+            <Link to='/Volumes'/>.
+          </Menu.Item>
+          <Menu.Item key='/Buckets'>
+            <Icon type='folder-open'/>
+            <span>Buckets</span>
+            <Link to='/Buckets'/>.
+          </Menu.Item>
           <Menu.Item key='/Datanodes'>
             <Icon type='cluster'/>
             <span>Datanodes</span>

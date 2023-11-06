@@ -16,19 +16,27 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
+@progress-gray: #d0d0d0;
+@progress-blue: #1890ff;
+
+.quota-cell-container {
+  position: relative;
+  .capacity-bar {
+    .ant-progress-text {
+      font-size: 0.8em;
+    }
+    .ant-progress-inner {
+      background-color: @progress-gray;
+    }
+    position: absolute;
+    bottom: -12px;
+  }
 }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Volumes': 'Volumes',
-  '/Buckets': 'Buckets',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage', 
-  '/Heatmap': 'Heatmap',
-  '/Om':'Om',
-};
+.quota-used-bg {
+  color: @progress-blue;
+}
+
+.quota-remaining-bg {
+  color: @progress-gray;
+}

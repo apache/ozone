@@ -16,19 +16,30 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
+interface IAclIdentityColorMap {
+  [aclIdentity: string]: string;
 }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Volumes': 'Volumes',
-  '/Buckets': 'Buckets',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage', 
-  '/Heatmap': 'Heatmap',
-  '/Om':'Om',
+interface IAclRightColorMap {
+  [aclRight: string]: string;
+}
+
+export const aclIdentityTypeColorMap: IAclIdentityColorMap = {
+  USER: 'green',
+  GROUP: 'blue',
+  WORLD: 'magenta',
+  ANONYMOUS: 'gray',
+  CLIENT_IP: 'gold'
+};
+
+export const aclRightColorMap: IAclRightColorMap = {
+  READ: 'green',
+  WRITE: 'blue',
+  CREATE: 'orange',
+  LIST: 'magenta',
+  DELETE: 'red',
+  READ_ACL: 'lime',
+  WRITE_ACL: 'purple',
+  ALL: 'gold',
+  NONE: 'gray'
 };
