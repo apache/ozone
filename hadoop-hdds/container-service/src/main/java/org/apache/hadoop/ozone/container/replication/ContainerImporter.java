@@ -81,13 +81,6 @@ public class ContainerImporter {
   public void importContainer(long containerID, Path tarFilePath,
       HddsVolume hddsVolume, CopyContainerCompression compression)
       throws IOException {
-    if (containerSet.getContainer(containerID) != null) {
-      LOG.warn("Container already exists with container Id {}", containerID);
-      throw new StorageContainerException("Container already exists " +
-          "with container Id " + containerID,
-          ContainerProtos.Result.CONTAINER_EXISTS);
-    }
-
     synchronized (this) {
       if (importContainerProgress.contains(containerID)) {
         LOG.warn("Container import in progress with container Id {}",
@@ -98,6 +91,13 @@ public class ContainerImporter {
       } else {
         importContainerProgress.add(containerID);
       }
+    }
+
+    if (containerSet.getContainer(containerID) != null) {
+      LOG.warn("Container already exists with container Id {}", containerID);
+      throw new StorageContainerException("Container already exists " +
+          "with container Id " + containerID,
+          ContainerProtos.Result.CONTAINER_EXISTS);
     }
 
     try {
