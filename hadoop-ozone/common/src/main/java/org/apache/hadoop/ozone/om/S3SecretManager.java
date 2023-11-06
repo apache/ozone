@@ -113,12 +113,4 @@ public interface S3SecretManager {
     }
   }
 
-  default void clearCache() {
-    S3SecretCache cache = cache();
-    if (cache != null) {
-      LOG.info("Clearing S3 cache since DoubleBuffer is flushed to DB.");
-      cache.clearCache();
-    }
-  }
-
 }

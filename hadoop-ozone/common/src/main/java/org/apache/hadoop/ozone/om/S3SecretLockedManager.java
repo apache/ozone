@@ -78,6 +78,16 @@ public class S3SecretLockedManager implements S3SecretManager {
   }
 
   @Override
+  public void clearS3Cache() {
+    lock.acquireWriteLock(S3_SECRET_LOCK, "cache");
+    try {
+      secretManager.clearS3Cache();
+    } finally {
+      lock.releaseWriteLock(S3_SECRET_LOCK, "cache");
+    }
+  }
+
+  @Override
   public <T> T doUnderLock(String lockId, S3SecretFunction<T> action)
       throws IOException {
     lock.acquireWriteLock(S3_SECRET_LOCK, lockId);

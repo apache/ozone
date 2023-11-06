@@ -21,9 +21,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
-import java.time.Duration;
-import java.time.temporal.TemporalUnit;
-
 /**
  * S3 secret cache implementation based on in-memory cache.
  */
@@ -33,10 +30,6 @@ public class S3InMemoryCache implements S3SecretCache {
   public S3InMemoryCache() {
     cache = CacheBuilder.newBuilder()
         .build();
-  }
-
-  public static S3InMemoryCacheBuilder builder() {
-    return new S3InMemoryCacheBuilder();
   }
 
   @Override
@@ -65,14 +58,5 @@ public class S3InMemoryCache implements S3SecretCache {
   @Override
   public S3SecretValue get(String id) {
     return cache.getIfPresent(id);
-  }
-
-  /**
-   * Builder for {@link S3InMemoryCache}.
-   */
-  public static class S3InMemoryCacheBuilder {
-    public S3InMemoryCache build() {
-      return new S3InMemoryCache();
-    }
   }
 }

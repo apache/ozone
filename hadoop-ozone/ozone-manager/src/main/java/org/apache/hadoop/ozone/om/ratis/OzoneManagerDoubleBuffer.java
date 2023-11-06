@@ -295,8 +295,6 @@ public final class OzoneManagerDoubleBuffer {
   void flushTransactions() {
     while (isRunning.get() && canFlush()) {
       flushCurrentBuffer();
-      // Invalidate all the content in S3SecretManager cache.
-      s3SecretManager.clearS3Cache();
     }
   }
 
@@ -528,6 +526,8 @@ public final class OzoneManagerDoubleBuffer {
     cleanupEpochs.forEach((tableName, epochs) -> {
       Collections.sort(epochs);
       omMetadataManager.getTable(tableName).cleanupCache(epochs);
+      // Invalidate all the content in S3SecretManager cache.
+      s3SecretManager.clearS3Cache();
     });
   }
 

@@ -46,12 +46,6 @@ public interface S3SecretCacheProvider {
    * In-memory cache implementation.
    */
   S3SecretCacheProvider IN_MEMORY = conf -> {
-    long expireTime = conf
-        .getLong(CACHE_LIFETIME, DEFAULT_CACHE_LIFETIME);
-    return S3InMemoryCache.builder()
-        .setExpireTime(expireTime, ChronoUnit.SECONDS)
-        .setMaxSize(conf
-            .getLong(CACHE_MAX_SIZE, DEFAULT_CACHE_MAX_SIZE))
-        .build();
+    return new S3InMemoryCache();
   };
 }
