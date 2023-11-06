@@ -66,6 +66,8 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
    * Assuming all dirObjIds belong to a bucket this function resolves absolute
    * path for a given FSO bucket.
    * @param dirObjIds Object Ids corresponding to which absolute path is needed.
+   * @param skipUnresolvedObjs boolean value to skipUnresolved objects when
+   *                           false exception will be thrown.
    * @return Map of Path corresponding to provided directory object IDs
    */
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")

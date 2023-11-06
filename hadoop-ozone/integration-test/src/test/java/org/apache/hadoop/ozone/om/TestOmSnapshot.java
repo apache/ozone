@@ -1069,9 +1069,10 @@ public class TestOmSnapshot {
    * 2) Snapshot snap1 created.
    * 3) Dir dir1/dir2 is created.
    * 4) Key k1 is renamed to key dir1/dir2/k1_renamed
+   * 5) Dir dir1 is deleted.
+   * 6) Snapshot snap2 created.
    * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
-   *    of 3 key
-   *    with 1 rename entry & 2 dirs create entry.
+   *    of 1 delete key entry.
    */
   @Test
   public void testSnapDiffWithDirectoryDelete() throws Exception {
