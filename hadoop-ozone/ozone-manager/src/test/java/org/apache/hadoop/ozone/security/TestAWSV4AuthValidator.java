@@ -17,19 +17,14 @@
  */
 package org.apache.hadoop.ozone.security;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Arrays;
 import java.util.Collection;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * Test for {@link AWSV4AuthValidator}.
- * */
-@RunWith(Parameterized.class)
 public class TestAWSV4AuthValidator {
 
   private String strToSign;
@@ -37,15 +32,6 @@ public class TestAWSV4AuthValidator {
   private String awsAccessKey;
   private Boolean result;
 
-  public TestAWSV4AuthValidator(String strToSign, String signature,
-      String awsAccessKey, Boolean result) {
-    this.strToSign = strToSign;
-    this.signature = signature;
-    this.awsAccessKey = awsAccessKey;
-    this.result = result;
-  }
-
-  @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][]{
         {
@@ -85,8 +71,14 @@ public class TestAWSV4AuthValidator {
     });
   }
 
-  @Test
-  public void testValidateRequest() {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateRequest(String strToSign, String signature,
+                                  String awsAccessKey, Boolean result) {
+    this.strToSign = strToSign;
+    this.signature = signature;
+    this.awsAccessKey = awsAccessKey;
+    this.result = result;
     assertEquals(result, AWSV4AuthValidator.validateRequest(
             strToSign, signature, awsAccessKey));
   }

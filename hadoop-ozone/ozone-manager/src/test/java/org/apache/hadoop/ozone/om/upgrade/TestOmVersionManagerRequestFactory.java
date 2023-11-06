@@ -33,9 +33,9 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.experimental.categories.Category;
 import org.reflections.Reflections;
 
@@ -48,7 +48,7 @@ public class TestOmVersionManagerRequestFactory {
 
   private static OMLayoutVersionManager omVersionManager;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws OMException {
     omVersionManager = new OMLayoutVersionManager(0);
   }
@@ -59,7 +59,7 @@ public class TestOmVersionManagerRequestFactory {
     // Try getting v1 of 'CreateKey'.
     Class<? extends OMClientRequest> requestType =
         omVersionManager.getHandler(CreateKey.name());
-    Assert.assertEquals(requestType, OMKeyCreateRequest.class);
+    Assertions.assertEquals(requestType, OMKeyCreateRequest.class);
   }
 
   @Test
@@ -78,14 +78,14 @@ public class TestOmVersionManagerRequestFactory {
       try {
         getRequestTypeMethod = c.getMethod("getRequestType");
       } catch (NoSuchMethodException nsmEx) {
-        Assert.fail(String.format(
+        Assertions.fail(String.format(
             "%s does not have the 'getRequestType' method " +
             "which should be defined or inherited for every OM request class.",
             c));
       }
       String type = (String) getRequestTypeMethod.invoke(null);
-      Assert.assertNotNull(String.format("Cannot get handler for %s", type),
-          omVersionManager.getHandler(type));
+      Assertions.assertNotNull(omVersionManager.getHandler(type),
+          String.format("Cannot get handler for %s", type));
     }
   }
 
@@ -103,11 +103,11 @@ public class TestOmVersionManagerRequestFactory {
       }
       Method getRequestTypeMethod = requestClass.getMethod(
           "getRequestType");
-      Assert.assertNotNull(getRequestTypeMethod);
+      Assertions.assertNotNull(getRequestTypeMethod);
 
       Constructor<? extends OMClientRequest> constructorWithOmRequestArg =
           requestClass.getDeclaredConstructor(OMRequest.class);
-      Assert.assertNotNull(constructorWithOmRequestArg);
+      Assertions.assertNotNull(constructorWithOmRequestArg);
     }
   }
 }

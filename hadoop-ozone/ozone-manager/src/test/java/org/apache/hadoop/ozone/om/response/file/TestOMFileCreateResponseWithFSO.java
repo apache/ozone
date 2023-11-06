@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.response.key.TestOMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,7 +40,7 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @NotNull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
-    Assert.assertNotNull(omBucketInfo);
+    Assertions.assertNotNull(omBucketInfo);
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
             omBucketInfo.getBucketName(), keyName, replicationType,
             replicationFactor,
@@ -51,7 +51,7 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @NotNull
   @Override
   protected String getOpenKeyName() throws IOException {
-    Assert.assertNotNull(omBucketInfo);
+    Assertions.assertNotNull(omBucketInfo);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);

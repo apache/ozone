@@ -32,8 +32,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -46,11 +46,6 @@ import static org.mockito.Mockito.when;
  * Tests OMCreateKeyRequestWithFSO class.
  */
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
-
-  public TestOMKeyCreateRequestWithFSO(boolean setKeyPathLock,
-                                       boolean setFileSystemPaths) {
-    super(setKeyPathLock, setFileSystemPaths);
-  }
 
   @Test
   public void testValidateAndUpdateCacheWithKeyContainsSnapshotReservedWord()
@@ -78,17 +73,19 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       OMClientResponse omKeyCreateResponse =
           omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
               ozoneManagerDoubleBufferHelper);
-      Assert.assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
-      Assert.assertEquals("Incorrect keyName", keyName,
+      Assertions.assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
+      Assertions.assertEquals(keyName,
           omKeyCreateResponse.getOMResponse()
-                .getCreateKeyResponse().getKeyInfo().getKeyName());
+                .getCreateKeyResponse().getKeyInfo().getKeyName(),
+          "Incorrect keyName");
     }
   }
 
   @Test
   public void testKeyCreateInheritParentDefaultAcls()
       throws Exception {
-    super.testKeyCreateInheritParentDefaultAcls();
+    super.testKeyCreateInheritParentDefaultAcls(
+        getKeyPathLockEnabled(), getEnableFileSystemPaths());
   }
 
   @Override
@@ -130,14 +127,14 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
     // Check open key entry
     Path keyPathFileName = keyPath.getFileName();
-    Assert.assertNotNull("Failed to find fileName", keyPathFileName);
+    Assertions.assertNotNull(keyPathFileName, "Failed to find fileName");
     String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
-    Assert.assertNotNull(omKeyInfo);
+    Assertions.assertNotNull(omKeyInfo);
   }
 
   @Override
@@ -147,7 +144,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
-    Assert.assertNotNull("Bucket not found!", omBucketInfo);
+    Assertions.assertNotNull(omBucketInfo, "Bucket not found!");
     long lastKnownParentId = omBucketInfo.getObjectID();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
 
@@ -162,8 +159,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
               get(dbNodeName);
 
-      Assert.assertNotNull("Parent key path:" + fullKeyPath +
-              " doesn't exist", omDirInfo);
+      Assertions.assertNotNull(omDirInfo, "Parent key path:" + fullKeyPath +
+              " doesn't exist");
       lastKnownParentId = omDirInfo.getObjectID();
     }
 

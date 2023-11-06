@@ -43,11 +43,9 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -77,14 +75,10 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Test class for {@link OzoneNativeAuthorizer}.
- */
-@RunWith(Parameterized.class)
 public class TestOzoneNativeAuthorizer {
 
   private static final List<String> ADMIN_USERNAMES = singletonList("om");
@@ -107,7 +101,6 @@ public class TestOzoneNativeAuthorizer {
   private OzoneObj buckObj;
   private OzoneObj keyObj;
 
-  @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][]{
         {"key", "dir1/", ALL, ALL, true},
@@ -138,7 +131,7 @@ public class TestOzoneNativeAuthorizer {
     createKey(vol, buck, key);
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
@@ -163,7 +156,7 @@ public class TestOzoneNativeAuthorizer {
         new String[]{"test"});
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(testDir);
   }
@@ -407,8 +400,8 @@ public class TestOzoneNativeAuthorizer {
           a1.equals(CREATE) && obj.getResourceType().equals(VOLUME)
               ? ADMIN_USERNAMES.contains(user)
               : expectedAclResult;
-      assertEquals(msg, expectedResult,
-          nativeAuthorizer.checkAccess(obj, context));
+      assertEquals(expectedResult,
+          nativeAuthorizer.checkAccess(obj, context), msg);
 
       List<ACLType> aclsToBeValidated =
           Arrays.stream(ACLType.values()).collect(Collectors.toList());
@@ -439,11 +432,11 @@ public class TestOzoneNativeAuthorizer {
           List<List<ACLType>> right = acls.stream()
               .map(OzoneAcl::getAclList)
               .collect(Collectors.toList());
-          assertFalse("Did not expect client to have " + a2 + " acl. " +
-                  "Current acls found:" + right + ". Type:" + accessType + ","
-                  + " name:" + (accessType == USER ? user : group),
-              nativeAuthorizer.checkAccess(obj,
-                  builder.setAclRights(a2).build()));
+          assertFalse(nativeAuthorizer.checkAccess(obj,
+                  builder.setAclRights(a2).build()), "Did not expect client " +
+              "to have " + a2 + " acl. " +
+              "Current acls found:" + right + ". Type:" + accessType + ","
+              + " name:" + (accessType == USER ? user : group));
 
           // Randomize next type.
           int type = RandomUtils.nextInt(0, 3);
@@ -475,24 +468,24 @@ public class TestOzoneNativeAuthorizer {
             }
           }
 
-          assertTrue("Current acls :" + acls + ". " +
+          assertTrue(a2AclFound, "Current acls :" + acls + ". " +
               "Type:" + accessType + ", name:" + (accessType == USER ? user
-              : group) + " acl:" + a2, a2AclFound);
-          assertTrue("Expected client to have " + a1 + " acl. Current acls " +
-              "found:" + acls + ". Type:" + accessType +
-              ", name:" + (accessType == USER ? user : group), a1AclFound);
-          assertEquals("Current acls " + acls + ". Expect acl:" + a2 +
+              : group) + " acl:" + a2);
+          assertTrue(a1AclFound, "Expected client to have " + a1 + " acl. " +
+              "Current acls found:" + acls + ". Type:" + accessType +
+              ", name:" + (accessType == USER ? user : group));
+          assertEquals(expectedAclResult, nativeAuthorizer.checkAccess(obj,
+                  builder.setAclRights(a2).build()),
+              "Current acls " + acls + ". Expect acl:" + a2 +
                   " to be set? " + expectedAclResult + " accessType:"
-                  + accessType, expectedAclResult,
-              nativeAuthorizer.checkAccess(obj,
-                  builder.setAclRights(a2).build()));
+                  + accessType);
           aclsToBeValidated.remove(a2);
           for (ACLType a3 : aclsToBeValidated) {
             if (!a3.equals(a1) && !a3.equals(a2) && !a3.equals(CREATE)) {
-              assertFalse("User shouldn't have right " + a3 + ". " +
-                      "Current acl rights for user:" + a1 + "," + a2,
-                  nativeAuthorizer.checkAccess(obj,
-                      builder.setAclRights(a3).build()));
+              assertFalse(nativeAuthorizer.checkAccess(obj,
+                  builder.setAclRights(a3).build()),
+                  "User shouldn't have right " + a3 + ". " +
+                      "Current acl rights for user:" + a1 + "," + a2);
             }
           }
         }
@@ -526,8 +519,8 @@ public class TestOzoneNativeAuthorizer {
     boolean expectedResult = expectedAclResult
         || ADMIN_USERNAMES.contains(userName);
     for (ACLType a : allAcls) {
-      assertEquals("User " + userName + " should have right " + a + ".",
-          expectedResult, nativeAuthorizer.checkAccess(obj, ctx));
+      assertEquals(expectedResult, nativeAuthorizer.checkAccess(obj, ctx),
+          "User " + userName + " should have right " + a + ".");
     }
   }
 
@@ -542,8 +535,9 @@ public class TestOzoneNativeAuthorizer {
     allAcls.remove(CREATE);
     allAcls.remove(WRITE);
     for (ACLType a : allAcls) {
-      assertFalse("User shouldn't have right " + a + ".", 
-          nativeAuthorizer.checkAccess(obj, builder.setAclRights(a).build()));
+      assertFalse(nativeAuthorizer.checkAccess(obj,
+          builder.setAclRights(a).build()),
+          "User shouldn't have right " + a + ".");
     }
   }
 }
