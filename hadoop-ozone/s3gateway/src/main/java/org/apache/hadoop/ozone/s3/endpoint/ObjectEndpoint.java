@@ -59,11 +59,13 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
@@ -852,6 +854,7 @@ public class ObjectEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     String copyHeader = null;
     try {
+
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new DigestInputStream(new SignedChunksInputStream(body),
@@ -881,7 +884,7 @@ public class ObjectEndpoint extends EndpointBase {
             .createMultipartKey(ozoneBucket, key, length, partNumber,
                 uploadID, chunkSize, (DigestInputStream) body);
       }
-      String eTag;
+      KeyOutputStream keyOutputStream = null;
       if (copyHeader != null) {
         Pair<String, String> result = parseSourceHeader(copyHeader);
         String sourceBucket = result.getLeft();
@@ -930,7 +933,7 @@ public class ObjectEndpoint extends EndpointBase {
               getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(
                   sourceObject, ozoneOutputStream, 0, length);
-              eTag = ozoneOutputStream.getCommitUploadPartInfo().getPartName();
+              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
             }
           } else {
             try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
@@ -938,7 +941,7 @@ public class ObjectEndpoint extends EndpointBase {
                     partNumber, uploadID)) {
               getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
-              eTag = ozoneOutputStream.getCommitUploadPartInfo().getPartName();
+              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
             }
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -954,10 +957,16 @@ public class ObjectEndpoint extends EndpointBase {
               .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
                       ((DigestInputStream) body).getMessageDigest().digest())
                   .toLowerCase());
-          eTag = ozoneOutputStream.getCommitUploadPartInfo().getPartName();
+          keyOutputStream
+              = ozoneOutputStream.getKeyOutputStream();
         }
         getMetrics().incPutKeySuccessLength(putLength);
       }
+
+      assert keyOutputStream != null;
+      OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
+          keyOutputStream.getCommitUploadPartInfo();
+      String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);

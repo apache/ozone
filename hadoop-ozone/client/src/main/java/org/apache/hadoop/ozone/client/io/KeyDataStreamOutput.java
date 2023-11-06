@@ -399,11 +399,9 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       }
       if (atomicKeyCreation) {
         long expectedSize = blockDataStreamOutputEntryPool.getDataSize();
-        if (expectedSize != offset) {
-          LOG.info(String.format("Expected %d and actual %d write" +
-                  " sizes do not match, skip key COMMIT for atomic key",
-              expectedSize, offset));
-        }
+        Preconditions.checkArgument(expectedSize == offset,
+            String.format("Expected: %d and actual %d write sizes do not match",
+                expectedSize, offset));
       }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {
