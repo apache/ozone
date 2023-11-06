@@ -289,8 +289,7 @@ public class ObjectEndpoint extends EndpointBase {
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new DigestInputStream(new SignedChunksInputStream(body),
             E_TAG_PROVIDER.get());
-        length = Long.parseLong(
-            headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
+        length = Long.parseLong(amzDecodedLength);
       } else {
         body = new DigestInputStream(body, E_TAG_PROVIDER.get());
       }
@@ -894,9 +893,9 @@ public class ObjectEndpoint extends EndpointBase {
             volume.getName(), sourceBucket, sourceKey);
         String range =
             headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
+        RangeHeader rangeHeader = null;
         if (range != null) {
-          RangeHeader rangeHeader =
-              RangeHeaderParserUtil.parseRangeHeader(range, 0);
+          rangeHeader = RangeHeaderParserUtil.parseRangeHeader(range, 0);
           // When copy Range, the size of the target key is the
           // length specified by COPY_SOURCE_HEADER_RANGE.
           length = rangeHeader.getEndOffset() -
@@ -918,8 +917,6 @@ public class ObjectEndpoint extends EndpointBase {
         try (OzoneInputStream sourceObject = sourceKeyDetails.getContent()) {
           long copyLength;
           if (range != null) {
-            RangeHeader rangeHeader =
-                RangeHeaderParserUtil.parseRangeHeader(range, 0);
             final long skipped =
                 sourceObject.skip(rangeHeader.getStartOffset());
             if (skipped != rangeHeader.getStartOffset()) {
