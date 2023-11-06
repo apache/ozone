@@ -57,4 +57,27 @@ public class ITestRootedOzoneContractRootDir extends
   public void testRmNonEmptyRootDirNonRecursive() {
     // OFS doesn't support creating files directly under root
   }
+
+  @Override
+  public void testRmEmptyRootDirNonRecursive() {
+    // Internally test deletes volume recursively
+    // Which is not supported
+  }
+
+  @Override
+  public void testListEmptyRootDirectory() {
+    // Internally test deletes volume recursively
+    // Which is not supported
+  }
+
+  @Override
+  public void testSimpleRootListing() {
+    // Recursive list is not supported
+  }
+
+  @Override
+  public void testMkDirDepth1() {
+    // Internally test deletes volume recursively
+    // Which is not supported
+  }
 }

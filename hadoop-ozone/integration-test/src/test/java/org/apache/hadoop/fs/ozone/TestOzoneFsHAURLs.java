@@ -55,7 +55,9 @@ import java.util.OptionalInt;
 import java.util.UUID;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 
@@ -68,7 +70,7 @@ public class TestOzoneFsHAURLs {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   public static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 

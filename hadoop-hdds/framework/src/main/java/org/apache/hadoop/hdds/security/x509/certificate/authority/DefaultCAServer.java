@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -64,7 +65,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
 
 /**
@@ -132,6 +132,7 @@ public class DefaultCAServer implements CertificateServer {
   private CertificateStore store;
   private Lock lock;
   private static boolean testSecureFlag;
+  private BigInteger rootCertificateId;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -141,15 +142,23 @@ public class DefaultCAServer implements CertificateServer {
    * @param certificateStore - A store used to persist Certificates.
    */
   public DefaultCAServer(String subject, String clusterID, String scmID,
-                         CertificateStore certificateStore,
+      CertificateStore certificateStore, BigInteger rootCertId,
       PKIProfile pkiProfile, String componentName) {
     this.subject = subject;
     this.clusterID = clusterID;
     this.scmID = scmID;
     this.store = certificateStore;
+    this.rootCertificateId = rootCertId;
     this.profile = pkiProfile;
     this.componentName = componentName;
     lock = new ReentrantLock();
+  }
+
+  public DefaultCAServer(String subject, String clusterID, String scmID,
+      CertificateStore certificateStore, PKIProfile pkiProfile,
+      String componentName) {
+    this(subject, clusterID, scmID, certificateStore, BigInteger.ONE,
+        pkiProfile, componentName);
   }
 
   @Override
@@ -219,7 +228,8 @@ public class DefaultCAServer implements CertificateServer {
   @Override
   public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType approverType, NodeType role) {
+      CertificateApprover.ApprovalType approverType, NodeType role,
+      String certSerialId) {
     LocalDateTime beginDate = LocalDateTime.now();
     LocalDateTime endDate;
     // When issuing certificates for sub-ca use the max certificate duration
@@ -253,12 +263,14 @@ public class DefaultCAServer implements CertificateServer {
       case TESTING_AUTOMATIC:
         X509CertificateHolder xcert;
         try {
-          xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
+          xcert = signAndStoreCertificate(
+              beginDate, endDate, csr, role, certSerialId);
         } catch (SCMSecurityException e) {
           // Certificate with conflicting serial id, retry again may resolve
           // this issue.
           LOG.error("Certificate storage failed, retrying one more time.", e);
-          xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
+          xcert = signAndStoreCertificate(
+              beginDate, endDate, csr, role, certSerialId);
         }
         CertificateCodec codec = new CertificateCodec(config, componentName);
         CertPath certPath = codec.getCertPath();
@@ -277,19 +289,20 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
-      LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
-      throws IOException,
-      OperatorCreationException, CertificateException {
+      LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role,
+      String certSerialId) throws IOException, OperatorCreationException,
+      CertificateException {
 
     lock.lock();
     X509CertificateHolder xcert;
     try {
+      Preconditions.checkState(!Strings.isNullOrEmpty(certSerialId));
       xcert = approver.sign(config,
           getCAKeys().getPrivate(),
           getCACertificate(),
           Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
           Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant()),
-          csr, scmID, clusterID);
+          csr, scmID, clusterID, certSerialId);
       if (store != null) {
         store.checkValidCertID(xcert.getSerialNumber());
         store.storeValidCertificate(xcert.getSerialNumber(),
@@ -299,15 +312,6 @@ public class DefaultCAServer implements CertificateServer {
       lock.unlock();
     }
     return xcert;
-  }
-
-  @Override
-  public Future<CertPath> requestCertificate(String csr,
-      CertificateApprover.ApprovalType type, NodeType nodeType)
-      throws IOException {
-    PKCS10CertificationRequest request =
-        getCertificationRequest(csr);
-    return requestCertificate(request, type, nodeType);
   }
 
   @Override
@@ -568,7 +572,7 @@ public class DefaultCAServer implements CertificateServer {
         .setClusterID(this.clusterID)
         .setBeginDate(beginDate)
         .setEndDate(endDate)
-        .makeCA()
+        .makeCA(rootCertificateId)
         .setConfiguration(securityConfig)
         .setKey(key);
 

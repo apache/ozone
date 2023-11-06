@@ -35,10 +35,13 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -316,32 +319,35 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
   public void close() throws IOException {
   }
 
-  private void getTransaction(
-      DeletedBlocksTransaction tx,
+  private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions,
-      Set<DatanodeDetails> dnList,
+      Set<DatanodeDetails> dnList, Set<ContainerReplica> replicas,
       Map<UUID, Map<Long, CmdStatus>> commandStatus) {
-    try {
-      DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
-          .newBuilder(tx)
-          .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
-          .build();
-      Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(
-              ContainerID.valueOf(updatedTxn.getContainerID()));
-      for (ContainerReplica replica : replicas) {
-        DatanodeDetails details = replica.getDatanodeDetails();
-        if (!dnList.contains(details)) {
-          continue;
-        }
-        if (!transactionStatusManager.isDuplication(
-            details, updatedTxn.getTxID(), commandStatus)) {
-          transactions.addTransactionToDN(details.getUuid(), updatedTxn);
-        }
+    DeletedBlocksTransaction updatedTxn =
+        DeletedBlocksTransaction.newBuilder(tx)
+            .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
+            .build();
+    for (ContainerReplica replica : replicas) {
+      DatanodeDetails details = replica.getDatanodeDetails();
+      if (!dnList.contains(details)) {
+        continue;
       }
-    } catch (IOException e) {
-      LOG.warn("Got container info error.", e);
+      if (!transactionStatusManager.isDuplication(
+          details, updatedTxn.getTxID(), commandStatus)) {
+        transactions.addTransactionToDN(details.getUuid(), updatedTxn);
+      }
     }
+  }
+
+  private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
+      DeletedBlocksTransaction txn) throws ContainerNotFoundException {
+    ContainerInfo containerInfo = containerManager
+        .getContainer(ContainerID.valueOf(txn.getContainerID()));
+    ReplicationManager replicationManager =
+        scmContext.getScm().getReplicationManager();
+    ContainerHealthResult result = replicationManager
+        .getContainerReplicationHealth(containerInfo, replicas);
+    return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
   }
 
   @Override
@@ -384,7 +390,14 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              getTransaction(txn, transactions, dnList, commandStatus);
+              Set<ContainerReplica> replicas = containerManager
+                  .getContainerReplicas(
+                      ContainerID.valueOf(txn.getContainerID()));
+              if (checkInadequateReplica(replicas, txn)) {
+                continue;
+              }
+              getTransaction(
+                  txn, transactions, dnList, replicas, commandStatus);
               getSCMDeletedBlockTransactionStatusManager().
                   recordTransactionCommitted(txn.getTxID());
             }

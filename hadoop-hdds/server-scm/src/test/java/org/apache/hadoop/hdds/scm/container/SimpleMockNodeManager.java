@@ -382,6 +382,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
+  }
+
+  @Override
   public void close() throws IOException {
 
   }

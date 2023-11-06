@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -69,7 +70,8 @@ public class ReplicationServer {
 
   public ReplicationServer(ContainerController controller,
       ReplicationConfig replicationConfig, SecurityConfig secConf,
-      CertificateClient caClient, ContainerImporter importer) {
+      CertificateClient caClient, ContainerImporter importer,
+      String threadNamePrefix) {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
@@ -78,14 +80,23 @@ public class ReplicationServer {
 
     int replicationServerWorkers =
         replicationConfig.getReplicationMaxStreams();
-    this.executor =
-        new ThreadPoolExecutor(replicationServerWorkers,
-            replicationServerWorkers,
-            60, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
-            new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("ReplicationContainerReader-%d")
-                .build());
+    int replicationQueueLimit =
+        replicationConfig.getReplicationQueueLimit();
+    LOG.info("Initializing replication server with thread count = {}"
+            + " queue length = {}",
+        replicationConfig.getReplicationMaxStreams(),
+        replicationConfig.getReplicationQueueLimit());
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "ReplicationContainerReader-%d")
+        .build();
+    this.executor = new ThreadPoolExecutor(
+        replicationServerWorkers,
+        replicationServerWorkers,
+        60,
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(replicationQueueLimit),
+        threadFactory);
 
     init();
   }
@@ -151,6 +162,7 @@ public class ReplicationServer {
 
     public static final String PREFIX = "hdds.datanode.replication";
     public static final String STREAMS_LIMIT_KEY = "streams.limit";
+    public static final String QUEUE_LIMIT = "queue.limit";
 
     public static final String REPLICATION_STREAMS_LIMIT_KEY =
         PREFIX + "." + STREAMS_LIMIT_KEY;
@@ -177,6 +189,18 @@ public class ReplicationServer {
             "datanode can execute simultaneously"
     )
     private int replicationMaxStreams = REPLICATION_MAX_STREAMS_DEFAULT;
+
+    /**
+     * The maximum of replication request queue length.
+     */
+    @Config(key = QUEUE_LIMIT,
+        type = ConfigType.INT,
+        defaultValue = "4096",
+        tags = {DATANODE},
+        description = "The maximum number of queued requests for container " +
+            "replication"
+    )
+    private int replicationQueueLimit = 4096;
 
     @Config(key = "port", defaultValue = "9886",
         description = "Port used for the server2server replication server",
@@ -217,6 +241,14 @@ public class ReplicationServer {
 
     public void setReplicationMaxStreams(int replicationMaxStreams) {
       this.replicationMaxStreams = replicationMaxStreams;
+    }
+
+    public int getReplicationQueueLimit() {
+      return replicationQueueLimit;
+    }
+
+    public void setReplicationQueueLimit(int limit) {
+      this.replicationQueueLimit = limit;
     }
 
     @PostConstruct

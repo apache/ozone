@@ -32,6 +32,8 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
 
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.
  */
@@ -84,9 +86,12 @@ public class BackgroundContainerDataScanner extends
     ContainerData containerData = c.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData);
-    if (!c.scanData(throttler, canceler)) {
+    ScanResult result = c.scanData(throttler, canceler);
+    if (!result.isHealthy()) {
+      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
+          containerId, result.getException());
       metrics.incNumUnHealthyContainers();
-      controller.markContainerUnhealthy(containerId);
+      controller.markContainerUnhealthy(containerId, result);
     }
 
     metrics.incNumContainersScanned();

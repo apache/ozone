@@ -64,11 +64,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -79,6 +76,11 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
@@ -184,11 +186,11 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         out.write(value.getBytes(UTF_8));
       }
 
-      Assert.assertEquals(committedBytes + value.getBytes(UTF_8).length,
-              ozoneManager.getMetrics().getDataCommittedBytes());
+      assertEquals(committedBytes + value.getBytes(UTF_8).length,
+          ozoneManager.getMetrics().getDataCommittedBytes());
 
       OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
+      assertEquals(keyName, key.getName());
       byte[] fileContent;
       try (OzoneInputStream is = bucket.readKey(keyName)) {
         fileContent = new byte[value.getBytes(UTF_8).length];
@@ -219,12 +221,12 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       }
 
 
-      Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
+      assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.RATIS,
           ReplicationFactor.ONE));
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      assertEquals(value, new String(fileContent, UTF_8));
+      assertFalse(key.getCreationTime().isBefore(testStartTime));
+      assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -233,46 +235,9 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .forEach(
             keyLocationInfoGroup -> keyLocationInfoGroup.getLocationList()
                 .forEach(
-                    keyLocationInfo -> Assert.assertNull(keyLocationInfo
+                    keyLocationInfo -> assertNull(keyLocationInfo
                         .getToken())));
   }
-
-  /**
-   * Tests failure in following operations when grpc block token is
-   * not present.
-   * 1. getKey
-   * 2. writeChunk
-   * */
-  @Test
-  @Disabled("Needs to be moved out of this class as  client setup is static")
-  public void testKeyOpFailureWithoutBlockToken() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String value = "sample value";
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-
-    for (int i = 0; i < 10; i++) {
-      String keyName = UUID.randomUUID().toString();
-
-      try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.RATIS,
-          ReplicationFactor.ONE, new HashMap<>())) {
-        LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
-                "to find any token ",
-            () -> out.write(value.getBytes(UTF_8)));
-      }
-
-      OzoneKey key = bucket.getKey(keyName);
-      Assert.assertEquals(keyName, key.getName());
-      LambdaTestUtils.intercept(IOException.class, "Failed to authenticate" +
-              " with GRPC XceiverServer with Ozone block token.",
-          () -> bucket.readKey(keyName));
-    }
-  }
-
 
   @Test
   public void testS3Auth() throws Exception {
@@ -319,7 +284,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .submitRequest(null, writeRequest);
 
     // Verify response.
-    Assert.assertTrue(omResponse.getStatus() == Status.OK);
+    assertEquals(Status.OK, omResponse.getStatus());
 
     // Read Request
     OMRequest readRequest = OMRequest.newBuilder()
@@ -337,13 +302,13 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .submitRequest(null, readRequest);
 
     // Verify response.
-    Assert.assertTrue(omResponse.getStatus() == Status.OK);
+    assertEquals(Status.OK, omResponse.getStatus());
 
     VolumeInfo volumeInfo = omResponse.getInfoVolumeResponse().getVolumeInfo();
-    Assert.assertNotNull(volumeInfo);
-    Assert.assertEquals(volumeName, volumeInfo.getVolume());
-    Assert.assertEquals(accessKey, volumeInfo.getAdminName());
-    Assert.assertEquals(accessKey, volumeInfo.getOwnerName());
+    assertNotNull(volumeInfo);
+    assertEquals(volumeName, volumeInfo.getVolume());
+    assertEquals(accessKey, volumeInfo.getAdminName());
+    assertEquals(accessKey, volumeInfo.getOwnerName());
 
     // Override secret to S3Secret store with some dummy value
     s3SecretManager
@@ -352,14 +317,12 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, writeRequest);
-    Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
+    assertEquals(Status.INVALID_TOKEN, omResponse.getStatus());
 
     // Read request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, readRequest);
-    Assert.assertTrue(omResponse.getStatus() == Status.INVALID_TOKEN);
-
-
+    assertEquals(Status.INVALID_TOKEN, omResponse.getStatus());
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,
@@ -411,5 +374,4 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       cluster.shutdown();
     }
   }
-
 }

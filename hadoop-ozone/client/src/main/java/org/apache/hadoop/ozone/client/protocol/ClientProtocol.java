@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -624,7 +626,7 @@ public interface ClientProtocol {
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  @Nonnull S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
    * Returns S3 Secret given kerberos user.
@@ -880,7 +882,6 @@ public interface ClientProtocol {
       String keyName, boolean recursive, String startKey, long numEntries)
       throws IOException;
 
-
   /**
    * List the status for a file or a directory and its contents.
    *
@@ -898,6 +899,25 @@ public interface ClientProtocol {
    */
   List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
       String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException;
+
+  /**
+   * Lightweight listStatus API.
+   *
+   * @param volumeName Volume name
+   * @param bucketName Bucket name
+   * @param keyName    Absolute path of the entry to be listed
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @return list of file status
+   */
+  List<OzoneFileStatusLight> listStatusLight(String volumeName,
+      String bucketName, String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException;
 
   /**
@@ -999,6 +1019,10 @@ public interface ClientProtocol {
    */
   void clearThreadLocalS3Auth();
 
+  default ThreadLocal<S3Auth> getS3CredentialsProvider() {
+    return null;
+  }
+
   /**
    * Sets the owner of bucket.
    * @param volumeName Name of the Volume
@@ -1046,6 +1070,16 @@ public interface ClientProtocol {
       String bucketName, String snapshotName) throws IOException;
 
   /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
+   */
+  String printCompactionLogDag(String fileNamePrefix, String graphType)
+      throws IOException;
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name
@@ -1071,10 +1105,12 @@ public interface ClientProtocol {
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
-                                    boolean forceFullDiff)
+                                    boolean forceFullDiff,
+                                    boolean disableNativeDiff)
       throws IOException;
 
   /**

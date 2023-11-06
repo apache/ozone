@@ -48,9 +48,12 @@ public final class RocksDiffUtils {
   }
 
   public static boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
-      String firstDbKey, String lastDbKey) {
-    return firstDbKey.compareTo(prefixForColumnFamily) <= 0
-        && prefixForColumnFamily.compareTo(lastDbKey) <= 0;
+                                               String firstDbKey,
+                                               String lastDbKey) {
+    String firstKeyPrefix = constructBucketKey(firstDbKey);
+    String endKeyPrefix = constructBucketKey(lastDbKey);
+    return firstKeyPrefix.compareTo(prefixForColumnFamily) <= 0
+        && prefixForColumnFamily.compareTo(endKeyPrefix) <= 0;
   }
 
   public static String constructBucketKey(String keyName) {
@@ -66,6 +69,7 @@ public final class RocksDiffUtils {
     if (StringUtils.isNotBlank(bucket)) {
       builder.append(OM_KEY_PREFIX).append(bucket);
     }
+    builder.append(OM_KEY_PREFIX);
     return builder.toString();
   }
 

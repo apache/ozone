@@ -1392,6 +1392,55 @@
   </property>
 
   <property>
+    <name>ozone.om.open.mpu.cleanup.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically checks inactive multipart info
+      send multipart upload abort requests for them.
+      This entry controls the interval of this
+      cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A timeout value of multipart upload cleanup service. If this is set
+      greater than 0, the service will stop waiting for the multipart info abort
+      completion after this time. If timeout happens to a large proportion of
+      multipart aborts, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.expire.threshold</name>
+    <value>30d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long multipart upload is considered active. Specifically, if a multipart info
+      has been ongoing longer than the value of this config entry, that multipart info is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.parts.cleanup.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of parts, rounded up to the nearest
+      number of expired multipart upload. This property is used
+      to approximately throttle the number of MPU parts sent
+      to the OM.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1788,6 +1837,32 @@
   </property>
 
   <property>
+    <name>ozone.s3g.list-keys.shallow.enabled</name>
+    <value>true</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>If this is true, there will be efficiency optimization effects
+      when calling s3g list interface with delimiter '/' parameter, especially
+      when there are a large number of keys.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.secret.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The boolean which enables the Ozone S3Gateway Secret endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.type</name>
+    <value>kerberos</value>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
     <tag>OZONE, OM</tag>
@@ -1832,6 +1907,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Timeout for ozone grpc client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.ec.grpc.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone ec grpc client during write.
     </description>
   </property>
 
@@ -2019,6 +2103,14 @@
       OM.
       If undefined, OM snapshot dir will fallback to ozone.metadata.dirs.
       This fallback approach is not recommended for production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
+    <value>100000000</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Max size of SST files in OM Ratis Snapshot tarball.
     </description>
   </property>
   <property>
@@ -2258,6 +2350,40 @@
     <description>Time of day to start the rotation. Default 02:00 AM to avoid impacting
       daily workload. The supported format is 'hh:mm:ss', representing hour, minute,
       and second.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.ack.timeout</name>
+    <value>PT15M</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Max time that SCM leader will wait for the rotation preparation acks before it believes the rotation
+      is failed. Default is 15 minutes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Whether auto root CA and sub CA certificate rotation is enabled or not. Default is disabled.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.certificate.polling.interval</name>
+    <value>PT2h</value>
+    <description>Interval to use for polling in certificate clients for a new
+      root ca certificate. Every time the specified time duration elapses,
+      the clients send a request to the SCMs to see if a new root ca
+      certificate was generated. Once there is a change, the system
+      automatically adds the new root ca to the clients'
+      trust stores and requests a new certificate to be signed.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.expired.certificate.check.interval</name>
+    <value>P1D</value>
+    <description>Interval to use for removing expired certificates. A background
+      task to remove expired certificates from the scm metadata store is
+      scheduled to run at the rate this configuration option specifies.
     </description>
   </property>
   <property>
@@ -2742,10 +2868,10 @@
   </property>
   <property>
     <name>ozone.om.transport.class</name>
-    <value>org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory</value>
+    <value>org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory</value>
     <tag>OM, MANAGEMENT</tag>
     <description>
-      Enable Ozone Manager S3G Grpc channel.
+      Property to determine the transport protocol for the client to Ozone Manager channel.
     </description>
   </property>
   <property>
@@ -3305,7 +3431,7 @@
   </property>
   <property>
     <name>ozone.path.deleting.limit.per.task</name>
-    <value>10000</value>
+    <value>6000</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>A maximum number of paths(dirs/files) to be deleted by
       directory deleting service per time interval.
@@ -3332,6 +3458,15 @@
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.checkpoint.dir.creation.poll.timeout</name>
+    <value>20s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Max poll timeout for snapshot dir exists check performed before loading a snapshot in cache.
+      Unit defaults to millisecond if a unit is not specified.
     </description>
   </property>
   <property>
@@ -3939,6 +4074,15 @@
     <tag>OZONE, OM</tag>
     <description>
       Flag to always perform full snapshot diff (can be slow) without using the optimised compaction DAG.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.disable.native.libs</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Flag to perform snapshot diff without using native libs(can be slow).
     </description>
   </property>
 

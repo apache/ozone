@@ -28,9 +28,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -88,15 +90,20 @@ public class OMDBInsightEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
   private final GlobalStatsDao globalStatsDao;
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
                              ReconOMMetadataManager omMetadataManager,
-                             GlobalStatsDao globalStatsDao) {
+                             GlobalStatsDao globalStatsDao,
+                             ReconNamespaceSummaryManagerImpl
+                                 reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
     this.globalStatsDao = globalStatsDao;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
   }
 
   /**
@@ -105,11 +112,6 @@ public class OMDBInsightEndpoint {
    * @return the http json response wrapped in below format:
    *
    * {
-   *   "keysSummary": {
-   *     "totalUnreplicatedDataSize": 2147483648,
-   *     "totalReplicatedDataSize": 2147483648,
-   *     "totalOpenKeys": 8
-   *   },
    *   "lastKey": "/-4611686018427388160/-9223372036854775552/-922777620354",
    *   "replicatedTotal": 2147483648,
    *   "unreplicatedTotal": 2147483648,
@@ -174,8 +176,6 @@ public class OMDBInsightEndpoint {
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
 
-    // Create a HashMap for the keysSummary
-    Map<String, Long> keysSummary = new HashMap<>();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
@@ -255,13 +255,37 @@ public class OMDBInsightEndpoint {
         break;
       }
     }
-    // Populate the keysSummary map
-    createKeysSummaryForOpenKey(keysSummary);
-
-    openKeyInsightInfo.setKeysSummary(keysSummary);
 
     openKeyInsightInfo.setLastKey(lastKey);
     return Response.ok(openKeyInsightInfo).build();
+  }
+
+  /**
+   * Retrieves the summary of open keys.
+   *
+   * This method calculates and returns a summary of open keys.
+   *
+   * @return The HTTP  response body includes a map with the following entries:
+   * - "totalOpenKeys": the total number of open keys
+   * - "totalReplicatedDataSize": the total replicated size for open keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for open keys
+   *
+   *
+   * Example response:
+   *   {
+   *    "totalOpenKeys": 8,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalUnreplicatedDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/open/summary")
+  public Response getOpenKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for open keys
+    createKeysSummaryForOpenKey(keysSummary);
+    return Response.ok(keysSummary).build();
   }
 
   /**
@@ -310,8 +334,6 @@ public class OMDBInsightEndpoint {
         deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
     Table<String, RepeatedOmKeyInfo> deletedTable =
         omMetadataManager.getDeletedTable();
-    // Create a HashMap for the keysSummary
-    Map<String, Long> keysSummary = new HashMap<>();
     try (
         TableIterator<String, ? extends Table.KeyValue<String,
             RepeatedOmKeyInfo>>
@@ -348,10 +370,6 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
-      // Create the keysSummary for deleted keys
-      createKeysSummaryForDeletedKey(keysSummary);
-      // Set the keysSummary and lastKey in the response
-      deletedKeyAndDirInsightInfo.setKeysSummary(keysSummary);
       deletedKeyAndDirInsightInfo.setLastKey(lastKey);
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
@@ -362,6 +380,33 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /** Retrieves the summary of deleted keys.
+   *
+   * This method calculates and returns a summary of deleted keys.
+   *
+   * @return The HTTP  response body includes a map with the following entries:
+   * - "totalDeletedKeys": the total number of deleted keys
+   * - "totalReplicatedDataSize": the total replicated size for deleted keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for deleted keys
+   *
+   *
+   * Example response:
+   *   {
+   *    "totalDeletedKeys": 8,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalUnreplicatedDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/deletePending/summary")
+  public Response getDeletedKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for deleted keys
+    createKeysSummaryForDeletedKey(keysSummary);
+    return Response.ok(keysSummary).build();
   }
 
   /**
@@ -494,7 +539,8 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(key);
         keyEntityInfo.setPath(omKeyInfo.getKeyName());
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(omKeyInfo.getDataSize());
+        keyEntityInfo.setSize(
+            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
@@ -518,6 +564,27 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Given an object ID, return total data size (no replication)
+   * under this object. Note:- This method is RECURSIVE.
+   *
+   * @param objectId the object's ID
+   * @return total used data size in bytes
+   * @throws IOException ioEx
+   */
+  protected long fetchSizeForDeletedDirectory(long objectId)
+      throws IOException {
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (nsSummary == null) {
+      return 0L;
+    }
+    long totalSize = nsSummary.getSizeOfFiles();
+    for (long childId : nsSummary.getChildDir()) {
+      totalSize += fetchSizeForDeletedDirectory(childId);
+    }
+    return totalSize;
   }
 
   /** This method retrieves set of directories pending for deletion.
@@ -602,4 +669,8 @@ public class OMDBInsightEndpoint {
     return this.globalStatsDao;
   }
 
+  @VisibleForTesting
+  public Table<Long, NSSummary> getNsSummaryTable() {
+    return this.reconNamespaceSummaryManager.getNSSummaryTable();
+  }
 }

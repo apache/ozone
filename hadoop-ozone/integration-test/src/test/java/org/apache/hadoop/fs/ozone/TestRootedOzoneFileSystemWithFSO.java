@@ -19,11 +19,13 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -36,6 +38,9 @@ import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -51,63 +56,22 @@ public class TestRootedOzoneFileSystemWithFSO
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true, false},
-        new Object[]{true, false, false}
+        new Object[]{true, true, false, false},
+        new Object[]{true, false, false, false},
+        new Object[]{true, true, false, true},
+        new Object[]{true, false, false, true}
     );
   }
 
   public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis, boolean enableAcl) {
-    super(setDefaultFs, enableOMRatis, enableAcl);
+      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
+    super(setDefaultFs, enableOMRatis, isAclEnabled, noFlush);
   }
 
   @BeforeClass
   public static void init()
       throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testTempMount() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testDeleteEmptyVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  /**
-   * OFS: Test recursive listStatus on root and volume.
-   */
-  @Override
-  @Ignore("TODO:HDDS-4360")
-  public void testListStatusRootAndVolumeRecursive() throws IOException {
   }
 
   /**
@@ -128,13 +92,13 @@ public class TestRootedOzoneFileSystemWithFSO
         + root + "/b/c");
 
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, destinPath));
+    assertFalse(getFs().rename(dir2SourcePath, destinPath));
     // (b) parent of dst is a file. /root_dir/file1/c
     Path filePath = new Path(getBucketPath() + root + "/file1");
     ContractTestUtils.touch(getFs(), filePath);
     Path newDestinPath = new Path(filePath, "c");
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
+    assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
   @Test
@@ -188,7 +152,7 @@ public class TestRootedOzoneFileSystemWithFSO
       LOG.info("Created dir1 {}", subDir1);
       LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
       //  rename should fail and return false
-      Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+      assertFalse(getFs().rename(sourceRoot, subDir1));
     } finally {
       getFs().delete(sourceRoot, true);
     }
@@ -235,7 +199,8 @@ public class TestRootedOzoneFileSystemWithFSO
      */
 
     long prevDeletes = getOMMetrics().getNumKeyDeletes();
-    Assert.assertTrue(getFs().delete(volumePath1, true));
+    Assert.assertTrue(getFs().delete(bucketPath2, true));
+    Assert.assertTrue(getFs().delete(volumePath1, false));
     long deletes = getOMMetrics().getNumKeyDeletes();
     Assert.assertTrue(deletes == prevDeletes + 1);
   }
@@ -262,7 +227,28 @@ public class TestRootedOzoneFileSystemWithFSO
 
     FileStatus[] fileStatuses = getFs().listStatus(
         new Path(getBucketPath() + "/testListStatusFSO"));
-    Assert.assertEquals(valueGreaterBatchSize, fileStatuses.length);
+    assertEquals(valueGreaterBatchSize, fileStatuses.length);
+  }
+
+  @Test
+  public void testLeaseRecoverable() throws Exception {
+    // Create a file
+    final String dir = "dir1";
+    final String key = dir + "/key1";
+    final Path source = new Path(getBucketPath(), key);
+
+    LeaseRecoverable fs = (LeaseRecoverable)getFs();
+    FSDataOutputStream stream = getFs().create(source);
+    try {
+      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      stream.write(1);
+      stream.hsync();
+      assertFalse(fs.isFileClosed(source));
+      assertTrue(fs.recoverLease(source));
+      assertTrue(fs.isFileClosed(source));
+    } finally {
+      TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
+    }
   }
 
 }

@@ -28,6 +28,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -81,6 +82,7 @@ public class DatanodeDetails extends NodeImpl implements
    */
   private final UUID uuid;
   private final String uuidString;
+  private final String threadNamePrefix;
 
   private String ipAddress;
   private String hostName;
@@ -90,8 +92,8 @@ public class DatanodeDetails extends NodeImpl implements
   private long setupTime;
   private String revision;
   private String buildDate;
-  private HddsProtos.NodeOperationalState persistedOpState;
-  private long persistedOpStateExpiryEpochSec = 0;
+  private volatile HddsProtos.NodeOperationalState persistedOpState;
+  private volatile long persistedOpStateExpiryEpochSec = 0;
   private int initialVersion;
   private int currentVersion;
 
@@ -122,6 +124,7 @@ public class DatanodeDetails extends NodeImpl implements
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.uuidString = uuid.toString();
+    threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
@@ -141,6 +144,7 @@ public class DatanodeDetails extends NodeImpl implements
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
     this.uuidString = uuid.toString();
+    threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
@@ -572,6 +576,11 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  @JsonIgnore
+  public String threadNamePrefix() {
+    return threadNamePrefix;
   }
 
   /**

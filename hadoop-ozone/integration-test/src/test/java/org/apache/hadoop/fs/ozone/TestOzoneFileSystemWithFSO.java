@@ -20,12 +20,14 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -34,7 +36,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -48,7 +49,9 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -81,37 +84,10 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
   @Override
   public void cleanup() {
     super.cleanup();
-    try {
-      deleteRootDir();
-    } catch (IOException e) {
-      LOG.info("Failed to cleanup DB tables.", e);
-      fail("Failed to cleanup DB tables." + e.getMessage());
-    }
   }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystemWithFSO.class);
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testGetDirectoryModificationTime() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
 
   @Test
   public void testListStatusWithoutRecursiveSearch() throws Exception {
@@ -451,18 +427,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     assertEquals(fileBeforeMTime, fileAfterMTime);
   }
 
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-2939")
-  public void testListStatusWithIntermediateDir() throws Exception {
-  }
-
-  @Override
-  @Test
-  @Ignore("TODO:HDDS-5012")
-  public void testListStatusOnLargeDirectory() throws Exception {
-  }
-
   @Test
   public void testMultiLevelDirs() throws Exception {
     // reset metrics
@@ -566,6 +530,44 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         return false;
       }
     }, 1000, 120000);
+  }
+
+  /**
+   * Verify recoverLease() and isFileClosed() APIs.
+   * @throws Exception
+   */
+  @Test
+  public void testLeaseRecoverable() throws Exception {
+    // Create a file
+    Path parent = new Path("/d1/d2/");
+    Path source = new Path(parent, "file1");
+
+    LeaseRecoverable fs = (LeaseRecoverable)getFs();
+    FSDataOutputStream stream = getFs().create(source);
+    try {
+      // file not visible yet
+      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      stream.write(1);
+      stream.hsync();
+      // file is visible and open
+      assertFalse(fs.isFileClosed(source));
+      assertTrue(fs.recoverLease(source));
+      // file is closed after lease recovery
+      assertTrue(fs.isFileClosed(source));
+    } finally {
+      TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
+    }
+  }
+
+  @Test
+  public void testFSDeleteLogWarnNoExist() throws Exception {
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(BasicOzoneClientAdapterImpl.LOG);
+    getFs().delete(new Path("/d1/d3/noexist/"), true);
+    assertTrue(logCapture.getOutput().contains(
+        "delete key failed Unable to get file status"));
+    assertTrue(logCapture.getOutput().contains(
+        "WARN  ozone.BasicOzoneClientAdapterImpl"));
   }
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,

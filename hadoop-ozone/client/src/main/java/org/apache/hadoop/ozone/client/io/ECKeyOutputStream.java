@@ -22,6 +22,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -51,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -61,7 +63,8 @@ import org.slf4j.LoggerFactory;
  * ECKeyOutputStream handles the EC writes by writing the data into underlying
  * block output streams chunk by chunk.
  */
-public final class ECKeyOutputStream extends KeyOutputStream {
+public final class ECKeyOutputStream extends KeyOutputStream
+    implements KeyMetadataAware {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private final BlockingQueue<ECChunkBuffers> ecStripeQueue;
@@ -146,6 +149,10 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     this.encoder = CodecUtil.createRawEncoderWithFallback(
         builder.getReplicationConfig());
     this.flushExecutor = Executors.newSingleThreadExecutor();
+    S3Auth s3Auth = builder.getS3CredentialsProvider().get();
+    ThreadLocal<S3Auth> s3CredentialsProvider =
+        builder.getS3CredentialsProvider();
+    flushExecutor.submit(() -> s3CredentialsProvider.set(s3Auth));
     this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
     this.flushCheckpoint = new AtomicLong(0);
   }
@@ -603,12 +610,19 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     return blockOutputStreamEntryPool.getExcludeList();
   }
 
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockOutputStreamEntryPool.getMetadata();
+  }
+
   /**
    * Builder class of ECKeyOutputStream.
    */
   public static class Builder extends KeyOutputStream.Builder {
     private ECReplicationConfig replicationConfig;
     private ByteBufferPool byteBufferPool;
+
+    private ThreadLocal<S3Auth> s3CredentialsProvider;
 
     @Override
     public ECReplicationConfig getReplicationConfig() {
@@ -629,6 +643,16 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         ByteBufferPool bufferPool) {
       this.byteBufferPool = bufferPool;
       return this;
+    }
+
+    public ECKeyOutputStream.Builder setS3CredentialsProvider(
+        ThreadLocal<S3Auth> s3CredentialsThreadLocal) {
+      this.s3CredentialsProvider = s3CredentialsThreadLocal;
+      return this;
+    }
+
+    public ThreadLocal<S3Auth> getS3CredentialsProvider() {
+      return s3CredentialsProvider;
     }
 
     @Override

@@ -23,6 +23,8 @@ import java.util.Collections;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -50,6 +52,8 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
+
+import static java.util.Collections.singletonMap;
 
 /**
  * Tests BucketManagerImpl, mocks OMMetadataManager for testing.
@@ -386,6 +390,91 @@ public class TestBucketManagerImpl {
           omEx.getResult());
       throw omEx;
     }
+  }
+
+  @Test
+  public void testLinkedBucketResolution() throws Exception {
+    createSampleVol();
+    ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName("sample-vol")
+        .setBucketName("bucket-one")
+        .setDefaultReplicationConfig(
+            new DefaultReplicationConfig(
+                ecConfig))
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setQuotaInBytes(42 * 1024)
+        .setQuotaInNamespace(24 * 1024)
+        .setUsedBytes(10 * 1024)
+        .setUsedNamespace(5 * 1024)
+        .setStorageType(StorageType.SSD)
+        .setIsVersionEnabled(true)
+        .addAllMetadata(singletonMap("CustomKey", "CustomValue"))
+        .build();
+    writeClient.createBucket(bucketInfo);
+
+    OmBucketInfo bucketLinkInfo = OmBucketInfo.newBuilder()
+        .setVolumeName("sample-vol")
+        .setBucketName("link-one")
+        .setSourceVolume("sample-vol")
+        .setSourceBucket("bucket-one")
+        .build();
+    writeClient.createBucket(bucketLinkInfo);
+
+    OmBucketInfo bucketLink2 = OmBucketInfo.newBuilder()
+        .setVolumeName("sample-vol")
+        .setBucketName("link-two")
+        .setSourceVolume("sample-vol")
+        .setSourceBucket("link-one")
+        .build();
+    writeClient.createBucket(bucketLink2);
+
+    OmBucketInfo storedLinkBucket =
+        writeClient.getBucketInfo("sample-vol", "link-two");
+    Assert.assertNotNull("Replication config is not set",
+                         storedLinkBucket.getDefaultReplicationConfig());
+    Assert.assertEquals(ecConfig,
+                        storedLinkBucket
+                            .getDefaultReplicationConfig()
+                            .getReplicationConfig());
+
+    Assert.assertEquals(
+        "link-two", storedLinkBucket.getBucketName());
+    Assert.assertEquals(
+        "sample-vol", storedLinkBucket.getVolumeName());
+
+    Assert.assertEquals(
+        "link-one", storedLinkBucket.getSourceBucket());
+    Assert.assertEquals(
+        "sample-vol", storedLinkBucket.getSourceVolume());
+
+    Assert.assertEquals(
+        bucketInfo.getBucketLayout(),
+        storedLinkBucket.getBucketLayout());
+    Assert.assertEquals(
+        bucketInfo.getQuotaInBytes(),
+        storedLinkBucket.getQuotaInBytes());
+    Assert.assertEquals(
+        bucketInfo.getQuotaInNamespace(),
+        storedLinkBucket.getQuotaInNamespace());
+    Assert.assertEquals(
+        bucketInfo.getUsedBytes(),
+        storedLinkBucket.getUsedBytes());
+    Assert.assertEquals(
+        bucketInfo.getUsedNamespace(),
+        storedLinkBucket.getUsedNamespace());
+    Assert.assertEquals(
+        bucketInfo.getDefaultReplicationConfig(),
+        storedLinkBucket.getDefaultReplicationConfig());
+    Assert.assertEquals(
+        bucketInfo.getMetadata(),
+        storedLinkBucket.getMetadata());
+    Assert.assertEquals(
+        bucketInfo.getStorageType(),
+        storedLinkBucket.getStorageType());
+    Assert.assertEquals(
+        bucketInfo.getIsVersionEnabled(),
+        storedLinkBucket.getIsVersionEnabled());
   }
 
   private BucketLayout getBucketLayout() {

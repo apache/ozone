@@ -29,6 +29,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>RocksDB Checkpoint Differ</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.rocksdb</groupId>
@@ -81,6 +85,21 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-rocks-native</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.jgrapht</groupId>
+      <artifactId>jgrapht-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jgrapht</groupId>
+      <artifactId>jgrapht-ext</artifactId>
     </dependency>
   </dependencies>
 

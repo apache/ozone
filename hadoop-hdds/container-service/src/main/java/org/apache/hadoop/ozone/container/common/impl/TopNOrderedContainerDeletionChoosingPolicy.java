@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicyTemplate;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import java.util.Comparator;
 import java.util.List;
@@ -30,16 +30,15 @@ import java.util.List;
 public class TopNOrderedContainerDeletionChoosingPolicy
     extends ContainerDeletionChoosingPolicyTemplate {
   /** customized comparator used to compare differentiate container data. **/
-  private static final Comparator<KeyValueContainerData>
-        KEY_VALUE_CONTAINER_DATA_COMPARATOR = (KeyValueContainerData c1,
-                                               KeyValueContainerData c2) ->
-              Long.compare(c2.getNumPendingDeletionBlocks(),
-                  c1.getNumPendingDeletionBlocks());
+  private static final Comparator<ContainerData> CONTAINER_DATA_COMPARATOR =
+      (ContainerData c1, ContainerData c2) -> Long.compare(
+          ContainerUtils.getPendingDeletionBlocks(c2),
+          ContainerUtils.getPendingDeletionBlocks(c1));
 
   @Override
   protected void orderByDescendingPriority(
-      List<KeyValueContainerData> candidateContainers) {
+      List<ContainerData> candidateContainers) {
     // get top N list ordered by pending deletion blocks' number
-    candidateContainers.sort(KEY_VALUE_CONTAINER_DATA_COMPARATOR);
+    candidateContainers.sort(CONTAINER_DATA_COMPARATOR);
   }
 }

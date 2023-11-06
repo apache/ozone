@@ -446,6 +446,8 @@ public final class HddsUtils {
     case DeleteBlock:
     case PutBlock:
     case PutSmallFile:
+    case StreamInit:
+    case StreamWrite:
     default:
       return false;
     }
@@ -830,6 +832,13 @@ public final class HddsUtils {
       sortedOzoneProps.put(entry.getKey(), value);
     }
     return sortedOzoneProps;
+  }
+
+  @Nonnull
+  public static String threadNamePrefix(@Nullable String id) {
+    return id != null && !"".equals(id)
+        ? id + "-"
+        : "";
   }
 
   /**

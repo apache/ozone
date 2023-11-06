@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -30,9 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -153,7 +152,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = Result.FAILURE;
     List<OmKeyInfo> missingParentInfos;
@@ -200,18 +199,17 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           omDirectoryResult == NONE) {
         List<String> missingParents = omPathInfo.getMissingParents();
         long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-        List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
 
         dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
-            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex,
+            omBucketInfo, omPathInfo, trxnLogIndex,
             ozoneManager.getDefaultReplicationConfig());
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
-            missingParents, inheritAcls, trxnLogIndex);
+            missingParents, omBucketInfo, omPathInfo, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
-        OmBucketInfo omBucketInfo =
-            getBucketInfo(omMetadataManager, volumeName, bucketName);
         checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
         omBucketInfo.incrUsedNamespace(numMissingParents + 1L);
 
@@ -230,7 +228,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             result);
       }
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMDirectoryCreateResponse(
           createErrorOMResponse(omResponse, exception), result);
@@ -257,14 +255,16 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param ozoneManager
    * @param keyArgs
    * @param missingParents list of parent directories to be created
-   * @param inheritAcls ACLs to be assigned to each new parent dir
+   * @param bucketInfo
+   * @param omPathInfo
    * @param trxnLogIndex
    * @return
    * @throws IOException
    */
   public static List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,
-      KeyArgs keyArgs, List<String> missingParents, List<OzoneAcl> inheritAcls,
-      long trxnLogIndex) throws IOException {
+      KeyArgs keyArgs, List<String> missingParents, OmBucketInfo bucketInfo,
+      OMFileRequest.OMPathInfo omPathInfo, long trxnLogIndex)
+      throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     List<OmKeyInfo> missingParentInfos = new ArrayList<>();
 
@@ -290,10 +290,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
 
       LOG.debug("missing parent {} getting added to KeyTable", missingKey);
-      // what about keyArgs for parent directories? TODO
+
       OmKeyInfo parentKeyInfo =
           createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
-              inheritAcls, trxnLogIndex,
+              bucketInfo, omPathInfo, trxnLogIndex,
               ozoneManager.getDefaultReplicationConfig());
       objectCount++;
 
@@ -309,7 +309,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
       KeyArgs keyArgs, OMMetrics omMetrics, Result result,
-      IOException exception, int numMissingParents) {
+      Exception exception, int numMissingParents) {
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -349,15 +349,19 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param keyName
    * @param keyArgs
    * @param objectId
+   * @param bucketInfo
+   * @param omPathInfo
    * @param transactionIndex
    * @param serverDefaultReplConfig
    * @return the OmKeyInfo structure
    */
   public static OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
-      KeyArgs keyArgs, long objectId, List<OzoneAcl> inheritAcls,
-      long transactionIndex, ReplicationConfig serverDefaultReplConfig) {
+      KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
+      OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
+      ReplicationConfig serverDefaultReplConfig) {
     return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
-        serverDefaultReplConfig).setAcls(inheritAcls)
+        serverDefaultReplConfig)
+        .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo))
         .setUpdateID(transactionIndex).build();
   }
 

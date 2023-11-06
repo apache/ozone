@@ -75,12 +75,16 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
 
-    // Do not update the scan timestamp since this was just a metadata scan,
-    // not a full scan.
-    if (!container.scanMetaData()) {
+    Container.ScanResult result = container.scanMetaData();
+    if (!result.isHealthy()) {
+      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
+          containerID, result.getException());
       metrics.incNumUnHealthyContainers();
-      controller.markContainerUnhealthy(containerID);
+      controller.markContainerUnhealthy(containerID, result);
     }
+
+    // Do not update the scan timestamp after the scan since this was just a
+    // metadata scan, not a full data scan.
     metrics.incNumContainersScanned();
   }
 

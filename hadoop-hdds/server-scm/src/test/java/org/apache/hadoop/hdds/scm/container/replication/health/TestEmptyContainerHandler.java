@@ -169,6 +169,28 @@ public class TestEmptyContainerHandler {
   }
 
   /**
+   * This test exists to verify that the definition of an empty container is
+   * 0 key count. Number of used bytes are not considered.
+   */
+  @Test
+  public void testEmptyContainerWithNoReplicas()
+      throws IOException {
+    long keyCount = 0L;
+    long bytesUsed = 0L;
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, CLOSED, keyCount, bytesUsed);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(Collections.emptySet())
+        .build();
+
+    assertAndVerify(request, true, 0, 1);
+  }
+
+  /**
    * Handler should return false when there is a non-empty replica.
    */
   @Test

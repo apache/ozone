@@ -139,7 +139,7 @@ public class TestOMMultiTenantManager {
 
     // Check that Multi-Tenancy write requests are blocked when not enabled
     expectWriteRequestToFail(ozoneManager,
-        OMRequestTestUtils.createTenantRequest(tenantId));
+        OMRequestTestUtils.createTenantRequest(tenantId, false));
     expectWriteRequestToFail(ozoneManager,
         OMRequestTestUtils.deleteTenantRequest(tenantId));
     expectWriteRequestToFail(ozoneManager,

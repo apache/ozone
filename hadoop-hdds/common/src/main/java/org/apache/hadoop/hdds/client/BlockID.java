@@ -28,7 +28,7 @@ import java.util.Objects;
 
 public class BlockID {
 
-  private ContainerBlockID containerBlockID;
+  private final ContainerBlockID containerBlockID;
   private long blockCommitSequenceId;
 
   public BlockID(long containerID, long localID) {
@@ -67,10 +67,6 @@ public class BlockID {
 
   public ContainerBlockID getContainerBlockID() {
     return containerBlockID;
-  }
-
-  public void setContainerBlockID(ContainerBlockID containerBlockID) {
-    this.containerBlockID = containerBlockID;
   }
 
   @Override

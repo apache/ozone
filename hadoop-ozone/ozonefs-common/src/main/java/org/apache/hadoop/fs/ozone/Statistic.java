@@ -74,7 +74,13 @@ public enum Statistic {
   INVOCATION_RENAME(CommonStatisticNames.OP_RENAME,
       "Calls of rename()"),
   INVOCATION_SET_TIMES(CommonStatisticNames.OP_SET_TIMES,
-      "Calls of setTimes()");
+      "Calls of setTimes()"),
+  INVOCATION_IS_FILE_CLOSED("op_is_file_closed",
+      "Calls of isFileClosed()"),
+  INVOCATION_RECOVER_LEASE("op_recover_lease",
+      "Calls of recoverLease()"),
+  INVOCATION_SET_SAFE_MODE("op_set_safe_mode",
+      "Calls of setSafeMode()");
 
   private static final Map<String, Statistic> SYMBOL_MAP =
       new HashMap<>(Statistic.values().length);

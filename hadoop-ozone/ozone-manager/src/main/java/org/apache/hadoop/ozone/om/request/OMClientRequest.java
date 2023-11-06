@@ -49,16 +49,19 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -262,7 +265,7 @@ public abstract class OMClientRequest implements RequestAuditor {
           obj.getVolumeName(),
           obj.getBucketName(), contextBuilder.getAclRights(),
           obj.getResourceType());
-      UserGroupInformation currentUser = createUGI();
+      UserGroupInformation currentUser = createUGIForApi();
       contextBuilder.setClientUgi(currentUser);
       contextBuilder.setIp(getRemoteAddress());
       contextBuilder.setHost(getHostName());
@@ -316,7 +319,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       String vol, String bucket, String key, String volOwner)
       throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress(), getHostName(), true,
+        createUGIForApi(), getRemoteAddress(), getHostName(), true,
         volOwner);
   }
 
@@ -345,7 +348,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         ozoneManager.getOmMetadataReader()) {
       OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(),
           resType, storeType, aclType,
-          vol, bucket, key, volOwner, bucketOwner, createUGI(),
+          vol, bucket, key, volOwner, bucketOwner, createUGIForApi(),
           getRemoteAddress(), getHostName());
     }
   }
@@ -356,7 +359,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return UserGroupInformation.
    */
   @VisibleForTesting
-  public UserGroupInformation createUGI() {
+  public UserGroupInformation createUGI() throws AuthenticationException {
 
     if (userGroupInformation != null) {
       return userGroupInformation;
@@ -367,10 +370,26 @@ public abstract class OMClientRequest implements RequestAuditor {
           omRequest.getUserInfo().getUserName());
       return userGroupInformation;
     } else {
-      // This will never happen, as for every OM request preExecute, we
-      // should add userInfo.
-      return null;
+      throw new AuthenticationException("User info is not set."
+          + " Please check client auth credentials");
     }
+  }
+
+  /**
+   * Crete a UGI from request and wrap the AuthenticationException
+   * to OMException in case of empty credentials.
+   * @return UserGroupInformation
+   * @throws OMException exception about an empty user credential
+   *                      (unauthorized request)
+   */
+  public UserGroupInformation createUGIForApi() throws OMException {
+    UserGroupInformation ugi;
+    try {
+      ugi = createUGI();
+    } catch (AuthenticationException e) {
+      throw new OMException(e, UNAUTHORIZED);
+    }
+    return ugi;
   }
 
   /**
@@ -416,7 +435,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return error response need to be returned to client - OMResponse.
    */
   protected OMResponse createErrorOMResponse(
-      @Nonnull OMResponse.Builder omResponse, @Nonnull IOException ex) {
+      @Nonnull OMResponse.Builder omResponse, @Nonnull Exception ex) {
 
     omResponse.setSuccess(false);
     String errorMsg = exceptionErrorMessage(ex);
@@ -442,8 +461,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  private String exceptionErrorMessage(IOException ex) {
-    if (ex instanceof OMException) {
+  private String exceptionErrorMessage(Exception ex) {
+    if (ex instanceof OMException || ex instanceof InvalidPathException) {
       return ex.getMessage();
     } else {
       return org.apache.hadoop.util.StringUtils.stringifyException(ex);

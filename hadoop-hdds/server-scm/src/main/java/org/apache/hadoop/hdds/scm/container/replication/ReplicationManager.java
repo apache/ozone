@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECMisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
@@ -181,6 +182,7 @@ public class ReplicationManager implements SCMService {
   private final Clock clock;
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
+  private final ECMisReplicationCheckHandler ecMisReplicationCheckHandler;
   private final RatisReplicationCheckHandler ratisReplicationCheckHandler;
   private final EventPublisher eventPublisher;
   private final AtomicReference<ReplicationQueue> replicationQueue
@@ -238,11 +240,13 @@ public class ReplicationManager implements SCMService {
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
     this.legacyReplicationManager = legacyReplicationManager;
-    this.ecReplicationCheckHandler =
-        new ECReplicationCheckHandler(ecContainerPlacement);
+    this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
+    this.ecMisReplicationCheckHandler =
+        new ECMisReplicationCheckHandler(ecContainerPlacement);
     this.ratisReplicationCheckHandler =
         new RatisReplicationCheckHandler(ratisContainerPlacement);
     this.nodeManager = nodeManager;
+    this.metrics = ReplicationManagerMetrics.create(this);
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
@@ -273,6 +277,7 @@ public class ReplicationManager implements SCMService {
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
+        .addNext(ecMisReplicationCheckHandler)
         .addNext(new RatisUnhealthyReplicationCheckHandler());
     start();
   }
@@ -285,7 +290,6 @@ public class ReplicationManager implements SCMService {
     if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
-      metrics = ReplicationManagerMetrics.create(this);
       if (rmConf.isLegacyEnabled()) {
         legacyReplicationManager.setMetrics(metrics);
       }
@@ -336,18 +340,19 @@ public class ReplicationManager implements SCMService {
    */
   @VisibleForTesting
   protected void startSubServices() {
+    final String prefix = scmContext.threadNamePrefix();
     replicationMonitor = new Thread(this::run);
-    replicationMonitor.setName("ReplicationMonitor");
+    replicationMonitor.setName(prefix + "ReplicationMonitor");
     replicationMonitor.setDaemon(true);
     replicationMonitor.start();
 
     underReplicatedProcessorThread = new Thread(underReplicatedProcessor);
-    underReplicatedProcessorThread.setName("Under Replicated Processor");
+    underReplicatedProcessorThread.setName(prefix + "UnderReplicatedProcessor");
     underReplicatedProcessorThread.setDaemon(true);
     underReplicatedProcessorThread.start();
 
     overReplicatedProcessorThread = new Thread(overReplicatedProcessor);
-    overReplicatedProcessorThread.setName("Over Replicated Processor");
+    overReplicatedProcessorThread.setName(prefix + "OverReplicatedProcessor");
     overReplicatedProcessorThread.setDaemon(true);
     overReplicatedProcessorThread.start();
   }
@@ -801,7 +806,7 @@ public class ReplicationManager implements SCMService {
    * @param datanode The datanode for which the commands have been updated.
    */
   public void datanodeCommandCountUpdated(DatanodeDetails datanode) {
-    LOG.debug("Received a notification that the DN command count " +
+    LOG.trace("Received a notification that the DN command count " +
         "has been updated for {}", datanode);
     // If there is an existing mapping, we may need to remove it
     excludedNodes.computeIfPresent(datanode, (dn, v) -> {
@@ -1071,7 +1076,7 @@ public class ReplicationManager implements SCMService {
             "cluster. This property is used to configure the interval in " +
             "which that thread runs."
     )
-    private long interval = Duration.ofSeconds(300).toMillis();
+    private Duration interval = Duration.ofSeconds(300);
 
     /**
      * The frequency in which the Under Replicated queue is processed.
@@ -1084,7 +1089,7 @@ public class ReplicationManager implements SCMService {
         description = "How frequently to check if there are work to process " +
             " on the under replicated queue"
     )
-    private long underReplicatedInterval = Duration.ofSeconds(30).toMillis();
+    private Duration underReplicatedInterval = Duration.ofSeconds(30);
 
     /**
      * The frequency in which the Over Replicated queue is processed.
@@ -1097,7 +1102,7 @@ public class ReplicationManager implements SCMService {
         description = "How frequently to check if there are work to process " +
             " on the over replicated queue"
     )
-    private long overReplicatedInterval = Duration.ofSeconds(30).toMillis();
+    private Duration overReplicatedInterval = Duration.ofSeconds(30);
 
     /**
      * Timeout for container replication & deletion command issued by
@@ -1113,7 +1118,7 @@ public class ReplicationManager implements SCMService {
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(10).toMillis();
     public void setInterval(Duration interval) {
-      this.interval = interval.toMillis();
+      this.interval = interval;
     }
 
     public void setEventTimeout(Duration timeout) {
@@ -1289,23 +1294,23 @@ public class ReplicationManager implements SCMService {
     }
 
     public Duration getInterval() {
-      return Duration.ofMillis(interval);
+      return interval;
     }
 
     public Duration getUnderReplicatedInterval() {
-      return Duration.ofMillis(underReplicatedInterval);
+      return underReplicatedInterval;
     }
 
     public void setUnderReplicatedInterval(Duration duration) {
-      this.underReplicatedInterval = duration.toMillis();
+      this.underReplicatedInterval = duration;
     }
 
     public void setOverReplicatedInterval(Duration duration) {
-      this.overReplicatedInterval = duration.toMillis();
+      this.overReplicatedInterval = duration;
     }
 
     public Duration getOverReplicatedInterval() {
-      return Duration.ofMillis(overReplicatedInterval);
+      return overReplicatedInterval;
     }
 
     public long getEventTimeout() {

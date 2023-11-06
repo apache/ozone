@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMC
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemoveExpiredCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
@@ -153,6 +154,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         return scmSecurityResponse
             .setAllRootCaCertificatesResponseProto(getAllRootCa())
             .build();
+      case RemoveExpiredCertificates:
+        return scmSecurityResponse
+            .setRemoveExpiredCertificatesResponseProto(
+                removeExpiredCertificates())
+            .build();
 
       default:
         throw new IllegalArgumentException(
@@ -253,7 +259,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       throw createNotHAException();
     }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
-        request.getCSR());
+        request.getCSR(), request.hasRenew() && request.getRenew());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
@@ -414,4 +420,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     }
   }
 
+  public SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificates()
+      throws IOException {
+    return SCMRemoveExpiredCertificatesResponseProto.newBuilder()
+        .addAllRemovedExpiredCertificates(impl.removeExpiredCertificates())
+        .build();
+  }
 }

@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -61,11 +61,12 @@ public class TestCreatePipelineCommandHandler {
   private SCMConnectionManager connectionManager;
   private RaftClient raftClient;
   private GroupManagementApi raftClientGroupManager;
+  private OzoneConfiguration conf;
 
   @Before
   public void setup() throws Exception {
+    conf = new OzoneConfiguration();
     ozoneContainer = Mockito.mock(OzoneContainer.class);
-    stateContext = Mockito.mock(StateContext.class);
     connectionManager = Mockito.mock(SCMConnectionManager.class);
     raftClient = Mockito.mock(RaftClient.class);
     raftClientGroupManager = Mockito.mock(GroupManagementApi.class);
@@ -82,12 +83,9 @@ public class TestCreatePipelineCommandHandler {
     final SCMCommand<CreatePipelineCommandProto> command =
         new CreatePipelineCommand(pipelineID, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, datanodes);
+    stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
 
     final XceiverServerSpi writeChanel = Mockito.mock(XceiverServerSpi.class);
-    final DatanodeStateMachine dnsm = Mockito.mock(DatanodeStateMachine.class);
-
-    Mockito.when(stateContext.getParent()).thenReturn(dnsm);
-    Mockito.when(dnsm.getDatanodeDetails()).thenReturn(datanodes.get(0));
     Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
     Mockito.when(writeChanel.isExist(pipelineID.getProtobuf()))
         .thenReturn(false);
@@ -117,17 +115,13 @@ public class TestCreatePipelineCommandHandler {
             HddsProtos.ReplicationFactor.THREE, datanodes);
 
     final XceiverServerSpi writeChanel = Mockito.mock(XceiverServerSpi.class);
-    final DatanodeStateMachine dnsm = Mockito.mock(DatanodeStateMachine.class);
-
-    Mockito.when(stateContext.getParent()).thenReturn(dnsm);
-    Mockito.when(dnsm.getDatanodeDetails()).thenReturn(datanodes.get(0));
+    stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
     Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
     Mockito.when(writeChanel.isExist(pipelineID.getProtobuf()))
         .thenReturn(true);
 
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler(new OzoneConfiguration(),
-            MoreExecutors.directExecutor());
+        new CreatePipelineCommandHandler(conf, MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 

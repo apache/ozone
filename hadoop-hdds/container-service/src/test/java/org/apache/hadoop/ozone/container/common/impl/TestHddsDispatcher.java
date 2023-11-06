@@ -45,11 +45,11 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -84,6 +83,8 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -122,12 +123,7 @@ public class TestHddsDispatcher {
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = new ContainerSet(1000);
-
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
@@ -167,7 +163,6 @@ public class TestHddsDispatcher {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
-
   }
 
   @Test
@@ -195,12 +190,7 @@ public class TestHddsDispatcher {
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = new ContainerSet(1000);
-
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       // create a 50 byte container
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
@@ -238,11 +228,12 @@ public class TestHddsDispatcher {
           50, UUID.randomUUID().toString(),
           dd.getUuidString());
       Container container2 = new KeyValueContainer(containerData2, conf);
-      LambdaTestUtils.intercept(StorageContainerException.class,
-          "Container creation failed, due to disk out of space",
-          () -> container2.create(volumeSet,
-              new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
-
+      StorageContainerException scException =
+          assertThrows(StorageContainerException.class,
+              () -> container2.create(volumeSet,
+                  new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
+      assertEquals("Container creation failed, due to disk out of space",
+          scException.getMessage());
     } finally {
       volumeSet.shutdown();
       ContainerMetrics.remove();
@@ -465,11 +456,7 @@ public class TestHddsDispatcher {
         throw new RuntimeException(e);
       }
     });
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerType containerType : ContainerType.values()) {

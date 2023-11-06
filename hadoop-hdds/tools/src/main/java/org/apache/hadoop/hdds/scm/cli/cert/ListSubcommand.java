@@ -18,20 +18,31 @@
 package org.apache.hadoop.hdds.scm.cli.cert;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
+
+import static java.lang.System.err;
 
 /**
  * This is the handler that process certificate list command.
@@ -65,8 +76,12 @@ public class ListSubcommand extends ScmCertSubcommand {
       description = "Filter certificate by the type: valid or revoked",
       defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
   private String type;
-  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s";
-
+  
+  @Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+  
   private HddsProtos.NodeType parseCertRole(String r) {
     if (r.equalsIgnoreCase("om")) {
       return HddsProtos.NodeType.OM;
@@ -77,33 +92,106 @@ public class ListSubcommand extends ScmCertSubcommand {
     }
   }
 
-  private void printCert(X509Certificate cert) {
-    LOG.info(String.format(OUTPUT_FORMAT, cert.getSerialNumber(),
-        cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN(),
-        cert.getIssuerDN()));
-  }
-
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
     boolean isRevoked = type.equalsIgnoreCase("revoked");
     HddsProtos.NodeType nodeType = parseCertRole(role);
     List<String> certPemList = client.listCertificate(nodeType,
         startSerialId, count, isRevoked);
+    if (count == certPemList.size()) {
+      err.println("The certificate list could be longer than the batch size: "
+          + count + ". Please use the \"-c\" option to see more" +
+          " certificates.");
+    }
+
+    if (json) {
+      err.println("Certificate list:(Type=" + type.toUpperCase() +
+          ", BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
+      List<Certificate> certList = new ArrayList<>();
+      for (String certPemStr : certPemList) {
+        try {
+          X509Certificate cert =
+              CertificateCodec.getX509Certificate(certPemStr);
+          certList.add(new Certificate(cert));
+        } catch (CertificateException ex) {
+          LOG.error("Failed to parse certificate.");
+        }
+      }
+      System.out.println(
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(certList));
+      return;
+    }
+
     LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
         type.toUpperCase(), count, certPemList.size());
-    if (count == certPemList.size()) {
-      LOG.info("The certificate list could be longer than the batch size: {}." +
-          " Please use the \"-c\" option to see more certificates.", count);
+    printCertList(LOG, certPemList);
+  }
+
+  private static class BigIntJsonSerializer extends JsonSerializer<BigInteger> {
+    @Override
+    public void serialize(BigInteger value, JsonGenerator jgen,
+                          SerializerProvider provider)
+        throws IOException {
+      jgen.writeNumber(String.format("%d", value));
     }
-    LOG.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
-        "Expiry", "Subject", "Issuer"));
-    for (String certPemStr : certPemList) {
-      try {
-        X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
-        printCert(cert);
-      } catch (CertificateException ex) {
-        LOG.error("Failed to parse certificate.");
+  }
+
+  private static class Certificate {
+    private BigInteger serialNumber;
+    private String validFrom;
+    private String expiry;
+    private Map<String, String> subjectDN = new LinkedHashMap<>();
+    private Map<String, String> issuerDN = new LinkedHashMap<>();;
+
+    Certificate(X509Certificate cert) {
+      serialNumber = cert.getSerialNumber();
+      validFrom = cert.getNotBefore().toString();
+      expiry = cert.getNotAfter().toString();
+
+      String subject = cert.getSubjectDN().getName();
+      parseDnInfo(subject, true);
+
+      String issuer = cert.getIssuerDN().getName();
+      parseDnInfo(issuer, false);
+
+    }
+
+    private void parseDnInfo(String dnName, boolean isSubject) {
+      String[] dnNameComponents = dnName.split(",");
+      if (dnNameComponents.length == 0) {
+        err.println("Invalid format of name: " + dnName);
+      } else {
+        for (String elem : dnNameComponents) {
+          String[] components = elem.split("=");
+          if (components.length == 2) {
+            (isSubject ? subjectDN : issuerDN)
+                .put(components[0], components[1]);
+          } else {
+            err.println("Invalid format of name: " + dnName);
+          }
+        }
       }
+    }
+
+    @JsonSerialize(using = BigIntJsonSerializer.class)
+    public BigInteger getSerialNumber() {
+      return serialNumber;
+    }
+
+    public String getValidFrom() {
+      return validFrom;
+    }
+
+    public String getExpiry() {
+      return expiry;
+    }
+
+    public Map<String, String> getSubjectDN() {
+      return subjectDN;
+    }
+
+    public Map<String, String> getIssuerDN() {
+      return issuerDN;
     }
   }
 }

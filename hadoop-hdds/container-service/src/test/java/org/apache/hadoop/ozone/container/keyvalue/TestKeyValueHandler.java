@@ -38,12 +38,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -58,6 +59,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
 
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -83,7 +85,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public TestRule timeout = Timeout.seconds(300);
+  public final TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
@@ -263,7 +265,7 @@ public class TestKeyValueHandler {
 
   @Test
   public void testVolumeSetInKeyValueHandler() throws Exception {
-    File path = GenericTestUtils.getRandomizedTestDir();
+    File path = tempDir.newFolder();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
     conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
@@ -276,18 +278,14 @@ public class TestKeyValueHandler {
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
       DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails())
-          .thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(
+          datanodeDetails, conf);
       KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
           context.getParent().getDatanodeDetails().getUuidString(), cset,
           volumeSet, metrics, c -> {
       });
       assertEquals("org.apache.hadoop.ozone.container.common" +
-          ".volume.RoundRobinVolumeChoosingPolicy",
+          ".volume.CapacityVolumeChoosingPolicy",
           keyValueHandler.getVolumeChoosingPolicyForTesting()
               .getClass().getName());
 
@@ -356,9 +354,7 @@ public class TestKeyValueHandler {
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testDeleteContainer() throws IOException {
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueHandler.class.getSimpleName() +
-            "-" + UUID.randomUUID().toString());
+    final String testDir = tempDir.newFolder().getAbsolutePath();
     try {
       // Case 1 : Regular container delete
       final long containerID = 1L;
@@ -420,14 +416,14 @@ public class TestKeyValueHandler {
       kvHandler.handleCreateContainer(createContainer2, null);
 
       Assert.assertEquals(3, icrReceived.get());
-      Assert.assertNotNull(containerSet.getContainer(container2ID));
+      Container<?> container = containerSet.getContainer(container2ID);
+      Assert.assertNotNull(container);
       File deletedContainerDir = hddsVolume.getDeletedContainerDir();
       // to simulate failed move
       File dummyDir = new File(DUMMY_PATH);
       hddsVolume.setDeletedContainerDir(dummyDir);
       try {
-        kvHandler.deleteContainer(containerSet.getContainer(container2ID),
-            true);
+        kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
         Assert.assertTrue(
             sce.getMessage().contains("Failed to move container"));
@@ -440,7 +436,9 @@ public class TestKeyValueHandler {
       hddsVolume.failVolume();
       GenericTestUtils.LogCapturer kvHandlerLogs =
           GenericTestUtils.LogCapturer.captureLogs(KeyValueHandler.getLogger());
-      kvHandler.deleteContainer(containerSet.getContainer(container2ID), true);
+      // add the container back to containerSet as removed in previous delete
+      containerSet.addContainer(container);
+      kvHandler.deleteContainer(container, true);
       String expectedLog =
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";

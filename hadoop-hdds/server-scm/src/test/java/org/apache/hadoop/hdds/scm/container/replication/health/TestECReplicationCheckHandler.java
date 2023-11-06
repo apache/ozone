@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -82,7 +81,7 @@ public class TestECReplicationCheckHandler {
     Mockito.when(placementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
-    healthCheck = new ECReplicationCheckHandler(placementPolicy);
+    healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();
@@ -277,6 +276,41 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+  }
+
+  @Test
+  public void testUnderReplicatedAndUnhealthy() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+    replicas.addAll(createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 3),
+        Pair.of(IN_SERVICE, 4)));
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .build();
+
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(request);
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(-1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
+    assertTrue(result.isUnrecoverable());
+    assertFalse(result.isMissing());
+
+    assertTrue(healthCheck.handle(request));
+    // Unrecoverable so not added to the queue
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
   }
 
   @Test
@@ -542,87 +576,6 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-  }
-
-  @Test
-  public void testMisReplicatedContainer() {
-    ContainerInfo container = createContainerInfo(repConfig);
-
-    // Placement policy is always violated
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
-    )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(4, 5, 9));
-
-    Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
-    ContainerCheckRequest request = requestBuilder
-        .setContainerReplicas(replicas)
-        .setContainerInfo(container)
-        .build();
-
-    ContainerHealthResult result = healthCheck.checkHealth(request);
-    assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
-
-    assertTrue(healthCheck.handle(request));
-    assertEquals(1, repQueue.underReplicatedQueueSize());
-    assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
-  }
-
-  @Test
-  public void testMisReplicatedContainerFixedByPending() {
-    ContainerInfo container = createContainerInfo(repConfig);
-
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
-    )).thenAnswer(invocation -> {
-      List<DatanodeDetails> dns = invocation.getArgument(0);
-      // If the number of DNs is 5 or less make it be mis-replicated
-      if (dns.size() <= 5) {
-        return new ContainerPlacementStatusDefault(4, 5, 9);
-      } else {
-        return new ContainerPlacementStatusDefault(5, 5, 9);
-      }
-    });
-
-    List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 1));
-
-    Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
-    ContainerCheckRequest request = requestBuilder
-        .setContainerReplicas(replicas)
-        .setContainerInfo(container)
-        .setPendingOps(pending)
-        .build();
-
-    ContainerHealthResult result = healthCheck.checkHealth(request);
-    assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
-
-    // Under-replicated takes precedence and the over-replication is ignored
-    // for now.
-    assertTrue(healthCheck.handle(request));
-    assertEquals(0, repQueue.underReplicatedQueueSize());
-    assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
   @Test

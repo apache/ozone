@@ -46,7 +46,9 @@ import org.junit.Before;
 import org.junit.rules.TemporaryFolder;
 import org.junit.Test;
 import org.junit.rules.TestName;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -95,7 +97,7 @@ public class TestStorageVolumeChecker {
   public TestName testName = new TestName();
 
   @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
+  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -154,7 +156,7 @@ public class TestStorageVolumeChecker {
     LOG.info("Executing {}", testName.getMethodName());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
@@ -198,7 +200,7 @@ public class TestStorageVolumeChecker {
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
 
     Set<? extends StorageVolume> failedVolumes =

@@ -72,6 +72,40 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     Assert.assertEquals(mtime, keyMtime);
   }
 
+  /**
+   * Verify that setTimes() on key works as expected.
+   * @throws Exception
+   */
+  @Test
+  public void testKeySetTimesRequest() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String tableKey = addKeyToTable();
+    keyName = PARENT_DIR + "/" + FILE_NAME;
+    long mtime = 2000;
+    executeAndReturn(mtime);
+    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+    assertNotNull(keyStatus);
+    assertTrue(keyStatus.isFile());
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(tableKey);
+    Assert.assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
+    long keyMtime = keyStatus.getKeyInfo().getModificationTime();
+    Assert.assertEquals(mtime, keyMtime);
+    long newMtime = -1;
+    executeAndReturn(newMtime);
+    keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey);
+    Assert.assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
+    assertTrue(keyStatus.isFile());
+    keyMtime = keyStatus.getKeyInfo().getModificationTime();
+    Assert.assertEquals(mtime, keyMtime);
+  }
+
   protected String addKeyToTable() throws Exception {
     String key = PARENT_DIR + "/" + FILE_NAME;
     keyName = key; // updated key name
@@ -82,7 +116,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
             omMetadataManager);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils
-        .createOmKeyInfo(volumeName, bucketName, key,
+        .createOmKeyInfo(volumeName, bucketName, FILE_NAME,
             HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
             parentId + 1, parentId, 100, Time.now());
     OMRequestTestUtils

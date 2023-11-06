@@ -257,10 +257,11 @@ public class AbstractContainerReportHandler {
        * any other state.
        */
       if (replica.getState() != State.OPEN) {
-        logger.warn("Container {} is in OPEN state, but the datanode {} " +
-            "reports an {} replica.", containerId,
-            datanode, replica.getState());
-        // Should we take some action?
+        logger.info("Moving OPEN container {} to CLOSING state, datanode {} " +
+                "reported {} replica with index {}.", containerId, datanode,
+            replica.getState(), replica.getReplicaIndex());
+        containerManager.updateContainerState(containerId,
+            LifeCycleEvent.FINALIZE);
       }
       break;
     case CLOSING:

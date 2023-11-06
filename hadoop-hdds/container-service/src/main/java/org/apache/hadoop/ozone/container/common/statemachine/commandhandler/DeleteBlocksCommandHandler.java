@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -38,6 +39,8 @@ import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -58,13 +61,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -87,22 +92,35 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ConfigurationSource conf;
   private int invocationCount;
   private long totalTime;
-  private final ExecutorService executor;
+  private final ThreadPoolExecutor executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
   private final OzoneContainer ozoneContainer;
   private final BlockDeletingServiceMetrics blockDeleteMetrics;
+  private final long tryLockTimeoutMs;
+  private final Map<String, SchemaHandler> schemaHandlers;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
-      ConfigurationSource conf, int threadPoolSize, int queueLimit) {
+      ConfigurationSource conf, DatanodeConfiguration dnConf,
+      String threadNamePrefix) {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
     this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
-    this.executor = Executors.newFixedThreadPool(
-        threadPoolSize, new ThreadFactoryBuilder()
-            .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
-    this.deleteCommandQueues = new LinkedBlockingQueue<>(queueLimit);
+    this.tryLockTimeoutMs = dnConf.getBlockDeleteMaxLockWaitTimeoutMs();
+    schemaHandlers = new HashMap<>();
+    schemaHandlers.put(SCHEMA_V1, this::markBlocksForDeletionSchemaV1);
+    schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
+    schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
+
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix +
+            "DeleteBlocksCommandHandlerThread-%d")
+        .build();
+    this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+        dnConf.getBlockDeleteThreads(), threadFactory);
+    this.deleteCommandQueues =
+        new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
     handlerThread = new Daemon(new DeleteCmdWorker());
     handlerThread.start();
   }
@@ -178,6 +196,27 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   /**
+   * This class represents the result of executing a delete block transaction.
+   */
+  public static final class DeleteBlockTransactionExecutionResult {
+    private final DeleteBlockTransactionResult result;
+    private final boolean lockAcquisitionFailed;
+    public DeleteBlockTransactionExecutionResult(
+        DeleteBlockTransactionResult result, boolean lockAcquisitionFailed) {
+      this.result = result;
+      this.lockAcquisitionFailed = lockAcquisitionFailed;
+    }
+
+    public DeleteBlockTransactionResult getResult() {
+      return result;
+    }
+
+    public boolean isLockAcquisitionFailed() {
+      return lockAcquisitionFailed;
+    }
+  }
+
+  /**
    * Process delete commands.
    */
   public final class DeleteCmdWorker implements Runnable {
@@ -208,7 +247,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    * Process one delete transaction.
    */
   public final class ProcessTransactionTask implements
-      Callable<DeleteBlockTransactionResult> {
+      Callable<DeleteBlockTransactionExecutionResult> {
     private DeletedBlocksTransaction tx;
 
     public ProcessTransactionTask(DeletedBlocksTransaction transaction) {
@@ -216,12 +255,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
 
     @Override
-    public DeleteBlockTransactionResult call() {
+    public DeleteBlockTransactionExecutionResult call() {
       DeleteBlockTransactionResult.Builder txResultBuilder =
           DeleteBlockTransactionResult.newBuilder();
       txResultBuilder.setTxID(tx.getTxID());
       long containerId = tx.getContainerID();
-      int newDeletionBlocks = 0;
+      boolean lockAcquisitionFailed = false;
       try {
         Container cont = containerSet.getContainer(containerId);
         if (cont == null) {
@@ -232,27 +271,30 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         ContainerType containerType = cont.getContainerType();
         switch (containerType) {
         case KeyValueContainer:
-          KeyValueContainerData containerData = (KeyValueContainerData)
-              cont.getContainerData();
-          cont.writeLock();
-          try {
-            if (containerData.hasSchema(SCHEMA_V1)) {
-              markBlocksForDeletionSchemaV1(containerData, tx);
-            } else if (containerData.hasSchema(SCHEMA_V2)) {
-              markBlocksForDeletionSchemaV2(containerData, tx,
-                  newDeletionBlocks, tx.getTxID());
-            } else if (containerData.hasSchema(SCHEMA_V3)) {
-              markBlocksForDeletionSchemaV3(containerData, tx,
-                  newDeletionBlocks, tx.getTxID());
-            } else {
-              throw new UnsupportedOperationException(
-                  "Only schema version 1,2,3 are supported.");
+          KeyValueContainer keyValueContainer = (KeyValueContainer)cont;
+          KeyValueContainerData containerData =
+              keyValueContainer.getContainerData();
+          if (keyValueContainer.
+              writeLockTryLock(tryLockTimeoutMs, TimeUnit.MILLISECONDS)) {
+            try {
+              String schemaVersion = containerData
+                  .getSupportedSchemaVersionOrDefault();
+              if (getSchemaHandlers().containsKey(schemaVersion)) {
+                schemaHandlers.get(schemaVersion).handle(containerData, tx);
+              } else {
+                throw new UnsupportedOperationException(
+                    "Only schema version 1,2,3 are supported.");
+              }
+            } finally {
+              keyValueContainer.writeUnlock();
             }
-          } finally {
-            cont.writeUnlock();
+            txResultBuilder.setContainerID(containerId)
+                .setSuccess(true);
+          } else {
+            lockAcquisitionFailed = true;
+            txResultBuilder.setContainerID(containerId)
+                .setSuccess(false);
           }
-          txResultBuilder.setContainerID(containerId)
-              .setSuccess(true);
           break;
         default:
           LOG.error(
@@ -262,10 +304,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       } catch (IOException e) {
         LOG.warn("Failed to delete blocks for container={}, TXID={}",
             tx.getContainerID(), tx.getTxID(), e);
-        txResultBuilder.setContainerID(containerId)
-            .setSuccess(false);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (InterruptedException e) {
+        LOG.warn("InterruptedException while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        Thread.currentThread().interrupt();
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
-      return txResultBuilder.build();
+      return new DeleteBlockTransactionExecutionResult(
+          txResultBuilder.build(), lockAcquisitionFailed);
     }
   }
 
@@ -284,37 +331,26 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
-      LOG.info("Start to delete container blocks, TXIDs={}, "
+      LOG.info("Summary of deleting container blocks, numOfTransactions={}, "
               + "numOfContainers={}, numOfBlocks={}",
-          summary.getTxIDSummary(),
+          summary.getNumOfTxs(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Start to delete container blocks, TXIDs={}",
+            summary.getTxIDSummary());
+      }
       blockDeleteMetrics.incrReceivedContainerCount(
           summary.getNumOfContainers());
       blockDeleteMetrics.incrReceivedRetryTransactionCount(
           summary.getNumOfRetryTxs());
       blockDeleteMetrics.incrReceivedBlockCount(summary.getNumOfBlocks());
 
+      List<DeleteBlockTransactionResult> results =
+          executeCmdWithRetry(containerBlocks);
+
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
-          ContainerBlocksDeletionACKProto.newBuilder();
-      List<Future<DeleteBlockTransactionResult>> futures = new ArrayList<>();
-      for (int i = 0; i < containerBlocks.size(); i++) {
-        DeletedBlocksTransaction tx = containerBlocks.get(i);
-        Future<DeleteBlockTransactionResult> future =
-            executor.submit(new ProcessTransactionTask(tx));
-        futures.add(future);
-      }
-
-      // Wait for tasks to finish
-      futures.forEach(f -> {
-        try {
-          resultBuilder.addResults(f.get());
-        } catch (InterruptedException | ExecutionException e) {
-          LOG.error("task failed.", e);
-          Thread.currentThread().interrupt();
-        }
-      });
-
+          ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
       resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
           .getUuid().toString());
       blockDeletionACK = resultBuilder.build();
@@ -346,9 +382,73 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
+  @VisibleForTesting
+  public List<DeleteBlockTransactionResult> executeCmdWithRetry(
+      List<DeletedBlocksTransaction> transactions) {
+    List<DeleteBlockTransactionResult> results =
+        new ArrayList<>(transactions.size());
+    Map<Long, DeletedBlocksTransaction> idToTransaction =
+        new HashMap<>(transactions.size());
+    transactions.forEach(tx -> idToTransaction.put(tx.getTxID(), tx));
+    List<DeletedBlocksTransaction> retryTransaction = new ArrayList<>();
+
+    List<Future<DeleteBlockTransactionExecutionResult>> futures =
+        submitTasks(transactions);
+    // Wait for tasks to finish
+    handleTasksResults(futures, result -> {
+      if (result.isLockAcquisitionFailed()) {
+        retryTransaction.add(idToTransaction.get(result.getResult().getTxID()));
+      } else {
+        results.add(result.getResult());
+      }
+    });
+
+    idToTransaction.clear();
+    // Wait for all tasks to complete before retrying, usually it takes
+    // some time for all tasks to complete, then the retry may be successful.
+    // We will only retry once
+    if (!retryTransaction.isEmpty()) {
+      futures = submitTasks(retryTransaction);
+      handleTasksResults(futures, result -> {
+        if (result.isLockAcquisitionFailed()) {
+          blockDeleteMetrics.incrTotalLockTimeoutTransactionCount();
+        }
+        results.add(result.getResult());
+      });
+    }
+    return results;
+  }
+
+  @VisibleForTesting
+  public List<Future<DeleteBlockTransactionExecutionResult>> submitTasks(
+      List<DeletedBlocksTransaction> deletedBlocksTransactions) {
+    List<Future<DeleteBlockTransactionExecutionResult>> futures =
+        new ArrayList<>(deletedBlocksTransactions.size());
+
+    for (DeletedBlocksTransaction tx : deletedBlocksTransactions) {
+      Future<DeleteBlockTransactionExecutionResult> future =
+          executor.submit(new ProcessTransactionTask(tx));
+      futures.add(future);
+    }
+    return futures;
+  }
+
+  public void handleTasksResults(
+      List<Future<DeleteBlockTransactionExecutionResult>> futures,
+      Consumer<DeleteBlockTransactionExecutionResult> handler) {
+    futures.forEach(f -> {
+      try {
+        DeleteBlockTransactionExecutionResult result = f.get();
+        handler.accept(result);
+      } catch (InterruptedException | ExecutionException e) {
+        LOG.error("task failed.", e);
+        Thread.currentThread().interrupt();
+      }
+    });
+  }
+
   private void markBlocksForDeletionSchemaV3(
-      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks, long txnID)
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
       Table<String, DeletedBlocksTransaction> delTxTable =
@@ -357,13 +457,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           txn);
     };
 
-    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
-        txnID, schemaV3Marker);
+    markBlocksForDeletionTransaction(containerData, delTX,
+        delTX.getTxID(), schemaV3Marker);
   }
 
   private void markBlocksForDeletionSchemaV2(
-      KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks, long txnID)
+      KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     DeletionMarker schemaV2Marker = (table, batch, tid, txn) -> {
       Table<Long, DeletedBlocksTransaction> delTxTable =
@@ -371,8 +470,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       delTxTable.putWithBatch(batch, tid, txn);
     };
 
-    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
-        txnID, schemaV2Marker);
+    markBlocksForDeletionTransaction(containerData, delTX,
+        delTX.getTxID(), schemaV2Marker);
   }
 
   /**
@@ -385,8 +484,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   private void markBlocksForDeletionTransaction(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks, long txnID, DeletionMarker marker)
+      long txnID, DeletionMarker marker)
       throws IOException {
+    int newDeletionBlocks = 0;
     long containerId = delTX.getContainerID();
     logDeleteTransaction(containerId, containerData, delTX);
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
@@ -568,5 +668,50 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
         BatchOperation batch, long txnID, DeletedBlocksTransaction delTX)
         throws IOException;
+  }
+
+  /**
+   * The SchemaHandler interface provides a contract for handling
+   * KeyValueContainerData and DeletedBlocksTransaction based
+   * on different schema versions.
+   */
+  public interface SchemaHandler {
+    void handle(KeyValueContainerData containerData,
+        DeletedBlocksTransaction tx) throws IOException;
+  }
+
+  @VisibleForTesting
+  public Map<String, SchemaHandler> getSchemaHandlers() {
+    return schemaHandlers;
+  }
+
+  @VisibleForTesting
+  public BlockDeletingServiceMetrics getBlockDeleteMetrics() {
+    return blockDeleteMetrics;
+  }
+
+  @VisibleForTesting
+  public ThreadPoolExecutor getExecutor() {
+    return executor;
+  }
+
+  public void setPoolSize(int size) {
+    if (size <= 0) {
+      throw new IllegalArgumentException("Pool size must be positive.");
+    }
+
+    int currentCorePoolSize = executor.getCorePoolSize();
+
+    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
+    // equal to the corePoolSize. We must make sure this invariant holds when
+    // changing the pool size. Therefore, we take into account whether the
+    // new size is greater or smaller than the current core pool size.
+    if (size > currentCorePoolSize) {
+      executor.setMaximumPoolSize(size);
+      executor.setCorePoolSize(size);
+    } else {
+      executor.setCorePoolSize(size);
+      executor.setMaximumPoolSize(size);
+    }
   }
 }

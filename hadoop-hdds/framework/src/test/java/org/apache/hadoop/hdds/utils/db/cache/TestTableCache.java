@@ -36,7 +36,7 @@ import org.slf4j.event.Level;
  */
 public class TestTableCache {
 
-  private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
+  private TableCache<String, String> tableCache;
 
   @BeforeAll
   public static void setLogLevel() {
@@ -45,9 +45,9 @@ public class TestTableCache {
 
   private void createTableCache(TableCache.CacheType cacheType) {
     if (cacheType == TableCache.CacheType.FULL_CACHE) {
-      tableCache = new FullTableCache<>();
+      tableCache = new FullTableCache<>("");
     } else {
-      tableCache = new PartialTableCache<>();
+      tableCache = new PartialTableCache<>("");
     }
   }
 

@@ -22,24 +22,24 @@ import java.util.Objects;
 
 /**
  * CacheResult which is returned as response for Key exist in cache or not.
- * @param <CACHEVALUE>
+ * @param <VALUE>
  */
-public class CacheResult<CACHEVALUE extends CacheValue> {
+public class CacheResult<VALUE> {
 
-  private CacheStatus cacheStatus;
-  private CACHEVALUE cachevalue;
+  private final CacheStatus cacheStatus;
+  private final CacheValue<VALUE> cacheValue;
 
-  public CacheResult(CacheStatus cacheStatus, CACHEVALUE cachevalue) {
-    this.cacheStatus = cacheStatus;
-    this.cachevalue = cachevalue;
+  public CacheResult(CacheStatus status, CacheValue<VALUE> value) {
+    this.cacheStatus = status;
+    this.cacheValue = value;
   }
 
   public CacheStatus getCacheStatus() {
     return cacheStatus;
   }
 
-  public CACHEVALUE getValue() {
-    return cachevalue;
+  public CacheValue<VALUE> getValue() {
+    return cacheValue;
   }
 
   @Override
@@ -52,12 +52,12 @@ public class CacheResult<CACHEVALUE extends CacheValue> {
     }
     CacheResult< ? > that = (CacheResult< ? >) o;
     return cacheStatus == that.cacheStatus &&
-        Objects.equals(cachevalue, that.cachevalue);
+        Objects.equals(cacheValue, that.cacheValue);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(cacheStatus, cachevalue);
+    return Objects.hash(cacheStatus, cacheValue);
   }
 
   /**

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -83,7 +84,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredUserLock = false;
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
     String owner = null;
     OMClientResponse omClientResponse = null;
     try {
@@ -140,7 +141,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeDeleteResponse(omResponse.build(),
           volume, owner, newVolumeList);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));

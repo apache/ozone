@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -96,6 +97,7 @@ import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -115,6 +117,7 @@ public final class OzoneManagerRatisServer {
   private final OzoneManager ozoneManager;
   private final OzoneManagerStateMachine omStateMachine;
   private final String ratisStorageDir;
+  private final OMPerformanceMetrics perfMetrics;
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -143,7 +146,8 @@ public final class OzoneManagerRatisServer {
     this.omRatisAddress = addr;
     this.port = addr.getPort();
     this.ratisStorageDir = OzoneManagerRatisUtils.getOMRatisDirectory(conf);
-    RaftProperties serverProperties = newRaftProperties(conf);
+    final RaftProperties serverProperties = newRaftProperties(
+        conf, port, ratisStorageDir);
 
     this.raftPeerId = localRaftPeerId;
     this.raftGroupId = RaftGroupId.valueOf(
@@ -173,6 +177,7 @@ public final class OzoneManagerRatisServer {
         .setParameters(parameters)
         .setStateMachine(omStateMachine)
         .build();
+    this.perfMetrics = om.getPerfMetrics();
   }
 
   /**
@@ -245,11 +250,9 @@ public final class OzoneManagerRatisServer {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest =
-          createWriteRaftClientRequest(omRequest);
+      RaftClientRequest raftClientRequest = createRaftRequest(omRequest);
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-
-      return processReply(omRequest, raftClientReply);
+      return createOmResponse(omRequest, raftClientReply);
     } else {
       LOG.info("Rejecting write request on OM {} because it is in prepare " +
           "mode: {}", ozoneManager.getOMNodeId(),
@@ -267,6 +270,27 @@ public final class OzoneManagerRatisServer {
     }
   }
 
+  private OMResponse createOmResponse(OMRequest omRequest,
+      RaftClientReply raftClientReply) throws ServiceException {
+    return captureLatencyNs(
+        perfMetrics.getCreateOmResponseLatencyNs(),
+        () -> createOmResponseImpl(omRequest, raftClientReply));
+  }
+
+  private RaftClientReply submitRequestToRatis(
+      RaftClientRequest raftClientRequest) throws ServiceException {
+    return captureLatencyNs(
+        perfMetrics.getSubmitToRatisLatencyNs(),
+        () -> submitRequestToRatisImpl(raftClientRequest));
+  }
+
+  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
+    RaftClientRequest raftClientRequest = captureLatencyNs(
+        perfMetrics.getCreateRatisRequestLatencyNs(),
+        () -> createRaftRequestImpl(omRequest));
+    return raftClientRequest;
+  }
+
   /**
    * API used internally from OzoneManager Server when requests needs to be
    * submitted to ratis, where the crafted RaftClientRequest is passed along.
@@ -277,11 +301,12 @@ public final class OzoneManagerRatisServer {
    */
   public OMResponse submitRequest(OMRequest omRequest,
       RaftClientRequest raftClientRequest) throws ServiceException {
-    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-    return processReply(omRequest, raftClientReply);
+    RaftClientReply raftClientReply =
+        submitRequestToRatis(raftClientRequest);
+    return createOmResponse(omRequest, raftClientReply);
   }
 
-  private RaftClientReply submitRequestToRatis(
+  private RaftClientReply submitRequestToRatisImpl(
       RaftClientRequest raftClientRequest) throws ServiceException {
     try {
       return server.submitClientRequestAsync(raftClientRequest)
@@ -419,7 +444,7 @@ public final class OzoneManagerRatisServer {
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
-  private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
     if (!ozoneManager.isTestSecureOmFlag()) {
       Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
       Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
@@ -444,8 +469,8 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response which is returned to client.
    * @throws ServiceException
    */
-  private OMResponse processReply(OMRequest omRequest, RaftClientReply reply)
-      throws ServiceException {
+  private OMResponse createOmResponseImpl(OMRequest omRequest,
+      RaftClientReply reply) throws ServiceException {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. This can happen first time
     // when client is submitting request to OM.
@@ -571,7 +596,8 @@ public final class OzoneManagerRatisServer {
 
   //TODO simplify it to make it shorter
   @SuppressWarnings("methodlength")
-  private RaftProperties newRaftProperties(ConfigurationSource conf) {
+  public static RaftProperties newRaftProperties(ConfigurationSource conf,
+      int port, String ratisStorageDir) {
     // Set RPC type
     final String rpcType = conf.get(
         OMConfigKeys.OZONE_OM_RATIS_RPC_TYPE_KEY,
@@ -727,17 +753,8 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
         snapshotAutoTriggerThreshold);
 
-    createRaftServerProperties(conf, properties);
+    getOMHAConfigs(conf).forEach(properties::set);
     return properties;
-  }
-
-  private void createRaftServerProperties(ConfigurationSource ozoneConf,
-      RaftProperties raftProperties) {
-    Map<String, String> ratisServerConf =
-        getOMHAConfigs(ozoneConf);
-    ratisServerConf.forEach((key, val) -> {
-      raftProperties.set(key, val);
-    });
   }
 
   private static Map<String, String> getOMHAConfigs(

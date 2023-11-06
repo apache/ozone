@@ -46,6 +46,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -57,6 +59,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -70,6 +73,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartInfoInitiateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -211,6 +215,33 @@ public final class OMRequestTestUtils {
 
   /**
    * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable. isMultipartKey flag indicates
+   * whether the key is a MPU key.
+   *
+   * @param openKeyTable
+   * @param isMultipartKey
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param clientID
+   * @param replicationType
+   * @param replicationFactor
+   * @param omMetadataManager
+   * @throws Exception
+   */
+  @SuppressWarnings("parameterNumber")
+  public static void addKeyToTable(boolean openKeyTable, boolean isMultipartKey,
+      String volumeName, String bucketName, String keyName, long clientID,
+      HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor,
+      OMMetadataManager omMetadataManager) throws Exception {
+    addKeyToTable(openKeyTable, isMultipartKey, false,
+        volumeName, bucketName, keyName, clientID, replicationType,
+        replicationFactor, 0L, omMetadataManager);
+  }
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
    * to openKeyTable, else add's it to keyTable.
    * @throws Exception
    */
@@ -223,7 +254,8 @@ public final class OMRequestTestUtils {
       List<OmKeyLocationInfo> locationList, long version) throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationType, replicationFactor, trxnLogIndex, Time.now(), version);
+        replicationType, replicationFactor, trxnLogIndex, Time.now(), version,
+        false);
     omKeyInfo.appendNewBlocks(locationList, false);
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
@@ -254,12 +286,31 @@ public final class OMRequestTestUtils {
    * to openKeyTable, else add's it to keyTable.
    * @throws Exception
    */
+  @SuppressWarnings("parameternumber")
+  public static void addKeyToTable(boolean openKeyTable, boolean isMultipartKey,
+      boolean addToCache, String volumeName, String bucketName, String keyName,
+      long clientID, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws Exception {
+
+    OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationType, replicationFactor, trxnLogIndex, Time.now(), 0L,
+        isMultipartKey);
+
+    addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
+        omMetadataManager);
+  }
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   * @throws Exception
+   */
   public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
                                    OmKeyInfo omKeyInfo,  long clientID,
                                    long trxnLogIndex,
                                    OMMetadataManager omMetadataManager)
-          throws Exception {
-
+      throws Exception {
     String volumeName = omKeyInfo.getVolumeName();
     String bucketName = omKeyInfo.getBucketName();
     String keyName = omKeyInfo.getKeyName();
@@ -277,14 +328,104 @@ public final class OMRequestTestUtils {
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
+
+      // Simulate bucket quota (usage) update done in OMKeyCommitRequest
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+          bucketKey);
+      // omBucketInfo can be null if some mocked tests doesn't use the table
+      if (omBucketInfo != null) {
+        omBucketInfo.incrUsedBytes(omKeyInfo.getReplicatedSize());
+      }
+
       if (addToCache) {
         omMetadataManager.getKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
                 CacheValue.get(trxnLogIndex, omKeyInfo));
+        if (omBucketInfo != null) {
+          omMetadataManager.getBucketTable()
+              .addCacheEntry(new CacheKey<>(bucketKey),
+                  CacheValue.get(trxnLogIndex + 1, omBucketInfo));
+        }
       }
       omMetadataManager.getKeyTable(getDefaultBucketLayout())
           .put(ozoneKey, omKeyInfo);
+
+      if (omBucketInfo != null) {
+        omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+      }
     }
+  }
+
+  /**
+   * Add open multipart key to openKeyTable.
+   *
+   * @throws Exception DB failure
+   */
+  public static void addMultipartKeyToOpenKeyTable(boolean addToCache,
+      OmKeyInfo omKeyInfo, String uploadId, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws IOException {
+
+    String multipartKey = omMetadataManager.getMultipartKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(), uploadId);
+
+    if (addToCache) {
+      omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT)
+          .addCacheEntry(new CacheKey<>(multipartKey),
+              CacheValue.get(trxnLogIndex, omKeyInfo));
+    }
+    omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT)
+        .put(multipartKey, omKeyInfo);
+  }
+
+  /**
+   * Add multipart info entry to the multipartInfoTable.
+   * @throws Exception
+   */
+  public static String addMultipartInfoToTable(boolean addToCache,
+      OmKeyInfo omKeyInfo, OmMultipartKeyInfo omMultipartKeyInfo,
+      long trxnLogIndex, OMMetadataManager omMetadataManager)
+      throws IOException {
+    String ozoneDBKey = omMetadataManager.getMultipartKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(), omMultipartKeyInfo.getUploadID());
+
+    if (addToCache) {
+      omMetadataManager.getMultipartInfoTable()
+          .addCacheEntry(new CacheKey<>(ozoneDBKey),
+              CacheValue.get(trxnLogIndex, omMultipartKeyInfo));
+    }
+
+    omMetadataManager.getMultipartInfoTable().put(ozoneDBKey,
+        omMultipartKeyInfo);
+
+    return ozoneDBKey;
+  }
+
+  public static PartKeyInfo createPartKeyInfo(String volumeName,
+      String bucketName, String keyName, String uploadId, int partNumber) {
+    return PartKeyInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(OmMultipartUpload.getDbKey(
+            volumeName, bucketName, keyName, uploadId))
+        .setPartKeyInfo(KeyInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setDataSize(100L) // Just set dummy size for testing
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
+  }
+
+  /**
+   * Append a {@link PartKeyInfo} to an {@link OmMultipartKeyInfo}.
+   */
+  public static void addPart(PartKeyInfo partKeyInfo,
+       OmMultipartKeyInfo omMultipartKeyInfo) {
+    omMultipartKeyInfo.addPartKeyInfo(partKeyInfo);
   }
 
   /**
@@ -441,7 +582,7 @@ public final class OMRequestTestUtils {
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
       long creationTime) {
     return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
-            replicationFactor, objectID, creationTime, 0L);
+            replicationFactor, objectID, creationTime, 0L, false);
   }
 
   /**
@@ -451,20 +592,51 @@ public final class OMRequestTestUtils {
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
-      long creationTime, long version) {
+      long creationTime, boolean isMultipartKey) {
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
+        replicationFactor, objectID, creationTime, 0L, isMultipartKey);
+  }
+
+  /**
+   * Create OmKeyInfo for LEGACY/OBS bucket.
+   */
+  @SuppressWarnings("parameterNumber")
+  private static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long creationTime, long version, boolean isMultipartKey) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setFileName(OzoneFSUtils.getFileName(keyName))
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(version, new ArrayList<>())))
+            new OmKeyLocationInfoGroup(version, new ArrayList<>(),
+                isMultipartKey)))
         .setCreationTime(creationTime)
         .setModificationTime(Time.now())
         .setDataSize(1000L)
         .setReplicationConfig(
             ReplicationConfig
                 .fromProtoTypeAndFactor(replicationType, replicationFactor))
+        .setObjectID(objectID)
+        .setUpdateID(objectID)
+        .build();
+  }
+
+  /**
+   * Create OmMultipartKeyInfo for OBS/LEGACY bucket.
+   */
+  public static OmMultipartKeyInfo createOmMultipartKeyInfo(String uploadId,
+        long creationTime, HddsProtos.ReplicationType replicationType,
+        HddsProtos.ReplicationFactor replicationFactor, long objectID) {
+    return new OmMultipartKeyInfo.Builder()
+        .setUploadID(uploadId)
+        .setCreationTime(creationTime)
+        .setReplicationConfig(
+            ReplicationConfig
+                .fromProtoTypeAndFactor(replicationType, replicationFactor))
+        .setPartKeyInfoList(Collections.emptySortedMap())
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();
@@ -542,17 +714,18 @@ public final class OMRequestTestUtils {
         BucketLayout.DEFAULT);
   }
 
-  public static void addBucketToDB(String volumeName, String bucketName,
-      OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
+  public static OmBucketInfo addBucketToDB(String volumeName,
+      String bucketName, OMMetadataManager omMetadataManager,
+      BucketLayout bucketLayout)
       throws Exception {
-    addBucketToDB(omMetadataManager,
+    return addBucketToDB(omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setBucketLayout(bucketLayout)
     );
   }
 
-  public static void addBucketToDB(OMMetadataManager omMetadataManager,
+  public static OmBucketInfo addBucketToDB(OMMetadataManager omMetadataManager,
       OmBucketInfo.Builder builder) throws Exception {
 
     OmBucketInfo omBucketInfo = builder
@@ -567,6 +740,8 @@ public final class OMRequestTestUtils {
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
         CacheValue.get(1L, omBucketInfo));
+
+    return omBucketInfo;
   }
 
   /**
@@ -971,12 +1146,14 @@ public final class OMRequestTestUtils {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
-  public static OMRequest createTenantRequest(String tenantId) {
+  public static OMRequest createTenantRequest(String tenantId,
+      boolean forceCreationWhenVolumeExists) {
 
     final CreateTenantRequest.Builder requestBuilder =
         CreateTenantRequest.newBuilder()
             .setTenantId(tenantId)
-            .setVolumeName(tenantId);
+            .setVolumeName(tenantId)
+            .setForceCreationWhenVolumeExists(forceCreationWhenVolumeExists);
 
     return OMRequest.newBuilder()
         .setCreateTenantRequest(requestBuilder)
@@ -1131,10 +1308,18 @@ public final class OMRequestTestUtils {
             .setSnapshotName(snapshotName)
             .build();
 
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("remote-address")
+            .build();
+
     return OMRequest.newBuilder()
         .setCreateSnapshotRequest(createSnapshotRequest)
         .setCmdType(Type.CreateSnapshot)
         .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
         .build();
   }
 
@@ -1154,10 +1339,18 @@ public final class OMRequestTestUtils {
             .setDeletionTime(Time.now())
             .build();
 
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("0.0.0.0")
+            .build();
+
     return OMRequest.newBuilder()
         .setDeleteSnapshotRequest(deleteSnapshotRequest)
         .setCmdType(Type.DeleteSnapshot)
         .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
         .build();
   }
 
@@ -1222,7 +1415,21 @@ public final class OMRequestTestUtils {
       long parentID, long trxnLogIndex, long creationTime) {
     return createOmKeyInfo(volumeName, bucketName, keyName,
       replicationType, replicationFactor, objectID,
-      parentID, trxnLogIndex, creationTime, 0L);
+      parentID, trxnLogIndex, creationTime, 0L, false);
+  }
+
+  /**
+   * Create OmKeyInfo with isMultipartKey flag.
+   */
+  @SuppressWarnings("parameterNumber")
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long parentID, long trxnLogIndex, long creationTime,
+      boolean isMultipartKey) {
+    return createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationType, replicationFactor, objectID,
+        parentID, trxnLogIndex, creationTime, 0L, isMultipartKey);
   }
 
   /**
@@ -1233,13 +1440,28 @@ public final class OMRequestTestUtils {
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
       long parentID, long trxnLogIndex, long creationTime, long version) {
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
+        replicationFactor, objectID, parentID, trxnLogIndex, creationTime,
+        version, false);
+  }
+
+  /**
+   * Create OmKeyInfo for FSO bucket.
+   */
+  @SuppressWarnings("parameterNumber")
+  private static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long parentID, long trxnLogIndex, long creationTime, long version,
+      boolean isMultipartKey) {
     String fileName = OzoneFSUtils.getFileName(keyName);
     return new OmKeyInfo.Builder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(version, new ArrayList<>())))
+                    new OmKeyLocationInfoGroup(version, new ArrayList<>(),
+                        isMultipartKey)))
             .setCreationTime(creationTime)
             .setModificationTime(Time.now())
             .setDataSize(1000L)
@@ -1296,6 +1518,30 @@ public final class OMRequestTestUtils {
           .put(ozoneDBKey, omKeyInfo);
     }
     return ozoneDBKey;
+  }
+
+  /**
+   * Add open multipart key to openFileTable.
+   *
+   * @throws Exception DB failure
+   */
+  public static void addMultipartKeyToOpenFileTable(boolean addToCache,
+      String fileName, OmKeyInfo omKeyInfo, String uploadId, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws IOException {
+    final long volumeId = omMetadataManager.getVolumeId(
+        omKeyInfo.getVolumeName());
+    final long bucketId = omMetadataManager.getBucketId(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+    String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
+        omKeyInfo.getParentObjectID(), fileName, uploadId);
+
+    if (addToCache) {
+      omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .addCacheEntry(new CacheKey<>(multipartKey),
+              CacheValue.get(trxnLogIndex, omKeyInfo));
+    }
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put(multipartKey, omKeyInfo);
   }
 
   /**

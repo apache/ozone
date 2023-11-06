@@ -17,6 +17,8 @@
  */
 package org.apache.ozone.rocksdiff;
 
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,12 +32,16 @@ public class DifferSnapshotInfo {
 
   private final Map<String, String> tablePrefixes;
 
+  private final ManagedRocksDB rocksDB;
+
   public DifferSnapshotInfo(String db, UUID id, long gen,
-                            Map<String, String> prefixes) {
+                            Map<String, String> prefixes,
+                            ManagedRocksDB rocksDB) {
     dbPath = db;
     snapshotId = id;
     snapshotGeneration = gen;
     tablePrefixes = prefixes;
+    this.rocksDB = rocksDB;
   }
 
   public String getDbPath() {
@@ -61,4 +67,7 @@ public class DifferSnapshotInfo {
         dbPath, snapshotId, snapshotGeneration, tablePrefixes.size());
   }
 
+  public ManagedRocksDB getRocksDB() {
+    return rocksDB;
+  }
 }

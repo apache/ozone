@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
@@ -212,10 +214,15 @@ public class ContainerReader implements Runnable {
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
+            cleanupContainer(hddsVolume, kvContainer);
             kvContainer.delete();
             LOG.info("Delete recovering container {}.",
                 kvContainer.getContainerData().getContainerID());
           }
+          return;
+        }
+        if (kvContainer.getContainerState() == DELETED) {
+          cleanupContainer(hddsVolume, kvContainer);
           return;
         }
         containerSet.addContainer(kvContainer);
@@ -230,6 +237,23 @@ public class ContainerReader implements Runnable {
       throw new StorageContainerException("Unrecognized ContainerType " +
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
+    }
+  }
+
+  private void cleanupContainer(
+      HddsVolume volume, KeyValueContainer kvContainer) {
+    try {
+      LOG.info("Finishing delete of container {}.",
+          kvContainer.getContainerData().getContainerID());
+      // container information from db is removed for V3
+      // and container moved to tmp folder
+      // then container content removed from tmp folder
+      KeyValueContainerUtil.removeContainer(kvContainer.getContainerData(),
+          volume.getConf());
+      kvContainer.delete();
+    } catch (IOException ex) {
+      LOG.warn("Failed to remove deleted container {}.",
+          kvContainer.getContainerData().getContainerID(), ex);
     }
   }
 }

@@ -35,13 +35,13 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -81,18 +81,14 @@ public class TestRecursiveAclWithFSO {
   }
 
   @Test
-  @Flaky("HDDS-8092")
   public void testKeyDeleteAndRenameWithoutPermission() throws Exception {
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
        l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
     String aclWorldAll = "world::a";
-
     List<String> keys = new ArrayList<>();
     // Create volumes with user1
-
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-
       createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclWorldAll);
     }
 
@@ -100,9 +96,7 @@ public class TestRecursiveAclWithFSO {
     UserGroupInformation.setLoginUser(user1);
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-
       OzoneVolume volume = objectStore.getVolume("volume1");
-
       BucketArgs omBucketArgs =
           BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
 
@@ -134,7 +128,7 @@ public class TestRecursiveAclWithFSO {
        *     Try deleting b2
        *
        *     Test case 2:
-       *     Remove delete acl fro dir c2
+       *     Remove delete acl from dir c2
        *     Try deleting b1
        *
        *     Test case 3
@@ -147,7 +141,6 @@ public class TestRecursiveAclWithFSO {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-
       String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
       String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
 
@@ -159,7 +152,6 @@ public class TestRecursiveAclWithFSO {
       keys.add(keyf6);
       keys.add(file1);
       keys.add(file2);
-
       createKeys(objectStore, ozoneBucket, keys);
 
       // Test case 1
@@ -184,7 +176,6 @@ public class TestRecursiveAclWithFSO {
         assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
             ome.getResult(), "Permission check failed");
       }
-
       // perform rename
       try {
         ozoneBucket.renameKey("a/b2", "a/b2_renamed");
@@ -198,9 +189,14 @@ public class TestRecursiveAclWithFSO {
       // Test case 2
       // Remove acl from directory c2, delete/rename a/b1 should throw
       // permission denied since c2 is a subdirectory
-
-      UserGroupInformation.setLoginUser(user1);
-      removeAclsFromKey(objectStore, ozoneBucket, "a/b1/c2");
+      user1.doAs((PrivilegedExceptionAction<Void>) () -> {
+        try (OzoneClient c = cluster.newClient()) {
+          ObjectStore o = c.getObjectStore();
+          OzoneBucket b = o.getVolume("volume1").getBucket("bucket1");
+          removeAclsFromKey(o, b, "a/b1/c2");
+        }
+        return null;
+      });
 
       UserGroupInformation.setLoginUser(user2);
       // perform  delete
@@ -224,9 +220,15 @@ public class TestRecursiveAclWithFSO {
       }
 
       // Test case 3
-      // delete b3 and this shouldn't throw exception because acls have not
-      // been removed from subpaths.
-      ozoneBucket.deleteDirectory("a/b3", true);
+      // delete b3 and this should throw exception because user2 has no acls
+      try {
+        ozoneBucket.deleteDirectory("a/b3", true);
+        fail("Should throw permission denied !");
+      } catch (OMException ome) {
+        // expect permission error
+        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+            ome.getResult(), "Permission check failed");
+      }
     }
   }
 

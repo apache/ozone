@@ -185,15 +185,6 @@ public class ReconServer extends GenericCli {
         reconStorage, this::saveNewCertId, this::terminateRecon);
 
     CertificateClient.InitResponse response = certClient.init();
-    if (response.equals(CertificateClient.InitResponse.REINIT)) {
-      LOG.info("Re-initialize certificate client.");
-      certClient.close();
-      reconStorage.unsetReconCertSerialId();
-      reconStorage.persistCurrentState();
-      certClient = new ReconCertificateClient(secConf, scmSecurityClient,
-          reconStorage, this::saveNewCertId, this::terminateRecon);
-      response = certClient.init();
-    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:
@@ -209,10 +200,6 @@ public class ReconServer extends GenericCli {
       break;
     case FAILURE:
       LOG.error("Recon security initialization failed, case:{}.", response);
-      throw new RuntimeException("Recon security initialization failed.");
-    case RECOVER:
-      LOG.error("Recon security initialization failed. Recon certificate is " +
-          "missing.");
       throw new RuntimeException("Recon security initialization failed.");
     default:
       LOG.error("Recon security initialization failed. Init response: {}",

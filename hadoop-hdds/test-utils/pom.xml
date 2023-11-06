@@ -72,6 +72,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.jacoco</groupId>
       <artifactId>org.jacoco.core</artifactId>
       <scope>provided</scope>

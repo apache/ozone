@@ -183,12 +183,11 @@ public class TestLeaseManager {
     LeaseManager<DummyResource> manager = new LeaseManager<>("Test", 5000);
     manager.start();
     DummyResource resourceOne = new DummyResource("one");
-    Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
-    leaseStatus.put(resourceOne, "lease in use");
-    leaseOne.registerCallBack(() -> {
+    Lease<DummyResource> leaseOne = manager.acquire(resourceOne, () -> {
       leaseStatus.put(resourceOne, "lease expired");
       return null;
     });
+    leaseStatus.put(resourceOne, "lease in use");
     // wait for lease to expire
     long sleepTime = leaseOne.getRemainingTime() + 1000;
     try {
@@ -212,12 +211,11 @@ public class TestLeaseManager {
     LeaseManager<DummyResource> manager = new LeaseManager<>("Test", 5000);
     manager.start();
     DummyResource resourceOne = new DummyResource("one");
-    Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
-    leaseStatus.put(resourceOne, "lease in use");
-    leaseOne.registerCallBack(() -> {
+    Lease<DummyResource> leaseOne = manager.acquire(resourceOne, () -> {
       leaseStatus.put(resourceOne, "lease expired");
       return null;
     });
+    leaseStatus.put(resourceOne, "lease in use");
     leaseStatus.put(resourceOne, "lease released");
     manager.release(resourceOne);
     Assertions.assertTrue(leaseOne.hasExpired());
@@ -237,36 +235,31 @@ public class TestLeaseManager {
     DummyResource resourceThree = new DummyResource("three");
     DummyResource resourceFour = new DummyResource("four");
     DummyResource resourceFive = new DummyResource("five");
-    Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
-    Lease<DummyResource> leaseTwo = manager.acquire(resourceTwo);
-    Lease<DummyResource> leaseThree = manager.acquire(resourceThree);
-    Lease<DummyResource> leaseFour = manager.acquire(resourceFour);
-    Lease<DummyResource> leaseFive = manager.acquire(resourceFive);
+    Lease<DummyResource> leaseOne = manager.acquire(resourceOne, () -> {
+      leaseStatus.put(resourceOne, "lease expired");
+      return null;
+    });
+    Lease<DummyResource> leaseTwo = manager.acquire(resourceTwo, () -> {
+      leaseStatus.put(resourceTwo, "lease expired");
+      return null;
+    });
+    Lease<DummyResource> leaseThree = manager.acquire(resourceThree, () -> {
+      leaseStatus.put(resourceThree, "lease expired");
+      return null;
+    });
+    Lease<DummyResource> leaseFour = manager.acquire(resourceFour, () -> {
+      leaseStatus.put(resourceFour, "lease expired");
+      return null;
+    });
+    Lease<DummyResource> leaseFive = manager.acquire(resourceFive, () -> {
+      leaseStatus.put(resourceFive, "lease expired");
+      return null;
+    });
     leaseStatus.put(resourceOne, "lease in use");
     leaseStatus.put(resourceTwo, "lease in use");
     leaseStatus.put(resourceThree, "lease in use");
     leaseStatus.put(resourceFour, "lease in use");
     leaseStatus.put(resourceFive, "lease in use");
-    leaseOne.registerCallBack(() -> {
-      leaseStatus.put(resourceOne, "lease expired");
-      return null;
-    });
-    leaseTwo.registerCallBack(() -> {
-      leaseStatus.put(resourceTwo, "lease expired");
-      return null;
-    });
-    leaseThree.registerCallBack(() -> {
-      leaseStatus.put(resourceThree, "lease expired");
-      return null;
-    });
-    leaseFour.registerCallBack(() -> {
-      leaseStatus.put(resourceFour, "lease expired");
-      return null;
-    });
-    leaseFive.registerCallBack(() -> {
-      leaseStatus.put(resourceFive, "lease expired");
-      return null;
-    });
 
     // release lease one, two and three
     leaseStatus.put(resourceOne, "lease released");

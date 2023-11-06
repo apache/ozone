@@ -1,7 +1,3 @@
-package org.apache.hadoop.ozone.freon;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -18,9 +14,20 @@ import java.io.IOException;
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+package org.apache.hadoop.ozone.freon;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import org.junit.Assert;
 import org.junit.Test;
+
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.fs.Syncable;
+
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for the ContentGenerator class of Freon.
@@ -77,5 +84,37 @@ public class TestContentGenerator {
     System.arraycopy(buffer, 0, expected, 8, buffer.length);
     System.arraycopy(buffer, 0, expected, 16, 4);
     Assert.assertArrayEquals(expected, output.toByteArray());
+  }
+
+  @Test
+  public void writeWithHsync() throws IOException {
+    class SyncableByteArrayOutputStream extends ByteArrayOutputStream
+        implements Syncable, StreamCapabilities {
+      @Override
+      public void hflush() throws IOException {
+      }
+      @Override
+      public void hsync() throws IOException {
+      }
+
+      @Override
+      public boolean hasCapability(String capability) {
+        return true;
+      }
+    }
+    ContentGenerator generator = new ContentGenerator(20, 8, 3,
+        ContentGenerator.SyncOptions.HSYNC);
+
+    SyncableByteArrayOutputStream syncable =
+        new SyncableByteArrayOutputStream();
+    SyncableByteArrayOutputStream spySyncable = spy(syncable);
+
+    generator.write(spySyncable);
+    verify(spySyncable, times(8)).hsync();
+
+    generator = new ContentGenerator(20, 8, 3);
+    spySyncable = spy(syncable);
+    generator.write(spySyncable);
+    verify(spySyncable, times(0)).hsync();
   }
 }

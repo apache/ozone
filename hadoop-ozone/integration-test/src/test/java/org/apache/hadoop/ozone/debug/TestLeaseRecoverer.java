@@ -26,7 +26,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import picocli.CommandLine;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -37,6 +39,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -59,7 +62,7 @@ public class TestLeaseRecoverer {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(120000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(120000));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -70,6 +73,7 @@ public class TestLeaseRecoverer {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String omId = UUID.randomUUID().toString();

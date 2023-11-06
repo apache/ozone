@@ -44,28 +44,23 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
  * parsing logic is in
  * {@link org.apache.hadoop.hdds.scm.client.HddsClientUtils}.
  */
+@Timeout(300)
 public class TestHddsClientUtils {
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   /**
    * Verify client endpoint lookup failure if it is not configured.
@@ -73,8 +68,8 @@ public class TestHddsClientUtils {
   @Test
   public void testMissingScmClientAddress() {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    thrown.expect(ConfigurationException.class);
-    HddsUtils.getScmAddressForClients(conf);
+    assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
   }
 
   /**
@@ -133,7 +128,7 @@ public class TestHddsClientUtils {
       int port) {
     Iterator<InetSocketAddress> scmAddrIterator =
         HddsUtils.getScmAddressForClients(conf).iterator();
-    Assert.assertTrue(scmAddrIterator.hasNext());
+    assertTrue(scmAddrIterator.hasNext());
     InetSocketAddress scmAddr = scmAddrIterator.next();
     assertThat(scmAddr.getHostString(), is(address));
     assertThat(scmAddr.getPort(), is(port));
@@ -186,7 +181,7 @@ public class TestHddsClientUtils {
     conf.set(OZONE_SCM_NAMES, scmHost);
     final Collection<InetSocketAddress> address =
         HddsUtils.getScmAddressForClients(conf);
-    Assert.assertTrue(address.iterator().hasNext());
+    assertTrue(address.iterator().hasNext());
     InetSocketAddress socketAddress = address.iterator().next();
     assertEquals(scmHost, socketAddress.getHostName());
     assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, socketAddress.getPort());
@@ -205,7 +200,7 @@ public class TestHddsClientUtils {
     conf.set(OZONE_SCM_NAMES, scmHost);
     final Collection<InetSocketAddress> address =
         HddsUtils.getScmAddressForClients(conf);
-    Assert.assertTrue(address.iterator().hasNext());
+    assertTrue(address.iterator().hasNext());
     InetSocketAddress socketAddress = address.iterator().next();
     assertEquals(scmHost.split(":")[0],
         socketAddress.getHostName());
@@ -246,6 +241,7 @@ public class TestHddsClientUtils {
     final String upperCase = "notAname";
     final String endDot = "notaname.";
     final String startDot = ".notaname";
+    final String unicodeCharacters = "ｚｚｚ";
     final String tooShort = StringUtils.repeat("a",
         OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH - 1);
 
@@ -257,6 +253,7 @@ public class TestHddsClientUtils {
     invalidNames.add(upperCase);
     invalidNames.add(endDot);
     invalidNames.add(startDot);
+    invalidNames.add(unicodeCharacters);
     invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
@@ -279,7 +276,14 @@ public class TestHddsClientUtils {
     invalidNames.add("test<string>");
     invalidNames.add("10%3=1");
     invalidNames.add("photo[0201]");
-    invalidNames.add("what?");
+    invalidNames.add("square_right]");
+    invalidNames.add("my\\file");
+    invalidNames.add("for}");
+    invalidNames.add("{curly-left");
+    invalidNames.add("\"hi\"");
+    invalidNames.add("\\\\~`");
+    invalidNames.add("Code`");
+
 
     for (String name : invalidNames) {
       try {
@@ -287,6 +291,34 @@ public class TestHddsClientUtils {
         fail("Did not reject invalid string [" + name + "] as a name");
       } catch (IllegalArgumentException e) {
         // throwing up on an invalid name. it's working.
+      }
+    }
+
+    List<String> validNames = new ArrayList<>();
+    validNames.add("123_123");
+    validNames.add("abcd/abcd");
+    validNames.add("test-name");
+    validNames.add("hi!ozone");
+    validNames.add("test(string)");
+    validNames.add("10*3+1");
+    validNames.add("photo'0201'");
+    validNames.add("my.name");
+    validNames.add("you&me");
+    validNames.add("1=0");
+    validNames.add("print;");
+    validNames.add("3:5:2");
+    validNames.add("a,b,c");
+    validNames.add("my name is");
+    validNames.add("xyz@mail");
+    validNames.add("dollar$");
+
+    for (String name : validNames) {
+      try {
+        HddsClientUtils.verifyKeyName(name);
+        // not throwing up on a valid name. it's working.
+      } catch (IllegalArgumentException e) {
+        // throwing up on an valid name. it's not working.
+        fail("Rejected valid string [" + name + "] as a name");
       }
     }
   }

@@ -22,6 +22,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -129,7 +131,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -203,12 +205,15 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
                 dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
 
+        long usedBytesDiff = 0;
         //Find all unused parts.
         List<OmKeyInfo> allKeyInfoToRemove = new ArrayList<>();
         for (PartKeyInfo partKeyInfo : partKeyInfoMap) {
           if (!partNumbers.contains(partKeyInfo.getPartNumber())) {
-            allKeyInfoToRemove.add(OmKeyInfo
-                .getFromProtobuf(partKeyInfo.getPartKeyInfo()));
+            OmKeyInfo delPartKeyInfo =
+                OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+            allKeyInfoToRemove.add(delPartKeyInfo);
+            usedBytesDiff -= delPartKeyInfo.getReplicatedSize();
           }
         }
 
@@ -218,7 +223,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         // creation after the knob turned on.
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-        long usedBytesDiff = 0;
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
@@ -249,7 +253,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 .setVolume(requestedVolume)
                 .setBucket(requestedBucket)
                 .setKey(keyName)
-                .setHash(DigestUtils.sha256Hex(keyName)));
+                .setHash(omKeyInfo.getMetadata().get("ETag")));
 
         long volumeId = omMetadataManager.getVolumeId(volumeName);
         long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
@@ -266,7 +270,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_REQUEST);
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = getOmClientResponse(omResponse, exception);
@@ -286,7 +290,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected S3MultipartUploadCompleteResponse getOmClientResponse(
-      OMResponse.Builder omResponse, IOException exception) {
+      OMResponse.Builder omResponse, Exception exception) {
     return new S3MultipartUploadCompleteResponse(
         createErrorOMResponse(omResponse, exception), getBucketLayout());
   }
@@ -326,7 +330,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       MultipartUploadCompleteRequest multipartUploadCompleteRequest,
       List<OzoneManagerProtocolProtos.Part> partsList,
       Map<String, String> auditMap, String volumeName,
-      String bucketName, String keyName, IOException exception,
+      String bucketName, String keyName, Exception exception,
       Result result) {
     auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString()
         .replaceAll("\\n", " "));
@@ -387,7 +391,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo())
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
-          .setAcls(dbOpenKeyInfo.getAcls());
+          .setAcls(dbOpenKeyInfo.getAcls())
+          .addMetadata("ETag",
+              multipartUploadedKeyHash(partKeyInfoMap));
       // Check if db entry has ObjectID. This check is required because
       // it is possible that between multipart key uploads and complete,
       // we had an upgrade.
@@ -415,6 +421,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.updateLocationInfoList(partLocationInfos, true, true);
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
+      omKeyInfo.getMetadata().put("ETag",
+          multipartUploadedKeyHash(partKeyInfoMap));
     }
     omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
     return omKeyInfo;
@@ -630,4 +638,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  private String multipartUploadedKeyHash(
+      OmMultipartKeyInfo.PartKeyInfoMap partsList) {
+    StringBuffer keysConcatenated = new StringBuffer();
+    for (PartKeyInfo partKeyInfo: partsList) {
+      keysConcatenated.append(KeyValueUtil.getFromProtobuf(partKeyInfo
+          .getPartKeyInfo().getMetadataList()).get("ETag"));
+    }
+    return DigestUtils.md5Hex(keysConcatenated.toString()) + "-"
+        + partsList.size();
+  }
+
 }
