@@ -78,6 +78,14 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
+
   private enum StripeWriteStatus {
     SUCCESS,
     FAILED
@@ -155,6 +163,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
     flushExecutor.submit(() -> s3CredentialsProvider.set(s3Auth));
     this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
     this.flushCheckpoint = new AtomicLong(0);
+    this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
 
   /**
@@ -512,6 +521,12 @@ public final class ECKeyOutputStream extends KeyOutputStream
         Preconditions.checkArgument(writeOffset == offset,
             "Expected writeOffset= " + writeOffset
                 + " Expected offset=" + offset);
+        if (atomicKeyCreation) {
+          long expectedSize = blockOutputStreamEntryPool.getDataSize();
+          Preconditions.checkState(expectedSize == offset, String.format(
+              "Expected: %d and actual %d write sizes do not match",
+                  expectedSize, offset));
+        }
         blockOutputStreamEntryPool.commitKey(offset);
       }
     } catch (ExecutionException e) {

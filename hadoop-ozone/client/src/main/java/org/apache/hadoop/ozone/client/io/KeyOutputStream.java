@@ -708,6 +708,10 @@ public class KeyOutputStream extends OutputStream
       return clientMetrics;
     }
 
+    public boolean getAtomicKeyCreation() {
+      return atomicKeyCreation;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
