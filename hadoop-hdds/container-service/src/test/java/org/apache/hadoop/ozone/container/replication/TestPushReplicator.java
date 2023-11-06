@@ -151,7 +151,7 @@ class TestPushReplicator {
   @Test
   void importSameContainerWhenAlreadyImport() throws Exception {
     long containerId = 1;
-    // crate container
+    // create container
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
@@ -163,7 +163,6 @@ class TestPushReplicator {
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = new ContainerImporter(conf,
         containerSet, controllerMock, volumeSet);
-    // run import async first time having delay
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
     try {
@@ -179,7 +178,7 @@ class TestPushReplicator {
   @Test
   void importSameContainerWhenFirstInProgress() throws Exception {
     long containerId = 1;
-    // crate container
+    // create container
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
