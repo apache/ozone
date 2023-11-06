@@ -3028,7 +3028,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
-        messageException.add("IO-Exception Occurred");
+        messageException.add("IO-Exception Occurred, " + e.getMessage());
         resultList.add(messageException);
         return resultList;
       }
