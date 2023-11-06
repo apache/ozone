@@ -131,8 +131,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         );
       }
       metrics.incNumKeyLookups();
-      return keyManager.lookupKey(resolvedArgs, bucket.bucketLayout(),
-          getClientAddress());
+      return keyManager.lookupKey(resolvedArgs, bucket, getClientAddress());
     } catch (Exception ex) {
       metrics.incNumKeyLookupFails();
       auditSuccess = false;

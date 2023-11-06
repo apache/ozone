@@ -377,12 +377,12 @@ public class KeyManagerImpl implements KeyManager {
     return edek;
   }
   @Override
-  public OmKeyInfo lookupKey(OmKeyArgs args, BucketLayout bucketLayout,
+  public OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
     Preconditions.checkNotNull(args);
 
     OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args, bucketLayout));
+        () -> readKeyInfo(args, bucket.bucketLayout()));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.

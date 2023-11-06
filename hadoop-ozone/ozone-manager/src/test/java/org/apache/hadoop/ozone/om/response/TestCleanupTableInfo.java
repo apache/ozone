@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.response;
 
 import com.google.common.collect.Iterators;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -130,13 +129,9 @@ public class TestCleanupTableInfo {
     when(om.getMetadataManager()).thenReturn(metaMgr);
     when(om.resolveBucketLink(any(KeyArgs.class), any(OMClientRequest.class)))
         .thenAnswer(
-            invocationOnMock -> {
-              Pair<String, String> pair =
-                  Pair.of(TEST_VOLUME_NAME, TEST_BUCKET_NAME);
-              return new ResolvedBucket(TEST_VOLUME_NAME, TEST_BUCKET_NAME,
-                  TEST_VOLUME_NAME, TEST_BUCKET_NAME,
-                  "owner", BucketLayout.DEFAULT);
-            }
+            invocationOnMock -> new ResolvedBucket(TEST_VOLUME_NAME, TEST_BUCKET_NAME,
+                TEST_VOLUME_NAME, TEST_BUCKET_NAME,
+                "owner", BucketLayout.DEFAULT)
         );
     when(om.getAclsEnabled()).thenReturn(false);
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
