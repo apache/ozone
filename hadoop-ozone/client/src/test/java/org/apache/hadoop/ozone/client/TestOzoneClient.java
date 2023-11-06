@@ -242,7 +242,7 @@ public class TestOzoneClient {
           value.getBytes(UTF_8).length, ReplicationType.RATIS, ONE,
           new HashMap<>());
       out1.write(value.substring(0, value.length() - 1).getBytes(UTF_8));
-      Assertions.assertThrows(IllegalArgumentException.class, out1::close,
+      Assertions.assertThrows(IllegalStateException.class, out1::close,
           "Expected IllegalArgumentException due to size mismatch.");
 
       // Simulating second mismatch: Write more data than expected
@@ -251,7 +251,7 @@ public class TestOzoneClient {
           new HashMap<>());
       value += "1";
       out2.write(value.getBytes(UTF_8));
-      Assertions.assertThrows(IllegalArgumentException.class, out2::close,
+      Assertions.assertThrows(IllegalStateException.class, out2::close,
           "Expected IllegalArgumentException due to size mismatch.");
     } finally {
       client.getProxy().setIsS3Request(false);
