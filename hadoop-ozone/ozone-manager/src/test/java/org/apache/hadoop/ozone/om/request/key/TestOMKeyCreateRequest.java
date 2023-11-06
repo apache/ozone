@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.PrefixManager;
+import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -427,6 +429,53 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   }
 
+
+  @Test
+  public void testValidateAndUpdateCacheWithInvalidPath() throws Exception {
+
+    PrefixManager prefixManager = new PrefixManagerImpl(
+        ozoneManager.getMetadataManager(), true);
+    when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+    OMRequest modifiedOmRequest =
+        doPreExecute(createKeyRequest(
+            false, 0, String.valueOf('\u0000')));
+
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+
+    String openKey = getOpenKey(id);
+
+    // Add volume and bucket entries to DB.
+    addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    // Before calling
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+
+    Assert.assertNull(omKeyInfo);
+
+    OMClientResponse omKeyCreateResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH,
+        omKeyCreateResponse.getOMResponse().getStatus());
+
+
+
+    // As We got an error, openKey Table should not have entry.
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+
+    Assert.assertNull(omKeyInfo);
+
+  }
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOMRequest

@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.client.ReplicationType.EC;
 
@@ -37,14 +37,14 @@ public class TestOmBucketArgs {
         .setVolumeName("volume")
         .build();
 
-    Assert.assertEquals(false, bucketArgs.hasQuotaInBytes());
-    Assert.assertEquals(false, bucketArgs.hasQuotaInNamespace());
+    Assertions.assertFalse(bucketArgs.hasQuotaInBytes());
+    Assertions.assertFalse(bucketArgs.hasQuotaInNamespace());
 
     OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
         bucketArgs.getProtobuf());
 
-    Assert.assertEquals(false, argsFromProto.hasQuotaInBytes());
-    Assert.assertEquals(false, argsFromProto.hasQuotaInNamespace());
+    Assertions.assertFalse(argsFromProto.hasQuotaInBytes());
+    Assertions.assertFalse(argsFromProto.hasQuotaInNamespace());
 
     bucketArgs = OmBucketArgs.newBuilder()
         .setBucketName("bucket")
@@ -53,39 +53,39 @@ public class TestOmBucketArgs {
         .setQuotaInBytes(456)
         .build();
 
-    Assert.assertEquals(true, bucketArgs.hasQuotaInBytes());
-    Assert.assertEquals(true, bucketArgs.hasQuotaInNamespace());
+    Assertions.assertTrue(bucketArgs.hasQuotaInBytes());
+    Assertions.assertTrue(bucketArgs.hasQuotaInNamespace());
 
     argsFromProto = OmBucketArgs.getFromProtobuf(
         bucketArgs.getProtobuf());
 
-    Assert.assertEquals(true, argsFromProto.hasQuotaInBytes());
-    Assert.assertEquals(true, argsFromProto.hasQuotaInNamespace());
+    Assertions.assertTrue(argsFromProto.hasQuotaInBytes());
+    Assertions.assertTrue(argsFromProto.hasQuotaInNamespace());
   }
 
   @Test
   public void testDefaultReplicationConfigIsSetCorrectly() {
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
-            .setBucketName("bucket")
-            .setVolumeName("volume")
-            .build();
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .build();
 
     OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
-            bucketArgs.getProtobuf());
+        bucketArgs.getProtobuf());
 
-    Assert.assertEquals(null, argsFromProto.getDefaultReplicationConfig());
+    Assertions.assertNull(argsFromProto.getDefaultReplicationConfig());
 
     bucketArgs = OmBucketArgs.newBuilder()
-            .setBucketName("bucket")
-            .setVolumeName("volume")
-            .setDefaultReplicationConfig(new DefaultReplicationConfig(
-                    new ECReplicationConfig(3, 2)))
-            .build();
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(
+            new ECReplicationConfig(3, 2)))
+        .build();
 
     argsFromProto = OmBucketArgs.getFromProtobuf(
-            bucketArgs.getProtobuf());
+        bucketArgs.getProtobuf());
 
-    Assert.assertEquals(EC,
-            argsFromProto.getDefaultReplicationConfig().getType());
+    Assertions.assertEquals(EC,
+        argsFromProto.getDefaultReplicationConfig().getType());
   }
 }

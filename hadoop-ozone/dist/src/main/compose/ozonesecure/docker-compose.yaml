@@ -25,6 +25,7 @@ services:
     command: ["krb5kdc","-n"]
   kms:
     image: apache/hadoop:${HADOOP_VERSION}
+    hostname: kms
     ports:
     - 9600:9600
     env_file:
@@ -36,6 +37,7 @@ services:
     command: ["hadoop", "kms"]
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    hostname: dn
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs

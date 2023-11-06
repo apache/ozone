@@ -124,7 +124,7 @@ public class TestDeleteBlocksCommandHandler {
         conf.getObject(DatanodeConfiguration.class);
 
     handler = spy(new DeleteBlocksCommandHandler(
-        ozoneContainer, conf, dnConf));
+        ozoneContainer, conf, dnConf, ""));
     blockDeleteMetrics = handler.getBlockDeleteMetrics();
     TestSchemaHandler testSchemaHandler1 = Mockito.spy(new TestSchemaHandler());
     TestSchemaHandler testSchemaHandler2 = Mockito.spy(new TestSchemaHandler());

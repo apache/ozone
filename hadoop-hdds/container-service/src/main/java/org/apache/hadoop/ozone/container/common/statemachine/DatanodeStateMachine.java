@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -167,12 +168,16 @@ public class DatanodeStateMachine implements Closeable {
     VersionedDatanodeFeatures.initialize(layoutVersionManager);
 
     this.dnCRLStore = crlStore;
+    String threadNamePrefix = datanodeDetails.threadNamePrefix();
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder()
-            .setNameFormat("Datanode State Machine Task Thread - %d").build());
+            .setNameFormat(threadNamePrefix +
+                "DatanodeStateMachineTaskThread-%d")
+            .build());
     connectionManager = new SCMConnectionManager(conf);
-    context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
+    context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
+        threadNamePrefix);
     // OzoneContainer instance is used in a non-thread safe way by the context
     // past to its constructor, so we much synchronize its access. See
     // HDDS-3116 for more details.
@@ -216,32 +221,35 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionMetrics = ECReconstructionMetrics.create();
 
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
-        conf, certClient, secretKeyClient, context, ecReconstructionMetrics);
+        conf, certClient, secretKeyClient, context, ecReconstructionMetrics,
+        threadNamePrefix);
 
     // This is created as an instance variable as Mockito needs to access it in
     // a test. The test mocks it in a running mini-cluster.
     reconstructECContainersCommandHandler =
         new ReconstructECContainersCommandHandler(conf, supervisor,
-        ecReconstructionCoordinator);
+            ecReconstructionCoordinator);
 
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
+        .build();
     pipelineCommandExecutorService = Executors
-        .newSingleThreadExecutor(new ThreadFactoryBuilder()
-            .setNameFormat("PipelineCommandHandlerThread-%d").build());
+        .newSingleThreadExecutor(threadFactory);
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler(
             dnConf.getContainerCloseThreads(),
-            dnConf.getCommandQueueLimit()))
+            dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
-            conf, dnConf))
+            conf, dnConf, threadNamePrefix))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
             pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock,
-            dnConf.getCommandQueueLimit()))
+            dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(
             new ClosePipelineCommandHandler(pipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
@@ -262,6 +270,7 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
         .addPublisherFor(CRLStatusReport.class)
+        .addThreadNamePrefix(threadNamePrefix)
         .build();
 
     queueMetrics = DatanodeQueueMetrics.create(this);
@@ -551,7 +560,8 @@ public class DatanodeStateMachine implements Closeable {
     };
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("Datanode State Machine Daemon Thread")
+        .setNameFormat(datanodeDetails.threadNamePrefix() +
+            "DatanodeStateMachineDaemonThread")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate Datanode, encounter uncaught exception"
               + " in Datanode State Machine Thread";
@@ -689,7 +699,8 @@ public class DatanodeStateMachine implements Closeable {
   private Thread getCommandHandlerThread(Runnable processCommandQueue) {
     Thread handlerThread = new Thread(processCommandQueue);
     handlerThread.setDaemon(true);
-    handlerThread.setName("Command processor thread");
+    handlerThread.setName(
+        datanodeDetails.threadNamePrefix() + "CommandProcessorThread");
     handlerThread.setUncaughtExceptionHandler((Thread t, Throwable e) -> {
       // Let us just restart this thread after logging a critical error.
       // if this thread is not running we cannot handle commands from SCM.

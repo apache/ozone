@@ -56,14 +56,16 @@ public class TestRootedOzoneFileSystemWithFSO
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true, false},
-        new Object[]{true, false, false}
+        new Object[]{true, true, false, false},
+        new Object[]{true, false, false, false},
+        new Object[]{true, true, false, true},
+        new Object[]{true, false, false, true}
     );
   }
 
   public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis, boolean enableAcl) {
-    super(setDefaultFs, enableOMRatis, enableAcl);
+      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
+    super(setDefaultFs, enableOMRatis, isAclEnabled, noFlush);
   }
 
   @BeforeClass

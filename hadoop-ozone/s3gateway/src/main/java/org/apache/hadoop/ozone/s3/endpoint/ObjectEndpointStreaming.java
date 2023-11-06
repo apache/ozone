@@ -17,8 +17,12 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import javax.ws.rs.core.Response;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -28,10 +32,10 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.security.DigestInputStream;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -49,10 +53,11 @@ final class ObjectEndpointStreaming {
   private ObjectEndpointStreaming() {
   }
 
-  public static long put(OzoneBucket bucket, String keyPath,
-                         long length, ReplicationConfig replicationConfig,
-                         int chunkSize, Map<String, String> keyMetadata,
-                         InputStream body)
+  public static Pair<String, Long> put(
+      OzoneBucket bucket, String keyPath,
+      long length, ReplicationConfig replicationConfig,
+      int chunkSize, Map<String, String> keyMetadata,
+      DigestInputStream body)
       throws IOException, OS3Exception {
 
     try {
@@ -80,14 +85,35 @@ final class ObjectEndpointStreaming {
     }
   }
 
-  public static long putKeyWithStream(OzoneBucket bucket,
-                                      String keyPath,
-                                      long length,
-                                      int bufferSize,
-                                      ReplicationConfig replicationConfig,
-                                      Map<String, String> keyMetadata,
-                                      InputStream body)
+  public static Pair<String, Long> putKeyWithStream(
+      OzoneBucket bucket,
+      String keyPath,
+      long length,
+      int bufferSize,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      DigestInputStream body)
       throws IOException {
+    long writeLen;
+    String eTag;
+    try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
+        length, replicationConfig, keyMetadata)) {
+      writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
+      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+          .toLowerCase();
+      ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
+    }
+    return Pair.of(eTag, writeLen);
+  }
+
+  public static long copyKeyWithStream(
+      OzoneBucket bucket,
+      String keyPath,
+      long length,
+      int bufferSize,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      InputStream body) throws IOException {
     long writeLen = 0;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
@@ -117,16 +143,19 @@ final class ObjectEndpointStreaming {
   public static Response createMultipartKey(OzoneBucket ozoneBucket, String key,
                                             long length, int partNumber,
                                             String uploadID, int chunkSize,
-                                            InputStream body)
+                                            DigestInputStream body)
       throws IOException, OS3Exception {
     OzoneDataStreamOutput streamOutput = null;
-    String eTag = "";
+    String eTag;
     S3GatewayMetrics metrics = S3GatewayMetrics.create();
     try {
       streamOutput = ozoneBucket
           .createMultipartStreamKey(key, length, partNumber, uploadID);
       long putLength =
           writeToStreamOutput(streamOutput, body, chunkSize, length);
+      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+          .toLowerCase();
+      ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
       metrics.incPutKeySuccessLength(putLength);
     } catch (OMException ex) {
       if (ex.getResult() ==
