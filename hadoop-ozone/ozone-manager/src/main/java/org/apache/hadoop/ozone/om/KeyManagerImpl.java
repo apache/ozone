@@ -1969,13 +1969,13 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public OmKeyInfo getKeyInfo(OmKeyArgs args, BucketLayout bucketLayout,
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket bucket,
       String clientAddress) throws IOException {
     Preconditions.checkNotNull(args);
 
     OmKeyInfo value = captureLatencyNs(
         metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args, bucketLayout));
+        () -> readKeyInfo(args, bucket.bucketLayout()));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.

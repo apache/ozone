@@ -185,8 +185,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       }
 
       metrics.incNumGetKeyInfo();
-      OmKeyInfo keyInfo =
-          keyManager.getKeyInfo(resolvedArgs, bucket.bucketLayout(),
+      OmKeyInfo keyInfo = keyManager.getKeyInfo(resolvedArgs, bucket,
               OmMetadataReader.getClientAddress());
       KeyInfoWithVolumeContext.Builder builder = KeyInfoWithVolumeContext
           .newBuilder()
