@@ -855,7 +855,8 @@ public class TestKeyManagerImpl {
 
   @NotNull
   private ResolvedBucket resolvedBucket() {
-    ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME, VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
+    ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
+        VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
     return bucket;
   }
 

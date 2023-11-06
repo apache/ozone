@@ -129,7 +129,8 @@ public class TestCleanupTableInfo {
     when(om.getMetadataManager()).thenReturn(metaMgr);
     when(om.resolveBucketLink(any(KeyArgs.class), any(OMClientRequest.class)))
         .thenAnswer(
-            invocationOnMock -> new ResolvedBucket(TEST_VOLUME_NAME, TEST_BUCKET_NAME,
+            invocationOnMock -> new ResolvedBucket(
+                TEST_VOLUME_NAME, TEST_BUCKET_NAME,
                 TEST_VOLUME_NAME, TEST_BUCKET_NAME,
                 "owner", BucketLayout.DEFAULT)
         );
