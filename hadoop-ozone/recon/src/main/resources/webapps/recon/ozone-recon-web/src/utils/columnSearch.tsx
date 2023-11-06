@@ -67,7 +67,7 @@ class ColumnSearch extends React.PureComponent {
       </div>
     ),
     filterIcon: (filtered: boolean) => (
-      <Icon type='search' style={{color: filtered ? '#1890ff' : undefined}}/>
+      <Icon type='search' style={{color: filtered ? '#1890ff' : '#000000'}}/>
     ),
     onFilter: (value: string, record: any) => {
       if (record[dataIndex] !== undefined || record[dataIndex] !== null) {
