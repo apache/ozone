@@ -80,7 +80,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
    *
    * @return returns true if the SCM provided a new root ca certificate.
    */
-  boolean pollRootCas() {
+  void pollRootCas() {
     try {
       List<String> pemEncodedRootCaList =
           scmSecureClient.getAllRootCaCertificates();
@@ -90,7 +90,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
           = new ArrayList<>(rootCAsFromSCM);
       scmCertsWithoutKnownCerts.removeAll(knownRootCerts);
       if (scmCertsWithoutKnownCerts.isEmpty()) {
-        return false;
+        return;
       }
       LOG.info("Some root CAs are not known to the client out of the root " +
           "CAs known to the SCMs. Root CA Cert ids known to the client: " +
@@ -119,7 +119,6 @@ public class RootCaRotationPoller implements Runnable, Closeable {
     } catch (IOException e) {
       LOG.error("Error while trying to poll root ca certificate", e);
     }
-    return true;
   }
 
   public void addRootCARotationProcessor(

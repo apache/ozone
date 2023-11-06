@@ -41,6 +41,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
@@ -81,8 +83,20 @@ public class TestRootCaRotationPoller {
     //for them
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
-    //Then assume that the rootCaRotationProcessors weren't invoked
-    Assertions.assertFalse(poller.pollRootCas());
+    CompletableFuture<Void> processingResult = new CompletableFuture<>();
+    AtomicBoolean isProcessed = new AtomicBoolean(false);
+    poller.addRootCARotationProcessor(
+        certificates -> {
+          isProcessed.set(true);
+          processingResult.complete(null);
+          return processingResult;
+        }
+    );
+    poller.pollRootCas();
+    //Then the certificates are not processed. Note that we can't invoke
+    // processingResult.join before as it never gets completed
+    Assertions.assertThrows(TimeoutException.class, () ->
+        GenericTestUtils.waitFor(isProcessed::get, 50, 5000));
   }
 
   @Test
@@ -103,8 +117,19 @@ public class TestRootCaRotationPoller {
     //when the scm returns the unknown certificate to the poller
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
+    CompletableFuture<Void> processingResult = new CompletableFuture<>();
+    AtomicBoolean isProcessed = new AtomicBoolean(false);
+    poller.addRootCARotationProcessor(
+        certificates -> {
+          isProcessed.set(true);
+          processingResult.complete(null);
+          return processingResult;
+        }
+    );
+    poller.pollRootCas();
+    processingResult.join();
     //The root ca processors are invoked
-    Assertions.assertTrue(poller.pollRootCas());
+    Assertions.assertTrue(isProcessed.get());
   }
 
   @Test
@@ -135,7 +160,8 @@ public class TestRootCaRotationPoller {
           Assertions.assertEquals(certificates.size(), 2);
           processingResult.complete(null);
           return processingResult;
-        });
+        }
+    );
     //Then the first run encounters an error
     poller.pollRootCas();
     processingResult.join();
