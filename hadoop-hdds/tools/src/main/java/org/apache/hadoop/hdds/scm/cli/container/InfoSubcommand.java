@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,14 +107,7 @@ public class InfoSubcommand extends ScmSubcommand {
           && spec.root().userObject() instanceof GenericParentCommand
           && ((GenericParentCommand) spec.root().userObject()).isVerbose();
       if (verbose) {
-        Pipeline pipeline = null;
-        try {
-          pipeline = scmClient.getPipeline(
-              container.getContainerInfo().getPipelineID().getProtobuf());
-        } catch (PipelineNotFoundException pnfe) {
-          // Pipeline not found.
-        }
-        LOG.info("Pipeline Info: {}", pipeline == null ? "Pipeline Not Found" : pipeline.getId());
+        LOG.info("Pipeline Info: {}", container.getPipeline());
       } else {
         LOG.info("Pipeline id: {}",
             container.getContainerInfo().getPipelineID());
