@@ -88,7 +88,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
-      getOmLockDetails().merge(omMetadataManager.getLock()
+      mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volume, bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();
       OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
@@ -144,7 +144,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (lockAcquired) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volume, bucket));
       }
       if (omClientResponse != null) {

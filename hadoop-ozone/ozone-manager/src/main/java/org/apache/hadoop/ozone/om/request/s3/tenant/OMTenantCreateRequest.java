@@ -258,7 +258,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             tenantId, null, null);
       }
 
-      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
@@ -276,7 +276,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         }
       }
 
-      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           USER_LOCK, owner));
       acquiredUserLock = getOmLockDetails().isLockAcquired();
 
@@ -360,11 +360,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner));
       }
       if (acquiredVolumeLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
                 volumeName));
       }

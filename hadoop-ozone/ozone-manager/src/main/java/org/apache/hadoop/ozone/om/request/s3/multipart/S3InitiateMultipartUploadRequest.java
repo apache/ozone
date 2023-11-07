@@ -149,7 +149,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
               bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
@@ -249,7 +249,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

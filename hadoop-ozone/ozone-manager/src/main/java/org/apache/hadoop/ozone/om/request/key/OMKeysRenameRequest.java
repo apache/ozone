@@ -120,7 +120,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
               bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -238,7 +238,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

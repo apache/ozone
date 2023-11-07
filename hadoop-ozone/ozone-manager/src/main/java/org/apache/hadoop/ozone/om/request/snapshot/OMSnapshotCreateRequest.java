@@ -146,12 +146,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     try {
       // Lock bucket so it doesn't
       //  get deleted while creating snapshot
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
               volumeName, bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName));
       acquiredSnapshotLock = getOmLockDetails().isLockAcquired();
@@ -201,12 +201,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredSnapshotLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
                 volumeName, bucketName, snapshotName));
       }
       if (acquiredBucketLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
                 bucketName));
       }

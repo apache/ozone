@@ -105,7 +105,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
               bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
@@ -236,7 +236,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

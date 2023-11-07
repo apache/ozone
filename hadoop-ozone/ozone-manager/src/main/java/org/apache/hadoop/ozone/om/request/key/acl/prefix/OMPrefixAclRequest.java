@@ -89,7 +89,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
             volume, bucket, key);
       }
 
-      getOmLockDetails().merge(omMetadataManager.getLock()
+      mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(PREFIX_LOCK, prefixPath));
       lockAcquired = getOmLockDetails().isLockAcquired();
 
@@ -141,7 +141,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (lockAcquired) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(PREFIX_LOCK, getOzoneObj().getPath()));
       }
       if (omClientResponse != null) {

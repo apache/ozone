@@ -218,7 +218,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
               bucketName, keyName));
       acquireLock = getOmLockDetails().isLockAcquired();
@@ -345,7 +345,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        getOmLockDetails().merge(ozoneLockStrategy
+        mergeOmLockDetails(ozoneLockStrategy
             .releaseWriteLock(omMetadataManager, volumeName,
                 bucketName, keyName));
       }

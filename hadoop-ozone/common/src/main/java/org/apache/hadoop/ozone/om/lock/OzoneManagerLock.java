@@ -617,13 +617,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     } else {
       switch (type) {
       case LOCKWAIT:
-        omLockDetails.get().add(deltaNanos, OMLockDetails.LockType.WAIT);
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.WAIT);
         break;
       case LOCKSHARED:
-        omLockDetails.get().add(deltaNanos, OMLockDetails.LockType.READ);
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.READ);
         break;
       case LOCKEXCLUSIVE:
-        omLockDetails.get().add(deltaNanos, OMLockDetails.LockType.WRITE);
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.WRITE);
         break;
       default:
         LOG.error("Unsupported Timing type {}", type);

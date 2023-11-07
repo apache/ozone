@@ -97,7 +97,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, null);
       }
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
               bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();
@@ -143,7 +143,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (lockAcquired) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
                 bucket));
       }

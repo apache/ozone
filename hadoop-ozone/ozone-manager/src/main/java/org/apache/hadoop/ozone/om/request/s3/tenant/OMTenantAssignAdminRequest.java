@@ -183,7 +183,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
       volumeName = ozoneManager.getMultiTenantManager()
           .getTenantVolumeName(tenantId);
 
-      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
@@ -228,7 +228,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
           ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
         Preconditions.checkNotNull(volumeName);
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
                 volumeName));
       }

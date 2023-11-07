@@ -89,7 +89,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, null, null);
       }
-      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       lockAcquired = getOmLockDetails().isLockAcquired();
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
@@ -137,7 +137,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (lockAcquired) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(VOLUME_LOCK, volume));
       }
       if (omClientResponse != null) {

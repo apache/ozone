@@ -107,7 +107,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
               IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      getOmLockDetails().merge(omMetadataManager.getLock()
+      mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquireLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -230,7 +230,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquireLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

@@ -469,7 +469,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmBucketInfo bucketInfo = null;
     if (ozoneManager.getKmsProvider() != null) {
       try {
-        getOmLockDetails().merge(omMetadataManager.getLock().acquireReadLock(
+        mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
             BUCKET_LOCK, volumeName, bucketName));
         acquireLock = getOmLockDetails().isLockAcquired();
 
@@ -490,7 +490,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
       } finally {
         if (acquireLock) {
-          getOmLockDetails().merge(omMetadataManager.getLock().releaseReadLock(
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
               BUCKET_LOCK, volumeName, bucketName));
         }
       }
@@ -526,7 +526,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     if (ozoneManager.getKmsProvider() != null) {
-      getOmLockDetails().merge(omMetadataManager.getLock().acquireReadLock(
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
           BUCKET_LOCK, volumeName, bucketName));
       acquireLock = getOmLockDetails().isLockAcquired();
       try {
@@ -550,7 +550,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          getOmLockDetails().merge(omMetadataManager.getLock()
+          mergeOmLockDetails(omMetadataManager.getLock()
               .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
         }
       }

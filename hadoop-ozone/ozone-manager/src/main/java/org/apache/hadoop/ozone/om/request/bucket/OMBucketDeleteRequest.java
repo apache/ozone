@@ -116,10 +116,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       }
 
       // acquire lock
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
               bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
@@ -194,11 +194,11 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (acquiredVolumeLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseReadLock(VOLUME_LOCK, volumeName));
       }
       if (omClientResponse != null) {

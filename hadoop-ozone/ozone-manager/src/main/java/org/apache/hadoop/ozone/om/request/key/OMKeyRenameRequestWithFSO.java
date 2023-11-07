@@ -129,7 +129,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
             IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
       }
 
-      getOmLockDetails().merge(omMetadataManager.getLock()
+      mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
@@ -233,7 +233,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquiredLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

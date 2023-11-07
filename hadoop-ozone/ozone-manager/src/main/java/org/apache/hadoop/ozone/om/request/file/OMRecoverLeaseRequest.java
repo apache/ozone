@@ -135,7 +135,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -169,7 +169,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
                 volumeName, bucketName));
       }

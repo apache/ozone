@@ -187,7 +187,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       List<OmKeyLocationInfo>
           locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
               bucketName));
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
@@ -341,7 +341,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omDoubleBufferHelper);
 
       if (bucketLockAcquired) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

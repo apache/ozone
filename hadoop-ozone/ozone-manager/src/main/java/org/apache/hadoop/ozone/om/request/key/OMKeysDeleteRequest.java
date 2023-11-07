@@ -128,7 +128,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
 
-      getOmLockDetails().merge(omMetadataManager.getLock()
+      mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
       // Validate bucket and volume exists or not.
@@ -206,7 +206,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     } finally {
       if (acquiredLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,

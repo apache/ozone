@@ -125,7 +125,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
       }
       // acquire lock
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
               bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -197,7 +197,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        getOmLockDetails().merge(omMetadataManager.getLock()
+        mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (omClientResponse != null) {

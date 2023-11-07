@@ -139,12 +139,12 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     try {
       // Acquire bucket lock
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName));
       acquiredSnapshotLock = getOmLockDetails().isLockAcquired();
@@ -197,12 +197,12 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredSnapshotLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
                 volumeName, bucketName, snapshotName));
       }
       if (acquiredBucketLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
                 volumeName, bucketName));
       }

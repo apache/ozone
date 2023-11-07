@@ -140,7 +140,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
               OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
-      getOmLockDetails().merge(
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -188,7 +188,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquiredLock) {
-        getOmLockDetails().merge(
+        mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(
                 BUCKET_LOCK, volumeName, bucketName));
       }

@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMLockDetailsProto;
 
-import static org.apache.hadoop.ozone.om.lock.OMLockDetails.LockType.WAIT;
-
 /**
  * This class is for recording detailed consumed time on Locks.
  */
@@ -43,14 +41,14 @@ public class OMLockDetails {
   }
 
 
-  enum LockType {
+  enum LockOpType {
     WAIT,
     READ,
     WRITE
   }
 
-  public void add(long timeNanos, LockType lockType) {
-    switch (lockType) {
+  public void add(long timeNanos, LockOpType lockOpType) {
+    switch (lockOpType) {
     case WAIT:
       waitLockNanos += timeNanos;
       break;
