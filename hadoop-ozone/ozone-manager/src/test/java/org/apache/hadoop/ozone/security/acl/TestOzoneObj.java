@@ -49,13 +49,13 @@ public class TestOzoneObj {
 
     objInfo = getBuilder(null, null, null).build();
     Assertions.assertNull(objInfo.getVolumeName());
-    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(), "unexpected path " +
-            "accessor");
+    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(),
+        "unexpected path accessor");
 
     objInfo = getBuilder(volume, null, null).build();
     Assertions.assertEquals(objInfo.getVolumeName(), volume);
-    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(), "unexpected path " +
-        "accessor");
+    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(),
+        "unexpected path accessor");
 
   }
 
