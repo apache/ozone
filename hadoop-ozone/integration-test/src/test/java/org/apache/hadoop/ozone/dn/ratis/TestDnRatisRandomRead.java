@@ -84,8 +84,8 @@ public class TestDnRatisRandomRead {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
-
-  private static BucketLayout bucketLayout = BucketLayout.LEGACY;
+  private static final BucketLayout bucketLayout = BucketLayout.LEGACY;
+  private static final int REPLICATION_COUNT = 3;
 
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
@@ -93,10 +93,7 @@ public class TestDnRatisRandomRead {
   private static String volumeName;
   private static Path volumePath;
   private static String bucketName;
-  // Store path commonly used by tests that test functionality within a bucket
   private static Path bucketPath;
-
-  private static final int REPLICATION_COUNT = 3;
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -153,30 +150,6 @@ public class TestDnRatisRandomRead {
   public void cleanup() throws IOException {
     fs.delete(bucketPath, true);
     fs.delete(volumePath, false);
-  }
-
-  public static MiniOzoneCluster getCluster() {
-    return cluster;
-  }
-
-  public static FileSystem getFs() {
-    return fs;
-  }
-
-  public static void setBucketLayout(BucketLayout bLayout) {
-    bucketLayout = bLayout;
-  }
-
-  public static String getBucketName() {
-    return bucketName;
-  }
-
-  public static String getVolumeName() {
-    return volumeName;
-  }
-
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 
   @Test
