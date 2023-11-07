@@ -78,12 +78,12 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     // and directory table
     OmBucketInfo obsBucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    Assertions.assertTrue(obsBucketInfo.getUsedNamespace() == 0);
-    Assertions.assertTrue(obsBucketInfo.getUsedBytes() == 0);
+    Assertions.assertEquals(0, obsBucketInfo.getUsedNamespace());
+    Assertions.assertEquals(0, obsBucketInfo.getUsedBytes());
     OmBucketInfo fsoBucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, fsoBucketName));
-    Assertions.assertTrue(fsoBucketInfo.getUsedNamespace() == 0);
-    Assertions.assertTrue(fsoBucketInfo.getUsedBytes() == 0);
+    Assertions.assertEquals(0, fsoBucketInfo.getUsedNamespace());
+    Assertions.assertEquals(0, fsoBucketInfo.getUsedBytes());
     
     QuotaRepairTask quotaRepairTask = new QuotaRepairTask(omMetadataManager);
     quotaRepairTask.repair();
@@ -94,10 +94,10 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
         omMetadataManager.getBucketKey(volumeName, bucketName));
     OmBucketInfo fsoUpdateBucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, fsoBucketName));
-    Assertions.assertTrue(obsUpdateBucketInfo.getUsedNamespace() == 10);
-    Assertions.assertTrue(obsUpdateBucketInfo.getUsedBytes() == 30000);
-    Assertions.assertTrue(fsoUpdateBucketInfo.getUsedNamespace() == 13);
-    Assertions.assertTrue(fsoUpdateBucketInfo.getUsedBytes() == 10000);
+    Assertions.assertEquals(10, obsUpdateBucketInfo.getUsedNamespace());
+    Assertions.assertEquals(30000, obsUpdateBucketInfo.getUsedBytes());
+    Assertions.assertEquals(13, fsoUpdateBucketInfo.getUsedNamespace());
+    Assertions.assertEquals(10000, fsoUpdateBucketInfo.getUsedBytes());
   }
 
   @Test
@@ -121,23 +121,23 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     // pre check for quota flag
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    Assertions.assertTrue(bucketInfo.getQuotaInBytes() == -2);
+    Assertions.assertEquals(-2, bucketInfo.getQuotaInBytes());
     
     omVolumeArgs = omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName));
-    Assertions.assertTrue(omVolumeArgs.getQuotaInBytes() == -2);
-    Assertions.assertTrue(omVolumeArgs.getQuotaInNamespace() == -2);
+    Assertions.assertEquals(-2, omVolumeArgs.getQuotaInBytes());
+    Assertions.assertEquals(-2, omVolumeArgs.getQuotaInNamespace());
 
     QuotaRepairTask quotaRepairTask = new QuotaRepairTask(omMetadataManager);
     quotaRepairTask.repair();
 
     bucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    Assertions.assertTrue(bucketInfo.getQuotaInBytes() == -1);
+    Assertions.assertEquals(-1, bucketInfo.getQuotaInBytes());
     OmVolumeArgs volArgsVerify = omMetadataManager.getVolumeTable()
         .get(omMetadataManager.getVolumeKey(volumeName));
-    Assertions.assertTrue(volArgsVerify.getQuotaInBytes() == -1);
-    Assertions.assertTrue(volArgsVerify.getQuotaInNamespace() == -1);
+    Assertions.assertEquals(-1, volArgsVerify.getQuotaInBytes());
+    Assertions.assertEquals(-1, volArgsVerify.getQuotaInNamespace());
   }
 
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,

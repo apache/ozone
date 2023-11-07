@@ -164,8 +164,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assertions.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.OK);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.OK);
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
@@ -204,8 +204,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMClientResponse omClientResponse =
         omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
-    Assertions.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   @Test
@@ -264,8 +264,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assertions.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
     // Key should not exist in DB
     Assertions.assertTrue(omMetadataManager.getDirectoryTable().isEmpty(),
@@ -372,8 +372,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assertions.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
 
     Assertions.assertEquals(0, ozoneManager.getMetrics().getNumKeys(),
         "Wrong OM numKeys metrics");
@@ -726,7 +726,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           parentID, dirName);
@@ -765,7 +765,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, dirName);
@@ -787,7 +787,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, dirName);

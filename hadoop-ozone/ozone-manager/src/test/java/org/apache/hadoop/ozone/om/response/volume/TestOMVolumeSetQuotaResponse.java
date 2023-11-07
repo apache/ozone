@@ -123,8 +123,8 @@ public class TestOMVolumeSetQuotaResponse {
     try {
       omVolumeSetQuotaResponse.checkAndUpdateDB(omMetadataManager,
           batchOperation);
-      Assertions.assertTrue(omMetadataManager.countRowsInTable(
-          omMetadataManager.getVolumeTable()) == 0);
+      Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+          omMetadataManager.getVolumeTable()));
     } catch (IOException ex) {
       fail("testAddToDBBatchFailure failed");
     }

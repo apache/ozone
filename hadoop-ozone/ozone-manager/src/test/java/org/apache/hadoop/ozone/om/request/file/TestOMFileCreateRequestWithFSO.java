@@ -94,8 +94,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
-    Assertions.assertTrue(omFileCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assertions.assertSame(omFileCreateResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   @Test

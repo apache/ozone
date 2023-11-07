@@ -451,8 +451,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
           .validateAndUpdateCache(ozoneManager, trxnLogIndex,
               ozoneManagerDoubleBufferHelper);
 
-      Assertions.assertTrue(omClientResponse.getOMResponse().getStatus() ==
-          OzoneManagerProtocolProtos.Status.OK);
+      Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+          Status.OK);
 
       trxnLogIndex++;
 
@@ -494,8 +494,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
                 ozoneManager, trxnLogIndex, ozoneManagerDoubleBufferHelper);
         trxnLogIndex++;
 
-        Assertions.assertTrue(commitResponse.getOMResponse().getStatus() ==
-            OzoneManagerProtocolProtos.Status.OK);
+        Assertions.assertSame(commitResponse.getOMResponse().getStatus(),
+            Status.OK);
 
         // MPU part open key should be deleted after commit
         String partKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -534,8 +534,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
           .validateAndUpdateCache(ozoneManager, trxnLogIndex,
               ozoneManagerDoubleBufferHelper);
 
-      Assertions.assertTrue(omClientResponse.getOMResponse().getStatus() ==
-          OzoneManagerProtocolProtos.Status.OK);
+      Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+          Status.OK);
 
       trxnLogIndex++;
 
@@ -573,8 +573,8 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
                 ozoneManager, trxnLogIndex, ozoneManagerDoubleBufferHelper);
         trxnLogIndex++;
 
-        Assertions.assertTrue(commitResponse.getOMResponse().getStatus() ==
-            OzoneManagerProtocolProtos.Status.OK);
+        Assertions.assertSame(commitResponse.getOMResponse().getStatus(),
+            Status.OK);
 
         // MPU part open key should be deleted after commit
         String partKey = omMetadataManager.getOpenKey(volume, bucket, keyName,

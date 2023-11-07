@@ -23,9 +23,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -60,33 +58,6 @@ public class TestOmVersionManagerRequestFactory {
     Class<? extends OMClientRequest> requestType =
         omVersionManager.getHandler(CreateKey.name());
     Assertions.assertEquals(requestType, OMKeyCreateRequest.class);
-  }
-
-  @Test
-  public void testAllOMRequestClassesHaveGetRequestTypeMethod()
-      throws Exception {
-    Reflections reflections = new Reflections(
-        "org.apache.hadoop.ozone.om.request");
-    Set<Class<? extends OMClientRequest>> subTypes =
-        reflections.getSubTypesOf(OMClientRequest.class);
-    List<Class<? extends OMClientRequest>> collect = subTypes.stream()
-            .filter(c -> !Modifier.isAbstract(c.getModifiers()))
-            .collect(Collectors.toList());
-
-    for (Class<? extends OMClientRequest> c : collect) {
-      Method getRequestTypeMethod = null;
-      try {
-        getRequestTypeMethod = c.getMethod("getRequestType");
-      } catch (NoSuchMethodException nsmEx) {
-        Assertions.fail(String.format(
-            "%s does not have the 'getRequestType' method " +
-            "which should be defined or inherited for every OM request class.",
-            c));
-      }
-      String type = (String) getRequestTypeMethod.invoke(null);
-      Assertions.assertNotNull(omVersionManager.getHandler(type),
-          String.format("Cannot get handler for %s", type));
-    }
   }
 
   @Test

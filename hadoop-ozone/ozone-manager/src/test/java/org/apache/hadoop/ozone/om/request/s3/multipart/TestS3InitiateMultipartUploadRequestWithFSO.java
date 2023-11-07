@@ -133,7 +133,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, dirName);
@@ -233,7 +233,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           parentID, dirName);

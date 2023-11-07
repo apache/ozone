@@ -139,7 +139,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     // Create 10 keys
     String parentDir = "/user";
-    String key = "";
+    String key;
 
 
     for (int i = 0; i < count; i++) {

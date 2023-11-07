@@ -224,9 +224,9 @@ public class TestOzoneDelegationTokenSecretManager {
     OzoneTokenIdentifier identifier =
         OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
     // Check basic details.
-    Assertions.assertTrue(identifier.getRealUser().equals(TEST_USER));
-    Assertions.assertTrue(identifier.getRenewer().equals(TEST_USER));
-    Assertions.assertTrue(identifier.getOwner().equals(TEST_USER));
+    assertEquals(identifier.getRealUser(), TEST_USER);
+    assertEquals(identifier.getRenewer(), TEST_USER);
+    assertEquals(identifier.getOwner(), TEST_USER);
 
     validateHash(token.getPassword(), token.getIdentifier());
   }

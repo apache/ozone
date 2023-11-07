@@ -76,7 +76,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     List<OmKeyLocationInfo> omKeyLocationInfo =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
-    Assertions.assertTrue(omKeyLocationInfo.size() == 0);
+    Assertions.assertEquals(0, omKeyLocationInfo.size());
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -107,7 +107,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     omKeyLocationInfo =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
-    Assertions.assertTrue(omKeyLocationInfo.size() == 1);
+    Assertions.assertEquals(1, omKeyLocationInfo.size());
 
     Assertions.assertEquals(keyLocation.getBlockID().getContainerBlockID()
         .getContainerID(), omKeyLocationInfo.get(0).getContainerID());
@@ -137,8 +137,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assertions.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND);
+    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND);
 
   }
 
@@ -160,8 +160,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assertions.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
+    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
   }
 
@@ -183,8 +183,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assertions.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
+    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
   }
 

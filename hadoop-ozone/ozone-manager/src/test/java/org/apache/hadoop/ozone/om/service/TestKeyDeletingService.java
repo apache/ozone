@@ -80,7 +80,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.AfterEach;
@@ -464,7 +463,7 @@ public class TestKeyDeletingService {
     rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey2);
-    Assertions.assertTrue(rangeKVs.size() == 0);
+    Assertions.assertEquals(0, rangeKVs.size());
   }
 
   /*
@@ -670,10 +669,11 @@ t
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
-        assertEquals(expectedSize.get(snapshotName), snapshotEntry.getValue().
+        Assertions.assertEquals(expectedSize.get(snapshotName),
+            snapshotEntry.getValue().
             getExclusiveSize());
         // Since for the test we are using RATIS/THREE
-        assertEquals(expectedSize.get(snapshotName) * 3,
+        Assertions.assertEquals(expectedSize.get(snapshotName) * 3,
             snapshotEntry.getValue().getExclusiveReplicatedSize());
       }
     }
@@ -686,7 +686,7 @@ t
              iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         SnapshotInfo snapInfo = iterator.next().getValue();
-        assertEquals(snapInfo.getDeepClean(), deepClean);
+        Assertions.assertEquals(snapInfo.getDeepClean(), deepClean);
       }
     }
   }

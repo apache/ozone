@@ -657,7 +657,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Check modification time is set or not.
     Assertions.assertTrue(modifiedKeyArgs.getModificationTime() > 0);
-    Assertions.assertTrue(originalKeyArgs.getModificationTime() == 0);
+    Assertions.assertEquals(0, originalKeyArgs.getModificationTime());
 
     Assertions.assertEquals(originalKeyArgs.getVolumeName(),
         modifiedKeyArgs.getVolumeName());

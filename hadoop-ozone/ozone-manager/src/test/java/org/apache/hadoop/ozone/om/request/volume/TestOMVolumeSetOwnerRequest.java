@@ -117,7 +117,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
             omMetadataManager.getUserKey(ownerKey));
 
     Assertions.assertNotNull(oldOwnerVolumeList);
-    Assertions.assertTrue(oldOwnerVolumeList.getVolumeNamesList().size() == 0);
+    Assertions.assertEquals(0, oldOwnerVolumeList.getVolumeNamesList().size());
 
   }
 

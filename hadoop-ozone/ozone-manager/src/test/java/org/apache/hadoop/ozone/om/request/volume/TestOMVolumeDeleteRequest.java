@@ -82,8 +82,8 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
-    Assertions.assertTrue(omMetadataManager.getUserTable().get(ownerKey)
-        .getVolumeNamesList().size() == 0);
+    Assertions.assertEquals(0, omMetadataManager.getUserTable().get(ownerKey)
+        .getVolumeNamesList().size());
     // As now volume is deleted, table should not have those entries.
     Assertions.assertNull(omMetadataManager.getVolumeTable().get(volumeKey));
   }

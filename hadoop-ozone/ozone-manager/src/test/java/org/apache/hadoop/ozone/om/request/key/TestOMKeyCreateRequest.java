@@ -87,6 +87,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private boolean keyPathLockEnabled;
   private boolean enableFileSystemPaths;
 
+  @org.junit.Test
   public void testPreExecuteWithNormalKey() throws Exception {
     ReplicationConfig ratis3Config =
         ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
@@ -242,8 +243,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMClientResponse omKeyCreateResponse =
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
-    Assertions.assertTrue(omKeyCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assertions.assertSame(omKeyCreateResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   private void checkResponse(OMRequest modifiedOmRequest,

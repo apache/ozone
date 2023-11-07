@@ -93,8 +93,8 @@ public class TestS3MultipartUploadAbortResponse
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     // As no parts are created, so no entries should be there in delete table.
-    Assertions.assertTrue(omMetadataManager.countRowsInTable(
-        omMetadataManager.getDeletedTable()) == 0);
+    Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+        omMetadataManager.getDeletedTable()));
   }
 
   protected S3InitiateMultipartUploadResponse
@@ -164,8 +164,8 @@ public class TestS3MultipartUploadAbortResponse
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     // As 2 parts are created, so 2 entries should be there in delete table.
-    Assertions.assertTrue(omMetadataManager.countRowsInTable(
-        omMetadataManager.getDeletedTable()) == 2);
+    Assertions.assertEquals(2, omMetadataManager.countRowsInTable(
+        omMetadataManager.getDeletedTable()));
 
     String part1DeletedKeyName =
         omMetadataManager.getOzoneDeletePathKey(

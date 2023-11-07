@@ -88,7 +88,7 @@ public class TestS3MultipartUploadCompleteRequest
 
     // deleted key entries count is expected to be 0
     if (count == 0) {
-      Assertions.assertTrue(rangeKVs.size() == 0);
+      Assertions.assertEquals(0, rangeKVs.size());
       return;
     }
 

@@ -55,7 +55,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
-import static org.slf4j.MDC.put;
 
 /**
  * Tests OMFileCreateRequest.
@@ -88,7 +87,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         keyArgs.getKeyLocationsList();
 
     // KeyLocation should be set.
-    Assertions.assertTrue(keyLocations.size() == 1);
+    Assertions.assertEquals(1, keyLocations.size());
     Assertions.assertEquals(CONTAINER_ID,
         keyLocations.get(0).getBlockID().getContainerBlockID()
             .getContainerID());
@@ -120,8 +119,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     KeyArgs keyArgs = modifiedOmRequest.getCreateFileRequest().getKeyArgs();
     Assertions.assertNotNull(keyArgs);
-    Assertions.assertTrue(keyArgs.getModificationTime() == 0);
-    Assertions.assertTrue(keyArgs.getKeyLocationsList().size() == 0);
+    Assertions.assertEquals(0, keyArgs.getModificationTime());
+    Assertions.assertEquals(0, keyArgs.getKeyLocationsList().size());
   }
 
   @Test
@@ -157,7 +156,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
-    Assertions.assertTrue(omKeyLocationInfoList.size() == 1);
+    Assertions.assertEquals(1, omKeyLocationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
 
@@ -201,8 +200,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
-    Assertions.assertTrue(omFileCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assertions.assertSame(omFileCreateResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   @Test
@@ -435,7 +434,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
       for (int indx = 0; indx < dirs.size(); indx++) {
         String dirName = dirs.get(indx);
-        String dbKey = "";
+        String dbKey;
         // for index=0, parentID is bucketID
         dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
             parentID, dirName);
@@ -557,7 +556,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
           omKeyInfo.getLatestVersionLocations().getLocationList();
-      Assertions.assertTrue(omKeyLocationInfoList.size() == 1);
+      Assertions.assertEquals(1, omKeyLocationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
 

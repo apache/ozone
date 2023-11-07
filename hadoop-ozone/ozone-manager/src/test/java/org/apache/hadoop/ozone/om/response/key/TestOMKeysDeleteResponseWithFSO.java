@@ -86,7 +86,7 @@ public class TestOMKeysDeleteResponseWithFSO
         dirKeyInfo.getObjectID(), dirOzoneDBKey));
 
     // create set of keys directly under the bucket
-    String ozoneDBKey = "";
+    String ozoneDBKey;
     String keyPrefix = "key";
     for (int i = 0; i < 10; i++) {
       keyName = keyPrefix + i;

@@ -58,7 +58,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     String parent = "/user";
     String key = "key";
 
-    String ozoneKey = "";
+    String ozoneKey;
     for (int i = 0; i < 10; i++) {
       keyName = parent.concat(key + i);
       OMRequestTestUtils.addKeyToTable(false, volumeName,
