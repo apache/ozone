@@ -19,8 +19,9 @@ package org.apache.hadoop.ozone.freon;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Syncable;
@@ -40,7 +41,7 @@ public class TestContentGenerator {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
-    Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
+    assertArrayEquals(generator.getBuffer(), output.toByteArray());
   }
 
   @Test
@@ -50,7 +51,7 @@ public class TestContentGenerator {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     generator.write(baos);
 
-    Assert.assertEquals(10000, baos.toByteArray().length);
+    assertEquals(10000, baos.toByteArray().length);
   }
 
   @Test
@@ -59,7 +60,7 @@ public class TestContentGenerator {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
-    Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
+    assertArrayEquals(generator.getBuffer(), output.toByteArray());
   }
 
   @Test
@@ -68,7 +69,7 @@ public class TestContentGenerator {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
     generator.write(output);
-    Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
+    assertArrayEquals(generator.getBuffer(), output.toByteArray());
   }
 
   @Test
@@ -83,7 +84,7 @@ public class TestContentGenerator {
     System.arraycopy(buffer, 0, expected, 0, buffer.length);
     System.arraycopy(buffer, 0, expected, 8, buffer.length);
     System.arraycopy(buffer, 0, expected, 16, 4);
-    Assert.assertArrayEquals(expected, output.toByteArray());
+    assertArrayEquals(expected, output.toByteArray());
   }
 
   @Test

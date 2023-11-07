@@ -22,12 +22,14 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -68,20 +70,20 @@ public class TestGenerateOzoneRequiredConfigurations {
    *
    * @throws Exception In case of exception while creating output directory.
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     outputBaseDir = GenericTestUtils.getTestDir();
     FileUtils.forceMkdir(outputBaseDir);
     genconfTool = new GenerateOzoneRequiredConfigurations();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void reset() {
     // reset stream after each unit test
     out.reset();
@@ -95,7 +97,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   /**
    * Cleans up the output base directory.
    */
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(outputBaseDir);
   }
@@ -122,7 +124,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    Assert.assertTrue(out.toString(DEFAULT_ENCODING).contains(msg));
+    assertTrue(out.toString(DEFAULT_ENCODING).contains(msg));
   }
 
   private void executeWithException(String[] args, String msg) {
@@ -148,8 +150,8 @@ public class TestGenerateOzoneRequiredConfigurations {
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
     }  catch (Exception ex) {
-      Assert.assertTrue("Expected " + msg + ", but got: " + ex.getMessage(),
-          ex.getMessage().contains(msg));
+      assertTrue(ex.getMessage().contains(msg),
+          "Expected " + msg + ", but got: " + ex.getMessage());
     }
   }
 
@@ -176,8 +178,7 @@ public class TestGenerateOzoneRequiredConfigurations {
 
     //Asserts all properties have a non-empty value
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertTrue(p.getValue() != null && p.getValue().length() > 0);
     }
   }
 
@@ -205,8 +206,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         oc.readPropertyFromXml(url);
 
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertTrue(p.getValue() != null && p.getValue().length() > 0);
     }
     ozoneConfigurationCount = allProperties.size();
 
@@ -222,13 +222,11 @@ public class TestGenerateOzoneRequiredConfigurations {
     allProperties = oc.readPropertyFromXml(url);
 
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertTrue(p.getValue() != null && p.getValue().length() > 0);
     }
     ozoneSecurityConfigurationCount = allProperties.size();
 
-    Assert.assertNotEquals(ozoneConfigurationCount,
-        ozoneSecurityConfigurationCount);
+    assertNotEquals(ozoneConfigurationCount, ozoneSecurityConfigurationCount);
   }
 
   /**
