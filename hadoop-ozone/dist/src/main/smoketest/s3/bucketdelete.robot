@@ -45,11 +45,12 @@ Delete non-existent bucket
                    Should contain                     ${result}                              NoSuchBucket
 
 Delete bucket with incomplete multipart uploads
-    ${bucket} =                Create bucket to be deleted
+    [tags]    no-bucket-type
+    ${bucket} =                Create bucket
 
     # initiate incomplete multipart uploads (multipart upload is initiated but not completed/aborted)
     ${initiate_result} =       Execute AWSS3APICli     create-multipart-upload --bucket ${bucket} --key incomplete-multipartkey
-    ${uploadID} =              Execute and checkrc     echo '${initiate_result}' | jq -r '.UploadId'    0
+    ${uploadID} =              Execute                 echo '${initiate_result}' | jq -r '.UploadId'
                                Should contain          ${initiate_result}    ${bucket}
                                Should contain          ${initiate_result}    incomplete-multipartkey
                                Should contain          ${initiate_result}    UploadId
