@@ -46,6 +46,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Provider;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class that provides a Recon SQL DB with all the tables created, and APIs
@@ -53,7 +54,8 @@ import com.google.inject.Provider;
  */
 public class AbstractReconSqlDBTest {
 
-  private Path temporaryFolder;
+  @TempDir
+  protected Path temporaryFolder;
 
   private Injector injector;
   private DSLContext dslContext;
