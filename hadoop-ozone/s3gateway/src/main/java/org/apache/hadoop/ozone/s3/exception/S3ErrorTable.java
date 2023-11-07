@@ -64,7 +64,10 @@ public final class S3ErrorTable {
           " or might be invalid", HTTP_FORBIDDEN);
 
   public static final OS3Exception BUCKET_NOT_EMPTY = new OS3Exception(
-      "BucketNotEmpty", "The bucket you tried to delete is not empty.",
+      "BucketNotEmpty", "The bucket you tried to delete is not empty. " +
+      "If you are using --force option to delete all objects in the bucket, " +
+      "please ensure that the bucket layout is OBJECT_STORE or " +
+      "that the bucket is completely empty before delete.",
       HTTP_CONFLICT);
 
   public static final OS3Exception MALFORMED_HEADER = new OS3Exception(

@@ -539,10 +539,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           addToCompactionLogTable(compactionLogEntry);
 
           // Populate the DAG
-          // TODO: [SNAPSHOT] Once SnapshotChainManager is put into use,
-          //  set snapshotID to snapshotChainManager.getLatestGlobalSnapshot()
           populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
-              compactionLogEntry.getOutputFileInfoList(), null,
+              compactionLogEntry.getOutputFileInfoList(),
               db.getLatestSequenceNumber());
         }
       }
@@ -802,7 +800,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
                   CompactionLogEntryProto.parseFrom(value));
           populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
-              null,
               compactionLogEntry.getDbSequenceNumber());
           managedRocksIterator.get().next();
         }
@@ -1121,8 +1118,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Helper method to add a new file node to the DAG.
    * @return CompactionNode
    */
-  private CompactionNode addNodeToDAG(String file, String snapshotID,
-                                      long seqNum, String startKey,
+  private CompactionNode addNodeToDAG(String file, long seqNum, String startKey,
                                       String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
@@ -1132,8 +1128,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (FileNotFoundException e) {
       LOG.info("Can't find SST '{}'", file);
     }
-    CompactionNode fileNode = new CompactionNode(file, snapshotID, numKeys,
+
+    CompactionNode fileNode = new CompactionNode(file, numKeys,
         seqNum, startKey, endKey, columnFamily);
+
     forwardCompactionDAG.addNode(fileNode);
     backwardCompactionDAG.addNode(fileNode);
 
@@ -1144,13 +1142,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Populate the compaction DAG with input and output SST files lists.
    * @param inputFiles List of compaction input files.
    * @param outputFiles List of compaction output files.
-   * @param snapshotId Snapshot ID for debugging purpose. In fact, this can be
-   *                   arbitrary String as long as it helps debugging.
    * @param seqNum DB transaction sequence number.
    */
   private void populateCompactionDAG(List<CompactionFileInfo> inputFiles,
                                      List<CompactionFileInfo> outputFiles,
-                                     String snapshotId,
                                      long seqNum) {
 
     if (LOG.isDebugEnabled()) {
@@ -1160,14 +1155,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     for (CompactionFileInfo outfile : outputFiles) {
       final CompactionNode outfileNode = compactionNodeMap.computeIfAbsent(
           outfile.getFileName(),
-          file -> addNodeToDAG(file, snapshotId, seqNum, outfile.getStartKey(),
+
+          file -> addNodeToDAG(file, seqNum, outfile.getStartKey(),
               outfile.getEndKey(), outfile.getColumnFamily()));
+
 
       for (CompactionFileInfo infile : inputFiles) {
         final CompactionNode infileNode = compactionNodeMap.computeIfAbsent(
             infile.getFileName(),
-            file -> addNodeToDAG(file, snapshotId, seqNum, infile.getStartKey(),
+
+            file -> addNodeToDAG(file, seqNum, infile.getStartKey(),
                 infile.getEndKey(), infile.getColumnFamily()));
+
         // Draw the edges
         if (!outfileNode.getFileName().equals(infileNode.getFileName())) {
           forwardCompactionDAG.putEdge(outfileNode, infileNode);

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -101,7 +100,9 @@ public class TestOMDirectoryCreateRequestWithFSO {
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
             any(OMClientRequest.class)))
-            .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
+            .thenReturn(new ResolvedBucket("", "",
+                    "", "", "",
+                    BucketLayout.DEFAULT));
   }
 
   @After

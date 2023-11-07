@@ -778,8 +778,7 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     if (validateChunkChecksumData) {
       try {
-        Checksum.verifyChecksum(data.toByteString(byteBufferToByteString),
-            info.getChecksumData(), 0);
+        Checksum.verifyChecksum(data, info.getChecksumData(), 0);
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
       }

@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -397,7 +398,8 @@ public class TestKeyManagerUnit {
         .setBucketName("bucketOne")
         .setKeyName("keyOne")
         .build();
-    OmKeyInfo keyInfo = keyManager.getKeyInfo(keyArgs, "test");
+    OmKeyInfo keyInfo = keyManager.getKeyInfo(keyArgs,
+        resolveBucket(keyArgs), "test");
     final OmKeyLocationInfo blockLocation1 = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
     Assert.assertEquals(blockID1, blockLocation1.getBlockID());
@@ -412,7 +414,8 @@ public class TestKeyManagerUnit {
         .setBucketName("bucketOne")
         .setKeyName("keyTwo")
         .build();
-    OmKeyInfo keyInfo2 = keyManager.getKeyInfo(keyArgs, "test");
+    OmKeyInfo keyInfo2 = keyManager.getKeyInfo(keyArgs,
+        resolveBucket(keyArgs), "test");
     OmKeyLocationInfo blockLocation2 = keyInfo2
         .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
     Assert.assertEquals(blockID2, blockLocation2.getBlockID());
@@ -428,7 +431,8 @@ public class TestKeyManagerUnit {
         .setKeyName("keyTwo")
         .setForceUpdateContainerCacheFromSCM(true)
         .build();
-    keyInfo2 = keyManager.getKeyInfo(keyArgs, "test");
+    keyInfo2 = keyManager.getKeyInfo(keyArgs,
+        resolveBucket(keyArgs), "test");
     blockLocation2 = keyInfo2
         .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
     Assert.assertEquals(blockID2, blockLocation2.getBlockID());
@@ -436,6 +440,12 @@ public class TestKeyManagerUnit {
     // Ensure SCM is called.
     verify(containerClient, times(2))
         .getContainerWithPipelineBatch(containerIDs);
+  }
+
+  private ResolvedBucket resolveBucket(OmKeyArgs keyArgs) {
+    return new ResolvedBucket(keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getVolumeName(), keyArgs.getBucketName(), "",
+        BucketLayout.DEFAULT);
   }
 
   @Test
