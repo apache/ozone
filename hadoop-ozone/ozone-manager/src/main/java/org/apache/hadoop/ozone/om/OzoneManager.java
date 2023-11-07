@@ -4232,7 +4232,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
       OMClientRequest omClientRequest)
       throws IOException {
-    Pair<String, String> resolved;
+    OmBucketInfo resolved;
     if (isAclEnabled) {
       resolved = resolveBucketLink(requested, new HashSet<>(),
               omClientRequest.createUGIForApi(),
@@ -4243,13 +4243,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       resolved = resolveBucketLink(requested, new HashSet<>(),
           null, null, null, false);
     }
-    return new ResolvedBucket(requested, resolved);
+    return new ResolvedBucket(requested.getLeft(), requested.getRight(),
+        resolved);
   }
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
                                           boolean allowDanglingBuckets)
       throws IOException {
-    Pair<String, String> resolved;
+    OmBucketInfo resolved;
     if (isAclEnabled) {
       UserGroupInformation ugi = getRemoteUser();
       if (getS3Auth() != null) {
@@ -4266,7 +4267,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       resolved = resolveBucketLink(requested, new HashSet<>(),
           null, null, null, allowDanglingBuckets);
     }
-    return new ResolvedBucket(requested, resolved);
+    return new ResolvedBucket(requested.getLeft(), requested.getRight(),
+        resolved);
   }
 
   /**
@@ -4280,7 +4282,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException (most likely OMException) if ACL check fails, bucket is
    *   not found, loop is detected in the links, etc.
    */
-  private Pair<String, String> resolveBucketLink(
+  private OmBucketInfo resolveBucketLink(
       Pair<String, String> volumeAndBucket,
       Set<Pair<String, String>> visited,
       UserGroupInformation userGroupInformation,
@@ -4301,7 +4303,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw e;
     }
     if (!info.isLink()) {
-      return volumeAndBucket;
+      return info;
     }
 
     if (!visited.add(volumeAndBucket)) {
