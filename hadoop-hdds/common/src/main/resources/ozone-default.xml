@@ -1430,7 +1430,7 @@
 
   <property>
     <name>ozone.om.open.mpu.parts.cleanup.limit.per.task</name>
-    <value>0</value>
+    <value>1000</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       The maximum number of parts, rounded up to the nearest
