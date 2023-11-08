@@ -317,7 +317,7 @@ public final class ContainerUtils {
   public static long retrieveContainerIdFromTarName(String tarName)
       throws IOException {
     assert tarName != null;
-    Pattern pattern = Pattern.compile("container-(\\d+)((-.+.tar)|.tar)");
+    Pattern pattern = Pattern.compile("container-(\\d+)-.*\\.tar");
     // Now create matcher object.
     Matcher m = pattern.matcher(tarName);
 
