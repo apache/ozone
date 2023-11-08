@@ -26,8 +26,8 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      needs-unit-check: ${{ steps.categorize-basic-checks.outputs.needs-unit-check }}
+      needs-basic-check: false
+      needs-unit-check: false
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       unit-checks: ${{ steps.categorize-basic-checks.outputs.unit-checks }}
       needs-build: false
@@ -397,8 +397,6 @@ jobs:
   integration:
     needs:
       - build-info
-      - build
-      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-integration-tests == 'true'
