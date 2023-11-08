@@ -148,6 +148,10 @@ final class ObjectEndpointStreaming {
       throws IOException, OS3Exception {
     String eTag;
     S3GatewayMetrics metrics = S3GatewayMetrics.create();
+    // OmMultipartCommitUploadPartInfo can only be gotten after the
+    // OzoneDataStreamOutput is closed, so we need to save the
+    // KeyDataStreamOutput in the OzoneDataStreamOutput and use it to get the
+    // OmMultipartCommitUploadPartInfo after OzoneDataStreamOutput is closed.
     KeyDataStreamOutput keyDataStreamOutput = null;
     try {
       try (OzoneDataStreamOutput streamOutput = ozoneBucket

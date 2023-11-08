@@ -883,6 +883,10 @@ public class ObjectEndpoint extends EndpointBase {
             .createMultipartKey(ozoneBucket, key, length, partNumber,
                 uploadID, chunkSize, (DigestInputStream) body);
       }
+      // OmMultipartCommitUploadPartInfo can only be gotten after the
+      // OzoneOutputStream is closed, so we need to save the KeyOutputStream
+      // in the OzoneOutputStream and use it to get the
+      // OmMultipartCommitUploadPartInfo after OzoneOutputStream is closed.
       KeyOutputStream keyOutputStream = null;
       if (copyHeader != null) {
         Pair<String, String> result = parseSourceHeader(copyHeader);
