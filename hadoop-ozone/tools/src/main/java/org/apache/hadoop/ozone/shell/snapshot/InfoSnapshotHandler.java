@@ -5,19 +5,21 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.shell.snapshot;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
@@ -26,11 +28,11 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * ozone sh snapshot delete.
+ * ozone sh snapshot info.
  */
-@CommandLine.Command(name = "delete",
-    description = "Delete a snapshot")
-public class DeleteSnapshotHandler extends Handler {
+@CommandLine.Command(name = "info",
+    description = "returns information about an existing snapshot")
+public class InfoSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
   private BucketUri snapshotPath;
@@ -47,15 +49,16 @@ public class DeleteSnapshotHandler extends Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    client.getObjectStore()
-        .deleteSnapshot(volumeName, bucketName, snapshotName);
+    OzoneSnapshot ozoneSnapshot = client.getObjectStore()
+        .getSnapshotInfo(volumeName, bucketName, snapshotName);
+
     if (isVerbose()) {
-      out().format("Deleted snapshot '%s' under '%s/%s'.%n",
+      err().printf("Snapshot info for snapshot: %d under o3://%s/ %s ",
           snapshotName, volumeName, bucketName);
     }
+    printObjectAsJson(ozoneSnapshot);
   }
 }

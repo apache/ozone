@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -1260,6 +1261,55 @@ public class TestOmSnapshot {
     // TODO: Delete snapshot then delete bucket1 when deletion is implemented
     // no exception for bucket without snapshot
     volume.deleteBucket(bucket2);
+  }
+
+  @Test
+  public void testGetSnapshotInfo() throws Exception {
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+
+    createFileKey(bucket1, "key-1");
+    String snap1 = "snap-" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap1);
+
+    createFileKey(bucket1, "key-2");
+    String snap2 = "snap-" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap2);
+
+    OzoneSnapshot snapshot1 = store.getSnapshotInfo(volume, bucket, snap1);
+
+    Assertions.assertEquals(snap1, snapshot1.getName());
+    Assertions.assertEquals(volume, snapshot1.getVolumeName());
+    Assertions.assertEquals(bucket, snapshot1.getBucketName());
+
+    OzoneSnapshot snapshot2 = store.getSnapshotInfo(volume, bucket, snap2);
+    Assertions.assertEquals(snap2, snapshot2.getName());
+    Assertions.assertEquals(volume, snapshot2.getVolumeName());
+    Assertions.assertEquals(bucket, snapshot2.getBucketName());
+
+    testGetSnapshotInfoFailure(null, bucket, "snapshotName",
+        "volume can't be null or empty.");
+    testGetSnapshotInfoFailure(volume, null, "snapshotName",
+        "bucket can't be null or empty.");
+    testGetSnapshotInfoFailure(volume, bucket, null,
+        "snapshot name can't be null or empty.");
+    testGetSnapshotInfoFailure(volume, bucket, "snapshotName",
+        "Snapshot '/" + volume + "/" + bucket + "/snapshotName' is not found.");
+    testGetSnapshotInfoFailure(volume, "bucketName", "snapshotName",
+        "Snapshot '/" + volume + "/bucketName/snapshotName' is not found.");
+  }
+
+  public void testGetSnapshotInfoFailure(String volName,
+                                         String buckName,
+                                         String snapName,
+                                         String expectedMessage) {
+    Exception ioException = Assertions.assertThrows(Exception.class,
+        () -> store.getSnapshotInfo(volName, buckName, snapName));
+    Assertions.assertEquals(expectedMessage, ioException.getMessage());
   }
 
   @Test
