@@ -45,7 +45,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
 import java.io.IOException;
@@ -82,16 +85,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests Ozone Native Authorizer.
  */
+@ExtendWith(MockitoExtension.class)
 public class TestOzoneNativeAuthorizer {
 
   private static final List<String> ADMIN_USERNAMES = singletonList("om");
   private static File testDir;
-  private final String vol;
-  private final String buck;
+  private String vol;
+  private String buck;
   private String key;
-  private final String prefix;
-  private final ACLType parentDirUserAcl;
-  private final ACLType parentDirGroupAcl;
+  private String prefix;
+  private ACLType parentDirUserAcl;
+  private ACLType parentDirGroupAcl;
   private boolean expectedAclResult;
 
   private static OzoneManagerProtocol writeClient;
@@ -117,21 +121,21 @@ public class TestOzoneNativeAuthorizer {
     });
   }
 
-  public TestOzoneNativeAuthorizer(String keyName, String prefixName,
-      ACLType userRight,
+  public void createAll(
+      String keyName, String prefixName, ACLType userRight,
       ACLType groupRight, boolean expectedResult) throws IOException {
     int randomInt = RandomUtils.nextInt();
-    vol = "vol" + randomInt;
-    buck = "bucket" + randomInt;
-    key = keyName + randomInt;
-    prefix = prefixName + randomInt + OZONE_URI_DELIMITER;
-    parentDirUserAcl = userRight;
-    parentDirGroupAcl = groupRight;
-    expectedAclResult = expectedResult;
+    this.vol = "vol" + randomInt;
+    this.buck = "bucket" + randomInt;
+    this.key = keyName + randomInt;
+    this.prefix = prefixName + randomInt + OZONE_URI_DELIMITER;
+    this.parentDirUserAcl = userRight;
+    this.parentDirGroupAcl = groupRight;
+    this.expectedAclResult = expectedResult;
 
-    createVolume(vol);
-    createBucket(vol, buck);
-    createKey(vol, buck, key);
+    createVolume(this.vol);
+    createBucket(this.vol, this.buck);
+    createKey(this.vol, this.buck, this.key);
   }
 
   @BeforeAll
@@ -165,7 +169,7 @@ public class TestOzoneNativeAuthorizer {
   }
 
   private void createKey(String volume,
-      String bucket, String keyName) throws IOException {
+                         String bucket, String keyName) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volume)
         .setBucketName(bucket)
@@ -226,8 +230,12 @@ public class TestOzoneNativeAuthorizer {
         .build();
   }
 
-  @Test
-  public void testCheckAccessForVolume() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCheckAccessForVolume(
+      String keyName, String prefixName, ACLType userRight,
+      ACLType groupRight, boolean expectedResult) throws Exception {
+    createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     expectedAclResult = true;
     resetAclsAndValidateAccess(volObj, USER, writeClient);
     resetAclsAndValidateAccess(volObj, GROUP, writeClient);
@@ -235,9 +243,12 @@ public class TestOzoneNativeAuthorizer {
     resetAclsAndValidateAccess(volObj, ANONYMOUS, writeClient);
   }
 
-  @Test
-  public void testCheckAccessForBucket() throws Exception {
-
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCheckAccessForBucket(
+      String keyName, String prefixName, ACLType userRight,
+      ACLType groupRight, boolean expectedResult) throws Exception {
+    createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
         parentDirUserAcl, ACCESS);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
@@ -254,8 +265,12 @@ public class TestOzoneNativeAuthorizer {
     resetAclsAndValidateAccess(buckObj, ANONYMOUS, writeClient);
   }
 
-  @Test
-  public void testCheckAccessForKey() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCheckAccessForKey(
+      String keyName, String prefixName, ACLType userRight,
+      ACLType groupRight, boolean expectedResult) throws Exception {
+    createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
         parentDirUserAcl, ACCESS);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
@@ -272,12 +287,16 @@ public class TestOzoneNativeAuthorizer {
     resetAclsAndValidateAccess(keyObj, ANONYMOUS, writeClient);
   }
 
-  @Test
-  public void testCheckAccessForPrefix() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCheckAccessForPrefix(
+      String keyName, String prefixName, ACLType userRight,
+      ACLType groupRight, boolean expectedResult) throws Exception {
+    createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneObj prefixObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setBucketName(buck)
-        .setPrefixName(prefix)
+        .setPrefixName(this.prefix)
         .setResType(PREFIX)
         .setStoreType(OZONE)
         .build();
@@ -292,7 +311,6 @@ public class TestOzoneNativeAuthorizer {
     setVolumeAcl(Arrays.asList(userAcl, groupAcl));
 
     setBucketAcl(Arrays.asList(userAcl, groupAcl));
-
 
     resetAclsAndValidateAccess(prefixObj, USER, writeClient);
     resetAclsAndValidateAccess(prefixObj, GROUP, writeClient);
@@ -343,8 +361,9 @@ public class TestOzoneNativeAuthorizer {
         CacheValue.get(1L, omBucketInfo));
   }
 
-  private void resetAclsAndValidateAccess(OzoneObj obj,
-      ACLIdentityType accessType, OzoneManagerProtocol aclImplementor)
+  private void resetAclsAndValidateAccess(
+      OzoneObj obj, ACLIdentityType accessType,
+      OzoneManagerProtocol aclImplementor)
       throws IOException {
     List<OzoneAcl> acls;
     String user = testUgi.getUserName();
@@ -436,7 +455,7 @@ public class TestOzoneNativeAuthorizer {
               .map(OzoneAcl::getAclList)
               .collect(Collectors.toList());
           assertFalse(nativeAuthorizer.checkAccess(obj,
-                  builder.setAclRights(a2).build()), "Did not expect client " +
+              builder.setAclRights(a2).build()), "Did not expect client " +
               "to have " + a2 + " acl. " +
               "Current acls found:" + right + ". Type:" + accessType + ","
               + " name:" + (accessType == USER ? user : group));
@@ -445,7 +464,7 @@ public class TestOzoneNativeAuthorizer {
           int type = RandomUtils.nextInt(0, 3);
           ACLIdentityType identityType = ACLIdentityType.values()[type];
           // Add remaining acls one by one and then check access.
-          OzoneAcl addAcl = new OzoneAcl(identityType, 
+          OzoneAcl addAcl = new OzoneAcl(identityType,
               getAclName(identityType), a2, ACCESS);
 
           // For volume and bucket update to cache. As Old API's update to
@@ -486,7 +505,7 @@ public class TestOzoneNativeAuthorizer {
           for (ACLType a3 : aclsToBeValidated) {
             if (!a3.equals(a1) && !a3.equals(a2) && !a3.equals(CREATE)) {
               assertFalse(nativeAuthorizer.checkAccess(obj,
-                  builder.setAclRights(a3).build()),
+                      builder.setAclRights(a3).build()),
                   "User shouldn't have right " + a3 + ". " +
                       "Current acl rights for user:" + a1 + "," + a2);
             }
@@ -539,7 +558,7 @@ public class TestOzoneNativeAuthorizer {
     allAcls.remove(WRITE);
     for (ACLType a : allAcls) {
       assertFalse(nativeAuthorizer.checkAccess(obj,
-          builder.setAclRights(a).build()),
+              builder.setAclRights(a).build()),
           "User shouldn't have right " + a + ".");
     }
   }

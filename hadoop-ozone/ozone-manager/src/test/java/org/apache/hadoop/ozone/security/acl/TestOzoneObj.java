@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-
 import static org.mockito.Mockito.mock;
 
 /**
@@ -43,9 +42,8 @@ public class TestOzoneObj {
     builder = getBuilder(volume, bucket, key);
     objInfo = builder.build();
     Assertions.assertEquals(objInfo.getVolumeName(), volume);
-    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(), "unexpected" +
-        " path " +
-        "accessor");
+    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(),
+        "unexpected path accessor");
 
     objInfo = getBuilder(null, null, null).build();
     Assertions.assertNull(objInfo.getVolumeName());

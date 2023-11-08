@@ -87,7 +87,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private boolean keyPathLockEnabled;
   private boolean enableFileSystemPaths;
 
-  @org.junit.Test
+  @Test
   public void testPreExecuteWithNormalKey() throws Exception {
     ReplicationConfig ratis3Config =
         ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
