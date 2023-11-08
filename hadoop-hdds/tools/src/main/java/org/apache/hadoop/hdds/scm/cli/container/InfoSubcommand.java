@@ -109,8 +109,7 @@ public class InfoSubcommand extends ScmSubcommand {
       if (verbose) {
         LOG.info("Pipeline Info: {}", container.getPipeline());
       } else {
-        LOG.info("Pipeline id: {}",
-            container.getContainerInfo().getPipelineID());
+        LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
       }
       LOG.info("Write PipelineId: {}",
           container.getContainerInfo().getPipelineID().getId());
