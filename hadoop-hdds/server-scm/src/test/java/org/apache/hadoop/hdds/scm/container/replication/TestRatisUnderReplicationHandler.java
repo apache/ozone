@@ -390,6 +390,18 @@ public class TestRatisUnderReplicationHandler {
   }
 
   @Test
+  public void testDecommissionWithAllUnhealthyReplicas()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
+    replicas.addAll(createReplicas(container.containerID(), State.UNHEALTHY,
+        Pair.of(DECOMMISSIONING, 0)));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+  }
+
+  @Test
   public void onlyHealthyReplicasShouldBeReplicatedWhenAvailable()
       throws IOException {
     Set<ContainerReplica> replicas
