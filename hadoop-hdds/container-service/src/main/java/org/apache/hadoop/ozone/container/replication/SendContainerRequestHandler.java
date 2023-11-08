@@ -86,7 +86,7 @@ class SendContainerRequestHandler
 
       nextOffset += length;
     } catch (Throwable t) {
-      onError(t);
+      onError(t);t
     }
   }
 
