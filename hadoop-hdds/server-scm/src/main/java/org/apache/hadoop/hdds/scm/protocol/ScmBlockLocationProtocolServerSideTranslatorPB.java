@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -189,7 +190,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
     ExcludeList excludeList = ExcludeList.getFromProtoBuf(request.getExcludeList());
-    if (excludeList.getDatanodes().size() == scm.getScmNodeManager().getAllNodes().size()) {
+    if (excludeList.getDatanodes().size() ==
+        scm.getScmNodeManager().getNodeCount(NodeStatus.inServiceHealthy())) {
       throw new SCMException("All Datanodes have been added into exclude list. Client should retry all Datanodes again.",
           SCMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST);
     }
