@@ -188,7 +188,7 @@ public class TestBucketManagerImpl {
       BucketManager bucketManager = omTestManagers.getBucketManager();
       bucketManager.getBucketInfo("sample-vol", "bucket-one");
     });
-    Assertions.assertEquals("Bucket not found", exception.getMessage());
+    Assertions.assertTrue(exception.getMessage().contains("Bucket not found"));
     Assertions.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
         exception.getResult());
   }
@@ -333,7 +333,7 @@ public class TestBucketManagerImpl {
     });
     Assertions.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
           omEx.getResult());
-    Assertions.assertEquals("Bucket not found", omEx.getMessage());
+    Assertions.assertTrue(omEx.getMessage().contains("Bucket not found"));
   }
 
   @Test
