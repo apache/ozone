@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
@@ -81,11 +81,11 @@ class TestContainerImporter {
         containerSet, controllerMock, volumeSet);
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
-    StorageContainerException ex = Assert.assertThrows(
+    StorageContainerException ex = Assertions.assertThrows(
         StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
             null, NO_COMPRESSION));
-    Assert.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+    Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
     assertTrue(ex.getMessage().contains("Container already exists"));
   }
@@ -124,11 +124,11 @@ class TestContainerImporter {
     GenericTestUtils.waitFor(semaphore::hasQueuedThreads, 10, 5000);
     // run import second time and should fail immediately as
     // first import in progress
-    StorageContainerException ex = Assert.assertThrows(
+    StorageContainerException ex = Assertions.assertThrows(
         StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
             null, NO_COMPRESSION));
-    Assert.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+    Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
     assertTrue(ex.getMessage().contains("import in progress"));
     semaphore.release();
