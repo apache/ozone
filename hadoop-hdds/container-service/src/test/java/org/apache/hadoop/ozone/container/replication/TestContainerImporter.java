@@ -41,12 +41,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -81,14 +81,13 @@ class TestContainerImporter {
         containerSet, controllerMock, volumeSet);
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
-    try {
-      containerImporter.importContainer(containerId, tarFile.toPath(),
-          null, NO_COMPRESSION);
-      assertFalse(true, "exception should occur");
-    } catch (StorageContainerException ex) {
-      assertTrue(ex.getResult().equals(
-          ContainerProtos.Result.CONTAINER_EXISTS));
-    }
+    StorageContainerException ex = Assert.assertThrows(
+        StorageContainerException.class,
+        () -> containerImporter.importContainer(containerId, tarFile.toPath(),
+            null, NO_COMPRESSION));
+    Assert.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+        ex.getResult());
+    assertTrue(ex.getMessage().contains("Container already exists"));
   }
 
   @Test
@@ -100,7 +99,7 @@ class TestContainerImporter {
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     // mock controller for return container data with delay
     ContainerController controllerMock = mock(ContainerController.class);
-    Semaphore semaphore = new Semaphore(1);
+    Semaphore semaphore = new Semaphore(0);
     when(controllerMock.importContainer(any(), any(), any()))
         .thenAnswer((invocation) -> {
           semaphore.acquire();
@@ -122,18 +121,16 @@ class TestContainerImporter {
         // do nothing
       }
     });
-    GenericTestUtils.waitFor(() -> semaphore.availablePermits() == 0,
-        10, 5000);
+    GenericTestUtils.waitFor(semaphore::hasQueuedThreads, 10, 5000);
     // run import second time and should fail immediately as
     // first import in progress
-    try {
-      containerImporter.importContainer(containerId, tarFile.toPath(),
-          null, NO_COMPRESSION);
-      assertFalse(true, "exception should occur");
-    } catch (StorageContainerException ex) {
-      assertTrue(ex.getResult().equals(
-          ContainerProtos.Result.CONTAINER_EXISTS));
-    }
+    StorageContainerException ex = Assert.assertThrows(
+        StorageContainerException.class,
+        () -> containerImporter.importContainer(containerId, tarFile.toPath(),
+            null, NO_COMPRESSION));
+    Assert.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+        ex.getResult());
+    assertTrue(ex.getMessage().contains("import in progress"));
     semaphore.release();
   }
 
