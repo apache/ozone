@@ -450,7 +450,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
   private static UserGroupInformation testUgi;
-  private static boolean recoverCertificate = true;
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
@@ -649,11 +648,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omStorage, omInfo, "",
           scmInfo == null ? null : scmInfo.getScmId(),
           this::saveNewCertId, this::terminateOM);
-      if (recoverCertificate) {
-        certClient.initWithRecovery();
-      } else if (certClient instanceof OMCertificateClient) {
-        ((OMCertificateClient)certClient).init();
-      }
+      ((OMCertificateClient)certClient).init();
 
       SecretKeyProtocol secretKeyProtocol =
           HddsServerUtil.getSecretKeyClientForOm(conf);
@@ -1425,11 +1420,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 throw new RuntimeException("Failed to set new certificate ID");
               }
             }, null);
-    if (recoverCertificate) {
-      certClient.initWithRecovery();
-    } else {
-      certClient.init();
-    }
+    certClient.initWithRecovery();
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
@@ -4030,11 +4021,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public static void setUgi(UserGroupInformation user) {
     OzoneManager.testUgi = user;
-  }
-
-  @VisibleForTesting
-  public static void setRecoverCertificateFlag(boolean recoverCertificateFlag) {
-    OzoneManager.recoverCertificate = recoverCertificateFlag;
   }
 
   public OMNodeDetails getNodeDetails() {
