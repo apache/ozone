@@ -43,7 +43,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 /**
  * Test KeyOutputStream with RATIS keys.
@@ -142,7 +146,8 @@ public class TestKeyOutputStream {
     keyOutputStream.setBlockOutputStreamEntryPool(blockOutputStreamEntryPool);
     doReturn(testKeyString.length())
         .when(keyOutputStream)
-        .getCurrentBlockOutputStreamDataWritten(any(BlockOutputStreamEntry.class), anyLong());
+        .getCurrentBlockOutputStreamDataWritten(
+            any(BlockOutputStreamEntry.class), anyLong());
     return keyOutputStream;
   }
 

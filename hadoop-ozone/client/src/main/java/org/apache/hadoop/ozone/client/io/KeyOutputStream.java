@@ -270,7 +270,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       // the buffers
       Preconditions.checkState(!retry || len <= config
           .getStreamBufferMaxSize());
-      int dataWritten = getCurrentBlockOutputStreamDataWritten(current, currentPos);
+      int dataWritten =
+          getCurrentBlockOutputStreamDataWritten(current, currentPos);
       writeLen = retry ? (int) len : dataWritten;
       // In retry path, the data written is already accounted in offset.
       if (!retry) {
@@ -721,8 +722,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     blockOutputStreamEntryPool = streamEntryPool;
   }
 
-  protected int getCurrentBlockOutputStreamDataWritten(BlockOutputStreamEntry current,
-                                                       long currentPos) {
+  protected int getCurrentBlockOutputStreamDataWritten(
+      BlockOutputStreamEntry current, long currentPos) {
     return (int) (current.getWrittenDataLength() - currentPos);
   }
 
