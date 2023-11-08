@@ -30,6 +30,9 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 
+/**
+ * Test for non ha prepare.
+ */
 public class TestOMNonHaPrepare {
   private static MiniOzoneCluster cluster;
   private static OzoneAdmin ozoneAdmin;
