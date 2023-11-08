@@ -93,17 +93,8 @@ public final class HddsVolumeUtil {
         hddsVolumeSet.getVolumesList());
     long start = System.currentTimeMillis();
     for (HddsVolume volume : hddsVolumes) {
-      futures.add(CompletableFuture.runAsync(() -> {
-        try {
-          volume.loadDbStore(readOnly);
-        } catch (IOException e) {
-          onFailure(volume);
-          if (logger != null) {
-            logger.error("Load db store for HddsVolume {} failed",
-                volume.getStorageDir().getAbsolutePath(), e);
-          }
-        }
-      }));
+      futures.add(CompletableFuture.runAsync(
+          () -> loadVolume(volume, readOnly, logger)));
     }
     for (CompletableFuture<Void> future : futures) {
       future.join();
@@ -111,6 +102,19 @@ public final class HddsVolumeUtil {
     if (logger != null) {
       logger.info("Load {} volumes DbStore cost: {}ms", hddsVolumes.size(),
           System.currentTimeMillis() - start);
+    }
+  }
+
+  private static void loadVolume(HddsVolume volume, boolean readOnly,
+      Logger logger) {
+    try {
+      volume.loadDbStore(readOnly);
+    } catch (IOException e) {
+      onFailure(volume);
+      if (logger != null) {
+        logger.error("Load db store for HddsVolume {} failed",
+            volume.getStorageDir().getAbsolutePath(), e);
+      }
     }
   }
 
