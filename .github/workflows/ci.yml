@@ -26,8 +26,8 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      needs-basic-check: false
-      needs-unit-check: false
+      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
+      needs-unit-check: ${{ steps.categorize-basic-checks.outputs.needs-unit-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       unit-checks: ${{ steps.categorize-basic-checks.outputs.unit-checks }}
       needs-build: false
