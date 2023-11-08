@@ -162,6 +162,18 @@ public interface ClientProtocol {
   OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException;
 
+  /**
+   * Get OzoneKey in S3 context.
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @param partNumber Multipart-upload part number
+   * @return {@link OzoneKey}
+   * @throws IOException
+   */
+  OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                  int partNumber)
+      throws IOException;
+
   OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**

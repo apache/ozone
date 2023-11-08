@@ -1614,12 +1614,13 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OmKeyInfo keyInfo =
         getKeyInfo(volumeName, bucketName, keyName, false);
-
-    return getOzoneKeyDetails(keyInfo);
+    return getOzoneKeyDetails(keyInfo, false);
   }
 
   @NotNull
-  private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo) {
+  private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo,
+                                             boolean hasPartNumber)
+      throws IOException {
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
     long lastKeyOffset = 0L;
     List<OmKeyLocationInfo> omKeyLocationInfos = keyInfo
@@ -1632,18 +1633,44 @@ public class RpcClient implements ClientProtocol {
     }
 
     return new OzoneKeyDetails(keyInfo.getVolumeName(), keyInfo.getBucketName(),
-        keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getKeyName(),
+        hasPartNumber ? getTotalBytesRead(keyInfo) : keyInfo.getDataSize(),
+        keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
         () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile());
   }
 
+  private long getTotalBytesRead(OmKeyInfo keyInfo) throws IOException {
+    OzoneInputStream keyContent = getInputStreamWithRetryFunction(keyInfo);
+    byte[] buffer = new byte[4096];
+    int bytesRead;
+    long totalBytesRead = 0;
+    while ((bytesRead = keyContent.read(buffer)) != -1) {
+      totalBytesRead += bytesRead;
+    }
+    return totalBytesRead;
+  }
+
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
     OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
-    return getOzoneKeyDetails(keyInfo);
+    return getOzoneKeyDetails(keyInfo, false);
+  }
+
+  @Override
+  public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                         int partNumber) throws IOException {
+    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
+    List<OmKeyLocationInfo> filteredKeyLocationInfo = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly().stream()
+        .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
+            partNumber)
+        .collect(Collectors.toList());
+    keyInfo.updateLocationInfoList(filteredKeyLocationInfo, false);
+    return getOzoneKeyDetails(keyInfo, true);
   }
 
   @NotNull
