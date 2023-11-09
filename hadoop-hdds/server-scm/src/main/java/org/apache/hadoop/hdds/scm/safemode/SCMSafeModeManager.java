@@ -277,7 +277,7 @@ public class SCMSafeModeManager implements SafeModeManager {
             HAUtils.getScmContainerClient(config);
         boolean success = true;
         try {
-         scmHaManager.getRatisServer().updateRaftPeerPriority(selfPeerId);
+          scmHaManager.getRatisServer().updateRaftPeerPriority(selfPeerId);
         } catch (Exception exception) {
           success = false;
           LOG.info("Could not update priority for peer {} {}", selfPeerId,

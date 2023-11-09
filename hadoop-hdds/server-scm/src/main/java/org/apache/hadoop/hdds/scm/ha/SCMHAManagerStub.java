@@ -214,6 +214,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
       throw new IOException("submitSnapshotRequest is called.");
     }
 
+    @Override
+    public void updateRaftPeerPriority(String peerId) throws IOException {
+      return;
+    }
+
     private Message process(final SCMRatisRequest request) throws Exception {
       try {
         final Object handler = handlers.get(request.getType());
