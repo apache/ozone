@@ -25,8 +25,8 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
+import java.util.stream.Stream;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
@@ -81,20 +82,18 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
 import org.apache.ratis.util.ExitUtils;
-import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static org.slf4j.event.Level.INFO;
@@ -102,7 +101,7 @@ import static org.slf4j.event.Level.INFO;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-@InterfaceAudience.Private
+@Timeout(80)
 public final class TestDelegationToken {
 
   private static final String TEST_USER = "testUgiUser@EXAMPLE.COM";
@@ -112,11 +111,8 @@ public final class TestDelegationToken {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestDelegationToken.class);
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(80));
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -134,12 +130,16 @@ public final class TestDelegationToken {
   private String omId;
   private OzoneManagerProtocolClientSideTranslatorPB omClient;
 
-  @BeforeClass
+  public static Stream<Boolean> options() {
+    return Stream.of(false, true);
+  }
+
+  @BeforeAll
   public static void setup() {
     ExitUtils.disableSystemExit();
   }
 
-  @Before
+  @BeforeEach
   public void init() {
     try {
       conf = new OzoneConfiguration();
@@ -155,7 +155,7 @@ public final class TestDelegationToken {
           getPort(OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
 
       DefaultMetricsSystem.setMiniClusterMode(true);
-      final String path = folder.newFolder().toString();
+      final String path = folder.resolve("om-meta").toString();
       Path metaDirPath = Paths.get(path, "om-meta");
       conf.set(OZONE_METADATA_DIRS, metaDirPath.toString());
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
@@ -167,13 +167,12 @@ public final class TestDelegationToken {
       setSecureConfig();
       createCredentialsInKDC();
       generateKeyPair();
-      //      OzoneManager.setTestSecureOmFlag(true);
     } catch (Exception e) {
       LOG.error("Failed to initialize TestSecureOzoneCluster", e);
     }
   }
 
-  @After
+  @AfterEach
   public void stop() {
     try {
       stopMiniKdc();
@@ -256,14 +255,16 @@ public final class TestDelegationToken {
    * 5. Test success of token cancellation.
    * 5. Test failure of token cancellation.
    */
-  @Test
-  public void testDelegationToken() throws Exception {
+  @ParameterizedTest
+  @MethodSource("options")
+  public void testDelegationToken(boolean useIp) throws Exception {
 
     // Capture logs for assertions
     LogCapturer logs = LogCapturer.captureLogs(Server.AUDITLOG);
     LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils
         .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
+    SecurityUtil.setTokenServiceUseIp(useIp);
 
     // Setup secure OM for start
     setupOm(conf);
@@ -317,7 +318,8 @@ public final class TestDelegationToken {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token);
       assertEquals("OzoneToken", token.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(conf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token.getService().toString());
       omClient.close();
 

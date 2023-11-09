@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -40,20 +42,10 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
-import java.text.ParseException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.Map;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.OptionalLong;
-
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -66,6 +58,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -86,15 +79,28 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.annotations.VisibleForTesting;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.text.ParseException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.OptionalLong;
+
 import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
 import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
-import org.apache.commons.io.IOUtils;
-
-import org.apache.commons.lang3.tuple.Pair;
-
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
@@ -127,10 +133,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UN
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
-import org.apache.http.HttpStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Key level rest endpoints.
  */
@@ -139,6 +141,18 @@ public class ObjectEndpoint extends EndpointBase {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpoint.class);
+
+  private static final ThreadLocal<MessageDigest> E_TAG_PROVIDER;
+
+  static {
+    E_TAG_PROVIDER = ThreadLocal.withInitial(() -> {
+      try {
+        return MessageDigest.getInstance("Md5");
+      } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
+    });
+  }
 
   @Context
   private ContainerRequestContext context;
@@ -262,26 +276,47 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
+      if (customMetadata.containsKey(ETAG)
+          || customMetadata.containsKey(ETAG.toLowerCase())) {
+        String customETag = customMetadata.get(ETAG) != null ?
+            customMetadata.get(ETAG) : customMetadata.get(ETAG.toLowerCase());
+        customMetadata.remove(ETAG);
+        customMetadata.remove(ETAG.toLowerCase());
+        customMetadata.put(ETAG_CUSTOM, customETag);
+      }
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
-        body = new SignedChunksInputStream(body);
+        body = new DigestInputStream(new SignedChunksInputStream(body),
+            E_TAG_PROVIDER.get());
+      } else {
+        body = new DigestInputStream(body, E_TAG_PROVIDER.get());
       }
-      long putLength = 0;
+
+      long putLength;
+      String eTag = null;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
         getMetrics().updatePutKeyMetadataStats(startNanos);
-        putLength = ObjectEndpointStreaming
+        Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,
-                customMetadata, body);
+                customMetadata, (DigestInputStream) body);
+        eTag = keyWriteResult.getKey();
+        putLength = keyWriteResult.getValue();
       } else {
         output = getClientProtocol().createKey(volume.getName(), bucketName,
             keyPath, length, replicationConfig, customMetadata);
         getMetrics().updatePutKeyMetadataStats(startNanos);
         putLength = IOUtils.copyLarge(body, output);
+        eTag = DatatypeConverter.printHexBinary(
+            ((DigestInputStream) body).getMessageDigest().digest())
+            .toLowerCase();
+        output.getMetadata().put(ETAG, eTag);
       }
 
       getMetrics().incPutKeySuccessLength(putLength);
-      return Response.ok().status(HttpStatus.SC_OK)
+      return Response.ok()
+          .header(ETAG, wrapInQuotes(eTag))
+          .status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
       auditSuccess = false;
@@ -421,8 +456,9 @@ public class ObjectEndpoint extends EndpointBase {
 
         responseBuilder.header(CONTENT_RANGE_HEADER, contentRangeVal);
       }
-      responseBuilder.header(ACCEPT_RANGE_HEADER,
-          RANGE_HEADER_SUPPORTED_UNIT);
+      responseBuilder
+          .header(ETAG, wrapInQuotes(keyDetails.getMetadata().get(ETAG)))
+          .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
 
       // if multiple query parameters having same name,
       // Only the first parameters will be recognized
@@ -535,7 +571,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     ResponseBuilder response = Response.ok().status(HttpStatus.SC_OK)
-        .header("ETag", "" + key.getModificationTime())
+        .header(ETAG, "" + wrapInQuotes(key.getMetadata().get(ETAG)))
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
@@ -765,8 +801,8 @@ public class ObjectEndpoint extends EndpointBase {
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
       completeMultipartUploadResponse.setKey(key);
-      completeMultipartUploadResponse.setETag(omMultipartUploadCompleteInfo
-          .getHash());
+      completeMultipartUploadResponse.setETag(
+          wrapInQuotes(omMultipartUploadCompleteInfo.getHash()));
       // Location also setting as bucket name.
       completeMultipartUploadResponse.setLocation(bucket);
       AUDIT.logWriteSuccess(
@@ -820,7 +856,10 @@ public class ObjectEndpoint extends EndpointBase {
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
-        body = new SignedChunksInputStream(body);
+        body = new DigestInputStream(new SignedChunksInputStream(body),
+            E_TAG_PROVIDER.get());
+      } else {
+        body = new DigestInputStream(body, E_TAG_PROVIDER.get());
       }
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
@@ -841,7 +880,7 @@ public class ObjectEndpoint extends EndpointBase {
           getMetrics().updatePutKeyMetadataStats(startNanos);
           return ObjectEndpointStreaming
               .createMultipartKey(ozoneBucket, key, length, partNumber,
-                  uploadID, chunkSize, body);
+                  uploadID, chunkSize, (DigestInputStream) body);
         }
         ozoneOutputStream = getClientProtocol().createMultipartKey(
             volume.getName(), bucket, key, length, partNumber, uploadID);
@@ -893,6 +932,10 @@ public class ObjectEndpoint extends EndpointBase {
         } else {
           getMetrics().updatePutKeyMetadataStats(startNanos);
           long putLength = IOUtils.copyLarge(body, ozoneOutputStream);
+          ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
+              .getMetadata().put("ETag", DatatypeConverter.printHexBinary(
+                  ((DigestInputStream) body).getMessageDigest().digest())
+                  .toLowerCase());
           getMetrics().incPutKeySuccessLength(putLength);
         }
       } finally {
@@ -911,8 +954,7 @@ public class ObjectEndpoint extends EndpointBase {
         return Response.ok(new CopyPartResult(eTag)).build();
       } else {
         getMetrics().updateCreateMultipartKeySuccessStats(startNanos);
-        return Response.ok().header("ETag",
-            eTag).build();
+        return Response.ok().header(ETAG, eTag).build();
       }
 
     } catch (OMException ex) {
@@ -1014,7 +1056,7 @@ public class ObjectEndpoint extends EndpointBase {
         replication.getReplicationType() == EC) &&
         srcKeyLen > datastreamMinLength) {
       copyLength = ObjectEndpointStreaming
-          .putKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
+          .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
               chunkSize, replication, metadata, src);
     } else {
       try (OzoneOutputStream dest = getClientProtocol()
@@ -1190,4 +1232,9 @@ public class ObjectEndpoint extends EndpointBase {
   public boolean isDatastreamEnabled() {
     return datastreamEnabled;
   }
+
+  private String wrapInQuotes(String value) {
+    return "\"" + value + "\"";
+  }
+
 }

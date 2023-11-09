@@ -640,9 +640,14 @@ public class TestOmSnapshot {
 
   private OmKeyInfo getOmKeyInfo(String volume, String bucket,
                                  String key) throws IOException {
+    ResolvedBucket resolvedBucket = new ResolvedBucket(volume, bucket,
+        volume, bucket, "", bucketLayout);
     return cluster.getOzoneManager().getKeyManager()
-            .getKeyInfo(new OmKeyArgs.Builder().setVolumeName(volume)
-            .setBucketName(bucket).setKeyName(key).build(), null);
+            .getKeyInfo(new OmKeyArgs.Builder()
+                .setVolumeName(volume)
+                .setBucketName(bucket)
+                .setKeyName(key).build(),
+                resolvedBucket, null);
   }
 
   /**

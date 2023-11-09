@@ -59,7 +59,7 @@ public class BlockManagerImpl implements BlockManager {
       "Unable to find the block.";
 
   // Default Read Buffer capacity when Checksum is not present
-  private final long defaultReadBufferCapacity;
+  private final int defaultReadBufferCapacity;
 
   /**
    * Constructs a Block Manager.
@@ -69,34 +69,26 @@ public class BlockManagerImpl implements BlockManager {
   public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
-    this.defaultReadBufferCapacity = (long) config.getStorageSize(
+    final double size = config.getStorageSize(
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    if (size <= 0) {
+      throw new IllegalArgumentException(
+          ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY + " <= 0");
+    } else if (size > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException(
+          ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY
+              + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE);
+    }
+    this.defaultReadBufferCapacity = (int) size;
   }
 
-  /**
-   * Puts or overwrites a block.
-   *
-   * @param container - Container for which block need to be added.
-   * @param data     - BlockData.
-   * @return length of the block.
-   * @throws IOException
-   */
   @Override
   public long putBlock(Container container, BlockData data) throws IOException {
     return putBlock(container, data, true);
   }
-  /**
-   * Puts or overwrites a block.
-   *
-   * @param container - Container for which block need to be added.
-   * @param data - BlockData.
-   * @param endOfBlock - The last putBlock call for this block (when
-   *                   all the chunks are written and stream is closed)
-   * @return length of the block.
-   * @throws IOException
-   */
+
   @Override
   public long putBlock(Container container, BlockData data,
       boolean endOfBlock) throws IOException {
@@ -222,14 +214,6 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  /**
-   * Gets an existing block.
-   *
-   * @param container - Container from which block need to be fetched.
-   * @param blockID - BlockID of the block.
-   * @return Key Data.
-   * @throws IOException
-   */
   @Override
   public BlockData getBlock(Container container, BlockID blockID)
       throws IOException {
@@ -264,14 +248,6 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  /**
-   * Returns the length of the committed block.
-   *
-   * @param container - Container from which block need to be fetched.
-   * @param blockID - BlockID of the block.
-   * @return length of the block.
-   * @throws IOException in case, the block key does not exist in db.
-   */
   @Override
   public long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException {
@@ -287,12 +263,17 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
-  public long getDefaultReadBufferCapacity() {
+  public int getDefaultReadBufferCapacity() {
     return defaultReadBufferCapacity;
   }
 
   /**
    * Deletes an existing block.
+   * As Deletion is handled by BlockDeletingService,
+   * UnsupportedOperationException is thrown always
+   *
+   * @param container - Container from which block need to be deleted.
+   * @param blockID - ID of the block.
    */
   @Override
   public void deleteBlock(Container container, BlockID blockID) throws
@@ -303,14 +284,6 @@ public class BlockManagerImpl implements BlockManager {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * List blocks in a container.
-   *
-   * @param container - Container from which blocks need to be listed.
-   * @param startLocalID  - Key to start from, 0 to begin.
-   * @param count    - Number of blocks to return.
-   * @return List of Blocks that match the criteria.
-   */
   @Override
   public List<BlockData> listBlock(Container container, long startLocalID, int
       count) throws IOException {

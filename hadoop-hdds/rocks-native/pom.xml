@@ -72,16 +72,12 @@
 
     <profiles>
         <profile>
-            <id>rocks_tools_native</id>
+            <id>cpu-count</id>
             <activation>
                 <property>
-                    <name>rocks_tools_native</name>
+                    <name>!system.numCores</name>
                 </property>
             </activation>
-            <properties>
-                <cmake.standards>20</cmake.standards>
-                <sstDump.include>true</sstDump.include>
-            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -100,6 +96,22 @@
                             </execution>
                         </executions>
                     </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>rocks_tools_native</id>
+            <activation>
+                <property>
+                    <name>rocks_tools_native</name>
+                </property>
+            </activation>
+            <properties>
+                <cmake.standards>20</cmake.standards>
+                <sstDump.include>true</sstDump.include>
+            </properties>
+            <build>
+                <plugins>
                     <plugin>
                         <groupId>com.googlecode.maven-download-plugin</groupId>
                         <artifactId>download-maven-plugin</artifactId>
