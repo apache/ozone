@@ -160,6 +160,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -212,6 +213,7 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
   private final ContainerClientMetrics clientMetrics;
+  private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -687,7 +689,7 @@ public class RpcClient implements ClientProtocol {
         : "with server-side default bucket layout";
     LOG.info("Creating Bucket: {}/{}, {}, {} as owner, Versioning {}, " +
             "Storage Type set to {} and Encryption set to {}, " +
-            "Replication Type set to {}, Namespace Quota set to {}, " + 
+            "Replication Type set to {}, Namespace Quota set to {}, " +
             "Space Quota set to {} ",
         volumeName, bucketName, layoutMsg, owner, isVersionEnabled,
         storageType, bek != null, replicationType,
@@ -1346,6 +1348,13 @@ public class RpcClient implements ClientProtocol {
         .setLatestVersionLocation(getLatestVersionLocation);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    // For bucket with layout OBJECT_STORE, when create an empty file (size=0),
+    // OM will set DataSize to OzoneConfigKeys#OZONE_SCM_BLOCK_SIZE,
+    // which will cause S3G's atomic write length check to fail,
+    // so reset size to 0 here.
+    if (isS3GRequest.get() && size == 0) {
+      openKey.getKeyInfo().setDataSize(size);
+    }
     return createOutputStream(openKey);
   }
 
@@ -1787,6 +1796,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(uploadID)
         .setIsMultipartKey(true)
+        .setAtomicKeyCreation(isS3GRequest.get())
         .build();
     return createOutputStream(openKey, keyOutputStream);
   }
@@ -1802,7 +1812,9 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     final OpenKeySession openKey = newMultipartOpenKey(
         volumeName, bucketName, keyName, size, partNumber, uploadID);
-
+    // Amazon S3 never adds partial objects, So for S3 requests we need to
+    // set atomicKeyCreation to true
+    // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
             .setHandler(openKey)
@@ -1814,6 +1826,7 @@ public class RpcClient implements ClientProtocol {
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(conf.getObject(OzoneClientConfig.class))
+            .setAtomicKeyCreation(isS3GRequest.get())
             .build();
     keyOutputStream
         .addPreallocateBlocks(
@@ -2216,6 +2229,9 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     final ReplicationConfig replicationConfig
         = openKey.getKeyInfo().getReplicationConfig();
+    // Amazon S3 never adds partial objects, So for S3 requests we need to
+    // set atomicKeyCreation to true
+    // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
             .setHandler(openKey)
@@ -2224,6 +2240,7 @@ public class RpcClient implements ClientProtocol {
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(conf.getObject(OzoneClientConfig.class))
+            .setAtomicKeyCreation(isS3GRequest.get())
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -2305,6 +2322,7 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(conf.getObject(OzoneClientConfig.class))
+        .setAtomicKeyCreation(isS3GRequest.get())
         .setClientMetrics(clientMetrics);
   }
 
@@ -2381,6 +2399,11 @@ public class RpcClient implements ClientProtocol {
   public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
+  }
+
+  @Override
+  public void setIsS3Request(boolean s3Request) {
+    this.isS3GRequest.set(s3Request);
   }
 
   @Override

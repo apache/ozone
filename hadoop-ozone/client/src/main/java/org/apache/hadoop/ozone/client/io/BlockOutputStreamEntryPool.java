@@ -438,4 +438,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return null;
   }
 
+  long getDataSize() {
+    return keyArgs.getDataSize();
+  }
 }

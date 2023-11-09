@@ -289,6 +289,10 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
     return totalDataLen;
   }
 
+  public long getDataSize() {
+    return keyArgs.getDataSize();
+  }
+
   @Override
   public Map<String, String> getMetadata() {
     return this.keyArgs.getMetadata();

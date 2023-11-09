@@ -578,6 +578,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setIsS3Request(boolean isS3Request) {
+
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }

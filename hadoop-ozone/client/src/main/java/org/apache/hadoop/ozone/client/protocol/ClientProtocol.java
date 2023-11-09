@@ -1008,6 +1008,9 @@ public interface ClientProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
+
+  void setIsS3Request(boolean isS3Request);
+
   /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
