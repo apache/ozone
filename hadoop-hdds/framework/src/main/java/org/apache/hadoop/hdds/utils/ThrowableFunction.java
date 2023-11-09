@@ -15,24 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test.tag;
+package org.apache.hadoop.hdds.utils;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-import org.junit.jupiter.api.Tag;
 
 /**
- * Annotation to mark JUnit5 test classes that require native libraries.
+ * Utility interface for function which throws exceptions.
+ * Similar to {@link java.util.function.Function}.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
-@Retention(RetentionPolicy.RUNTIME)
-@Tag("native")
-public @interface Native {
-  /**
-   * Native Library being used.
-   */
-  String value();
+public interface ThrowableFunction<T, R, E extends Throwable> {
+  R apply(T t) throws E;
 }

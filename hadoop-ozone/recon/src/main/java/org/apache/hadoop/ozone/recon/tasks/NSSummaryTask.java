@@ -17,6 +17,7 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -123,7 +124,9 @@ public class NSSummaryTask implements ReconOmTask {
 
     List<Future<Boolean>> results;
     ExecutorService executorService = Executors
-        .newFixedThreadPool(2);
+        .newFixedThreadPool(2,
+            new ThreadFactoryBuilder().setNameFormat("NSSummaryTask - %d")
+                .build());
     try {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {

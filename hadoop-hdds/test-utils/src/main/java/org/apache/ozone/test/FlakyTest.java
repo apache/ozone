@@ -15,24 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test.tag;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-import org.junit.jupiter.api.Tag;
+package org.apache.ozone.test;
 
 /**
- * Annotation to mark JUnit5 test classes that require native libraries.
+ * Interface to mark JUnit4 test classes or methods that exhibit intermittent
+ * issues.  These are run separately from the normal tests in CI.  In case of
+ * failure they may be repeated a few times.
+ * Usage: <code>@Category(FlakyTest.class) @Flaky("HDDS-123")</code>
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
-@Retention(RetentionPolicy.RUNTIME)
-@Tag("native")
-public @interface Native {
-  /**
-   * Native Library being used.
-   */
-  String value();
+public interface FlakyTest {
+  // category marker
 }

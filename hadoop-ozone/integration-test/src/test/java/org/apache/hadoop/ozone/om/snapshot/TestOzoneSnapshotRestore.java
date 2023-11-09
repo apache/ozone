@@ -42,9 +42,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -68,6 +70,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * Tests Snapshot Restore function.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
@@ -96,7 +99,7 @@ public class TestOzoneSnapshotRestore {
     counter = new AtomicInteger();
   }
 
-  @BeforeEach
+  @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     // Enable filesystem snapshot feature for the test regardless of the default
@@ -133,7 +136,7 @@ public class TestOzoneSnapshotRestore {
 
   }
 
-  @AfterEach
+  @AfterAll
   public void tearDown() throws Exception {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -342,6 +345,7 @@ public class TestOzoneSnapshotRestore {
 
   @ParameterizedTest
   @MethodSource("bucketTypes")
+  @Flaky("HDDS-9436")
   public void testUnorderedDeletion(BucketLayout bucketLayoutTest)
           throws Exception {
     String volume = "vol-" + counter.incrementAndGet();

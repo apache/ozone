@@ -250,7 +250,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    *
    * @return true if secret mgr is running
    */
-  public synchronized boolean isRunning() {
+  public boolean isRunning() {
     return running;
   }
 
