@@ -79,6 +79,16 @@ public class ContainerImporter {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
+  public boolean isAllowedContainerImport(long containerID) {
+    if (importContainerProgress.contains(containerID)) {
+      return false;
+    }
+    if (containerSet.getContainer(containerID) != null) {
+      return false;
+    }
+    return true;
+  }
+
   public void importContainer(long containerID, Path tarFilePath,
       HddsVolume hddsVolume, CopyContainerCompression compression)
       throws IOException {
