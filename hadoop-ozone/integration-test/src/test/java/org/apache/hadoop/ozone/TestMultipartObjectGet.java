@@ -206,10 +206,11 @@ public class TestMultipartObjectGet {
     completeMultipartUploadRequest.setPartList(partsList);
     completeMultipartUpload(completeMultipartUploadRequest, uploadID);
 
-    getObjectMultipart(0, (content1 + content2 + content3).getBytes().length);
-    getObjectMultipart(1, content1.getBytes().length);
-    getObjectMultipart(2, content2.getBytes().length);
-    getObjectMultipart(3, content3.getBytes().length);
+    getObjectMultipart(0,
+        (content1 + content2 + content3).getBytes(UTF_8).length);
+    getObjectMultipart(1, content1.getBytes(UTF_8).length);
+    getObjectMultipart(2, content2.getBytes(UTF_8).length);
+    getObjectMultipart(3, content3.getBytes(UTF_8).length);
   }
 
   private static String generateRandomContent(int sizeInMB) {
