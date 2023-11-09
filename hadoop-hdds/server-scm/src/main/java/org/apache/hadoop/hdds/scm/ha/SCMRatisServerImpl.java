@@ -338,6 +338,34 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     }
   }
 
+  public void updateRaftPeerPriority(String peerId) throws IOException {
+    List<RaftPeer> raftPeers =
+        new ArrayList<>(getDivision().getGroup().getPeers());
+    RaftPeer peerToUpdate = raftPeers.stream()
+        .filter(peer -> peer.getId().toString().equals(peerId)).findFirst()
+        .get();
+    RaftPeer newPeer = RaftPeer.newBuilder(peerToUpdate).setPriority(1).build();
+    raftPeers.add(newPeer);
+    raftPeers.remove(peerToUpdate);
+    final SetConfigurationRequest configRequest =
+        new SetConfigurationRequest(clientId, division.getPeer().getId(),
+            division.getGroup().getGroupId(), nextCallId(), raftPeers);
+    try {
+      RaftClientReply raftClientReply =
+          division.getRaftServer().setConfiguration(configRequest);
+      if (!raftClientReply.isSuccess()) {
+        LOG.error("Failed to update Raft Peer Priority for peer ID : {}",
+            peerToUpdate.getId());
+        throw new IOException("Failed to update Raft Peer Priority for " +
+            "peer ID : " + peerToUpdate.getId());
+      }
+    } catch (IOException exception) {
+      LOG.error("Failed to update Raft Peer Priority for peer ID : {}",
+          peerToUpdate.getId());
+      throw exception;
+    }
+  }
+
   @Override
   public boolean removeSCM(RemoveSCMRequest request) throws IOException {
     final List<RaftPeer> newRaftPeerList =

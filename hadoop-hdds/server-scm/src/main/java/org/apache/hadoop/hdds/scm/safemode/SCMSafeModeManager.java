@@ -31,13 +31,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +113,8 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SCMContext scmContext;
 
   private final SafeModeMetrics safeModeMetrics;
+
+  private SCMHAManager scmHaManager;
 
   public SCMSafeModeManager(ConfigurationSource conf,
              List<ContainerInfo> allContainers,
@@ -249,8 +256,41 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     // TODO: Remove handler registration as there is no need to listen to
     // register events anymore.
-
+    updateRaftPeerPriority();
     emitSafeModeStatus();
+  }
+
+  /**
+   * If SCM HA is configured, update priority of the RaftPeer for the current
+   * SCM as it is out of safeMode. This ensures that if all the Raft peers have
+   * up-to-date indexes,the peer with the higher priority is elected as the
+   * leader.
+   */
+  private void updateRaftPeerPriority() {
+    if (scmHaManager != null && scmHaManager.getRatisServer() != null) {
+      RaftServer.Division division =
+          scmHaManager.getRatisServer().getDivision();
+      if (division != null) {
+        RaftPeer self = division.getPeer();
+        String selfPeerId = self.getId().toString();
+        StorageContainerLocationProtocol scmClient =
+            HAUtils.getScmContainerClient(config);
+        boolean success = true;
+        try {
+         scmHaManager.getRatisServer().updateRaftPeerPriority(selfPeerId);
+        } catch (Exception exception) {
+          success = false;
+          LOG.info("Could not update priority for peer {} {}", selfPeerId,
+              exception);
+        }
+        if (!success) {
+          LOG.error("Could not update priority for peer {}", selfPeerId);
+        } else {
+          LOG.info("Successfully updated Raft peer priority for peer : {}",
+              selfPeerId);
+        }
+      }
+    }
   }
 
   /**
@@ -317,6 +357,10 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   public void setPreCheckComplete(boolean newState) {
     this.preCheckComplete.set(newState);
+  }
+
+  public void setScmHaManager(SCMHAManager scmHaManager) {
+    this.scmHaManager = scmHaManager;
   }
 
   public static Logger getLogger() {

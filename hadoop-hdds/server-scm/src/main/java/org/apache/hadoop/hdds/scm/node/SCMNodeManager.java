@@ -249,6 +249,10 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getNodeCount(nodeStatus);
   }
 
+  public SCMStorageConfig getScmStorageConfig() {
+    return scmStorageConfig;
+  }
+
   /**
    * Returns the Number of Datanodes by State they are in. Passing null for
    * either of the states acts like a wildcard for that state.

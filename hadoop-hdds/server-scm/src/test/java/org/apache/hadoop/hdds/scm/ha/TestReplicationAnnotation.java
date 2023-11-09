@@ -108,6 +108,10 @@ public class TestReplicationAnnotation {
       public GrpcTlsConfig getGrpcTlsConfig() {
         return null;
       }
+
+      @Override
+      public void updateRaftPeerPriority(String peerId) {
+      }
     };
   }
 

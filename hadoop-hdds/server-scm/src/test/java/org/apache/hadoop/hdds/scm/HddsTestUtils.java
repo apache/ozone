@@ -825,15 +825,21 @@ public final class HddsTestUtils {
    * @return NodeRegistrationContainerReport
    */
   public static SCMDatanodeProtocolServer.NodeRegistrationContainerReport
-      createNodeRegistrationContainerReport(List<ContainerInfo> dnContainers) {
-    List<ContainerReplicaProto>
-        containers = new ArrayList<>();
+      createNodeRegistrationContainerReport(
+      List<ContainerInfo> dnContainers) {
+    return createNodeRegistrationContainerReport(dnContainers,
+        MockDatanodeDetails.randomDatanodeDetails());
+  }
+
+  public static SCMDatanodeProtocolServer.NodeRegistrationContainerReport
+      createNodeRegistrationContainerReport(List<ContainerInfo> dnContainers,
+      DatanodeDetails datanodeDetails) {
+    List<ContainerReplicaProto> containers = new ArrayList<>();
     dnContainers.forEach(c -> {
       containers.add(getRandomContainerInfo(c.getContainerID()));
     });
     return new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(
-        MockDatanodeDetails.randomDatanodeDetails(),
-        getContainerReports(containers));
+        datanodeDetails, getContainerReports(containers));
   }
 
   /**
