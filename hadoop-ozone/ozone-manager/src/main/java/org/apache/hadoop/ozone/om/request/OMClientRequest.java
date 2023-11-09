@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -168,6 +169,11 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+    } else if (GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get() != null
+        && GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get() != null) {
+      userInfo.setHostName(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get());
+      userInfo.setRemoteAddress(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY
+          .get());
     }
 
     return userInfo.build();
