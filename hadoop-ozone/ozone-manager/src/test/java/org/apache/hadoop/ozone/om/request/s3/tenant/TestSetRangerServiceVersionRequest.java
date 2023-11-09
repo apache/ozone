@@ -28,15 +28,15 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 
 /**
@@ -44,15 +44,15 @@ import java.util.UUID;
  */
 public class TestSetRangerServiceVersionRequest {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OzoneManager ozoneManager;
   // Set ozoneManagerDoubleBuffer to do nothing.
   private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
       ((response, transactionIndex) -> null);
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     ozoneManager = Mockito.mock(OzoneManager.class);
     Mockito.when(ozoneManager.getVersionManager())
@@ -60,12 +60,12 @@ public class TestSetRangerServiceVersionRequest {
 
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     Mockito.when(ozoneManager.getMetadataManager())
         .thenReturn(new OmMetadataManagerImpl(conf, ozoneManager));
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     Mockito.framework().clearInlineMocks();
   }
@@ -98,13 +98,13 @@ public class TestSetRangerServiceVersionRequest {
             ozoneManager, txLogIndex, ozoneManagerDoubleBufferHelper);
 
     // Check response type and cast
-    Assert.assertTrue(clientResponse
+    Assertions.assertTrue(clientResponse
         instanceof OMSetRangerServiceVersionResponse);
     final OMSetRangerServiceVersionResponse omSetRangerServiceVersionResponse =
         (OMSetRangerServiceVersionResponse) clientResponse;
 
     // Verify response
     String verStr = omSetRangerServiceVersionResponse.getNewServiceVersion();
-    Assert.assertEquals(10L, Long.parseLong(verStr));
+    Assertions.assertEquals(10L, Long.parseLong(verStr));
   }
 }
