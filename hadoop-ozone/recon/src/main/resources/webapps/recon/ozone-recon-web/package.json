@@ -76,7 +76,7 @@
     "eslint-plugin-unicorn": "^19.0.1",
     "json-server": "^0.15.1",
     "npm-run-all": "^4.1.5",
-    "xo": "^0.30.0"
+    "xo": "^0.56.0"
   },
   "xo": {
     "space": true,
