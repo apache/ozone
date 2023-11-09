@@ -852,7 +852,8 @@ public final class OzoneManagerRatisServer {
 
   @VisibleForTesting
   public RaftPeerId getRaftLeaderId() {
-    return this.getLeader() == null ? null : this.getLeader().getId();
+    RaftPeer leader = this.getLeader();
+    return leader == null ? null : leader.getId();
   }
 
   @VisibleForTesting
