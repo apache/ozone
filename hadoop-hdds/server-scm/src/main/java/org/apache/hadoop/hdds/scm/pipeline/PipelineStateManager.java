@@ -65,8 +65,7 @@ public interface PipelineStateManager {
 
   void addContainerToPipeline(
       PipelineID pipelineID,
-      ContainerID containerID
-  ) throws IOException;
+      ContainerID containerID, boolean checkPipelineClosed) throws IOException;
 
   void addContainerToPipelineSCMStart(
       PipelineID pipelineID,

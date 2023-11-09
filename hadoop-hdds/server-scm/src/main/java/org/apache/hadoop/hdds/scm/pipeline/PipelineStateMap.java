@@ -97,19 +97,24 @@ class PipelineStateMap {
    *
    * @param pipelineID - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
+   * @param  checkPipelineClosed - check if pipeline is closed
    * @throws IOException if pipeline is not in open state or does not exist
    */
-  void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+  void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID,
+      boolean checkPipelineClosed)
       throws IOException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
     Preconditions.checkNotNull(containerID,
         "Container Id cannot be null");
 
-    Pipeline pipeline = getPipeline(pipelineID);
-    if (pipeline.isClosed()) {
-      throw new InvalidPipelineStateException(format(
-          "Cannot add container to pipeline=%s in closed state", pipelineID));
+    if (checkPipelineClosed) {
+      Pipeline pipeline = getPipeline(pipelineID);
+      if (pipeline.isClosed()) {
+        throw new InvalidPipelineStateException(
+            format("Cannot add container to pipeline=%s in closed state",
+                pipelineID));
+      }
     }
     pipeline2container.get(pipelineID).add(containerID);
   }

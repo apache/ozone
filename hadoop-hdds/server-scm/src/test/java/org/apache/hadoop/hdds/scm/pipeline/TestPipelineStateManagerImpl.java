@@ -302,14 +302,14 @@ public class TestPipelineStateManagerImpl {
     stateManager.addPipeline(pipelineProto);
     pipeline = stateManager.getPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(++containerID), true);
 
     // move pipeline to open state
     openPipeline(pipelineProto);
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(++containerID), true);
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(++containerID), true);
 
     //verify the number of containers returned
     Set<ContainerID> containerIDs =
@@ -320,7 +320,7 @@ public class TestPipelineStateManagerImpl {
     removePipeline(pipelineProto);
     try {
       stateManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueOf(++containerID));
+          ContainerID.valueOf(++containerID), true);
       Assertions.fail("Container should not have been added");
     } catch (IOException e) {
       // Can not add a container to removed pipeline
@@ -337,7 +337,7 @@ public class TestPipelineStateManagerImpl {
     // close the pipeline
     openPipeline(pipelineProto);
     stateManager
-        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
+        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1), true);
 
     try {
       removePipeline(pipelineProto);
@@ -364,7 +364,7 @@ public class TestPipelineStateManagerImpl {
     openPipeline(pipelineProto);
 
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(containerID));
+        ContainerID.valueOf(containerID), true);
     Assertions.assertEquals(1,
         stateManager.getContainers(pipeline.getId()).size());
     stateManager.removeContainerFromPipeline(pipeline.getId(),
@@ -374,9 +374,9 @@ public class TestPipelineStateManagerImpl {
 
     // add two containers in the pipeline
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(++containerID), true);
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(++containerID), true);
     Assertions.assertEquals(2,
         stateManager.getContainers(pipeline.getId()).size());
 

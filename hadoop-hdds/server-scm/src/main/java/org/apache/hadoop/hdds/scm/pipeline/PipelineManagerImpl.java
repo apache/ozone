@@ -387,7 +387,7 @@ public class PipelineManagerImpl implements PipelineManager {
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
-    stateManager.addContainerToPipeline(pipelineID, containerID);
+    stateManager.addContainerToPipeline(pipelineID, containerID, true);
   }
 
   @Override

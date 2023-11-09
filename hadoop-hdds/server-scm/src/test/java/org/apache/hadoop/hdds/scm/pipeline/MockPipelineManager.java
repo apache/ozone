@@ -201,7 +201,7 @@ public class MockPipelineManager implements PipelineManager {
   public void addContainerToPipeline(final PipelineID pipelineID,
                                      final ContainerID containerID)
       throws IOException {
-    stateManager.addContainerToPipeline(pipelineID, containerID);
+    stateManager.addContainerToPipeline(pipelineID, containerID, true);
   }
 
   @Override
