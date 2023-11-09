@@ -339,7 +339,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     try {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
             bucket.realVolume(), bucket.realBucket(), keyPrefix)
         );
       }

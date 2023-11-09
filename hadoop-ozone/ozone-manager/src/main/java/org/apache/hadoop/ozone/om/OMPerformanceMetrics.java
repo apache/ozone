@@ -215,9 +215,11 @@ public class OMPerformanceMetrics {
   public MutableRate getValidateAndUpdateCacneLatencyNs() {
     return validateAndUpdateCacneLatencyNs;
   }
-  public MutableRate getListKeysAclCheckLatencyNs(){
+
+  public MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
   }
+
   public MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
   }
