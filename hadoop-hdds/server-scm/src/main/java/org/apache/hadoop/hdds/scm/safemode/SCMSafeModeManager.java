@@ -35,12 +35,10 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.server.RaftServer;
 import org.slf4j.Logger;
@@ -273,8 +271,6 @@ public class SCMSafeModeManager implements SafeModeManager {
       if (division != null) {
         RaftPeer self = division.getPeer();
         String selfPeerId = self.getId().toString();
-        StorageContainerLocationProtocol scmClient =
-            HAUtils.getScmContainerClient(config);
         boolean success = true;
         try {
           scmHaManager.getRatisServer().updateRaftPeerPriority(selfPeerId);

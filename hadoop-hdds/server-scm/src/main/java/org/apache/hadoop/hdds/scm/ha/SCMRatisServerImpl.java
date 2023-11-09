@@ -368,8 +368,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         retries++;
       }
       if (!success) {
-        LOG.error("Failed to update Raft Peer Priority for peer ID : {}",
-            peerToUpdate.getId());
         throw new IOException(
             "Failed to update Raft Peer Priority for " + "peer ID : " +
                 peerToUpdate.getId());
