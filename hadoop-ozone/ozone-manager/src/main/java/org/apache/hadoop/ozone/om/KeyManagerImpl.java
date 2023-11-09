@@ -1804,7 +1804,7 @@ public class KeyManagerImpl implements KeyManager {
             }
             sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
                 uuidList);
-            if (sortedNodes != null) {
+            if (sortedNodes != null && !sortedNodes.isEmpty()) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
           } else if (LOG.isDebugEnabled()) {
@@ -1819,14 +1819,14 @@ public class KeyManagerImpl implements KeyManager {
 
   private List<DatanodeDetails> sortDatanodes(String clientMachine,
       List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
-    List<DatanodeDetails> sortedNodes = null;
     try {
-      sortedNodes = scmClient.getBlockClient()
+      List<DatanodeDetails> sortedNodes = scmClient.getBlockClient()
           .sortDatanodes(nodeList, clientMachine);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
             clientMachine, sortedNodes);
       }
+      return sortedNodes;
     } catch (IOException e) {
       LOG.warn("Unable to sort datanodes based on distance to client, "
           + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
@@ -1834,7 +1834,7 @@ public class KeyManagerImpl implements KeyManager {
           keyInfo.getVolumeName(), keyInfo.getBucketName(),
           keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
     }
-    return sortedNodes;
+    return Collections.emptyList();
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
