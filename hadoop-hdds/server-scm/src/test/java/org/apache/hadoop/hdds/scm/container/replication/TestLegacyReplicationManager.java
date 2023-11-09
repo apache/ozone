@@ -1605,9 +1605,9 @@ public class TestLegacyReplicationManager {
     @ParameterizedTest
     @EnumSource(value = LifeCycleState.class,
         names = {"CLOSED", "QUASI_CLOSED"})
-    public void testOverReplicatedWithOnlyUnhealthyReplicas()
-        throws Exception {
-      final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+    public void testOverReplicatedWithOnlyUnhealthyReplicas(
+        LifeCycleState state) throws Exception {
+      final ContainerInfo container = createContainer(state);
       for (int i = 0; i < 4; i++) {
         addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
       }
