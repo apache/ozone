@@ -811,12 +811,11 @@ message PrefixInfo {
 
 /**
  * SnapshotStatus - snapshot states.
- * Snapshot in one of : active, deleted, or reclaimed state
+ * Snapshot in one of : active or deleted state
  */
 enum SnapshotStatusProto {
   SNAPSHOT_ACTIVE = 1;
   SNAPSHOT_DELETED = 2;
-  SNAPSHOT_RECLAIMED = 3;
 }
 
 /**

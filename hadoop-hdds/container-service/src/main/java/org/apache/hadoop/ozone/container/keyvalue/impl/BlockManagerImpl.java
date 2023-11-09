@@ -69,10 +69,19 @@ public class BlockManagerImpl implements BlockManager {
   public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
-    this.defaultReadBufferCapacity = (int) config.getStorageSize(
+    final double size = config.getStorageSize(
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    if (size <= 0) {
+      throw new IllegalArgumentException(
+          ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY + " <= 0");
+    } else if (size > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException(
+          ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY
+              + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE);
+    }
+    this.defaultReadBufferCapacity = (int) size;
   }
 
   @Override

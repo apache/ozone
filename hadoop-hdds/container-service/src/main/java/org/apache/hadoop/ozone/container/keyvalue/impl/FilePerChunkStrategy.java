@@ -229,7 +229,7 @@ public class FilePerChunkStrategy implements ChunkManager {
       possibleFiles.add(finalChunkFile);
     }
 
-    int len = (int) info.getLen();
+    final long len = info.getLen();
     int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 

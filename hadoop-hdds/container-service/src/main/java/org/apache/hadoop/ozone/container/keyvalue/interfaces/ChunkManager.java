@@ -119,10 +119,10 @@ public interface ChunkManager {
 
   static int getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
       int defaultReadBufferCapacity) {
-    int bufferCapacity = 0;
+    long bufferCapacity = 0;
     if (chunkInfo.isReadDataIntoSingleBuffer()) {
       // Older client - read all chunk data into one single buffer.
-      bufferCapacity = (int) chunkInfo.getLen();
+      bufferCapacity = chunkInfo.getLen();
     } else {
       // Set buffer capacity to checksum boundary size so that each buffer
       // corresponds to one checksum. If checksum is NONE, then set buffer
@@ -140,9 +140,16 @@ public interface ChunkManager {
     }
     // If the buffer capacity is 0, set all the data into one ByteBuffer
     if (bufferCapacity == 0) {
-      bufferCapacity = (int) chunkInfo.getLen();
+      bufferCapacity = chunkInfo.getLen();
     }
 
-    return bufferCapacity;
+    if (bufferCapacity > Integer.MAX_VALUE) {
+      throw new IllegalStateException("Integer overflow:"
+          + " bufferCapacity = " + bufferCapacity
+          + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE
+          + ", defaultReadBufferCapacity=" + defaultReadBufferCapacity
+          + ", chunkInfo=" + chunkInfo);
+    }
+    return Math.toIntExact(bufferCapacity);
   }
 }

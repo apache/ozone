@@ -34,6 +34,7 @@ Execute AWSS3APICli
     ${output} =       Execute                    aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
+# For possible AWS CLI return codes see: https://docs.aws.amazon.com/cli/latest/topic/return-codes.html
 Execute AWSS3APICli and checkrc
     [Arguments]       ${command}                 ${expected_error_code}
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}

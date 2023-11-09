@@ -59,6 +59,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
@@ -561,6 +562,52 @@ public class TestRatisUnderReplicationHandler {
             command.getKey()));
   }
 
+  @Test
+  public void testOnlyClosedReplicasOfClosedContainersAreSources()
+      throws IOException {
+    container = createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, 1);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    final ContainerReplica closedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.CLOSED, 1);
+    replicas.add(closedReplica);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, 1));
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 1);
+    commands.forEach(
+        command -> Assert.assertEquals(closedReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
+
+  @Test
+  public void testQuasiClosedReplicasAreSourcesWhenOnlyTheyAreAvailable()
+      throws IOException {
+    container = createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, 1);
+
+    Set<ContainerReplica> replicas = new HashSet<>(1);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 2);
+
+    // test the same, but for a QUASI_CLOSED container
+    container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
+        RATIS_REPLICATION_CONFIG);
+    replicas = new HashSet<>(1);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, container.getSequenceId()));
+
+    commandsSent.clear();
+    testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 2);
+  }
 
   /**
    * Tests whether the specified expectNumCommands number of commands are
