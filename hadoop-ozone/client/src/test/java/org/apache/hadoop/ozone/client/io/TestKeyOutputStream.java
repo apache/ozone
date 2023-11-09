@@ -67,7 +67,6 @@ public class TestKeyOutputStream {
         keyOutputStream.getExcludeList().getDatanodes().size());
 
     ExcludeList excludeList = spy(keyOutputStream.getExcludeList());
-    when(excludeList.getExpiryTime()).thenReturn(300 * 1000L);
     doReturn(true).when(excludeList)
         .isExpired(anyLong()); // mock DN in exclude list expires
     keyOutputStream.getBlockOutputStreamEntryPool().setExcludeList(excludeList);
@@ -90,9 +89,7 @@ public class TestKeyOutputStream {
     OzoneManagerClientProtocol ozoneManagerClientProtocol
         = mock(OzoneManagerClientProtocol.class);
 
-    OzoneClientConfig clientConfig = spy(new OzoneClientConfig());
-    when(clientConfig.getStreamBufferSize()).thenReturn(1);
-    when(clientConfig.getExcludeNodesExpiryTime()).thenReturn(300 * 1000L);
+    OzoneClientConfig clientConfig = new OzoneClientConfig();
 
     KeyOutputStream.Builder builder;
 

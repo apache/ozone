@@ -350,10 +350,6 @@ public class OzoneClientConfig {
     return excludeNodesExpiryTime;
   }
 
-  public void setExcludeNodesExpiryTime(long expiryTime) {
-    excludeNodesExpiryTime = expiryTime;
-  }
-
   public int getBufferIncrement() {
     return bufferIncrement;
   }
