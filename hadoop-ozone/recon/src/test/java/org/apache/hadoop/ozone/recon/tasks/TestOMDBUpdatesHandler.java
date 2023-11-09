@@ -69,7 +69,8 @@ public class TestOMDBUpdatesHandler {
   private OMDBDefinition omdbDefinition = new OMDBDefinition();
   private Random random = new Random();
 
-  private OzoneConfiguration createNewTestPath(String folderName) throws IOException {
+  private OzoneConfiguration createNewTestPath(String folderName)
+      throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
     Path tempDirPath =
         Files.createDirectory(temporaryFolder.resolve(folderName));

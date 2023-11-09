@@ -48,7 +48,7 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestReconContainerMetadataManagerImpl {
 
   @TempDir()
-  private static Path TEMP_FOLDER;
+  private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
 
@@ -60,10 +60,10 @@ public class TestReconContainerMetadataManagerImpl {
   public static void setupOnce() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
-            TEMP_FOLDER.resolve("JunitOmDBDir")).toFile()),
-        Files.createDirectory(TEMP_FOLDER.resolve("NewDir")).toFile());
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(TEMP_FOLDER.toFile())
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withContainerDB()
             .withReconOm(reconOMMetadataManager)
