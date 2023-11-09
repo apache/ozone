@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
@@ -84,9 +85,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         new Object[]{false, false});
   }
 
-  private boolean keyPathLockEnabled;
-  private boolean enableFileSystemPaths;
-
   @Test
   public void testPreExecuteWithNormalKey() throws Exception {
     ReplicationConfig ratis3Config =
@@ -108,7 +106,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private void preExecuteTest(boolean isMultipartKey, int partNumber,
-      ReplicationConfig repConfig) throws Exception {
+                              ReplicationConfig repConfig) throws Exception {
     long scmBlockSize = ozoneManager.getScmBlockSize();
     for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
       doPreExecute(createKeyRequest(isMultipartKey, partNumber,
@@ -132,10 +130,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCache(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0));
@@ -222,10 +218,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded(
       boolean setKeyPathLock, boolean setFileSystemPaths)throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0, "test/" + keyName));
 
@@ -247,9 +241,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
-  private void checkResponse(OMRequest modifiedOmRequest,
-      OMClientResponse omKeyCreateResponse, long id, boolean override,
-      BucketLayout bucketLayout) throws Exception {
+  private void checkResponse(
+      OMRequest modifiedOmRequest, OMClientResponse omKeyCreateResponse,
+      long id, boolean override, BucketLayout bucketLayout) throws Exception {
 
     Assertions.assertEquals(OK,
         omKeyCreateResponse.getOMResponse().getStatus());
@@ -298,16 +292,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithNoSuchMultipartUploadError(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     int partNumber = 1;
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(true, partNumber));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
@@ -346,15 +338,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithVolumeNotFound(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
@@ -390,16 +380,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithBucketNotFound(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(
             false, 0));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
@@ -436,13 +424,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithInvalidPath(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     PrefixManager prefixManager = new PrefixManagerImpl(
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(
             false, 0, String.valueOf('\u0000')));
@@ -490,7 +476,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private OMRequest doPreExecute(OMRequest originalOMRequest) throws Exception {
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(originalOMRequest);
+        getOMKeyCreateRequest(originalOMRequest);
 
     OMRequest modifiedOmRequest =
         omKeyCreateRequest.preExecute(ozoneManager);
@@ -561,7 +547,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
-      String keyName) {
+                                     String keyName) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -582,8 +568,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCreateKeyRequest(createKeyRequest).build();
   }
 
-  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
-      long keyLength, ReplicationConfig repConfig) {
+  private OMRequest createKeyRequest(
+      boolean isMultipartKey, int partNumber, long keyLength,
+      ReplicationConfig repConfig) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -613,17 +600,15 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   @ParameterizedTest
-  @MethodSource("data")
+  @ValueSource(booleans =  {true, false})
   public void testKeyCreateWithFileSystemPathsEnabled(
-      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
+      boolean setKeyPathLock) throws Exception {
     OzoneConfiguration configuration = getOzoneConfiguration();
     configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
     when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, true));
+        new OzoneLockProvider(setKeyPathLock, true));
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
@@ -744,10 +729,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @MethodSource("data")
   public void testKeyCreateInheritParentDefaultAcls(
       boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
-    this.keyPathLockEnabled = setKeyPathLock;
-    this.enableFileSystemPaths = setFileSystemPaths;
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
@@ -795,7 +778,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    * from parent DEFAULT acls.
    */
   private void verifyKeyInheritAcls(List<OzoneAcl> keyAcls,
-      List<OzoneAcl> bucketAcls) {
+                                    List<OzoneAcl> bucketAcls) {
 
     List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
@@ -873,8 +856,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     checkCreatedPaths(omKeyCreateRequest, omRequest, keyName);
   }
 
-  protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
-      OMRequest omRequest, String keyName) throws Exception {
+  protected void checkCreatedPaths(
+      OMKeyCreateRequest omKeyCreateRequest, OMRequest omRequest,
+      String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
@@ -903,7 +887,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   protected String getOpenKey(long id) throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName,
-            keyName, id);
+        keyName, id);
   }
 
   protected String getOzoneKey() throws IOException {
@@ -919,11 +903,4 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     return new OMKeyCreateRequest(omRequest, layout);
   }
 
-  protected boolean getKeyPathLockEnabled() {
-    return keyPathLockEnabled;
-  }
-
-  protected boolean getEnableFileSystemPaths() {
-    return enableFileSystemPaths;
-  }
 }
