@@ -254,8 +254,8 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     // TODO: Remove handler registration as there is no need to listen to
     // register events anymore.
-    updateRaftPeerPriority();
     emitSafeModeStatus();
+    updateRaftPeerPriority();
   }
 
   /**

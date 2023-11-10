@@ -353,15 +353,15 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final SetConfigurationRequest configRequest =
         new SetConfigurationRequest(clientId, division.getInfo().getLeaderId(),
             division.getGroup().getGroupId(), nextCallId(), raftPeers);
-
+    RaftClient raftClient = null;
     try {
       RaftClient.Builder clientBuilder = RaftClient.newBuilder().setRaftGroup(
               RaftGroup.valueOf(division.getGroup().getGroupId(), oldPeers))
           .setProperties(new RaftProperties());
       boolean success = false;
       int retries = 0;
+      raftClient = clientBuilder.build();
       while (!success && retries < UPDATE_PEER_PRIORITY_RETRY_COUNT) {
-        RaftClient raftClient = clientBuilder.build();
         RaftClientReply raftClientReply =
             raftClient.getClientRpc().sendRequest(configRequest);
         success = raftClientReply.isSuccess();
@@ -376,6 +376,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       LOG.error("Failed to update Raft Peer Priority for peer ID : {}",
           peerToUpdate.getId());
       throw exception;
+    } finally {
+      if (raftClient != null) {
+        raftClient.close();
+      }
     }
   }
 
