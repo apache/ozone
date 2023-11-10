@@ -1804,7 +1804,7 @@ public class KeyManagerImpl implements KeyManager {
             }
             sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
                 uuidList);
-            if (sortedNodes != null && !sortedNodes.isEmpty()) {
+            if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
           } else if (LOG.isDebugEnabled()) {
