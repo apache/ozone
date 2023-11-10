@@ -99,6 +99,8 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.MOVE;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
 /**
  * Legacy Replication Manager (RM) is a legacy , which is used to process
@@ -1340,21 +1342,50 @@ public class LegacyReplicationManager {
       ReplicationManagerReport report) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
-    int excessReplicas = replicas.size() -
-        container.getReplicationConfig().getRequiredNodes();
-    int missingReplicas = excessReplicas * -1;
 
-    if (missingReplicas > 0) {
+    RatisContainerReplicaCount unhealthyReplicaSet =
+        new RatisContainerReplicaCount(container,
+            new HashSet<>(replicaSet.getReplicas()),
+            getPendingOps(container.containerID()),
+            minHealthyForMaintenance,
+            true);
+
+    if (unhealthyReplicaSet.isUnderReplicated()) {
       handleUnderReplicatedAllUnhealthy(container, replicas,
-          placementStatus, missingReplicas, report);
-    } else if (excessReplicas > 0) {
+          placementStatus, unhealthyReplicaSet.additionalReplicaNeeded(),
+          report);
+    } else if (unhealthyReplicaSet.isOverReplicated()) {
       handleOverReplicatedAllUnhealthy(container, replicas,
-          excessReplicas, report);
+          unhealthyReplicaSet.getExcessRedundancy(true), report);
     } else {
       // We have the correct number of unhealthy replicas. See if any of them
       // can be closed.
       closeReplicasIfPossible(container, replicas);
     }
+  }
+
+  /**
+   * Transform the Legacy inflight operation in the pendingOps format.
+   * @param containerID The contaiuner to get the pending ops for.
+   * @return A list of pendingOp, or an empty list if none exist.
+   */
+  private List<ContainerReplicaOp> getPendingOps(ContainerID containerID) {
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    List<InflightAction> inflightActions = inflightReplication.get(containerID);
+    if (inflightActions != null) {
+      for (InflightAction a : inflightActions) {
+        pendingOps.add(new ContainerReplicaOp(
+            ADD, a.getDatanode(), 0, Long.MAX_VALUE));
+      }
+    }
+    inflightActions = inflightDeletion.get(containerID);
+    if (inflightActions != null) {
+      for (InflightAction a : inflightActions) {
+        pendingOps.add(new ContainerReplicaOp(
+            DELETE, a.getDatanode(), 0, Long.MAX_VALUE));
+      }
+    }
+    return pendingOps;
   }
 
   /**
