@@ -535,6 +535,24 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     adapter.deleteSnapshot(pathToKey(path), snapshotName);
   }
 
+  private class InnerDeleteResult {
+    private boolean success;
+    private boolean partiallyDeleted;
+
+    public InnerDeleteResult(boolean success, boolean partiallyDeleted) {
+      this.success = success;
+      this.partiallyDeleted = partiallyDeleted;
+    }
+
+    public boolean isSuccess() {
+      return success;
+    }
+
+    public boolean isPartiallyDeleted() {
+      return partiallyDeleted;
+    }
+  }
+
   private class DeleteIterator extends OzoneListingIterator {
     private final boolean recursive;
     private final OzoneBucket bucket;
@@ -562,7 +580,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("Deleting keys: {}", keyPathList);
       boolean succeed = adapterImpl.deleteObjects(this.bucket, keyPathList);
       // if recursive delete is requested ignore the return value of
-      // deleteObject and issue deletes for other keys.
+      // deleteObject and issue deletes for other keys and set partiallyDeleted
+      // to true
+      if (recursive && !succeed) {
+        if (!isPartiallyComplete()) {
+          setPartiallyComplete(true);
+        }
+      }
       return recursive || succeed;
     }
   }
@@ -639,30 +663,25 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * @return true if successfully deletes all required keys, false otherwise
    * @throws IOException
    */
-  private boolean innerDelete(Path f, boolean recursive) throws IOException {
+  private InnerDeleteResult innerDelete(Path f, boolean recursive)
+      throws IOException {
     LOG.trace("delete() path:{} recursive:{}", f, recursive);
     try {
       OzoneListingIterator iterator =
           new DeleteIteratorFactory(f, recursive).getDeleteIterator();
-      return iterator.iterate();
+      boolean success = iterator.iterate();
+      boolean partiallyDeleted = iterator.isPartiallyComplete();
+      return new InnerDeleteResult(success, partiallyDeleted);
     } catch (FileNotFoundException e) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Couldn't delete {} - does not exist", f);
       }
-      return false;
+      return new InnerDeleteResult(false, false);
     }
   }
 
-
-  /**
-   * {@inheritDoc}
-   *
-   * OFS supports volume and bucket deletion, recursive or non-recursive.
-   * e.g. delete(new Path("/volume1"), true)
-   * But root deletion is explicitly disallowed for safety concerns.
-   */
-  @Override
-  public boolean delete(Path f, boolean recursive) throws IOException {
+  public boolean delete(Path f, boolean recursive, boolean partiallyDeleted)
+      throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
@@ -693,9 +712,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     // delete bucket
     if (ofsPath.isBucket()) {
-      return deleteBucket(f, recursive, ofsPath);
+      InnerDeleteResult innerDeleteResult = deleteBucket(f, recursive, ofsPath);
+      if (innerDeleteResult.isPartiallyDeleted()){
+        partiallyDeleted = true;
+      }
+      return innerDeleteResult.isSuccess();
     }
-    
     // delete files and directory
     FileStatus status;
     try {
@@ -717,7 +739,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
 
       // delete inner content of directory with manual recursion
-      result = innerDelete(f, recursive);
+      InnerDeleteResult innerDeleteResult = innerDelete(f, recursive);
+      result = innerDeleteResult.isSuccess();
+      if (innerDeleteResult.isPartiallyDeleted()){
+        partiallyDeleted = true;
+      }
     } else {
       LOG.debug("delete: Path is a file: {}", f);
       result = adapter.deleteObject(key);
@@ -732,8 +758,21 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return result;
   }
 
-  private boolean deleteBucket(Path f, boolean recursive, OFSPath ofsPath)
-      throws IOException {
+
+  /**
+   * {@inheritDoc}
+   *
+   * OFS supports volume and bucket deletion, recursive or non-recursive.
+   * e.g. delete(new Path("/volume1"), true)
+   * But root deletion is explicitly disallowed for safety concerns.
+   */
+  @Override
+  public boolean delete(Path f, boolean recursive) throws IOException {
+    return delete(f, recursive, false);
+  }
+
+  private InnerDeleteResult deleteBucket(Path f, boolean recursive,
+      OFSPath ofsPath) throws IOException {
     // check status of normal bucket
     try {
       getFileStatus(f);
@@ -741,10 +780,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // remove orphan link bucket directly
       if (isLinkBucket(f, ofsPath)) {
         deleteBucketFromVolume(f, ofsPath);
-        return true;
+        return new InnerDeleteResult(true,false);
       }
       LOG.warn("delete: Path does not exist: {}", f);
-      return false;
+      return new InnerDeleteResult(false,false);
     }
 
     // handling posix symlink delete behaviours
@@ -755,11 +794,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     // rm path does not have trailing slash
     if (isLinkBucket(f, ofsPath) && !handleTrailingSlash) {
       deleteBucketFromVolume(f, ofsPath);
-      return true;
+      return new InnerDeleteResult(true,false);
     }
 
     // delete inner content of bucket
-    boolean result = innerDelete(f, recursive);
+    InnerDeleteResult innerDeleteResult = innerDelete(f, recursive);
 
     // check if rm path does not have trailing slash
     // if so, the contents of bucket were deleted and skip delete bucket
@@ -767,7 +806,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (!handleTrailingSlash) {
       deleteBucketFromVolume(f, ofsPath);
     }
-    return result;
+    return innerDeleteResult;
   }
 
   private boolean isLinkBucket(Path f, OFSPath ofsPath) {
@@ -1335,6 +1374,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private String pathKey;
     private Iterator<BasicKeyInfo> keyIterator = null;
     private boolean isFSO;
+    private boolean isPartiallyComplete;
 
     OzoneListingIterator(Path path, boolean isFSO)
         throws IOException {
@@ -1342,6 +1382,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.status = getFileStatusAdapter(path);
       this.pathKey = pathToKey(path);
       this.isFSO = isFSO;
+      this.isPartiallyComplete = false;
       if (!isFSO) {
         if (status.isDir()) {
           this.pathKey = addTrailingSlashIfNeeded(pathKey);
@@ -1449,6 +1490,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     FileStatusAdapter getStatus() {
       return status;
+    }
+
+    public boolean isPartiallyComplete() {
+      return isPartiallyComplete;
+    }
+
+    public void setPartiallyComplete(boolean partiallyComplete) {
+      isPartiallyComplete = partiallyComplete;
     }
   }
 

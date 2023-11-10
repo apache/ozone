@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.shell.PathData;
 import org.apache.hadoop.util.ToolRunner;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
@@ -139,10 +140,22 @@ public final class OzoneFsDelete {
       if (moveToTrash(item) || !canBeSafelyDeleted(item)) {
         return;
       }
-      if (!item.fs.delete(path, deleteDirs)) {
-        throw new PathIOException(item.toString());
+      boolean partiallyDeleted = false;
+      if (item.fs.getUri().getScheme().equals(OZONE_OFS_URI_SCHEME)) {
+        BasicRootedOzoneFileSystem ofs = (BasicRootedOzoneFileSystem) item.fs;
+        ofs.delete(path, deleteDirs, partiallyDeleted);
+      } else {
+        if (!item.fs.delete(path, deleteDirs)) {
+          throw new PathIOException(item.toString());
+        }
       }
-      out.println("Deleted " + item + (trailing ? OZONE_URI_DELIMITER : ""));
+      if (partiallyDeleted) {
+        out.println(
+            "Partially Deleted." + item + (trailing ? OZONE_URI_DELIMITER :
+                ""));
+      } else {
+        out.println("Deleted " + item + (trailing ? OZONE_URI_DELIMITER : ""));
+      }
     }
 
     private boolean canBeSafelyDeleted(PathData item)
