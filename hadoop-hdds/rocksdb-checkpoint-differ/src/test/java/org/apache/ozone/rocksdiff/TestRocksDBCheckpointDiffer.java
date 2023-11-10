@@ -82,6 +82,7 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.rocksdb.SstFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -91,6 +92,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.Time.now;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
@@ -133,6 +135,8 @@ public class TestRocksDBCheckpointDiffer {
   private RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private RocksDB activeRocksDB;
   private ColumnFamilyHandle keyTableCFHandle;
+  private ColumnFamilyHandle directoryTableCFHandle;
+  private ColumnFamilyHandle fileTableCFHandle;
   private ColumnFamilyHandle compactionLogTableCFHandle;
 
   @BeforeEach
@@ -184,6 +188,8 @@ public class TestRocksDBCheckpointDiffer {
     activeRocksDB = RocksDB.open(dbOptions, activeDbDirName, cfDescriptors,
         cfHandles);
     keyTableCFHandle = cfHandles.get(1);
+    directoryTableCFHandle = cfHandles.get(2);
+    fileTableCFHandle = cfHandles.get(3);
     compactionLogTableCFHandle = cfHandles.get(4);
 
     rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(cfHandles.get(4));
@@ -207,6 +213,8 @@ public class TestRocksDBCheckpointDiffer {
   public void cleanUp() {
     IOUtils.closeQuietly(rocksDBCheckpointDiffer);
     IOUtils.closeQuietly(keyTableCFHandle);
+    IOUtils.closeQuietly(directoryTableCFHandle);
+    IOUtils.closeQuietly(fileTableCFHandle);
     IOUtils.closeQuietly(compactionLogTableCFHandle);
     IOUtils.closeQuietly(activeRocksDB);
     deleteDirectory(compactionLogDir);
@@ -1818,5 +1826,109 @@ public class TestRocksDBCheckpointDiffer {
 
     assertEquals(expectedResponse, rocksDBCheckpointDiffer.shouldSkipNode(node,
         columnFamilyToPrefixMap));
+  }
+
+  private static Stream<Arguments> shouldSkipFileCases() {
+    return Stream.of(
+        Arguments.of("volumeTable", true),
+        Arguments.of("bucketTable", true),
+        Arguments.of("keyTable", false),
+        Arguments.of("directoryTable", false),
+        Arguments.of("fileTable", false),
+        Arguments.of("snapshotInfoTable", true),
+        Arguments.of("compactionLogTable", true),
+        Arguments.of(null, false)); // case when failed to read SST
+  }
+
+  @MethodSource("shouldSkipFileCases")
+  @ParameterizedTest
+  public void testShouldSkipFile(String columnFamily,
+                                 boolean expectedResult) {
+    CompactionFileInfo fileInfo =
+        new CompactionFileInfo("fileName", "startKey", "endKey", columnFamily);
+    assertEquals(expectedResult,
+        rocksDBCheckpointDiffer.shouldSkipFile(fileInfo));
+  }
+
+  // End-to-end to verify that only 'keyTable', 'directoryTable' and
+  // 'fileTable' column families SST files are hard linked to SST back-up dir.
+  @Test
+  public void testCreateHardLinks() throws RocksDBException, IOException {
+    // To skip 'isSnapshotInfoTableEmpty' check in 'newCompactionBeginListener'.
+    rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
+        Mockito.mock(ColumnFamilyHandle.class));
+    createKeys(keyTableCFHandle, "keyName-", "keyValue-", 100);
+    createKeys(directoryTableCFHandle, "dirName-", "dirValue-", 10);
+    createKeys(fileTableCFHandle, "fileName-", "fileValue-", 100);
+    createKeys(compactionLogTableCFHandle, "logName-", "logValue-", 10);
+
+    List<LiveFileMetaData> liveFilesMetaData =
+        activeRocksDB.getLiveFilesMetaData();
+
+    List<String> expectedFilesInBackDir = liveFilesMetaData.stream()
+        .filter(file -> COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(
+            new String(file.columnFamilyName(), UTF_8)))
+        .map(SstFileMetaData::fileName)
+        .sorted()
+        .collect(Collectors.toList());
+
+    List<String> sstFilesInActiveDB = liveFilesMetaData
+        .stream()
+        .map(file -> file.path() + file.fileName())
+        .collect(Collectors.toList());
+
+    rocksDBCheckpointDiffer.createHardLinks(sstFilesInActiveDB);
+    List<String> actualFilesInBackDir;
+    try (Stream<Path> pathStream = Files.list(
+        Paths.get(rocksDBCheckpointDiffer.getSSTBackupDir()))) {
+      actualFilesInBackDir = pathStream
+          .map(file -> "/" + file.getFileName().toString())
+          .sorted().collect(Collectors.toList());
+    }
+
+    assertEquals(expectedFilesInBackDir, actualFilesInBackDir);
+  }
+
+  private void createKeys(ColumnFamilyHandle cfh,
+                          String keyPrefix,
+                          String valuePrefix,
+                          int numberOfKeys) throws RocksDBException {
+
+    for (int i = 0; i < numberOfKeys; ++i) {
+      String generatedString = RandomStringUtils.randomAlphabetic(7);
+      String keyStr = keyPrefix + i + "-" + generatedString;
+      String valueStr = valuePrefix + i + "-" + generatedString;
+      byte[] key = keyStr.getBytes(UTF_8);
+      activeRocksDB.put(cfh, key, valueStr.getBytes(UTF_8));
+      if (i % 10 == 0) {
+        activeRocksDB.flush(new FlushOptions(), cfh);
+      }
+    }
+  }
+
+  // End-to-end to verify that only 'keyTable', 'directoryTable'
+  // and 'fileTable' column families SST files are added to compaction DAG.
+  @Test
+  public void testDag() throws RocksDBException {
+    // Setting is not non-empty table so that 'isSnapshotInfoTableEmpty'
+    // returns true.
+    rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(keyTableCFHandle);
+    createKeys(keyTableCFHandle, "keyName-", "keyValue-", 100);
+    createKeys(directoryTableCFHandle, "dirName-", "dirValue-", 100);
+    createKeys(fileTableCFHandle, "fileName-", "fileValue-", 100);
+    createKeys(compactionLogTableCFHandle, "logName-", "logValue-", 100);
+
+    // Make sures that some compaction happened.
+    assertFalse(rocksDBCheckpointDiffer.getCompactionNodeMap().isEmpty());
+
+    List<CompactionNode> compactionNodes = rocksDBCheckpointDiffer.
+        getCompactionNodeMap().values().stream()
+        .filter(node -> !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(
+            node.getColumnFamily()))
+        .collect(Collectors.toList());
+
+    // CompactionNodeMap should not contain any node other than 'keyTable',
+    // 'directoryTable' and 'fileTable' column families nodes.
+    assertTrue(compactionNodes.isEmpty());
   }
 }
