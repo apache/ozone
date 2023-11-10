@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -414,39 +413,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
     } else {
       // case before certificate bundle is supported
-      X509Certificate lastInsertedCert = getCertificate();
-      chain.add(lastInsertedCert);
-      List<X509Certificate> caCertList =
-          OzoneSecurityUtil.convertToX509(listCA());
-      Set<X509Certificate> rootCaCertList = getAllRootCaCerts();
-      while (!rootCaCertList.isEmpty() &&
-          !rootCaCertList.contains(lastInsertedCert)) {
-        Optional<X509Certificate> issuerOpt =
-            getIssuerForCert(lastInsertedCert, caCertList);
-        if (issuerOpt.isPresent()) {
-          X509Certificate issuer = issuerOpt.get();
-          chain.add(issuer);
-          lastInsertedCert = issuer;
-        } else {
-          throw new CertificateException("No issuer found for certificate: " +
-              lastInsertedCert);
-        }
+      X509Certificate cert = getCertificate();
+      if (cert != null) {
+        chain.add(getCertificate());
       }
-      //add root ca to the cert chain at the end
-      chain.add(lastInsertedCert);
+      cert = getCACertificate();
+      if (cert != null) {
+        chain.add(getCACertificate());
+      }
+      cert = getRootCACertificate();
+      if (cert != null) {
+        chain.add(cert);
+      }
+      Preconditions.checkState(chain.size() > 0, "Empty trust chain");
     }
     return chain;
-  }
-
-  private Optional<X509Certificate> getIssuerForCert(X509Certificate cert,
-      Iterable<X509Certificate> issuerCerts) {
-    for (X509Certificate issuer : issuerCerts) {
-      if (cert.getIssuerX500Principal().equals(
-          issuer.getSubjectX500Principal())) {
-        return Optional.of(issuer);
-      }
-    }
-    return Optional.empty();
   }
 
   public synchronized CertPath getCACertPath() {
