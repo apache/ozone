@@ -40,6 +40,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -50,7 +51,8 @@ import java.util.concurrent.Callable;
  */
 @Command(
     name = "upgrade",
-    description = "Upgrade schema v2 containers to v3",
+    description = "Offline upgrade all schema V2 containers to schema V3 " +
+        "for this datanode.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UpgradeSubcommand implements Callable<Void> {
@@ -63,7 +65,7 @@ public class UpgradeSubcommand implements Callable<Void> {
 
   @CommandLine.Option(names = {"--volume"},
       required = false,
-      description = "volume name")
+      description = "volume path")
   private String volume;
 
   @CommandLine.Option(names = {"-y", "--yes"},
@@ -87,30 +89,36 @@ public class UpgradeSubcommand implements Callable<Void> {
       return null;
     }
 
-    final Pair<Integer, Integer> layoutVersion =
-        upgradeChecker.getLayoutVersion(configuration);
-    final Integer softwareLayoutVersion = layoutVersion.getLeft();
-    final Integer metadataLayoutVersion = layoutVersion.getRight();
+    DatanodeDetails dnDetail =
+        UpgradeUtils.getDatanodeDetails(configuration);
+
+    Pair<HDDSLayoutFeature, HDDSLayoutFeature> layoutVersion =
+        upgradeChecker.getLayoutVersion(dnDetail, configuration);
+    final HDDSLayoutFeature softwareLayoutVersion = layoutVersion.getLeft();
+    final HDDSLayoutFeature metadataLayoutVersion = layoutVersion.getRight();
     final int needLayoutVersion =
         HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion();
 
-    if (metadataLayoutVersion < needLayoutVersion ||
-        softwareLayoutVersion < needLayoutVersion) {
+    if (metadataLayoutVersion.layoutVersion() < needLayoutVersion ||
+        softwareLayoutVersion.layoutVersion() < needLayoutVersion) {
       out().println(String.format(
           "Please upgrade your software version, no less than %s," +
-              " current metadata layout version is %d," +
-              " software layout version is %d",
+              " current metadata layout version is %s," +
+              " software layout version is %s",
           HDDSLayoutFeature.DATANODE_SCHEMA_V3.name(),
-          metadataLayoutVersion, softwareLayoutVersion));
+          metadataLayoutVersion.name(), softwareLayoutVersion.name()));
       return null;
     }
 
     if (!Strings.isNullOrEmpty(volume)) {
+      File volumeDir = new File(volume);
+      if (!volumeDir.exists() || !volumeDir.isDirectory()) {
+        out().println(
+            String.format("volume path: %s is not a directory", volume));
+        return null;
+      }
       configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volume);
     }
-
-    DatanodeDetails dnDetail =
-        UpgradeUtils.getDatanodeDetails(configuration);
 
     final HddsProtos.NodeOperationalState opState =
         dnDetail.getPersistedOpState();
@@ -125,18 +133,20 @@ public class UpgradeSubcommand implements Callable<Void> {
     List<HddsVolume> allVolume =
         upgradeChecker.getAllVolume(dnDetail, configuration);
 
-    final List<File> volumeDBPath = upgradeChecker.getVolumeDBPath(allVolume);
-
-    if (volumeDBPath.isEmpty()) {
-      out().println("No volume db store exists, need finalizae data node.");
+    final List<File> volumeDBPaths = upgradeChecker.getVolumeDBPath(allVolume);
+    if (volumeDBPaths.isEmpty()) {
+      out().println("No schema V3 volume db store exists, need finalize " +
+          "datanode first.");
       return null;
     }
 
-    for (HddsVolume hddsVolume : allVolume) {
+    Iterator<HddsVolume> volumeIterator = allVolume.iterator();
+    while (volumeIterator.hasNext()) {
+      HddsVolume hddsVolume = volumeIterator.next();
       if (UpgradeChecker.checkAlreadyMigrate(hddsVolume)) {
         out().println("Volume " + hddsVolume.getVolumeRootDir() +
             " it's already upgraded, skip it.");
-        return null;
+        volumeIterator.remove();
       }
     }
 
@@ -154,7 +164,7 @@ public class UpgradeSubcommand implements Callable<Void> {
     }
 
     final Map<File, Exception> backupExceptions =
-        upgradeChecker.dbBackup(volumeDBPath);
+        upgradeChecker.dbBackup(volumeDBPaths);
 
     if (!backupExceptions.isEmpty()) {
       final String backupFailDbPath = Arrays.toString(

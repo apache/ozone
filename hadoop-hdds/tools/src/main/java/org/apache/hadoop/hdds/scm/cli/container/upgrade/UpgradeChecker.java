@@ -22,8 +22,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -35,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -54,9 +56,12 @@ public class UpgradeChecker {
             "| grep -v grep";
     try {
       Process exec = Runtime.getRuntime().exec(command);
-      exec.waitFor(10, TimeUnit.SECONDS);
-      if (exec.exitValue() != 0 && exec.exitValue() != 1) {
-
+      boolean notTimeout = exec.waitFor(10, TimeUnit.SECONDS);
+      if (!notTimeout) {
+        return Pair.of(false,
+            String.format("Execution of the %s command timeout", command));
+      }
+      if (exec.exitValue() != 0) {
         return Pair.of(false,
             String.format("Return code of the command %s was %d", command,
                 exec.exitValue()));
@@ -70,26 +75,32 @@ public class UpgradeChecker {
         }
       }
     } catch (IOException | InterruptedException e) {
-
       return Pair.of(false,
           String.format("Run the command %s has error", command));
-
     }
     return Pair.of(true, "");
   }
 
-  public Pair<Integer, Integer> getLayoutVersion(OzoneConfiguration conf)
-      throws IOException {
-    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    HDDSLayoutVersionManager scmLayoutVersionManager =
-        new HDDSLayoutVersionManager(
-            scmStorageConfig.getLayoutVersion());
-    final int metadataLayoutVersion =
-        scmLayoutVersionManager.getMetadataLayoutVersion();
-    final int softwareLayoutVersion =
-        scmLayoutVersionManager.getSoftwareLayoutVersion();
+  public Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutVersion(
+      DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
+    DatanodeLayoutStorage layoutStorage =
+        new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
+    HDDSLayoutVersionManager layoutVersionManager =
+        new HDDSLayoutVersionManager(layoutStorage.getLayoutVersion());
 
-    return Pair.of(softwareLayoutVersion, metadataLayoutVersion);
+    final int metadataLayoutVersion =
+        layoutVersionManager.getMetadataLayoutVersion();
+    final HDDSLayoutFeature metadataLayoutFeature =
+        (HDDSLayoutFeature) layoutVersionManager.getFeature(
+            metadataLayoutVersion);
+
+    final int softwareLayoutVersion =
+        layoutVersionManager.getSoftwareLayoutVersion();
+    final HDDSLayoutFeature softwareLayoutFeature =
+        (HDDSLayoutFeature) layoutVersionManager.getFeature(
+            softwareLayoutVersion);
+
+    return Pair.of(softwareLayoutFeature, metadataLayoutFeature);
   }
 
   public List<HddsVolume> getAllVolume(DatanodeDetails detail,
@@ -123,8 +134,8 @@ public class UpgradeChecker {
     Map<File, Exception> failDBDir = new ConcurrentHashMap<>();
     for (File dbPath : dbPaths) {
       try {
-        final File backup =
-            new File(dbPath.getParentFile(), dbPath.getName() + ".bak");
+        final File backup = new File(dbPath.getParentFile(),
+            dbPath.getName() + "-" + UUID.randomUUID() + ".bak");
         if (backup.exists() || backup.mkdir()) {
           FileUtils.copyDirectory(dbPath, backup, true);
         }

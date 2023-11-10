@@ -67,7 +67,7 @@ public final class UpgradeUtils {
 
   public static File getVolumeMigrateFile(HddsVolume volume) {
     return new File(volume.getHddsRootDir(),
-        UpgradeTask.MIGRATE_FLAG_FILE_NAME);
+        UpgradeTask.UPGRADE_COMPLETE_FILE_NAME);
   }
 
   public static File getVolumeUpgradeLockFile(HddsVolume volume) {
@@ -75,7 +75,7 @@ public final class UpgradeUtils {
         UpgradeTask.UPGRADE_LOCK_FILE_NAME);
   }
 
-  public static boolean touchFile(File file) throws IOException {
+  public static boolean createFile(File file) throws IOException {
     final Date date = new Date();
     try (Writer writer = new OutputStreamWriter(new FileOutputStream(file),
         StandardCharsets.UTF_8)) {

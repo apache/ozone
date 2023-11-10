@@ -64,7 +64,7 @@ public class UpgradeTask {
   private final DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree;
 
   private static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
-  public static final String MIGRATE_FLAG_FILE_NAME = "migrate";
+  public static final String UPGRADE_COMPLETE_FILE_NAME = "migrate";
   public static final String UPGRADE_LOCK_FILE_NAME = "upgrade.lock";
 
   private static final Set<String> COLUMN_FAMILIES_NAME =
@@ -102,7 +102,7 @@ public class UpgradeTask {
       }
 
       try {
-        boolean touchSuccess = UpgradeUtils.touchFile(volumeUpgradeLockFile);
+        boolean touchSuccess = UpgradeUtils.createFile(volumeUpgradeLockFile);
         if (!touchSuccess) {
           result.fail(new Exception("Create upgrade lock file, " +
               volumeUpgradeLockFile.getAbsolutePath() + " fail."));
@@ -177,7 +177,7 @@ public class UpgradeTask {
       // touch a flag file
       if (e == null) {
         try {
-          UpgradeUtils.touchFile(file);
+          UpgradeUtils.createFile(file);
         } catch (IOException ioe) {
           LOG.warn("Touch upgrade finish file {} on volume {} fail.", file,
               hddsRootDir, ioe);
