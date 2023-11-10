@@ -186,6 +186,30 @@ public class BasicOmKeyInfo {
     return builder.build();
   }
 
+  public static BasicOmKeyInfo getFromProtobuf(String volumeName,
+      String bucketName, BasicKeyInfo basicKeyInfo) throws IOException {
+    if (basicKeyInfo == null) {
+      return null;
+    }
+
+    String keyName = basicKeyInfo.getKeyName();
+
+    Builder builder = new Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(basicKeyInfo.getDataSize())
+        .setCreationTime(basicKeyInfo.getCreationTime())
+        .setModificationTime(basicKeyInfo.getModificationTime())
+        .setReplicationConfig(ReplicationConfig.fromProto(
+            basicKeyInfo.getType(),
+            basicKeyInfo.getFactor(),
+            basicKeyInfo.getEcReplicationConfig()))
+        .setIsFile(!keyName.endsWith("/"));
+
+    return builder.build();
+  }
+
   public boolean equals(Object o) {
     if (this == o) {
       return true;

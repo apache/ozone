@@ -18,6 +18,7 @@
 
 package org.apache.ozone.compaction.log;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -49,7 +50,8 @@ public final class CompactionLogEntry implements
   private final List<CompactionFileInfo> outputFileInfoList;
   private final String compactionReason;
 
-  private CompactionLogEntry(long dbSequenceNumber,
+  @VisibleForTesting
+  public CompactionLogEntry(long dbSequenceNumber,
                             long compactionTime,
                             List<CompactionFileInfo> inputFileInfoList,
                             List<CompactionFileInfo> outputFileInfoList,

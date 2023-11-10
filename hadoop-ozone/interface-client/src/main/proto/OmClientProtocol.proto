@@ -144,6 +144,7 @@ enum Type {
   ListKeysLight = 126;
   AbortExpiredMultiPartUploads = 127;
   SetSnapshotProperty = 128;
+  ListStatusLight = 129;
 }
 
 enum SafeMode {
@@ -397,6 +398,7 @@ message OMResponse {
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
+  optional ListStatusLightResponse           listStatusLightResponse       = 129;
 }
 
 enum Status {
@@ -809,12 +811,11 @@ message PrefixInfo {
 
 /**
  * SnapshotStatus - snapshot states.
- * Snapshot in one of : active, deleted, or reclaimed state
+ * Snapshot in one of : active or deleted state
  */
 enum SnapshotStatusProto {
   SNAPSHOT_ACTIVE = 1;
   SNAPSHOT_DELETED = 2;
-  SNAPSHOT_RECLAIMED = 3;
 }
 
 /**
@@ -1129,12 +1130,24 @@ message OzoneFileStatusProto {
 
 }
 
+message OzoneFileStatusProtoLight {
+    optional string volumeName = 1;
+    optional string bucketName = 2;
+    optional BasicKeyInfo basicKeyInfo = 3;
+    optional uint64 blockSize = 4;
+    optional bool isDirectory = 5;
+}
+
 message GetFileStatusRequest {
     required KeyArgs keyArgs = 1;
 }
 
 message GetFileStatusResponse {
     required OzoneFileStatusProto status = 1;
+}
+
+message GetFileStatusLightResponse {
+    required OzoneFileStatusProtoLight status = 1;
 }
 
 message CreateDirectoryRequest {
@@ -1180,6 +1193,10 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+}
+
+message ListStatusLightResponse {
+    repeated OzoneFileStatusProtoLight statuses = 1;
 }
 
 message CreateKeyRequest {

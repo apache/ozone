@@ -24,8 +24,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -34,8 +34,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 /**
@@ -77,12 +77,13 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
       OMClientResponse omClientResponse =
           omVolumeCreateRequest.validateAndUpdateCache(ozoneManager,
               txLogIndex, ozoneManagerDoubleBufferHelper);
-      Assert.assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
+      Assertions.assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
       OMVolumeCreateResponse respone =
           (OMVolumeCreateResponse) omClientResponse;
-      Assert.assertEquals(expectedObjId, respone.getOmVolumeArgs()
+      Assertions.assertEquals(expectedObjId, respone.getOmVolumeArgs()
           .getObjectID());
-      Assert.assertEquals(txLogIndex, respone.getOmVolumeArgs().getUpdateID());
+      Assertions.assertEquals(txLogIndex,
+          respone.getOmVolumeArgs().getUpdateID());
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("should be greater than zero",
           ex);
@@ -109,8 +110,8 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // As we have not still called validateAndUpdateCache, get() should
     // return null.
 
-    Assert.assertNull(omMetadataManager.getVolumeTable().get(volumeKey));
-    Assert.assertNull(omMetadataManager.getUserTable().get(ownerKey));
+    Assertions.assertNull(omMetadataManager.getVolumeTable().get(volumeKey));
+    Assertions.assertNull(omMetadataManager.getUserTable().get(ownerKey));
 
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
     long txLogIndex = 2;
@@ -122,8 +123,8 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
 
@@ -134,26 +135,28 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     OmVolumeArgs omVolumeArgs =
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should not have entry.
-    Assert.assertNotNull(omVolumeArgs);
-    Assert.assertEquals(expectedObjId, omVolumeArgs.getObjectID());
-    Assert.assertEquals(txLogIndex, omVolumeArgs.getUpdateID());
+    Assertions.assertNotNull(omVolumeArgs);
+    Assertions.assertEquals(expectedObjId, omVolumeArgs.getObjectID());
+    Assertions.assertEquals(txLogIndex, omVolumeArgs.getUpdateID());
 
     // Initial modificationTime should be equal to creationTime.
     long creationTime = omVolumeArgs.getCreationTime();
     long modificationTime = omVolumeArgs.getModificationTime();
-    Assert.assertEquals(creationTime, modificationTime);
+    Assertions.assertEquals(creationTime, modificationTime);
 
     // Check data from table and request.
-    Assert.assertEquals(volumeInfo.getVolume(), omVolumeArgs.getVolume());
-    Assert.assertEquals(volumeInfo.getOwnerName(), omVolumeArgs.getOwnerName());
-    Assert.assertEquals(volumeInfo.getAdminName(), omVolumeArgs.getAdminName());
-    Assert.assertEquals(volumeInfo.getCreationTime(),
+    Assertions.assertEquals(volumeInfo.getVolume(), omVolumeArgs.getVolume());
+    Assertions.assertEquals(volumeInfo.getOwnerName(),
+        omVolumeArgs.getOwnerName());
+    Assertions.assertEquals(volumeInfo.getAdminName(),
+        omVolumeArgs.getAdminName());
+    Assertions.assertEquals(volumeInfo.getCreationTime(),
         omVolumeArgs.getCreationTime());
 
     OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
         omMetadataManager.getUserTable().get(ownerKey);
-    Assert.assertNotNull(userVolumeInfo);
-    Assert.assertEquals(volumeName, userVolumeInfo.getVolumeNames(0));
+    Assertions.assertNotNull(userVolumeInfo);
+    Assertions.assertEquals(volumeName, userVolumeInfo.getVolumeNames(0));
 
     // Create another volume for the user.
     originalRequest = createVolumeRequest("vol1", adminName,
@@ -168,11 +171,11 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 2L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    Assert.assertTrue(omMetadataManager
-        .getUserTable().get(ownerKey).getVolumeNamesList().size() == 2);
+    Assertions.assertEquals(2, omMetadataManager
+        .getUserTable().get(ownerKey).getVolumeNamesList().size());
   }
 
   @Test
@@ -200,12 +203,12 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_ALREADY_EXISTS,
-        omResponse.getStatus());
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status
+            .VOLUME_ALREADY_EXISTS, omResponse.getStatus());
 
     // Check really if we have a volume with the specified volume name.
-    Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
+    Assertions.assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName)));
   }
 
@@ -265,10 +268,10 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
 
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
-    Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
+    Assertions.assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName)));
   }
 
@@ -307,13 +310,13 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     VolumeInfo updated = modifiedRequest.getCreateVolumeRequest()
         .getVolumeInfo();
 
-    Assert.assertEquals(original.getAdminName(), updated.getAdminName());
-    Assert.assertEquals(original.getVolume(), updated.getVolume());
-    Assert.assertEquals(original.getOwnerName(),
+    Assertions.assertEquals(original.getAdminName(), updated.getAdminName());
+    Assertions.assertEquals(original.getVolume(), updated.getVolume());
+    Assertions.assertEquals(original.getOwnerName(),
         updated.getOwnerName());
-    Assert.assertNotEquals(original.getCreationTime(),
+    Assertions.assertNotEquals(original.getCreationTime(),
         updated.getCreationTime());
-    Assert.assertNotEquals(original.getModificationTime(),
+    Assertions.assertNotEquals(original.getModificationTime(),
         updated.getModificationTime());
   }
 }

@@ -158,21 +158,16 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
         throw new OMException("Snapshot does not exist", FILE_NOT_FOUND);
       }
 
-      if (!snapshotInfo.getSnapshotStatus().equals(
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-        // If the snapshot is not in active state, throw exception as well
-        switch (snapshotInfo.getSnapshotStatus()) {
-        case SNAPSHOT_DELETED:
-          throw new OMException("Snapshot is already deleted. "
-              + "Pending reclamation.", FILE_NOT_FOUND);
-        case SNAPSHOT_RECLAIMED:
-          throw new OMException("Snapshot is already deleted and reclaimed.",
-              FILE_NOT_FOUND);
-        default:
-          // Unknown snapshot non-active state
-          throw new OMException("Snapshot exists but no longer in active state",
-              FILE_NOT_FOUND);
-        }
+      switch (snapshotInfo.getSnapshotStatus()) {
+      case SNAPSHOT_DELETED:
+        throw new OMException("Snapshot is already deleted. "
+                + "Pending reclamation.", FILE_NOT_FOUND);
+      case SNAPSHOT_ACTIVE:
+        break;
+      default:
+        // Unknown snapshot non-active state
+        throw new OMException("Snapshot exists but no longer in active state",
+                FILE_NOT_FOUND);
       }
 
       // Mark snapshot as deleted
