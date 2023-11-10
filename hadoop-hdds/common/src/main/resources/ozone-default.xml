@@ -3507,6 +3507,25 @@
   </property>
 
   <property>
+    <name>ozone.snapshot.directory.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDirectoryService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.directory.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDirectoryService
+      thread run.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.scm.event.ContainerReport.thread.pool.size</name>
     <value>10</value>
     <tag>OZONE, SCM</tag>
