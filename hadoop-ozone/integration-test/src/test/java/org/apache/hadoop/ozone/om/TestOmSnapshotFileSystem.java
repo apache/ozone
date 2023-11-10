@@ -99,8 +99,6 @@ public abstract class TestOmSnapshotFileSystem {
   private static OzoneClient client;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
-  private static FileSystem fs;
-  private static OzoneFileSystem o3fs;
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager ozoneManager;
   private static String keyPrefix;
@@ -108,6 +106,8 @@ public abstract class TestOmSnapshotFileSystem {
   private static String bucketNameFso;
   private static String bucketNameLegacy;
   private final String bucketName;
+  private FileSystem fs;
+  private OzoneFileSystem o3fs;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmSnapshot.class);
