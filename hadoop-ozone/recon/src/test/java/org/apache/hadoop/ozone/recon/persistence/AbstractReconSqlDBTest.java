@@ -55,7 +55,7 @@ import org.junit.jupiter.api.io.TempDir;
 public class AbstractReconSqlDBTest {
 
   @TempDir
-  protected Path temporaryFolder;
+  private Path temporaryFolder;
 
   private Injector injector;
   private DSLContext dslContext;

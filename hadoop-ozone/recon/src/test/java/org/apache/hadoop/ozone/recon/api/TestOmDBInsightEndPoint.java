@@ -49,9 +49,11 @@ import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.ArrayList;
@@ -75,7 +77,8 @@ import static org.mockito.Mockito.when;
  * Unit test for OmDBInsightEndPoint.
  */
 public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
-
+  @TempDir
+  private Path temporaryFolder;
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;

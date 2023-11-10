@@ -35,9 +35,11 @@ import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -67,7 +69,8 @@ import static org.mockito.Mockito.when;
  * Unit test for Object Count Task.
  */
 public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
-
+  @TempDir
+  private Path temporaryFolder;
   private GlobalStatsDao globalStatsDao;
   private OmTableInsightTask omTableInsightTask;
   private DSLContext dslContext;

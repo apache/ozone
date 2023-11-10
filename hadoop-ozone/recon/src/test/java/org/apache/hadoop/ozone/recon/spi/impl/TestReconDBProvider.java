@@ -48,7 +48,6 @@ public class TestReconDBProvider {
 
   @BeforeEach
   public void setUp() throws IOException {
-    //tempFolder.create();
     injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {

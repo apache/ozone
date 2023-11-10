@@ -71,7 +71,6 @@ import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -760,7 +759,7 @@ public class TestContainerEndpoint {
         new HashSet<>(Arrays.asList("host2", "host3", "host4")));
     List<ContainerHistory> containerReplicas = container.getReplicas();
     containerReplicas.forEach(history -> {
-      Assertions.assertTrue(datanodes.contains(history.getDatanodeHost()));
+      assertTrue(datanodes.contains(history.getDatanodeHost()));
     });
   }
 
@@ -1117,7 +1116,7 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.CLEANUP);
     Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assertions.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1133,23 +1132,21 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.CLEANUP);
     containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assertions.assertEquals(2, containerIDs.size());
+    assertEquals(2, containerIDs.size());
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 0);
     List<DeletedContainerInfo> deletedContainerInfoList =
         (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
-    Assertions.assertEquals(2, deletedContainerInfoList.size());
+    assertEquals(2, deletedContainerInfoList.size());
 
     DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
-    Assertions.assertEquals(102, deletedContainerInfo.getContainerID());
-    Assertions.assertEquals("DELETED",
-        deletedContainerInfo.getContainerState());
+    assertEquals(102, deletedContainerInfo.getContainerID());
+    assertEquals("DELETED", deletedContainerInfo.getContainerState());
 
     deletedContainerInfo = deletedContainerInfoList.get(1);
-    Assertions.assertEquals(103, deletedContainerInfo.getContainerID());
-    Assertions.assertEquals("DELETED",
-        deletedContainerInfo.getContainerState());
+    assertEquals(103, deletedContainerInfo.getContainerID());
+    assertEquals("DELETED", deletedContainerInfo.getContainerState());
   }
 
   @Test
@@ -1170,7 +1167,7 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.CLEANUP);
     Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assertions.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1184,18 +1181,17 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.CLEANUP);
     containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assertions.assertEquals(2, containerIDs.size());
+    assertEquals(2, containerIDs.size());
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(1, 0);
     List<DeletedContainerInfo> deletedContainerInfoList =
         (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
-    Assertions.assertEquals(1, deletedContainerInfoList.size());
+    assertEquals(1, deletedContainerInfoList.size());
 
     DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
-    Assertions.assertEquals(104, deletedContainerInfo.getContainerID());
-    Assertions.assertEquals("DELETED",
-        deletedContainerInfo.getContainerState());
+    assertEquals(104, deletedContainerInfo.getContainerID());
+    assertEquals("DELETED", deletedContainerInfo.getContainerState());
   }
 
   @Test
@@ -1217,7 +1213,7 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.CLEANUP);
     Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assertions.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1231,18 +1227,17 @@ public class TestContainerEndpoint {
             HddsProtos.LifeCycleEvent.CLEANUP);
     containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    Assertions.assertEquals(2, containerIDs.size());
+    assertEquals(2, containerIDs.size());
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 106L);
     List<DeletedContainerInfo> deletedContainerInfoList =
         (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
-    Assertions.assertEquals(1, deletedContainerInfoList.size());
+    assertEquals(1, deletedContainerInfoList.size());
 
     DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
-    Assertions.assertEquals(107, deletedContainerInfo.getContainerID());
-    Assertions.assertEquals("DELETED",
-        deletedContainerInfo.getContainerState());
+    assertEquals(107, deletedContainerInfo.getContainerID());
+    assertEquals("DELETED", deletedContainerInfo.getContainerState());
   }
 
   private void updateContainerStateToDeleted(long containerId)

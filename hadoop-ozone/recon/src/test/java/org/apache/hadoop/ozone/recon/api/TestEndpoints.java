@@ -100,6 +100,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
@@ -134,6 +135,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -146,6 +148,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Test for Recon API endpoints.
  */
 public class TestEndpoints extends AbstractReconSqlDBTest {
+  @TempDir
+  private Path temporaryFolder;
   private NodeEndpoint nodeEndpoint;
   private PipelineEndpoint pipelineEndpoint;
   private ClusterStateEndpoint clusterStateEndpoint;
