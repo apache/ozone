@@ -178,8 +178,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private ColumnFamilyHandle compactionLogTableCFHandle;
   private RocksDB activeRocksDB;
 
+  /**
+   * For snapshot diff calculation we only need to track following column
+   * families. Other column families are irrelevant for snapshot diff.
+   */
   public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_DAG =
       ImmutableSet.of("keyTable", "directoryTable", "fileTable");
+
   /**
    * This is a package private constructor and should not be used other than
    * testing. Caller should use RocksDBCheckpointDifferHolder#getInstance() to
@@ -437,13 +442,39 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
+  @VisibleForTesting
+  boolean shouldSkipCompaction(byte[] columnFamilyBytes,
+                               List<String> inputFiles,
+                               List<String> outputFiles) {
+    String columnFamily = StringUtils.bytes2String(columnFamilyBytes);
+
+    if (!COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(columnFamily)) {
+      LOG.debug("Skipping compaction for columnFamily: {}", columnFamily);
+      return true;
+    }
+
+    if (inputFiles.isEmpty()) {
+      LOG.debug("Compaction input files list is empty");
+      return true;
+    }
+
+    if (new HashSet<>(inputFiles).equals(new HashSet<>(outputFiles))) {
+      LOG.info("Skipped the compaction entry. Compaction input files: " +
+          "{} and output files: {} are same.", inputFiles, outputFiles);
+      return true;
+    }
+
+    return false;
+  }
+
   private AbstractEventListener newCompactionBeginListener() {
     return new AbstractEventListener() {
       @Override
       public void onCompactionBegin(RocksDB db,
                                     CompactionJobInfo compactionJobInfo) {
-        if (compactionJobInfo.inputFiles().size() == 0) {
-          LOG.error("Compaction input files list is empty");
+        if (shouldSkipCompaction(compactionJobInfo.columnFamilyName(),
+            compactionJobInfo.inputFiles(),
+            compactionJobInfo.outputFiles())) {
           return;
         }
 
@@ -458,50 +489,24 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             return;
           }
         }
-        createHardLinks(compactionJobInfo.inputFiles());
-      }
-    };
-  }
 
-  @VisibleForTesting
-  void createHardLinks(List<String> sourceFiles) {
-    try (ManagedOptions options = new ManagedOptions();
-         ManagedReadOptions readOptions = new ManagedReadOptions()) {
-      // Create hardlink backups for the SST files that are going
-      // to be deleted after this RDB compaction.
-      for (String file : sourceFiles) {
-        CompactionFileInfo fileInfo =
-            toFileInfo(file, options, readOptions);
-        if (shouldSkipFile(fileInfo)) {
-          LOG.debug("Skipping hard link for sst file '{}' belongs to " +
-              "column family '{}'.", file, fileInfo.getColumnFamily());
-        } else {
-          LOG.debug("Creating hard link for sst file '{}' belongs to " +
-              "column family '{}'", file, fileInfo.getColumnFamily());
+        for (String file : compactionJobInfo.inputFiles()) {
           createLink(Paths.get(sstBackupDir, new File(file).getName()),
               Paths.get(file));
         }
       }
-    }
+    };
   }
+
 
   private AbstractEventListener newCompactionCompletedListener() {
     return new AbstractEventListener() {
       @Override
       public void onCompactionCompleted(RocksDB db,
                                         CompactionJobInfo compactionJobInfo) {
-
-        if (compactionJobInfo.inputFiles().isEmpty()) {
-          LOG.error("Compaction input files list is empty");
-          return;
-        }
-
-        if (new HashSet<>(compactionJobInfo.inputFiles())
-            .equals(new HashSet<>(compactionJobInfo.outputFiles()))) {
-          LOG.info("Skipped the compaction entry. Compaction input files: " +
-                  "{} and output files: {} are same.",
-              compactionJobInfo.inputFiles(),
-              compactionJobInfo.outputFiles());
+        if (shouldSkipCompaction(compactionJobInfo.columnFamilyName(),
+            compactionJobInfo.inputFiles(),
+            compactionJobInfo.outputFiles())) {
           return;
         }
 
@@ -1533,22 +1538,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     graph.generateImage(filePath);
   }
 
-  /**
-   * Returns true is compactionFileInfo has column family information and
-   * doesn't belong to any of the COLUMN_FAMILIES_TO_TRACK_IN_DAG.
-   * Otherwise, false and should be added compaction DAG.
-   * CompactionFileInfo doesn't have column family information in two cases,
-   * i). Backward compatibility. Before HDDS-8940, column family is not
-   *     persisted.
-   * ii). In case, it fails to read SST in {@link this.toFileInfo()}.
-   */
-  @VisibleForTesting
-  boolean shouldSkipFile(CompactionFileInfo compactionFileInfo) {
-    return Objects.nonNull(compactionFileInfo.getColumnFamily()) &&
-        !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(
-            compactionFileInfo.getColumnFamily());
-  }
-
   private List<CompactionFileInfo> toFileInfoList(List<String> sstFiles,
                                                   ManagedOptions options,
                                                   ManagedReadOptions readOptions
@@ -1561,14 +1550,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     for (String sstFile : sstFiles) {
       CompactionFileInfo fileInfo = toFileInfo(sstFile, options, readOptions);
-      if (shouldSkipFile(fileInfo)) {
-        LOG.debug("Skipping sst file: '{}' belongs to column family '{}'.",
-            sstFile, fileInfo.getColumnFamily());
-      } else {
-        LOG.debug("Adding sst file: '{}' belongs to column family '{}' to DAG.",
-            sstFile, fileInfo.getColumnFamily());
-        response.add(fileInfo);
-      }
+      response.add(fileInfo);
     }
     return response;
   }

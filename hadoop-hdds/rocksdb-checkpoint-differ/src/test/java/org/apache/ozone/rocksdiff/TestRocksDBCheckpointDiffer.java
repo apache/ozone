@@ -56,6 +56,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -82,7 +83,7 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
-import org.rocksdb.SstFileMetaData;
+import org.rocksdb.SstFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -1828,67 +1829,6 @@ public class TestRocksDBCheckpointDiffer {
         columnFamilyToPrefixMap));
   }
 
-  private static Stream<Arguments> shouldSkipFileCases() {
-    return Stream.of(
-        Arguments.of("volumeTable", true),
-        Arguments.of("bucketTable", true),
-        Arguments.of("keyTable", false),
-        Arguments.of("directoryTable", false),
-        Arguments.of("fileTable", false),
-        Arguments.of("snapshotInfoTable", true),
-        Arguments.of("compactionLogTable", true),
-        Arguments.of(null, false)); // case when failed to read SST
-  }
-
-  @MethodSource("shouldSkipFileCases")
-  @ParameterizedTest
-  public void testShouldSkipFile(String columnFamily,
-                                 boolean expectedResult) {
-    CompactionFileInfo fileInfo =
-        new CompactionFileInfo("fileName", "startKey", "endKey", columnFamily);
-    assertEquals(expectedResult,
-        rocksDBCheckpointDiffer.shouldSkipFile(fileInfo));
-  }
-
-  // End-to-end to verify that only 'keyTable', 'directoryTable' and
-  // 'fileTable' column families SST files are hard linked to SST back-up dir.
-  @Test
-  public void testCreateHardLinks() throws RocksDBException, IOException {
-    // To skip 'isSnapshotInfoTableEmpty' check in 'newCompactionBeginListener'.
-    rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
-        Mockito.mock(ColumnFamilyHandle.class));
-    createKeys(keyTableCFHandle, "keyName-", "keyValue-", 100);
-    createKeys(directoryTableCFHandle, "dirName-", "dirValue-", 10);
-    createKeys(fileTableCFHandle, "fileName-", "fileValue-", 100);
-    createKeys(compactionLogTableCFHandle, "logName-", "logValue-", 10);
-
-    List<LiveFileMetaData> liveFilesMetaData =
-        activeRocksDB.getLiveFilesMetaData();
-
-    List<String> expectedFilesInBackDir = liveFilesMetaData.stream()
-        .filter(file -> COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(
-            new String(file.columnFamilyName(), UTF_8)))
-        .map(SstFileMetaData::fileName)
-        .sorted()
-        .collect(Collectors.toList());
-
-    List<String> sstFilesInActiveDB = liveFilesMetaData
-        .stream()
-        .map(file -> file.path() + file.fileName())
-        .collect(Collectors.toList());
-
-    rocksDBCheckpointDiffer.createHardLinks(sstFilesInActiveDB);
-    List<String> actualFilesInBackDir;
-    try (Stream<Path> pathStream = Files.list(
-        Paths.get(rocksDBCheckpointDiffer.getSSTBackupDir()))) {
-      actualFilesInBackDir = pathStream
-          .map(file -> "/" + file.getFileName().toString())
-          .sorted().collect(Collectors.toList());
-    }
-
-    assertEquals(expectedFilesInBackDir, actualFilesInBackDir);
-  }
-
   private void createKeys(ColumnFamilyHandle cfh,
                           String keyPrefix,
                           String valuePrefix,
@@ -1909,7 +1849,8 @@ public class TestRocksDBCheckpointDiffer {
   // End-to-end to verify that only 'keyTable', 'directoryTable'
   // and 'fileTable' column families SST files are added to compaction DAG.
   @Test
-  public void testDag() throws RocksDBException {
+  public void testDagOnlyContainsDesiredCfh()
+      throws RocksDBException, IOException {
     // Setting is not non-empty table so that 'isSnapshotInfoTableEmpty'
     // returns true.
     rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(keyTableCFHandle);
@@ -1930,5 +1871,72 @@ public class TestRocksDBCheckpointDiffer {
     // CompactionNodeMap should not contain any node other than 'keyTable',
     // 'directoryTable' and 'fileTable' column families nodes.
     assertTrue(compactionNodes.isEmpty());
+
+    // Assert that only 'keyTable', 'directoryTable' and 'fileTable'
+    // column families SST files are backed-up.
+    try (ManagedOptions options = new ManagedOptions();
+         Stream<Path> pathStream = Files.list(
+             Paths.get(rocksDBCheckpointDiffer.getSSTBackupDir()))) {
+      pathStream.forEach(path -> {
+        try (SstFileReader fileReader = new SstFileReader(options)) {
+          fileReader.open(path.toAbsolutePath().toString());
+          String columnFamily = StringUtils.bytes2String(
+              fileReader.getTableProperties().getColumnFamilyName());
+          assertTrue(COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(columnFamily));
+        } catch (RocksDBException rocksDBException) {
+          fail("Failed to read file: " + path.toAbsolutePath());
+        }
+      });
+    }
+  }
+
+  private static Stream<Arguments> shouldSkipFileCases() {
+    return Stream.of(
+        Arguments.of("Case#1: volumeTable is irrelevant column family.",
+            "volumeTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#2: bucketTable is irrelevant column family.",
+            "bucketTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#3: snapshotInfoTable is irrelevant column family.",
+            "snapshotInfoTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#4: compactionLogTable is irrelevant column family.",
+            "compactionLogTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#5: Input file list is empty..",
+            "keyTable".getBytes(), Collections.emptyList(),
+            Arrays.asList("outputFile1", "outputFile2"), true),
+        Arguments.of("Case#6: Input and output file lists are same.",
+            "keyTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"), true),
+        Arguments.of("Case#7: keyTable is relevant column family.",
+            "keyTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), false),
+        Arguments.of("Case#8: directoryTable is relevant column family.",
+            "directoryTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), false),
+        Arguments.of("Case#9: fileTable is relevant column family.",
+            "fileTable".getBytes(),
+            Arrays.asList("inputFile1", "inputFile2", "inputFile3"),
+            Arrays.asList("outputFile1", "outputFile2"), false));
+  }
+
+  @MethodSource("shouldSkipFileCases")
+  @ParameterizedTest(name = "{0}")
+  public void testShouldSkipFile(String description,
+                                 byte[] columnFamilyBytes,
+                                 List<String> inputFiles,
+                                 List<String> outputFiles,
+                                 boolean expectedResult) {
+    assertEquals(expectedResult, rocksDBCheckpointDiffer
+        .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
 }
