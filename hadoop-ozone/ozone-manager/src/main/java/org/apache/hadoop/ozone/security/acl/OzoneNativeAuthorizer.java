@@ -35,6 +35,8 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Native (internal) implementation of {@link IAccessAuthorizer}.
@@ -119,7 +121,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
+    ACLType parentAclRight = getParentNativeAcl(
         context.getAclRights(), objInfo.getResourceType());
 
     parentContext = RequestContext.newBuilder()
@@ -186,6 +188,56 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       throw new OMException("Unexpected object type:" +
           objInfo.getResourceType(), INVALID_REQUEST);
     }
+  }
+
+  /**
+   * get the Parent ACL based on child ACL and resource type.
+   *
+   * @param aclRight child acl as required
+   * @param resType resource type
+   * @return parent acl
+   */
+  private static IAccessAuthorizer.ACLType getParentNativeAcl(
+      IAccessAuthorizer.ACLType aclRight, OzoneObj.ResourceType resType) {
+    // For volume, parent access has no meaning and not used
+    if (resType == VOLUME) {
+      return IAccessAuthorizer.ACLType.NONE;
+    }
+
+    // Refined the parent for bucket, keys & prefix
+    // OP         |CHILD       |PARENT
+
+    // CREATE      NONE        WRITE
+    // DELETE      DELETE      READ
+    // WRITE       WRITE       WRITE     (For key/prefix, volume is READ)
+    // WRITE_ACL   WRITE_ACL   READ      (V1 WRITE_ACL=>WRITE)
+
+    // READ        READ        READ
+    // LIST        LIST        READ      (V1 LIST=>READ)
+    // READ_ACL    READ_ACL    READ      (V1 READ_ACL=>READ)
+
+    // for bucket, except CREATE, all cases need READ for volume
+    if (resType == BUCKET) {
+      if (aclRight == IAccessAuthorizer.ACLType.CREATE) {
+        return IAccessAuthorizer.ACLType.WRITE;
+      }
+      return IAccessAuthorizer.ACLType.READ;
+    }
+
+    // else for key and prefix, bucket permission will be read
+    // except where key/prefix have CREATE and WRITE,
+    // bucket will have WRITE
+    IAccessAuthorizer.ACLType parentAclRight = aclRight;
+    if (aclRight == IAccessAuthorizer.ACLType.CREATE) {
+      parentAclRight = IAccessAuthorizer.ACLType.WRITE;
+    } else if (aclRight == IAccessAuthorizer.ACLType.READ_ACL
+        || aclRight == IAccessAuthorizer.ACLType.LIST
+        || aclRight == IAccessAuthorizer.ACLType.WRITE_ACL
+        || aclRight == IAccessAuthorizer.ACLType.DELETE) {
+      parentAclRight = IAccessAuthorizer.ACLType.READ;
+    }
+
+    return parentAclRight;
   }
 
   public void setVolumeManager(VolumeManager volumeManager) {
