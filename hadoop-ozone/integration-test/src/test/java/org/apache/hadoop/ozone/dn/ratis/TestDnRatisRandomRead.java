@@ -84,23 +84,22 @@ public class TestDnRatisRandomRead {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
-  private static final BucketLayout bucketLayout = BucketLayout.LEGACY;
+  private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
   private static final int REPLICATION_COUNT = 3;
 
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static FileSystem fs;
-  private static String volumeName;
-  private static Path volumePath;
-  private static String bucketName;
-  private static Path bucketPath;
+  private String volumeName;
+  private Path volumePath;
+  private String bucketName;
+  private Path bucketPath;
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        bucketLayout.name());
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT, BUCKET_LAYOUT.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(REPLICATION_COUNT)
@@ -110,7 +109,7 @@ public class TestDnRatisRandomRead {
     client = cluster.newClient();
 
     OzoneBucket ozoneBucket =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, BUCKET_LAYOUT);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -139,7 +138,7 @@ public class TestDnRatisRandomRead {
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, BUCKET_LAYOUT);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -198,6 +197,7 @@ public class TestDnRatisRandomRead {
     // 1/3 number of files per each datanode (3)
     long deviation = numFiles / REPLICATION_COUNT / 3;
     transactionsCountByDn.forEach(
-        count -> assertTrue(Math.abs(count - avgTransactionCountPerNode) < deviation));
+        count -> assertTrue(
+            Math.abs(count - avgTransactionCountPerNode) < deviation));
   }
 }

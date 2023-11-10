@@ -12,7 +12,14 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Optional;
 
+/**
+ * Interceptor used to capture metadata for current gPRC call.
+ * Sets context to current call with necessary keys.
+ */
 public class GrpcOzoneManagerMetadataInterceptor implements ServerInterceptor {
+  /**
+   * Key gets client address for current gRPC call.
+   */
   public static final Context.Key<String> CLIENT_ADDRESS_KEY =
       Context.key("clientAddressKey");
 
