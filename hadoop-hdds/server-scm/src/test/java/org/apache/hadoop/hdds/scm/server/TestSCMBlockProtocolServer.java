@@ -85,19 +85,19 @@ public class TestSCMBlockProtocolServer {
 
   @Test
   public void testSortDatanodes() throws Exception {
-    List<String> nodes = new ArrayList();
-    nodeManager.getAllNodes().stream().forEach(
+    List<String> nodes = new ArrayList<>();
+    nodeManager.getAllNodes().forEach(
         node -> nodes.add(node.getNetworkName()));
 
     // sort normal datanodes
     String client;
-    client = nodes.get(0);
+    client = nodeManager.getAllNodes().get(0).getIpAddress();
     List<DatanodeDetails> datanodeDetails =
         server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
@@ -105,17 +105,18 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertTrue(datanodeDetails.size() == 0);
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertTrue(datanodeDetails.size() == 0);
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
+    client = nodeManager.getAllNodes().get(0).getIpAddress();
     ScmBlockLocationProtocolProtos.SortDatanodesRequestProto request =
         ScmBlockLocationProtocolProtos.SortDatanodesRequestProto
             .newBuilder()

@@ -356,7 +356,7 @@ public class SCMBlockProtocolServer implements
         }
       });
       List<? extends Node> sortedNodeList = scm.getClusterMap()
-          .sortByDistanceCost(client, nodeList, nodes.size());
+          .sortByDistanceCost(client, nodeList, nodeList.size());
       return sortedNodeList.stream().map(r -> (DatanodeDetails) r).collect(
           Collectors.toList());
     } catch (Exception ex) {
