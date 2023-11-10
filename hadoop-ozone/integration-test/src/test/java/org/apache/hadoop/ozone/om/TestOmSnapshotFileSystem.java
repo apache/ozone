@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -39,7 +41,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -48,6 +49,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +67,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -75,10 +77,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -91,27 +94,46 @@ import static org.junit.jupiter.api.Assertions.fail;
  * OmSnapshot file system tests.
  */
 @Timeout(120)
-public class TestOmSnapshotFileSystem {
+public abstract class TestOmSnapshotFileSystem {
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
-  private static String volumeName;
-  private static String bucketName;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager ozoneManager;
   private static String keyPrefix;
+  private static String volumeName;
+  private static String bucketNameFso;
+  private static String bucketNameLegacy;
+  private final String bucketName;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
-  public static Stream<Arguments> bucketLayoutType() {
-    return Stream.of(
-        Arguments.of(BucketLayout.FILE_SYSTEM_OPTIMIZED),
-        Arguments.of(BucketLayout.LEGACY)
-    );
+  public TestOmSnapshotFileSystem(String bucketName) {
+    this.bucketName = bucketName;
+  }
+
+  /**
+   * OmSnapshot file system tests for FSO.
+   */
+  public static class TestOmSnapshotFileSystemFso
+      extends TestOmSnapshotFileSystem {
+    TestOmSnapshotFileSystemFso() {
+      super(bucketNameFso);
+    }
+  }
+
+  /**
+   * OmSnapshot file system tests for Legacy.
+   */
+  public static class TestOmSnapshotFileSystemLegacy
+      extends TestOmSnapshotFileSystem {
+    TestOmSnapshotFileSystemLegacy() {
+      super(bucketNameLegacy);
+    }
   }
 
   @BeforeAll
@@ -130,23 +152,27 @@ public class TestOmSnapshotFileSystem {
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster.getOzoneManager();
 
+    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    bucketNameFso = "bucket-fso-" + RandomStringUtils.randomNumeric(5);
+    bucketNameLegacy = "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
+
+    TestDataUtil.createVolume(client, volumeName);
+    TestDataUtil.createBucket(client, volumeName,
+        new BucketArgs.Builder().setBucketLayout(FILE_SYSTEM_OPTIMIZED).build(),
+        bucketNameFso);
+    TestDataUtil.createBucket(client, volumeName,
+        new BucketArgs.Builder().setBucketLayout(LEGACY).build(),
+        bucketNameLegacy);
+
     // stop the deletion services so that keys can still be read
     KeyManagerImpl keyManager = (KeyManagerImpl) ozoneManager.getKeyManager();
     keyManager.stop();
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
-  private static void setup(BucketLayout layoutType) throws Exception {
-    // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, layoutType);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
-
-    String rootPath = String
-        .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
-        bucket.getVolumeName());
+  @BeforeEach
+  public void setupFsClient() throws IOException {
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
@@ -161,7 +187,6 @@ public class TestOmSnapshotFileSystem {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   /**
@@ -196,12 +221,9 @@ public class TestOmSnapshotFileSystem {
     IOUtils.closeQuietly(o3fs);
   }
 
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
+  @Test
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
-  public void testListKeysAtDifferentLevels(BucketLayout layoutType)
-      throws Exception {
-    setup(layoutType);
+  public void testListKeysAtDifferentLevels() throws Exception {
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     assertEquals(ozoneVolume.getName(), volumeName);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
@@ -234,13 +256,13 @@ public class TestOmSnapshotFileSystem {
 
     int length = 10;
     byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
+    Arrays.fill(input, (byte) 96);
 
     createKeys(ozoneBucket, keys);
 
 
     setKeyPrefix(createSnapshot().substring(1));
-   
+
     // Delete the active fs so that we don't inadvertently read it
     deleteRootDir();
     // Root level listing keys
@@ -278,14 +300,16 @@ public class TestOmSnapshotFileSystem {
 
     // Boundary of a level
     ozoneKeyIterator =
-      ozoneBucket.listKeys(keyPrefix + "a/b2/d2", keyPrefix + "a/b2/d2/d21.tx");
+        ozoneBucket.listKeys(keyPrefix + "a/b2/d2",
+            keyPrefix + "a/b2/d2/d21.tx");
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d2/d22.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Boundary case - last node in the depth-first-traversal
     ozoneKeyIterator =
-      ozoneBucket.listKeys(keyPrefix + "a/b3/e3", keyPrefix + "a/b3/e3/e31.tx");
+        ozoneBucket.listKeys(keyPrefix + "a/b3/e3",
+            keyPrefix + "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
     checkKeyList(ozoneKeyIterator, expectedKeys);
   }
@@ -316,8 +340,8 @@ public class TestOmSnapshotFileSystem {
     checkKeyList(keyItr, expectedKeys);
   }
 
-  private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
-      List<String> keys) {
+  private void checkKeyList(Iterator<? extends OzoneKey> ozoneKeyIterator,
+                            List<String> keys) {
 
     LinkedList<String> outputKeys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
@@ -342,10 +366,10 @@ public class TestOmSnapshotFileSystem {
   }
 
   private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
+                         byte[] input) throws Exception {
 
     OzoneOutputStream ozoneOutputStream =
-            ozoneBucket.createKey(key, length);
+        ozoneBucket.createKey(key, length);
 
     ozoneOutputStream.write(input);
     ozoneOutputStream.write(input, 0, 10);
@@ -362,7 +386,7 @@ public class TestOmSnapshotFileSystem {
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-            bucketName, volumeName);
+        bucketName, volumeName);
     OzoneFileSystem o3fsNew = (OzoneFileSystem) FileSystem
         .get(new URI(rootPath), conf);
     FSDataInputStream fsDataInputStream = o3fsNew.open(new Path(key));
@@ -377,11 +401,8 @@ public class TestOmSnapshotFileSystem {
     keyPrefix = s;
   }
 
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
-  public void testBlockSnapshotFSAccessAfterDeletion(BucketLayout layoutType)
-      throws Exception {
-    setup(layoutType);
+  @Test
+  public void testBlockSnapshotFSAccessAfterDeletion() throws Exception {
     Path root = new Path("/");
     Path dir = new Path(root, "/testListKeysBeforeAfterSnapshotDeletion");
     Path key1 = new Path(dir, "key1");
@@ -450,13 +471,9 @@ public class TestOmSnapshotFileSystem {
     assertTrue(exception.getMessage().contains(errorMsg2));
   }
 
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
-
+  @Test
   // based on TestOzoneFileSystem:testListStatus
-  public void testListStatus(BucketLayout layoutType) throws Exception {
-    setup(layoutType);
-
+  public void testListStatus() throws Exception {
     Path root = new Path("/");
     Path parent = new Path(root, "/testListStatus");
     Path file1 = new Path(parent, "key1");
@@ -498,12 +515,9 @@ public class TestOmSnapshotFileSystem {
         "FileStatus did not return all children of the directory");
   }
 
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
+  @Test
   // based on TestOzoneFileSystem:testListStatusWithIntermediateDir
-  public void testListStatusWithIntermediateDir(BucketLayout layoutType)
-      throws Exception {
-    setup(layoutType);
+  public void testListStatusWithIntermediateDir() throws Exception {
     String keyName = "object-dir/object-name";
     createAndCommitKey(keyName);
 
@@ -528,10 +542,8 @@ public class TestOmSnapshotFileSystem {
     assertEquals(1, fileStatuses.length);
   }
 
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
-  public void testGetFileStatus(BucketLayout layoutType) throws Exception {
-    setup(layoutType);
+  @Test
+  public void testGetFileStatus() throws Exception {
     String dir = "dir";
     String keyName = dir + "/" + "key";
     createAndCommitKey(keyName);
@@ -559,11 +571,8 @@ public class TestOmSnapshotFileSystem {
     deleteRootDir();
   }
 
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
-  public void testReadFileFromSnapshot(BucketLayout layoutType)
-      throws Exception {
-    setup(layoutType);
+  @Test
+  public void testReadFileFromSnapshot() throws Exception {
     String keyName = "dir/file";
     byte[] strBytes = "Sample text".getBytes(StandardCharsets.UTF_8);
     Path parent = new Path("/");
@@ -598,7 +607,7 @@ public class TestOmSnapshotFileSystem {
     deleteRootDir();
   }
 
-  private static void createAndCommitKey(String keyName) throws IOException {
+  private void createAndCommitKey(String keyName) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName)
         .setAcls(Collections.emptyList())
@@ -612,11 +621,9 @@ public class TestOmSnapshotFileSystem {
   /**
    * Tests listStatus operation on root directory.
    */
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
+  @Test
   // based on TestOzoneFileSystem:testListStatusOnRoot
-  public void testListStatusOnRoot(BucketLayout layoutType) throws Exception {
-    setup(layoutType);
+  public void testListStatusOnRoot() throws Exception {
     Path root = new Path("/");
     Path dir1 = new Path(root, "dir1");
     Path dir12 = new Path(dir1, "dir12");
@@ -644,12 +651,9 @@ public class TestOmSnapshotFileSystem {
   /**
    * Tests listStatus operation on root directory.
    */
-  @ParameterizedTest
-  @MethodSource("bucketLayoutType")
+  @Test
   // based on TestOzoneFileSystem:testListStatusOnLargeDirectory
-  public void testListStatusOnLargeDirectory(BucketLayout layoutType)
-      throws Exception {
-    setup(layoutType);
+  public void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/");
     deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
@@ -670,10 +674,10 @@ public class TestOmSnapshotFileSystem {
     if (numDirs != fileStatuses.length) {
       for (int i = 0; i < fileStatuses.length; i++) {
         boolean duplicate =
-                actualPaths.add(fileStatuses[i].getPath().getName());
+            actualPaths.add(fileStatuses[i].getPath().getName());
         if (!duplicate) {
           LOG.info("Duplicate path:{} in FileStatusList",
-                  fileStatuses[i].getPath().getName());
+              fileStatuses[i].getPath().getName());
         }
         actualPathList.add(fileStatuses[i].getPath().getName());
       }
