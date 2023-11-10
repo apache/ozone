@@ -64,7 +64,7 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
     return new ProtocolMessageMetrics<KEY>(name, description, types, conf);
   }
 
-  public ProtocolMessageMetrics(String name, String description,
+  private ProtocolMessageMetrics(String name, String description,
       KEY[] values, ConfigurationSource conf) {
     this.name = name;
     this.description = description;
@@ -81,7 +81,7 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
         quantiles.put(value, mutableQuantiles);
         for (int i = 0; i < intervals.length; i++) {
           mutableQuantiles[i] = registry.newQuantiles(
-              value.toString() + "RpcTime" + intervals[i] + "s",
+              value.toString() + "RpcTime" + intervals[i] + "s" + "latencyMs",
               value.toString() + "rpc time in milli second",
               "ops", "latency", intervals[i]);
         }
@@ -126,8 +126,7 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    registry.snapshot(collector.addRecord(registry.info()), all);
-    counters.forEach((key, value) -> {
+      counters.forEach((key, value) -> {
       MetricsRecordBuilder builder =
           collector.addRecord(name);
       builder.add(
@@ -137,8 +136,12 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
       builder.addCounter(
           new MetricName("time", "Sum of the duration of the calls"),
           elapsedTimes.get(key).longValue());
+      if (quantileEnable) {
+        for (MutableQuantiles mutableQuantiles : quantiles.get(key)) {
+          mutableQuantiles.snapshot(builder, all);
+        }
+      }
       builder.endRecord();
-
     });
     MetricsRecordBuilder builder = collector.addRecord(name);
     builder.addCounter(new MetricName("concurrency",
