@@ -577,4 +577,14 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return {@link BlockGroup}
    */
   List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
+
+  /**
+   * Given a volume/bucket, check whether it contains incomplete MPUs.
+   *
+   * @param volume - Volume name
+   * @param bucket - Bucket name
+   * @return true if the bucket is empty
+   */
+  boolean containsIncompleteMPUs(String volume, String bucket)
+      throws IOException;
 }

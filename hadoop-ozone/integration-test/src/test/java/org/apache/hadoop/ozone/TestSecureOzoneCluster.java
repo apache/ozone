@@ -98,6 +98,7 @@ import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.KerberosAuthException;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -639,7 +640,8 @@ final class TestSecureOzoneCluster {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token);
       assertEquals("OzoneToken", token.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(conf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token.getService().toString());
 
       // Renew delegation token
@@ -1181,7 +1183,8 @@ final class TestSecureOzoneCluster {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token1);
       assertEquals("OzoneToken", token1.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(newConf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token1.getService().toString());
       assertEquals(omCertId1, token1.decodeIdentifier().getOmCertSerialId());
 

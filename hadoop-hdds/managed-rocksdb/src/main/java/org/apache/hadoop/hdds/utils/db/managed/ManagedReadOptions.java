@@ -20,17 +20,26 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.ReadOptions;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+
 /**
  * Managed WriteBatch.
  */
 public class ManagedReadOptions extends ReadOptions {
+
+  private final StackTraceElement[] elements;
+
   public ManagedReadOptions() {
-    super();
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return formatStackTrace(elements);
   }
 }

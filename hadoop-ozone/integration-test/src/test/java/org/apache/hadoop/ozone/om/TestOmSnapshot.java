@@ -640,9 +640,14 @@ public class TestOmSnapshot {
 
   private OmKeyInfo getOmKeyInfo(String volume, String bucket,
                                  String key) throws IOException {
+    ResolvedBucket resolvedBucket = new ResolvedBucket(volume, bucket,
+        volume, bucket, "", bucketLayout);
     return cluster.getOzoneManager().getKeyManager()
-            .getKeyInfo(new OmKeyArgs.Builder().setVolumeName(volume)
-            .setBucketName(bucket).setKeyName(key).build(), null);
+            .getKeyInfo(new OmKeyArgs.Builder()
+                .setVolumeName(volume)
+                .setBucketName(bucket)
+                .setKeyName(key).build(),
+                resolvedBucket, null);
   }
 
   /**
@@ -1060,6 +1065,45 @@ public class TestOmSnapshot {
           SnapshotDiffReportOzone.getDiffReportEntry(
               SnapshotDiffReport.DiffType.CREATE, "dir1"));
     }
+    Assert.assertEquals(diff.getDiffList(), diffEntries);
+  }
+
+  /**
+   * Testing scenario:
+   * 1) Key k1 is created.
+   * 2) Snapshot snap1 created.
+   * 3) Dir dir1/dir2 is created.
+   * 4) Key k1 is renamed to key dir1/dir2/k1_renamed
+   * 5) Dir dir1 is deleted.
+   * 6) Snapshot snap2 created.
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 1 delete key entry.
+   */
+  @Test
+  public void testSnapDiffWithDirectoryDelete() throws Exception {
+    Assume.assumeTrue(bucketLayout.isFileSystemOptimized());
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+    String snap1 = "snap1";
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    bucket.createDirectory("dir1/dir2");
+    String key1Renamed = "dir1/dir2/" + key1 + "_renamed";
+    bucket.renameKey(key1, key1Renamed);
+    bucket.deleteDirectory("dir1", true);
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> diffEntries = Lists.newArrayList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.DELETE, key1));
     Assert.assertEquals(diff.getDiffList(), diffEntries);
   }
 

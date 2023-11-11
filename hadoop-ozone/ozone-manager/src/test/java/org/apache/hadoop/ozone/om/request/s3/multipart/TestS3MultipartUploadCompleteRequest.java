@@ -30,8 +30,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -88,14 +88,14 @@ public class TestS3MultipartUploadCompleteRequest
 
     // deleted key entries count is expected to be 0
     if (count == 0) {
-      Assert.assertTrue(rangeKVs.size() == 0);
+      Assertions.assertEquals(0, rangeKVs.size());
       return;
     }
 
-    Assert.assertTrue(rangeKVs.size() >= 1);
+    Assertions.assertTrue(rangeKVs.size() >= 1);
 
     // Count must consider unused parts on commit
-    Assert.assertEquals(count,
+    Assertions.assertEquals(count,
         rangeKVs.get(0).getValue().getOmKeyInfoList().size());
   }
 
@@ -150,30 +150,31 @@ public class TestS3MultipartUploadCompleteRequest
     omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
             multipartUploadID);
 
-    Assert.assertNull(omMetadataManager
+    Assertions.assertNull(omMetadataManager
         .getOpenKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
         .get(multipartKey));
-    Assert.assertNull(
+    Assertions.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     OmKeyInfo multipartKeyInfo = omMetadataManager
         .getKeyTable(s3MultipartUploadCompleteRequest.getBucketLayout())
         .get(getOzoneDBKey(volumeName, bucketName, keyName));
-    Assert.assertNotNull(multipartKeyInfo);
-    Assert.assertNotNull(multipartKeyInfo.getLatestVersionLocations());
-    Assert.assertTrue(multipartKeyInfo.getLatestVersionLocations()
+    Assertions.assertNotNull(multipartKeyInfo);
+    Assertions.assertNotNull(multipartKeyInfo.getLatestVersionLocations());
+    Assertions.assertTrue(multipartKeyInfo.getLatestVersionLocations()
         .isMultipartKey());
 
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
         .getCacheValue(new CacheKey<>(
             omMetadataManager.getBucketKey(volumeName, bucketName)))
         .getCacheValue();
-    Assert.assertEquals(getNamespaceCount(), omBucketInfo.getUsedNamespace());
+    Assertions.assertEquals(getNamespaceCount(),
+        omBucketInfo.getUsedNamespace());
     return multipartUploadID;
   }
 
@@ -241,8 +242,8 @@ public class TestS3MultipartUploadCompleteRequest
             s3MultipartUploadCompleteRequest.validateAndUpdateCache(
                     ozoneManager, 3L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PART_ORDER,
-            omClientResponse.getOMResponse().getStatus());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status
+            .INVALID_PART_ORDER, omClientResponse.getOMResponse().getStatus());
   }
 
   @Test
@@ -263,7 +264,7 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
   }
@@ -287,7 +288,7 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
   }
@@ -314,7 +315,7 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(
+    Assertions.assertEquals(
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
         omClientResponse.getOMResponse().getStatus());
 

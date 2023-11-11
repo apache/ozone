@@ -29,6 +29,12 @@ import java.util.Set;
  */
 public interface ObjectPathResolver {
 
-  Map<Long, Path> getAbsolutePathForObjectIDs(Optional<Set<Long>> objIds)
+  Map<Long, Path> getAbsolutePathForObjectIDs(Optional<Set<Long>> objIds,
+                                              boolean skipUnresolvedObjs)
       throws IOException;
+
+  default Map<Long, Path> getAbsolutePathForObjectIDs(
+      Optional<Set<Long>> objIds) throws IOException {
+    return getAbsolutePathForObjectIDs(objIds, false);
+  }
 }

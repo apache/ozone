@@ -36,11 +36,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,25 +49,18 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Tests S3ExpiredMultipartUploadsAbortResponse.
+ * Tests S3 Expired Multipart Upload Abort Responses.
  */
-@RunWith(Parameterized.class)
 public class TestS3ExpiredMultipartUploadsAbortResponse
     extends TestS3MultipartResponse {
 
-  private final BucketLayout bucketLayout;
-
-  public TestS3ExpiredMultipartUploadsAbortResponse(
-      BucketLayout bucketLayout) {
-    this.bucketLayout = bucketLayout;
-  }
+  private BucketLayout bucketLayout;
 
   @Override
   public BucketLayout getBucketLayout() {
     return bucketLayout;
   }
 
-  @Parameters
   public static Collection<BucketLayout> bucketLayouts() {
     return Arrays.asList(
         BucketLayout.DEFAULT,
@@ -82,8 +73,11 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
    * associated parts.
    * @throws Exception
    */
-  @Test
-  public void testAddToDBBatchWithEmptyParts() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testAddToDBBatchWithEmptyParts(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     String volumeName = UUID.randomUUID().toString();
 
     Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToAbort =
@@ -98,20 +92,20 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
         // MPUs with no associated parts should have been removed
         // from the multipartInfoTable. Since there are no parts
         // these parts will not added to the deletedTable
-        Assert.assertFalse(omMetadataManager.getMultipartInfoTable().isExist(
-            abortInfo.getMultipartKey()));
-        Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
-            .isExist(abortInfo.getMultipartOpenKey()));
+        Assertions.assertFalse(omMetadataManager.getMultipartInfoTable()
+            .isExist(abortInfo.getMultipartKey()));
+        Assertions.assertFalse(omMetadataManager.getOpenKeyTable(
+            getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
       }
     }
 
     for (List<OmMultipartAbortInfo> abortInfos: mpusToKeep.values()) {
       for (OmMultipartAbortInfo abortInfo: abortInfos) {
         // These MPUs should not have been removed from the multipartInfoTable
-        Assert.assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
+        Assertions.assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
             abortInfo.getMultipartKey()));
-        Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
-            .isExist(abortInfo.getMultipartOpenKey()));
+        Assertions.assertTrue(omMetadataManager.getOpenKeyTable(
+            getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
       }
     }
   }
@@ -122,8 +116,11 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
    * parts.
    * @throws Exception
    */
-  @Test
-  public void testAddToDBBatchWithNonEmptyParts() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testAddToDBBatchWithNonEmptyParts(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     String volumeName = UUID.randomUUID().toString();
 
     Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToAbort =
@@ -137,10 +134,10 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       for (OmMultipartAbortInfo abortInfo: abortInfos) {
         // All the associated parts of the MPU should have been moved from
         // the multipartInfoTable to the deleted table.
-        Assert.assertFalse(omMetadataManager.getMultipartInfoTable().isExist(
-            abortInfo.getMultipartKey()));
-        Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
-            .isExist(abortInfo.getMultipartOpenKey()));
+        Assertions.assertFalse(omMetadataManager.getMultipartInfoTable()
+            .isExist(abortInfo.getMultipartKey()));
+        Assertions.assertFalse(omMetadataManager.getOpenKeyTable(
+            getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
 
         for (PartKeyInfo partKeyInfo: abortInfo
             .getOmMultipartKeyInfo().getPartKeyInfoMap()) {
@@ -148,7 +145,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
               OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
           String deleteKey = omMetadataManager.getOzoneDeletePathKey(
               currentPartKeyInfo.getObjectID(), abortInfo.getMultipartKey());
-          Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
+          Assertions.assertTrue(omMetadataManager.getDeletedTable().isExist(
               deleteKey));
         }
 
@@ -159,10 +156,10 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       for (OmMultipartAbortInfo abortInfo: abortInfos) {
         // These MPUs should not have been removed from the multipartInfoTable
         // and its parts should not be in the deletedTable.
-        Assert.assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
+        Assertions.assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
             abortInfo.getMultipartKey()));
-        Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
-            .isExist(abortInfo.getMultipartOpenKey()));
+        Assertions.assertTrue(omMetadataManager.getOpenKeyTable(
+            getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
 
         for (PartKeyInfo partKeyInfo: abortInfo
             .getOmMultipartKeyInfo().getPartKeyInfoMap()) {
@@ -170,7 +167,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
               OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
           String deleteKey = omMetadataManager.getOzoneDeletePathKey(
               currentPartKeyInfo.getObjectID(), abortInfo.getMultipartKey());
-          Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(
+          Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(
               deleteKey));
         }
       }
@@ -182,8 +179,11 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
    * submitted repsponse has an error status. In this case, no changes to the
    * DB should be mmade.
    */
-  @Test
-  public void testAddToDBBatchWithErrorResponse() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testAddToDBBatchWithErrorResponse(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     String volumeName = UUID.randomUUID().toString();
 
     Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToAbort =
@@ -197,7 +197,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
         // if an error occurs in the response, the batch operation moving MPUs
         // parts from the multipartInfoTable to the deleted table should not be
         // committed
-        Assert.assertTrue(
+        Assertions.assertTrue(
             omMetadataManager.getMultipartInfoTable().isExist(
                 multipartAbortInfo.getMultipartKey()));
 
@@ -208,7 +208,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
           String deleteKey = omMetadataManager.getOzoneDeletePathKey(
               currentPartKeyInfo.getObjectID(), multipartAbortInfo
                   .getMultipartKey());
-          Assert.assertFalse(omMetadataManager.getDeletedTable()
+          Assertions.assertFalse(omMetadataManager.getDeletedTable()
               .isExist(deleteKey));
         }
       }

@@ -20,17 +20,17 @@
 package org.apache.hadoop.ozone.om.request;
 
 import java.net.InetAddress;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import mockit.Mock;
 import mockit.MockUp;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,8 +53,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestOMClientRequestWithUserInfo {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
@@ -63,13 +63,13 @@ public class TestOMClientRequestWithUserInfo {
       UserGroupInformation.createRemoteUser("temp");
   private InetAddress inetAddress;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ozoneManager = Mockito.mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
@@ -107,12 +107,12 @@ public class TestOMClientRequestWithUserInfo {
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
 
-    Assert.assertFalse(omRequest.hasUserInfo());
+    Assertions.assertFalse(omRequest.hasUserInfo());
 
     OMRequest modifiedRequest =
         omBucketCreateRequest.preExecute(ozoneManager);
 
-    Assert.assertTrue(modifiedRequest.hasUserInfo());
+    Assertions.assertTrue(modifiedRequest.hasUserInfo());
 
     // Now pass modified request to OMBucketCreateRequest and check ugi and
     // remote Address.
@@ -125,9 +125,10 @@ public class TestOMClientRequestWithUserInfo {
 
     // Now check we have original user info, remote address and hostname or not.
     // Here from OMRequest user info, converted to UGI, InetAddress and String.
-    Assert.assertEquals(inetAddress.getHostAddress(),
+    Assertions.assertEquals(inetAddress.getHostAddress(),
         remoteAddress.getHostAddress());
-    Assert.assertEquals(userGroupInformation.getUserName(), ugi.getUserName());
-    Assert.assertEquals(inetAddress.getHostName(), hostName);
+    Assertions.assertEquals(userGroupInformation.getUserName(),
+        ugi.getUserName());
+    Assertions.assertEquals(inetAddress.getHostName(), hostName);
   }
 }

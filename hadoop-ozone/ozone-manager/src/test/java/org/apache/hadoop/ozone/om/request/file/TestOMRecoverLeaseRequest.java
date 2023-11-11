@@ -37,8 +37,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -47,7 +47,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -83,7 +83,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(true, true);
@@ -98,7 +98,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(true, false);
@@ -113,7 +113,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(false, true);
@@ -129,7 +129,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(false, false);
@@ -205,7 +205,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     if (hasKey) {
       assertNotNull(omKeyInfo);
     } else {
-      Assert.assertNull(omKeyInfo);
+      Assertions.assertNull(omKeyInfo);
     }
     // Entry should be deleted from openKey Table.
     String openKey = getOpenFileName();
@@ -214,7 +214,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     if (hasOpenKey) {
       assertNotNull(omKeyInfo);
     } else {
-      Assert.assertNull(omKeyInfo);
+      Assertions.assertNull(omKeyInfo);
     }
   }
 

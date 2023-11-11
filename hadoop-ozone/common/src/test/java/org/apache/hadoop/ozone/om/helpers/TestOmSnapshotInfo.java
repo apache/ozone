@@ -24,8 +24,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
 import org.apache.hadoop.util.Time;
-import org.junit.Test;
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.UUID;
 
@@ -102,7 +102,7 @@ public class TestOmSnapshotInfo {
   public void testSnapshotStatusProtoToObject() {
     OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntry =
         createSnapshotInfoProto();
-    Assert.assertEquals(SNAPSHOT_STATUS,
+    Assertions.assertEquals(SNAPSHOT_STATUS,
         SnapshotStatus.valueOf(snapshotInfoEntry.getSnapshotStatus()));
   }
 
@@ -114,32 +114,34 @@ public class TestOmSnapshotInfo {
 
     OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntryActual =
         snapshotInfo.getProtobuf();
-    Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotID(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getSnapshotID(),
         snapshotInfoEntryActual.getSnapshotID());
-    Assert.assertEquals(snapshotInfoEntryExpected.getName(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getName(),
         snapshotInfoEntryActual.getName());
-    Assert.assertEquals(snapshotInfoEntryExpected.getVolumeName(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getVolumeName(),
         snapshotInfoEntryActual.getVolumeName());
-    Assert.assertEquals(snapshotInfoEntryExpected.getBucketName(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getBucketName(),
         snapshotInfoEntryActual.getBucketName());
-    Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotStatus(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getSnapshotStatus(),
         snapshotInfoEntryActual.getSnapshotStatus());
-    Assert.assertEquals(snapshotInfoEntryExpected.getDbTxSequenceNumber(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getDbTxSequenceNumber(),
         snapshotInfoEntryActual.getDbTxSequenceNumber());
-    Assert.assertEquals(snapshotInfoEntryExpected.getDeepClean(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getDeepClean(),
         snapshotInfoEntryActual.getDeepClean());
-    Assert.assertEquals(snapshotInfoEntryExpected.getSstFiltered(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getSstFiltered(),
         snapshotInfoEntryActual.getSstFiltered());
-    Assert.assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
         snapshotInfoEntryActual.getReferencedSize());
-    Assert.assertEquals(snapshotInfoEntryExpected.getReferencedReplicatedSize(),
+    Assertions.assertEquals(
+        snapshotInfoEntryExpected.getReferencedReplicatedSize(),
         snapshotInfoEntryActual.getReferencedReplicatedSize());
-    Assert.assertEquals(snapshotInfoEntryExpected.getExclusiveSize(),
+    Assertions.assertEquals(snapshotInfoEntryExpected.getExclusiveSize(),
         snapshotInfoEntryActual.getExclusiveSize());
-    Assert.assertEquals(snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
+    Assertions.assertEquals(
+        snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
         snapshotInfoEntryActual.getExclusiveReplicatedSize());
 
-    Assert.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
+    Assertions.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
 
   @Test
@@ -150,32 +152,32 @@ public class TestOmSnapshotInfo {
 
     SnapshotInfo snapshotInfoActual = SnapshotInfo
         .getFromProtobuf(snapshotInfoEntry);
-    Assert.assertEquals(snapshotInfoExpected.getSnapshotId(),
+    Assertions.assertEquals(snapshotInfoExpected.getSnapshotId(),
         snapshotInfoActual.getSnapshotId());
-    Assert.assertEquals(snapshotInfoExpected.getName(),
+    Assertions.assertEquals(snapshotInfoExpected.getName(),
         snapshotInfoActual.getName());
-    Assert.assertEquals(snapshotInfoExpected.getVolumeName(),
+    Assertions.assertEquals(snapshotInfoExpected.getVolumeName(),
         snapshotInfoActual.getVolumeName());
-    Assert.assertEquals(snapshotInfoExpected.getBucketName(),
+    Assertions.assertEquals(snapshotInfoExpected.getBucketName(),
         snapshotInfoActual.getBucketName());
-    Assert.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
+    Assertions.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
-    Assert.assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
+    Assertions.assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
         snapshotInfoActual.getDbTxSequenceNumber());
-    Assert.assertEquals(snapshotInfoExpected.getDeepClean(),
+    Assertions.assertEquals(snapshotInfoExpected.getDeepClean(),
         snapshotInfoActual.getDeepClean());
-    Assert.assertEquals(snapshotInfoExpected.isSstFiltered(),
+    Assertions.assertEquals(snapshotInfoExpected.isSstFiltered(),
         snapshotInfoActual.isSstFiltered());
-    Assert.assertEquals(snapshotInfoExpected.getReferencedSize(),
+    Assertions.assertEquals(snapshotInfoExpected.getReferencedSize(),
         snapshotInfoActual.getReferencedSize());
-    Assert.assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),
+    Assertions.assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),
         snapshotInfoActual.getReferencedReplicatedSize());
-    Assert.assertEquals(snapshotInfoExpected.getExclusiveSize(),
+    Assertions.assertEquals(snapshotInfoExpected.getExclusiveSize(),
         snapshotInfoActual.getExclusiveSize());
-    Assert.assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
+    Assertions.assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
         snapshotInfoActual.getExclusiveReplicatedSize());
 
-    Assert.assertEquals(snapshotInfoExpected, snapshotInfoActual);
+    Assertions.assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 
   @Test
@@ -183,6 +185,6 @@ public class TestOmSnapshotInfo {
     // GMT: Sunday, July 10, 2022 7:56:55.001 PM
     long millis = 1657483015001L;
     String name = SnapshotInfo.generateName(millis);
-    Assert.assertEquals("s20220710-195655.001", name);
+    Assertions.assertEquals("s20220710-195655.001", name);
   }
 }
