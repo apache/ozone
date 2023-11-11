@@ -61,7 +61,7 @@ public class UpgradeChecker {
         return Pair.of(false,
             String.format("Execution of the %s command timeout", command));
       }
-      if (exec.exitValue() != 0) {
+      if (exec.exitValue() != 1) {
         return Pair.of(false,
             String.format("Return code of the command %s was %d", command,
                 exec.exitValue()));
