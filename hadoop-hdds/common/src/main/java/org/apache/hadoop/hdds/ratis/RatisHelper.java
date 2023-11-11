@@ -53,6 +53,7 @@ import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -497,94 +498,95 @@ public final class RatisHelper {
     log.debug("{}: {}\n  {}", name, buf, builder);
   }
 
+  static RaftPeer newRaftPeer(RaftPeer peer, RaftPeerId target) {
+    final int priority = peer.getId().equals(target) ?
+        HIGHER_PRIORITY : NEUTRAL_PRIORITY;
+    return RaftPeer.newBuilder(peer).setPriority(priority).build();
+  }
+
 
   /**
    * Use raft client to send admin request, transfer the leadership.
    * 1. Set priority and send setConfiguration request
    * 2. Trigger transferLeadership API.
    *
-   * @param raftGroup     the Raft group
+   * @param group         the Raft group
    * @param targetPeerId  the target expected leader
    */
   public static void transferRatisLeadership(ConfigurationSource conf,
-      RaftGroup raftGroup, RaftPeerId targetPeerId, GrpcTlsConfig tlsConfig)
+      RaftGroup group, RaftPeerId targetPeerId, GrpcTlsConfig tlsConfig)
       throws IOException {
-    // TODO: need a common raft client related conf.
-    try (RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
-        null, raftGroup, createRetryPolicy(conf), tlsConfig, conf)) {
-      if (raftGroup.getPeer(targetPeerId) == null) {
-        throw new IOException("Cannot choose the target leader. The expected " +
-            "leader RaftPeerId is " + targetPeerId + " and the peers are " +
-            raftGroup.getPeers().stream().map(RaftPeer::getId)
-                .collect(Collectors.toList()) + ".");
-      }
-      LOG.info("Chosen the targetLeaderId {} to transfer leadership",
-          targetPeerId);
+    if (group.getPeer(targetPeerId) == null) {
+      throw new IOException("Target " + targetPeerId + " not found in group "
+          + group.getPeers().stream().map(RaftPeer::getId)
+              .collect(Collectors.toList()) + ".");
+    }
 
-      // Set priority
-      List<RaftPeer> peersWithNewPriorities = new ArrayList<>();
-      for (RaftPeer peer : raftGroup.getPeers()) {
-        peersWithNewPriorities.add(
-            RaftPeer.newBuilder(peer)
-                .setPriority(peer.getId().equals(targetPeerId) ?
-                    HIGHER_PRIORITY : NEUTRAL_PRIORITY)
-                .build()
-        );
-      }
-      RaftClientReply reply;
-      // Set new configuration
-      reply = raftClient.admin().setConfiguration(peersWithNewPriorities);
-      if (reply.isSuccess()) {
-        LOG.info("Successfully set new priority for division: {}",
-            peersWithNewPriorities);
-      } else {
-        LOG.warn("Failed to set new priority for division: {}." +
-            " Ratis reply: {}", peersWithNewPriorities, reply);
-        throw new IOException(reply.getException());
+    LOG.info("Start transferring leadership to {}", targetPeerId);
+    try (RaftClient client = newRaftClient(SupportedRpcType.GRPC, null,
+        null, group, createRetryPolicy(conf), tlsConfig, conf)) {
+      final GroupInfoReply info = client.getGroupManagementApi(targetPeerId)
+          .info(group.getGroupId());
+      if (!info.isSuccess()) {
+        throw new IOException("Failed to get info for " + group.getGroupId()
+            + " from " + targetPeerId);
       }
 
-      // Trigger the transferLeadership
-      reply = raftClient.admin().transferLeadership(targetPeerId, 60000);
-      if (reply.isSuccess()) {
-        LOG.info("Successfully transferred leadership to {}.", targetPeerId);
-      } else {
-        LOG.warn("Failed to transfer leadership to {}. Ratis reply: {}",
-            targetPeerId, reply);
-        throw new IOException(reply.getException());
+      final RaftGroup remote = info.getGroup();
+      if (!group.equals(remote)) {
+        throw new IOException("Group mismatched: the given group " + group
+          + " and the remote group from " + targetPeerId + " are not equal."
+          + "\n Given: " + group
+          + "\n Remote: " + remote);
       }
-    } finally {
-      // Raft peers priorities need to be reset regardless of the result
-      // of transfer leadership
-      resetPriorities(conf, raftGroup, tlsConfig);
+
+      RaftClientReply setConf = null;
+      try {
+        // Set priority
+        final List<RaftPeer> peersWithNewPriorities = group.getPeers().stream()
+            .map(peer -> newRaftPeer(peer, targetPeerId))
+            .collect(Collectors.toList());
+        // Set new configuration
+        setConf = client.admin().setConfiguration(peersWithNewPriorities);
+        if (setConf.isSuccess()) {
+          LOG.info("Successfully set priority: {}", peersWithNewPriorities);
+        } else {
+          throw new IOException("Failed to set priority.",
+              setConf.getException());
+        }
+
+        // Trigger the transferLeadership
+        final RaftClientReply reply = client.admin()
+            .transferLeadership(targetPeerId, 60_000);
+        if (reply.isSuccess()) {
+          LOG.info("Successfully transferred leadership to {}.", targetPeerId);
+        } else {
+          LOG.warn("Failed to transfer leadership to {}. Ratis reply: {}",
+              targetPeerId, reply);
+          throw new IOException(reply.getException());
+        }
+      } finally {
+        // Reset peers regardless of the result of transfer leadership
+        if (setConf != null && setConf.isSuccess()) {
+          resetPriorities(remote, client);
+        }
+      }
     }
   }
 
-  private static void resetPriorities(ConfigurationSource conf,
-      RaftGroup raftGroup, GrpcTlsConfig tlsConfig) {
-    List<RaftPeer> resetPeers = new ArrayList<>();
-    for (RaftPeer peer : raftGroup.getPeers()) {
-      resetPeers.add(
-          RaftPeer.newBuilder(peer)
-              .setPriority(NEUTRAL_PRIORITY)
-              .build()
-      );
-    }
-    LOG.info("Resetting Raft peers priorities after transfer leadership");
-    try (RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
-        null, raftGroup, createRetryPolicy(conf), tlsConfig, conf)) {
-      RaftClientReply reply = raftClient.admin().setConfiguration(resetPeers);
+  private static void resetPriorities(RaftGroup original, RaftClient client) {
+    final List<RaftPeer> resetPeers = new ArrayList<>(original.getPeers());
+    LOG.info("Resetting Raft peers priorities to {}", resetPeers);
+    try {
+      RaftClientReply reply = client.admin().setConfiguration(resetPeers);
       if (reply.isSuccess()) {
-        LOG.info("Successfully reset priorities for division: {}",
-            resetPeers);
+        LOG.info("Successfully reset priorities: {}", original);
       } else {
-        LOG.warn("Failed to reset priorities for division: {}." +
-            " Ratis reply: {}", resetPeers, reply);
+        LOG.warn("Failed to reset priorities: {}, reply: {}", original, reply);
       }
     } catch (IOException e) {
-      LOG.error("Exception thrown when trying to reset priorities for " +
-              "division {}: ", resetPeers, e);
-      // Exception is not re-thrown to not mask the main transfer leadership
-      // error
+      LOG.error("Failed to reset priorities for " + original, e);
+      // Not re-thrown in order to keep the main exception, if there is any.
     }
   }
 }
