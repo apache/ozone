@@ -92,8 +92,8 @@ public final class RatisHelper {
 
   // Used for OM/SCM HA transfer leadership
   @VisibleForTesting
-  public static final int NEUTRAL_PRIORITY = 1;
-  private static final int HIGHER_PRIORITY = 2;
+  public static final int NEUTRAL_PRIORITY = 0;
+  private static final int HIGHER_PRIORITY = 1;
 
   private RatisHelper() {
   }
