@@ -575,7 +575,10 @@ public final class RatisHelper {
   }
 
   private static void resetPriorities(RaftGroup original, RaftClient client) {
-    final List<RaftPeer> resetPeers = new ArrayList<>(original.getPeers());
+    final List<RaftPeer> resetPeers = original.getPeers().stream()
+        .map(originalPeer -> RaftPeer.newBuilder(originalPeer)
+            .setPriority(NEUTRAL_PRIORITY).build())
+        .collect(Collectors.toList());
     LOG.info("Resetting Raft peers priorities to {}", resetPeers);
     try {
       RaftClientReply reply = client.admin().setConfiguration(resetPeers);
