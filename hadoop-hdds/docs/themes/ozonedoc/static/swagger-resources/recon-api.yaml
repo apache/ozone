@@ -1,3 +1,19 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 openapi: 3.0.0
 info:
   title: Ozone Recon REST API
@@ -163,6 +179,7 @@ paths:
           required: false
           schema:
             type: integer
+            default: 0
         - name: limit
           in: query
           description: Stores the limit for the number of results to fetch
@@ -176,6 +193,7 @@ paths:
           required: false
           schema:
             type: string
+            default: SCM
       responses:
         '200':
           description: Successful operation
@@ -196,6 +214,7 @@ paths:
           required: false
           schema:
             type: integer
+            default: 0
         - name: limit
           in: query
           description: Stores the limit for the number of results to fetch
@@ -220,7 +239,6 @@ paths:
         - name: prevKey
           in: query
           description: Stores the previous key after which to fetch the data.
-          example: /vol1/bucket1/key1
           required: false
           schema:
             type: string
@@ -231,6 +249,20 @@ paths:
           schema:
             type: integer
             default: 1000
+        - name: includeFso
+          in: query
+          description: Boolean value to determine whether to include FSO keys or not
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: includeNonFso
+          in: query
+          description: Boolean value to determine whether to include non-FSO keys or not
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Successful operation
@@ -248,7 +280,6 @@ paths:
         - name: prevKey
           in: query
           description: Stores the previous key after which to fetch the data.
-          example: /vol1/bucket1/key1
           required: false
           schema:
             type: string
@@ -276,7 +307,6 @@ paths:
         - name: prevKey
           in: query
           description: Stores the previous key after which to fetch the data.
-          example: /vol1/bucket1/dir1
           required: false
           schema:
             type: string
@@ -313,7 +343,6 @@ paths:
           required: false
           schema:
             type: string
-            example: /vol1/bucket1/key1
         - name: limit
           in: query
           description: Limit of the number of results returned
@@ -397,7 +426,7 @@ paths:
             type: string
         - name: files
           in: query
-          description: A boolean with a default value of false. If set to true, computes disk usage for keys under the path.
+          description: This boolean has a default value of false. When set to true, it calculates the disk usage for keys within the specified path and also provides a list of their corresponding sub-paths.
           example: true
           required: false
           schema:
@@ -553,7 +582,7 @@ paths:
             type: string
         - name: fileSize
           in: query
-          description: Filters the results based on the given file size.
+          description: Filters the results based on the given file size. The smallest file size being tracked for count is 1 KB i.e. 1024 bytes.
           example: 1024
           required: false
           schema:
@@ -565,6 +594,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/responses/FileSizeUtilization'
+  /utilization/containerCount:
+    get:
+      tags:
+        - Utilization
+      summary: Returns the container counts within the given container size. The smallest container size being tracked for count is 512 MB i.e. 512000000 bytes.
+      operationId: getContainerCounts
+      parameters:
+        - name: containerSize
+          in: query
+          description: Filters the results based on the given containerSize
+          example: 512000000
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ContainerUtilization'
   /metrics/query:
     get:
       tags:
@@ -1546,6 +1596,20 @@ components:
             bucket: bucket-3-50336,
             fileSize: 1024,
             count: 2
+    ContainerUtilization:
+      type: array
+      items:
+        type: object
+        properties:
+          containerSize:
+            type: number
+          count:
+            type: number
+      example:
+        - containerSize: 2147483648
+          count: 9
+        - containerSize: 1073741824
+          count: 3
     MetricsQuery:
       type: object
       properties:
