@@ -381,16 +381,15 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
     if (datanodeList == null) {
-      List<DatanodeDetails> orderedNodes =
+      datanodeList =
           topologyAwareRead ? pipeline.getNodesInOrder() : null;
       // if node order is not defined - use random shuffled order
-      if (orderedNodes == null || orderedNodes.isEmpty()) {
+      if (datanodeList == null || datanodeList.isEmpty()) {
         datanodeList = pipeline.getNodes();
         // Shuffle datanode list so that clients do not read in the same order
         // every time.
         Collections.shuffle(datanodeList);
-      } else {
-        datanodeList = orderedNodes;
+      } 
       }
     }
 
