@@ -185,7 +185,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <kotlin.version>1.6.21</kotlin.version>
     <metainf-services.version>1.8</metainf-services.version>
-    <picocli.version>4.6.1</picocli.version>
+    <picocli.version>4.7.5</picocli.version>
     <prometheus.version>0.7.0</prometheus.version>
     <reflections.version>0.9.11</reflections.version>
 
