@@ -582,7 +582,9 @@ paths:
             type: string
         - name: fileSize
           in: query
-          description: Filters the results based on the given file size. The smallest file size being tracked for count is 1 KB i.e. 1024 bytes.
+          description: |
+            Filters the results based on the given file size.<br>
+            The smallest file size being tracked for count is 1 KB i.e. 1024 bytes.
           example: 1024
           required: false
           schema:
@@ -598,14 +600,16 @@ paths:
     get:
       tags:
         - Utilization
-      summary: Returns the container counts within the given container size. The smallest container size being tracked for count is 512 MB i.e. 512000000 bytes.
+      summary: Returns the container counts within the given container size.
       operationId: getContainerCounts
       parameters:
         - name: containerSize
           in: query
-          description: Filters the results based on the given containerSize
+          description: |
+            Filters the results based on the given containerSize.<br>
+            The smallest container size being tracked for count is 512 MB i.e. 512000000 bytes.
           example: 512000000
-          required: true
+          required: false
           schema:
             type: number
       responses:
