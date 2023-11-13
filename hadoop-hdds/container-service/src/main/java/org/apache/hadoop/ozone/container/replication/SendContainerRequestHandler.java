@@ -84,7 +84,7 @@ class SendContainerRequestHandler
 
       // check and avoid download of container file if target already have
       // container data and import in progress
-      if (importer.isAllowedContainerImport(containerId)) {
+      if (!importer.isAllowedContainerImport(containerId)) {
         throw new StorageContainerException("Container exists or " +
             "import in progress with container Id " + containerId,
             ContainerProtos.Result.CONTAINER_EXISTS);
