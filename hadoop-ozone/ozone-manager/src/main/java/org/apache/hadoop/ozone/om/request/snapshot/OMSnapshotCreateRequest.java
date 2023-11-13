@@ -191,7 +191,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
           omResponse.build(), snapshotInfo);
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException | InvalidPathException | IllegalStateException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -254,22 +254,19 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       SnapshotChainManager snapshotChainManager =
           omMetadataManager.getSnapshotChainManager();
 
+      UUID latestPathSnapshot =
+          snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
+      UUID latestGlobalSnapshot =
+          snapshotChainManager.getLatestGlobalSnapshotId();
+
+      snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
+      snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
+
       try {
-        UUID latestPathSnapshot =
-            snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
-        UUID latestGlobalSnapshot =
-            snapshotChainManager.getLatestGlobalSnapshotId();
-
-        snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
-        snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
-
         snapshotChainManager.addSnapshot(snapshotInfo);
-
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
                 CacheValue.get(transactionLogIndex, snapshotInfo));
-      } catch (IllegalStateException illegalStateException) {
-        throw new IOException(illegalStateException);
       } catch (Exception exception) {
         // Remove snapshot from the SnapshotChainManager in case of any failure.
         // It is possible that createSnapshot request fails after snapshot gets
@@ -283,7 +280,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         // added to the SnapshotInfo table.
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
-        throw new IOException(exception);
+        throw new IOException(exception.getMessage(), exception);
       }
     }
   }
