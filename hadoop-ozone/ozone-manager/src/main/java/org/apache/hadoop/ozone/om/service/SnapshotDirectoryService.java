@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -495,6 +496,7 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
   /**
    * Stack node data for directory deep clean for snapshot.
    */
+  @SuppressFBWarnings
   public class StackNode {
     private String dirKey;
     private OmDirectoryInfo dirValue;
