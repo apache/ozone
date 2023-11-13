@@ -70,7 +70,7 @@ public class AbstractReconSqlDBTest {
   }
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
-      configurationProvider = provider;
+    configurationProvider = provider;
   }
 
   @BeforeEach
