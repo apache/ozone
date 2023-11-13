@@ -389,7 +389,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // Shuffle datanode list so that clients do not read in the same order
         // every time.
         Collections.shuffle(datanodeList);
-      } 
       }
     }
 
