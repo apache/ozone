@@ -253,10 +253,8 @@ public class TestLDBCli {
     // Check exit code. Print stderr if not expected
     Assertions.assertEquals(0, exitCode, stderr.toString());
 
-    if (exitCode == 0) {
-      // Verify stdout on success
-      Assertions.assertEquals("{  }\n", stdout.toString());
-    }
+    // Check stdout
+    Assertions.assertEquals("{  }\n", stdout.toString());
 
     // Check stderr
     Assertions.assertEquals("", stderr.toString());
