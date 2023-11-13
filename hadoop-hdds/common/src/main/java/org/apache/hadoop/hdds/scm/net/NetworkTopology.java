@@ -239,6 +239,8 @@ public interface NetworkTopology {
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
    * @param activeLen Number of active nodes at the front of the array
+   *
+   * @return list of sorted nodes if reader is not null, or empty list otherwise
    */
   List<? extends Node> sortByDistanceCost(Node reader,
       List<? extends Node> nodes, int activeLen);
