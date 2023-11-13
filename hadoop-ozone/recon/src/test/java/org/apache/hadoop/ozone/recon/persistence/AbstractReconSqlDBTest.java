@@ -46,15 +46,12 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Provider;
-import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class that provides a Recon SQL DB with all the tables created, and APIs
  * to access the DAOs easily.
  */
 public class AbstractReconSqlDBTest {
-
-  @TempDir
   private Path temporaryFolder;
 
   private Injector injector;
@@ -73,13 +70,7 @@ public class AbstractReconSqlDBTest {
   }
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
-    try {
-      temporaryFolder = Files.createTempDirectory("JunitConfig");
-      Files.createDirectory(temporaryFolder.resolve("ConfigProvider"));
       configurationProvider = provider;
-    } catch (IOException e) {
-      Assertions.fail();
-    }
   }
 
   @BeforeEach
