@@ -36,8 +36,11 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Mi
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -50,6 +53,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -76,17 +80,23 @@ public class TestRatisReplicationCheckHandler {
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
+  private ReplicationManager replicationManager;
   private int maintenanceRedundancy = 2;
 
   @BeforeEach
-  public void setup() throws IOException {
+  public void setup() throws IOException, NodeNotFoundException {
     containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
-    healthCheck = new RatisReplicationCheckHandler(containerPlacementPolicy);
+
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(Mockito.any()))
+        .thenReturn(NodeStatus.inServiceHealthy());
+    healthCheck = new RatisReplicationCheckHandler(containerPlacementPolicy,
+        replicationManager);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();
@@ -890,6 +900,89 @@ public class TestRatisReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  @Test
+  public void testExcessReplicasButNotOverReplicatedDuetoUniqueOrigins() {
+    final long sequenceID = 20;
+    final ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.QUASI_CLOSED,
+        sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        sequenceID - 1));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        sequenceID - 1));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        sequenceID - 1));
+
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.UNHEALTHY, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        sequenceID));
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  @Test
+  public void testExcessReplicasAndOverReplicatedDuetoNonUniqueOrigins() {
+    final long sequenceID = 20;
+    final ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.QUASI_CLOSED,
+        sequenceID);
+
+    UUID origin = UUID.randomUUID();
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        sequenceID - 1));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        sequenceID - 1));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.QUASI_CLOSED, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(), origin,
+        sequenceID - 1));
+
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.UNHEALTHY, 1, 1,
+        MockDatanodeDetails.randomDatanodeDetails(), origin,
+        sequenceID - 1));
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
 }
