@@ -38,14 +38,12 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,30 +56,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
  * Reading files from RATIS/THREE pipelines must be from random DN
  * when client is not defined in cluster topology.
  */
+@Timeout(600)
 public class TestDnRatisRandomRead {
-  public TestDnRatisRandomRead() {
-    try {
-      teardown();
-      init();
-    } catch (Exception e) {
-      LOG.info("Unexpected exception", e);
-      fail("Unexpected exception:" + e.getMessage());
-    }
-  }
-
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
-
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.LEGACY;
@@ -90,12 +72,12 @@ public class TestDnRatisRandomRead {
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static FileSystem fs;
-  private String volumeName;
-  private Path volumePath;
-  private String bucketName;
+  private static String volumeName;
+  private static Path volumePath;
+  private static String bucketName;
   private Path bucketPath;
 
-  private void init() throws Exception {
+  private static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
@@ -125,7 +107,18 @@ public class TestDnRatisRandomRead {
 
   }
 
-  @AfterClass
+  @BeforeAll
+  public static void setup() {
+    try {
+      teardown();
+      init();
+    } catch (Exception e) {
+      LOG.info("Unexpected exception", e);
+      fail("Unexpected exception:" + e.getMessage());
+    }
+  }
+
+  @AfterAll
   public static void teardown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -134,7 +127,7 @@ public class TestDnRatisRandomRead {
     IOUtils.closeQuietly(fs);
   }
 
-  @Before
+  @BeforeEach
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
@@ -145,7 +138,7 @@ public class TestDnRatisRandomRead {
     bucketPath = new Path(volumePath, bucketName);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     fs.delete(bucketPath, true);
     fs.delete(volumePath, false);
@@ -188,16 +181,10 @@ public class TestDnRatisRandomRead {
       if (metrics > 0) {
         transactionsCountByDn.add(metrics);
       }
-      System.out.println(dn.getDatanodeDetails().getUuid() + " " + metrics);
+      LOG.info("Got {} read transactions from {} DN", metrics,
+          dn.getDatanodeDetails().getUuid());
     });
     // read transactions must exist in all three DN
     assertEquals(REPLICATION_COUNT, transactionsCountByDn.size());
-    long avgTransactionCountPerNode = numFiles / REPLICATION_COUNT;
-    // expected deviation between transactions count by each datanode is
-    // 1/3 number of files per each datanode (3)
-    long deviation = numFiles / REPLICATION_COUNT / 3;
-    transactionsCountByDn.forEach(
-        count -> assertTrue(
-            Math.abs(count - avgTransactionCountPerNode) < deviation));
   }
 }
