@@ -23,9 +23,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.ExpectedException;
 
 /**
@@ -42,8 +42,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(ContainerReportsProto.class);
-    Assert.assertEquals(ContainerReportPublisher.class, publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
+    Assertions.assertEquals(ContainerReportPublisher.class, publisher.getClass());
+    Assertions.assertEquals(conf, publisher.getConf());
   }
 
   @Test
@@ -52,8 +52,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(NodeReportProto.class);
-    Assert.assertEquals(NodeReportPublisher.class, publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
+    Assertions.assertEquals(NodeReportPublisher.class, publisher.getClass());
+    Assertions.assertEquals(conf, publisher.getConf());
   }
 
   @Test
@@ -62,8 +62,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(CRLStatusReport.class);
-    Assert.assertEquals(CRLStatusReportPublisher.class, publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
+    Assertions.assertEquals(CRLStatusReportPublisher.class, publisher.getClass());
+    Assertions.assertEquals(conf, publisher.getConf());
   }
 
   @Test

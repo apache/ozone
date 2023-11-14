@@ -22,9 +22,9 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
@@ -51,28 +51,28 @@ public class TestDatanodeStoreCache {
     // test normal add
     cache.addDB(dbPath1, new RawDB(store1, dbPath1));
     cache.addDB(dbPath2, new RawDB(store2, dbPath2));
-    Assert.assertEquals(2, cache.size());
+    Assertions.assertEquals(2, cache.size());
 
     // test duplicate add
     cache.addDB(dbPath1, new RawDB(store1, dbPath1));
-    Assert.assertEquals(2, cache.size());
+    Assertions.assertEquals(2, cache.size());
 
     // test get, test reference the same object using ==
-    Assert.assertTrue(store1 == cache.getDB(dbPath1, conf).getStore());
+    Assertions.assertTrue(store1 == cache.getDB(dbPath1, conf).getStore());
 
     // test remove
     cache.removeDB(dbPath1);
-    Assert.assertEquals(1, cache.size());
+    Assertions.assertEquals(1, cache.size());
 
     // test remove non-exist
     try {
       cache.removeDB(dbPath1);
     } catch (Exception e) {
-      Assert.fail("Should not throw " + e);
+      Assertions.fail("Should not throw " + e);
     }
 
     // test shutdown
     cache.shutdownCache();
-    Assert.assertEquals(0, cache.size());
+    Assertions.assertEquals(0, cache.size());
   }
 }

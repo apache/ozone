@@ -35,8 +35,8 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.GroupManagementApi;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
@@ -63,7 +63,7 @@ public class TestCreatePipelineCommandHandler {
   private GroupManagementApi raftClientGroupManager;
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     ozoneContainer = Mockito.mock(OzoneContainer.class);

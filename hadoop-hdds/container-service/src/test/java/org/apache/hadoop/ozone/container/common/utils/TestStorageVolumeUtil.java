@@ -23,9 +23,9 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +34,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -58,7 +58,7 @@ public class TestStorageVolumeUtil {
   private HddsVolume.Builder hddsVolumeBuilder;
   private DbVolume.Builder dbVolumeBuilder;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     hddsVolumeBuilder = new HddsVolume.Builder(folder.newFolder().getPath())
         .datanodeUuid(DATANODE_UUID)

@@ -34,15 +34,15 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.volume.HddsVolume
     .HDDS_VOLUME_DIR;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
@@ -75,7 +75,7 @@ public class TestVolumeSet {
   @Rule
   public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     String dataDirKey = volume1 + "," + volume2;
@@ -87,7 +87,7 @@ public class TestVolumeSet {
     initializeVolumeSet();
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws IOException {
     // Delete the volume root dir
     List<StorageVolume> vols = new ArrayList<>();
@@ -221,7 +221,7 @@ public class TestVolumeSet {
 
     // Verify that volume usage can be queried during shutdown.
     for (StorageVolume volume : volumesList) {
-      Assert.assertNotNull(volume.getVolumeInfo().get()
+      Assertions.assertNotNull(volume.getVolumeInfo().get()
               .getUsageForTesting());
       volume.getAvailable();
     }

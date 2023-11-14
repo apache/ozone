@@ -25,10 +25,10 @@ import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
@@ -37,12 +37,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for {@link HddsVolumeUtil}.
@@ -58,7 +58,7 @@ public class TestHddsVolumeUtil {
   private MutableVolumeSet hddsVolumeSet;
   private MutableVolumeSet dbVolumeSet;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ContainerTestUtils.enableSchemaV3(conf);
 
@@ -86,7 +86,7 @@ public class TestHddsVolumeUtil {
         StorageVolume.VolumeType.DB_VOLUME, null);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     hddsVolumeSet.shutdown();
     dbVolumeSet.shutdown();

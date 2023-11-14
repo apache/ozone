@@ -40,19 +40,19 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 
 /**
@@ -71,7 +71,7 @@ public class TestHddsVolume {
   private HddsVolume.Builder volumeBuilder;
   private File versionFile;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     File rootDir = new File(folder.getRoot(), HddsVolume.HDDS_VOLUME_DIR);
     CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, folder.getRoot() +

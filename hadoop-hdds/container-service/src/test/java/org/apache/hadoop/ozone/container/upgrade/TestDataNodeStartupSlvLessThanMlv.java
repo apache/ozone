@@ -31,9 +31,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 
 /**
@@ -66,7 +66,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
 
     try {
       new DatanodeStateMachine(getNewDatanodeDetails(), conf);
-      Assert.fail("Expected IOException due to incorrect MLV on DataNode " +
+      Assertions.fail("Expected IOException due to incorrect MLV on DataNode " +
           "creation.");
     } catch (IOException e) {
       String expectedMessage = String.format("Metadata layout version (%s) > " +

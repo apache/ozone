@@ -61,7 +61,7 @@ import static org.mockito.Mockito.when;
 
 import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -329,7 +329,7 @@ public class TestHddsSecureDatanodeInit {
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
-    Assert.assertFalse(certId.equals(
+    Assertions.assertFalse(certId.equals(
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
@@ -369,11 +369,11 @@ public class TestHddsSecureDatanodeInit {
       String newCertId = client.getCertificate().getSerialNumber().toString();
       return newCertId.equals(certId2);
     }, 1000, CERT_LIFETIME * 1000);
-    Assert.assertFalse(client.getPrivateKey().equals(privateKey1));
-    Assert.assertFalse(client.getPublicKey().equals(publicKey1));
-    Assert.assertFalse(client.getCACertificate().getSerialNumber()
+    Assertions.assertFalse(client.getPrivateKey().equals(privateKey1));
+    Assertions.assertFalse(client.getPublicKey().equals(publicKey1));
+    Assertions.assertFalse(client.getCACertificate().getSerialNumber()
         .toString().equals(caCertId1));
-    Assert.assertFalse(client.getRootCACertificate().getSerialNumber()
+    Assertions.assertFalse(client.getRootCACertificate().getSerialNumber()
         .toString().equals(rootCaCertId1));
   }
 
@@ -404,7 +404,7 @@ public class TestHddsSecureDatanodeInit {
 
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
-    Assert.assertFalse(certId.equals(
+    Assertions.assertFalse(certId.equals(
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
@@ -412,12 +412,12 @@ public class TestHddsSecureDatanodeInit {
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(CERT_LIFETIME * 1000);
-    Assert.assertFalse(certId.equals(
+    Assertions.assertFalse(certId.equals(
         client.getCertificate().getSerialNumber().toString()));
     try {
       client.getCertificate().checkValidity();
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof CertificateExpiredException);
+      Assertions.assertTrue(e instanceof CertificateExpiredException);
     }
 
     // provide a new valid SCMGetCertResponseProto

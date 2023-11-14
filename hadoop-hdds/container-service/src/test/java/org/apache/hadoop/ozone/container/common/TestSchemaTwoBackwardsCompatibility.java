@@ -55,10 +55,10 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
@@ -75,7 +75,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTA
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -127,7 +127,7 @@ public class TestSchemaTwoBackwardsCompatibility {
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     testRoot = tempFolder.newFolder();
     conf = new OzoneConfiguration();
@@ -157,7 +157,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     when(dispatcher.getHandler(any())).thenReturn(keyValueHandler);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     BlockUtils.shutdownCache(conf);
   }
