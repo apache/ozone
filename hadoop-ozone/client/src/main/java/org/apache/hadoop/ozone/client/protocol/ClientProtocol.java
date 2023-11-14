@@ -1008,6 +1008,9 @@ public interface ClientProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
+
+  void setIsS3Request(boolean isS3Request);
+
   /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
@@ -1068,6 +1071,18 @@ public interface ClientProtocol {
    */
   void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName) throws IOException;
+
+  /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  OzoneSnapshot getSnapshotInfo(String volumeName,
+                                String bucketName,
+                                String snapshotName) throws IOException;
 
   /**
    * Create an image of the current compaction log DAG in the OM.

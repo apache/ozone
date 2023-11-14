@@ -18,7 +18,7 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' }}
+  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' && !startsWith(github.ref_name, 'dependabot') }}
 jobs:
   build-info:
     runs-on: ubuntu-20.04
@@ -474,7 +474,7 @@ jobs:
   coverage:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
-    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
+    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request' && !startsWith(github.ref_name, 'dependabot')
     needs:
       - unit
       - acceptance
@@ -482,6 +482,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Cache for maven dependencies
         uses: actions/cache@v3
         with:
@@ -501,11 +503,11 @@ jobs:
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
-      - name: Setup java 11
+      - name: Setup java 17
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: 11
+          java-version: 17
       - name: Upload coverage to Sonar
         run: ./hadoop-ozone/dev-support/checks/sonar.sh
         env:

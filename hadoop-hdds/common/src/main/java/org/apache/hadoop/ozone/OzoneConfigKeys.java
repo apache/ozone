@@ -55,8 +55,9 @@ public final class OzoneConfigKeys {
    * When set to true, allocate a random free port for ozone container,
    * so that a mini cluster is able to launch multiple containers on a node.
    *
-   * When set to false (default), container port is fixed as specified by
-   * DFS_CONTAINER_IPC_PORT_DEFAULT.
+   * When set to false (default), the container port will be specified as
+   * {@link #DFS_CONTAINER_IPC_PORT} and the default value will be specified
+   * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
    */
   public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
       "dfs.container.ipc.random.port";

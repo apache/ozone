@@ -81,6 +81,14 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
 
   private long clientID;
 
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
+
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
     return blockDataStreamOutputEntryPool.getStreamEntries();
@@ -109,7 +117,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
+      boolean unsafeByteBufferConversion,
+      boolean atomicKeyCreation
   ) {
     super(HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval()));
@@ -130,6 +139,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     // encrypted bucket.
     this.writeOffset = 0;
     this.clientID = handler.getId();
+    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -387,6 +397,12 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       if (!isException()) {
         Preconditions.checkArgument(writeOffset == offset);
       }
+      if (atomicKeyCreation) {
+        long expectedSize = blockDataStreamOutputEntryPool.getDataSize();
+        Preconditions.checkArgument(expectedSize == offset,
+            String.format("Expected: %d and actual %d write sizes do not match",
+                expectedSize, offset));
+      }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {
       blockDataStreamOutputEntryPool.cleanup();
@@ -422,6 +438,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
+    private boolean atomicKeyCreation = false;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -474,6 +491,11 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       return this;
     }
 
+    public Builder setAtomicKeyCreation(boolean atomicKey) {
+      this.atomicKeyCreation = atomicKey;
+      return this;
+    }
+
     public KeyDataStreamOutput build() {
       return new KeyDataStreamOutput(
           clientConfig,
@@ -486,7 +508,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion);
+          unsafeByteBufferConversion,
+          atomicKeyCreation);
     }
 
   }

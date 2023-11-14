@@ -224,6 +224,40 @@ public class TestOzoneClient {
     }
   }
 
+  /**
+   * This test validates that for S3G,
+   * the key upload process needs to be atomic.
+   * It simulates two mismatch scenarios where the actual write data size does
+   * not match the expected size.
+   */
+  @Test
+  public void testPutKeySizeMismatch() throws IOException {
+    String value = new String(new byte[1024], UTF_8);
+    OzoneBucket bucket = getOzoneBucket();
+    String keyName = UUID.randomUUID().toString();
+    try {
+      // Simulating first mismatch: Write less data than expected
+      client.getProxy().setIsS3Request(true);
+      OzoneOutputStream out1 = bucket.createKey(keyName,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS, ONE,
+          new HashMap<>());
+      out1.write(value.substring(0, value.length() - 1).getBytes(UTF_8));
+      Assertions.assertThrows(IllegalStateException.class, out1::close,
+          "Expected IllegalArgumentException due to size mismatch.");
+
+      // Simulating second mismatch: Write more data than expected
+      OzoneOutputStream out2 = bucket.createKey(keyName,
+          value.getBytes(UTF_8).length, ReplicationType.RATIS, ONE,
+          new HashMap<>());
+      value += "1";
+      out2.write(value.getBytes(UTF_8));
+      Assertions.assertThrows(IllegalStateException.class, out2::close,
+          "Expected IllegalArgumentException due to size mismatch.");
+    } finally {
+      client.getProxy().setIsS3Request(false);
+    }
+  }
+
   private OzoneBucket getOzoneBucket() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

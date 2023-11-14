@@ -21,9 +21,9 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
@@ -33,7 +33,7 @@ import java.io.IOException;
  */
 public class TestAuthorizerLockImpl {
 
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     // Enable debug logging for the test
     GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
@@ -58,46 +58,46 @@ public class TestAuthorizerLockImpl {
     readLockStamp = authorizerLock.tryReadLock(100);
     try {
       authorizerLock.unlockRead(readLockStamp - 1L);
-      Assert.fail("Should have thrown IllegalMonitorStateException");
+      Assertions.fail("Should have thrown IllegalMonitorStateException");
     } catch (IllegalMonitorStateException ignored) {
     }
     authorizerLock.unlockRead(readLockStamp);
     writeLockStamp = authorizerLock.tryWriteLock(100);
     try {
       authorizerLock.unlockWrite(writeLockStamp - 1L);
-      Assert.fail("Should have thrown IllegalMonitorStateException");
+      Assertions.fail("Should have thrown IllegalMonitorStateException");
     } catch (IllegalMonitorStateException ignored) {
     }
     authorizerLock.unlockWrite(writeLockStamp);
 
     // Case 2: Read lock is reentrant; Write lock is exclusive
     long readLockStamp1 = authorizerLock.tryReadLock(100);
-    Assert.assertTrue(readLockStamp1 > 0L);
+    Assertions.assertTrue(readLockStamp1 > 0L);
     long readLockStamp2 = authorizerLock.tryReadLock(100);
-    Assert.assertTrue(readLockStamp2 > 0L);
+    Assertions.assertTrue(readLockStamp2 > 0L);
 
     // Can't acquire write lock now, as read lock has been held
     long writeLockStamp1 = authorizerLock.tryWriteLock(100);
     // stamp == 0L means lock failure
-    Assert.assertEquals(0L, writeLockStamp1);
+    Assertions.assertEquals(0L, writeLockStamp1);
 
     // Release one read lock. Try again. Should fail
     authorizerLock.unlockRead(readLockStamp2);
     writeLockStamp1 = authorizerLock.tryWriteLock(100);
-    Assert.assertEquals(0L, writeLockStamp1);
+    Assertions.assertEquals(0L, writeLockStamp1);
 
     // Release the other read lock. And again. Should work
     authorizerLock.unlockRead(readLockStamp1);
     writeLockStamp1 = authorizerLock.tryWriteLock(100);
-    Assert.assertTrue(writeLockStamp1 > 0L);
+    Assertions.assertTrue(writeLockStamp1 > 0L);
 
     // But a second write lock won't work
     long writeLockStamp2 = authorizerLock.tryWriteLock(100);
-    Assert.assertEquals(0L, writeLockStamp2);
+    Assertions.assertEquals(0L, writeLockStamp2);
 
     // Read lock also won't work now that write lock is held
     readLockStamp = authorizerLock.tryReadLock(100);
-    Assert.assertEquals(0L, readLockStamp);
+    Assertions.assertEquals(0L, readLockStamp);
 
     authorizerLock.unlockWrite(writeLockStamp1);
   }
@@ -115,7 +115,7 @@ public class TestAuthorizerLockImpl {
       final Thread thread1 = new Thread(authorizerLock::unlockWriteInOMRequest);
       thread1.start();
     } catch (IOException e) {
-      Assert.fail("Should not have thrown: " + e.getMessage());
+      Assertions.fail("Should not have thrown: " + e.getMessage());
     }
   }
 
@@ -137,21 +137,21 @@ public class TestAuthorizerLockImpl {
 
     final AuthorizerLock authorizerLock = new AuthorizerLockImpl();
 
-    Assert.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
+    Assertions.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
 
     // Read lock does not affect the check
     long readLockStamp = authorizerLock.tryReadLock(100);
-    Assert.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
+    Assertions.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
     authorizerLock.unlockRead(readLockStamp);
 
     // Only a write lock acquired through InOMRequest variant affects the check
     authorizerLock.tryWriteLockInOMRequest();
-    Assert.assertTrue(authorizerLock.isWriteLockHeldByCurrentThread());
+    Assertions.assertTrue(authorizerLock.isWriteLockHeldByCurrentThread());
     authorizerLock.unlockWriteInOMRequest();
 
     // Regular write lock does not affect the check as well
     long writeLockStamp = authorizerLock.tryWriteLockThrowOnTimeout();
-    Assert.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
+    Assertions.assertFalse(authorizerLock.isWriteLockHeldByCurrentThread());
     authorizerLock.unlockWrite(writeLockStamp);
   }
 
@@ -161,20 +161,20 @@ public class TestAuthorizerLockImpl {
 
     // With no competing operations, an optimistic read should be valid.
     long stamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
-    Assert.assertTrue(authorizerLock.validateOptimisticRead(stamp));
+    Assertions.assertTrue(authorizerLock.validateOptimisticRead(stamp));
 
     // With only competing reads, an optimistic read should be valid.
     long optStamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
     long readStamp = authorizerLock.tryReadLock(100);
-    Assert.assertTrue(readStamp > 0L);
-    Assert.assertTrue(authorizerLock.validateOptimisticRead(optStamp));
+    Assertions.assertTrue(readStamp > 0L);
+    Assertions.assertTrue(authorizerLock.validateOptimisticRead(optStamp));
     authorizerLock.unlockRead(readStamp);
-    Assert.assertTrue(authorizerLock.validateOptimisticRead(optStamp));
+    Assertions.assertTrue(authorizerLock.validateOptimisticRead(optStamp));
 
     // When a write lock is held, optimistic read should time out trying to get
     // a stamp.
     long writeStamp = authorizerLock.tryWriteLockThrowOnTimeout();
-    Assert.assertThrows(IOException.class,
+    Assertions.assertThrows(IOException.class,
         authorizerLock::tryOptimisticReadThrowOnTimeout);
     authorizerLock.unlockWrite(writeStamp);
 
@@ -182,8 +182,8 @@ public class TestAuthorizerLockImpl {
     // stamp should be invalidated.
     optStamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
     writeStamp = authorizerLock.tryWriteLockThrowOnTimeout();
-    Assert.assertTrue(writeStamp > 0L);
-    Assert.assertFalse(authorizerLock.validateOptimisticRead(optStamp));
+    Assertions.assertTrue(writeStamp > 0L);
+    Assertions.assertFalse(authorizerLock.validateOptimisticRead(optStamp));
     authorizerLock.unlockWrite(writeStamp);
   }
 }

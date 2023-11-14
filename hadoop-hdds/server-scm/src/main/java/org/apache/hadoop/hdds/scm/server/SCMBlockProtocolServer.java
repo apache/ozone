@@ -24,6 +24,7 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -338,6 +339,9 @@ public class SCMBlockProtocolServer implements
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) {
     boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put("client", clientMachine);
+    auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
       Node client = null;
@@ -361,13 +365,13 @@ public class SCMBlockProtocolServer implements
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, null, ex)
+          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, auditMap, ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, null)
+            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, auditMap)
         );
       }
     }
