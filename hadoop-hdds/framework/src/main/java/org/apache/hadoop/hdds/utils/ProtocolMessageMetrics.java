@@ -38,7 +38,7 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 /**
  * Metrics to count all the subtypes of a specific message.
  */
-public class ProtocolMessageMetrics<KEY> implements MetricsSource {
+public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   private final String name;
 
@@ -126,9 +126,8 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-      counters.forEach((key, value) -> {
-      MetricsRecordBuilder builder =
-          collector.addRecord(name);
+    counters.forEach((key, value) -> {
+      MetricsRecordBuilder builder = collector.addRecord(name);
       builder.add(
           new MetricsTag(Interns.info("type", "Message type"), key.toString()));
       builder.addCounter(new MetricName("counter", "Number of distinct calls"),
