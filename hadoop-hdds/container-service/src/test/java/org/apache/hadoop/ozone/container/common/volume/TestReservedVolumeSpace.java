@@ -25,8 +25,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TemporaryFolder;
 
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
@@ -37,16 +39,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
  */
 public class TestReservedVolumeSpace {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-  @Rule
-  public TemporaryFolder temp = new TemporaryFolder();
+  @TempDir
+  public Path folder;
+  @TempDir
+  public Path temp;
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private HddsVolume.Builder volumeBuilder;
 
   @BeforeEach
   public void setup() throws Exception {
-    volumeBuilder = new HddsVolume.Builder(folder.getRoot().getPath())
+    volumeBuilder = new HddsVolume.Builder(folder.toString())
         .datanodeUuid(DATANODE_UUID)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
   }
@@ -91,7 +93,7 @@ public class TestReservedVolumeSpace {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-        folder.getRoot() + ":500B");
+        folder.toString() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
@@ -115,7 +117,7 @@ public class TestReservedVolumeSpace {
     conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     //Setting config for different volume, hence fallback happens
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-        temp.getRoot() + ":500B");
+        temp.toString() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
@@ -136,7 +138,7 @@ public class TestReservedVolumeSpace {
 
     // 500C doesn't match with any Storage Unit
     conf1.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-        folder.getRoot() + ":500C");
+        folder.toString() + ":500C");
     HddsVolume hddsVolume1 = volumeBuilder.conf(conf1).build();
 
     long reservedFromVolume1 = hddsVolume1.getVolumeInfo().get()

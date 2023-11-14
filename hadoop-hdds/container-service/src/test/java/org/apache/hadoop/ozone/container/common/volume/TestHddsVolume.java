@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Properties;
@@ -53,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TemporaryFolder;
 
 /**
@@ -65,18 +68,18 @@ public class TestHddsVolume {
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static final String RESERVED_SPACE = "100B";
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  public Path folder;
 
   private HddsVolume.Builder volumeBuilder;
   private File versionFile;
 
   @BeforeEach
   public void setup() throws Exception {
-    File rootDir = new File(folder.getRoot(), HddsVolume.HDDS_VOLUME_DIR);
-    CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, folder.getRoot() +
+    File rootDir = new File(folder.toString(), HddsVolume.HDDS_VOLUME_DIR);
+    CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED, folder.toString() +
         ":" + RESERVED_SPACE);
-    volumeBuilder = new HddsVolume.Builder(folder.getRoot().getPath())
+    volumeBuilder = new HddsVolume.Builder(folder.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
@@ -535,7 +538,7 @@ public class TestHddsVolume {
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {
-    File dbVolumeDir = folder.newFolder();
+    File dbVolumeDir = Files.createDirectory(folder.resolve("NewDir")).toFile();
     CONF.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         dbVolumeDir.getAbsolutePath());
     MutableVolumeSet dbVolumeSet = new MutableVolumeSet(DATANODE_UUID,

@@ -29,15 +29,19 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestName;
 import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
@@ -47,39 +51,28 @@ import static org.apache.hadoop.ozone.container.common.volume.TestStorageVolumeC
 /**
  * Test periodic volume checker in StorageVolumeChecker.
  */
+@Timeout(150)
 public class TestPeriodicVolumeChecker {
 
   public static final Logger LOG = LoggerFactory.getLogger(
       TestPeriodicVolumeChecker.class);
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public TestName testName = new TestName();
-
-  @Rule
-  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(150));
+  @TempDir
+  public Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
-        .getAbsolutePath());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
-        folder.newFolder().getAbsolutePath());
-  }
-
-  @AfterEach
-  public void cleanup() throws IOException {
-    FileUtils.deleteDirectory(folder.getRoot());
+        Files.createDirectory(folder.resolve("VolumeCheckerDir")).toString());
   }
 
   @Test
-  public void testPeriodicVolumeChecker() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  public void testPeriodicVolumeChecker(TestInfo testInfo) throws Exception {
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);

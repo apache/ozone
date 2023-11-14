@@ -24,13 +24,13 @@ import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -45,8 +45,10 @@ import static org.powermock.api.mockito.PowerMockito.when;
  * Test for {@link StorageVolumeUtil}.
  */
 public class TestStorageVolumeUtil {
-  @Rule
-  public final TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  public Path volumeDir;
+  @TempDir
+  public Path dbVolumeDir;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestStorageVolumeUtil.class);
@@ -60,11 +62,11 @@ public class TestStorageVolumeUtil {
 
   @BeforeEach
   public void setup() throws Exception {
-    hddsVolumeBuilder = new HddsVolume.Builder(folder.newFolder().getPath())
+    hddsVolumeBuilder = new HddsVolume.Builder(volumeDir.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    dbVolumeBuilder = new DbVolume.Builder(folder.newFolder().getPath())
+    dbVolumeBuilder = new DbVolume.Builder(dbVolumeDir.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);

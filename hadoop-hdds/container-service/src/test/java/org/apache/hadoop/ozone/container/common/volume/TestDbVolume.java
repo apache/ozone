@@ -26,10 +26,13 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -52,13 +55,13 @@ public class TestDbVolume {
   private DbVolume.Builder volumeBuilder;
   private File versionFile;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  public Path folder;
 
   @BeforeEach
   public void setup() throws Exception {
-    File rootDir = new File(folder.getRoot(), DbVolume.DB_VOLUME_DIR);
-    volumeBuilder = new DbVolume.Builder(folder.getRoot().getPath())
+    File rootDir = new File(folder.toFile(), DbVolume.DB_VOLUME_DIR);
+    volumeBuilder = new DbVolume.Builder(folder.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
@@ -161,7 +164,8 @@ public class TestDbVolume {
     File[] hddsVolumeDirs = new File[volumeNum];
     StringBuilder hddsDirs = new StringBuilder();
     for (int i = 0; i < volumeNum; i++) {
-      hddsVolumeDirs[i] = folder.newFolder();
+      hddsVolumeDirs[i] =
+          Files.createDirectory(folder.resolve("volumeDir" + i)).toFile();
       hddsDirs.append(hddsVolumeDirs[i]).append(",");
     }
     CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());

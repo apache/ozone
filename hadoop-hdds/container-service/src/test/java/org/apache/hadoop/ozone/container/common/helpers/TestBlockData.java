@@ -21,11 +21,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.junit.jupiter.api.Assertions;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,10 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests to test block deleting service.
  */
+@Timeout(10)
 public class TestBlockData {
   static final Logger LOG = LoggerFactory.getLogger(TestBlockData.class);
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(10));
 
   static ContainerProtos.ChunkInfo buildChunkInfo(String name, long offset,
       long len) {

@@ -57,9 +57,8 @@ import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -100,6 +99,7 @@ public class TestSchemaTwoBackwardsCompatibility {
   private OzoneConfiguration conf;
   private String clusterID;
   private String datanodeUuid;
+  @TempDir
   private File testRoot;
   private MutableVolumeSet volumeSet;
   private BlockManager blockManager;
@@ -124,12 +124,8 @@ public class TestSchemaTwoBackwardsCompatibility {
       new DispatcherContext.Builder()
           .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
-
   @BeforeEach
   public void setup() throws Exception {
-    testRoot = tempFolder.newFolder();
     conf = new OzoneConfiguration();
 
     clusterID = UUID.randomUUID().toString();

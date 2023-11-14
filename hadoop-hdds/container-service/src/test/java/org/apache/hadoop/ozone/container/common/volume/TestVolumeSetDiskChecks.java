@@ -68,29 +68,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
  * during initialization.
  */
+@Timeout(30)
 public class TestVolumeSetDiskChecks {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestVolumeSetDiskChecks.class);
-
-  @Rule
-  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   private OzoneConfiguration conf = null;
 

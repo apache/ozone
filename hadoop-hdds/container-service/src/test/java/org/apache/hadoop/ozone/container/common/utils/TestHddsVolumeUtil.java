@@ -27,12 +27,13 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -48,8 +49,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Test for {@link HddsVolumeUtil}.
  */
 public class TestHddsVolumeUtil {
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
+  @TempDir
+  public Path tempDir;
 
   private final String datanodeId = UUID.randomUUID().toString();
   private final String clusterId = UUID.randomUUID().toString();
@@ -66,7 +67,8 @@ public class TestHddsVolumeUtil {
     File[] hddsVolumeDirs = new File[VOLUMNE_NUM];
     StringBuilder hddsDirs = new StringBuilder();
     for (int i = 0; i < VOLUMNE_NUM; i++) {
-      hddsVolumeDirs[i] = tempDir.newFolder();
+      hddsVolumeDirs[i] =
+          Files.createDirectory(tempDir.resolve("volumeDir" + i)).toFile();
       hddsDirs.append(hddsVolumeDirs[i]).append(",");
     }
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
@@ -77,7 +79,8 @@ public class TestHddsVolumeUtil {
     File[] dbVolumeDirs = new File[VOLUMNE_NUM];
     StringBuilder dbDirs = new StringBuilder();
     for (int i = 0; i < VOLUMNE_NUM; i++) {
-      dbVolumeDirs[i] = tempDir.newFolder();
+      dbVolumeDirs[i] =
+          Files.createDirectory(tempDir.resolve("dbVolumeDir" + i)).toFile();
       dbDirs.append(dbVolumeDirs[i]).append(",");
     }
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,

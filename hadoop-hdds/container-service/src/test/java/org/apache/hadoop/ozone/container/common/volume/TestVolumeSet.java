@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
@@ -41,11 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -56,6 +53,7 @@ import java.util.UUID;
 /**
  * Tests {@link MutableVolumeSet} operations.
  */
+@Timeout(300)
 public class TestVolumeSet {
 
   private OzoneConfiguration conf;
@@ -71,9 +69,6 @@ public class TestVolumeSet {
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
   }
-
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @BeforeEach
   public void setup() throws Exception {

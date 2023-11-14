@@ -23,18 +23,15 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Assertions;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.ExpectedException;
 
 /**
  * Test cases to test ReportPublisherFactory.
  */
 public class TestReportPublisherFactory {
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
   @Test
   public void testGetContainerReportPublisher() {
@@ -70,8 +67,11 @@ public class TestReportPublisherFactory {
   public void testInvalidReportPublisher() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
-    exception.expect(RuntimeException.class);
-    exception.expectMessage("No publisher found for report");
-    factory.getPublisherFor(HddsProtos.DatanodeDetailsProto.class);
+    RuntimeException runtimeException = Assertions.assertThrows(
+        RuntimeException.class,
+        () -> factory.getPublisherFor(HddsProtos.DatanodeDetailsProto.class)
+    );
+    MatcherAssert.assertThat(runtimeException.getMessage(),
+        Matchers.containsString("No publisher found for report"));
   }
 }

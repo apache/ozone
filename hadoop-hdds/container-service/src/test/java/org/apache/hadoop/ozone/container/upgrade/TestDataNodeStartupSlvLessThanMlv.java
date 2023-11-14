@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -34,6 +36,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TemporaryFolder;
 
 /**
@@ -42,18 +45,18 @@ import org.junit.rules.TemporaryFolder;
  * software layout version.
  */
 public class TestDataNodeStartupSlvLessThanMlv {
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
+  @TempDir
+  public Path tempFolder;
 
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File datanodeSubdir = tempFolder.newFolder(DATANODE_LAYOUT_VERSION_DIR);
+    File datanodeSubdir = Files.createDirectory(
+        tempFolder.resolve(DATANODE_LAYOUT_VERSION_DIR)).toFile();
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempFolder.getRoot().getAbsolutePath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFolder.toString());
 
     // Set metadata layout version larger then software layout version.
     int largestSlv = maxLayoutVersion();

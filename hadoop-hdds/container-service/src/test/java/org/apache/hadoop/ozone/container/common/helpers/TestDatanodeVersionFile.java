@@ -23,12 +23,14 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -51,12 +53,13 @@ public class TestDatanodeVersionFile {
   private long cTime;
   private int lv;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  public Path folder;
 
   @BeforeEach
   public void setup() throws IOException {
-    versionFile = folder.newFile("Version");
+    versionFile = Files.createFile(
+        folder.resolve("VersionFile")).toFile();
     storageID = UUID.randomUUID().toString();
     clusterID = UUID.randomUUID().toString();
     datanodeUUID = UUID.randomUUID().toString();
