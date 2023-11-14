@@ -118,12 +118,12 @@ public class TestVolumeSet {
     List<StorageVolume> volumesList = volumeSet.getVolumesList();
 
     // VolumeSet initialization should add volume1 and volume2 to VolumeSet
-    assertEquals("VolumeSet intialization is incorrect",
-        volumesList.size(), volumes.size());
-    assertTrue("VolumeSet not initailized correctly",
-        checkVolumeExistsInVolumeSet(volume1));
-    assertTrue("VolumeSet not initailized correctly",
-        checkVolumeExistsInVolumeSet(volume2));
+    assertEquals(volumesList.size(), volumes.size(),
+        "VolumeSet intialization is incorrect");
+    assertTrue(checkVolumeExistsInVolumeSet(volume1),
+        "VolumeSet not initailized correctly");
+    assertTrue(checkVolumeExistsInVolumeSet(volume2),
+        "VolumeSet not initailized correctly");
   }
 
   @Test
@@ -137,8 +137,8 @@ public class TestVolumeSet {
 
     assertTrue(success);
     assertEquals(3, volumeSet.getVolumesList().size());
-    assertTrue("AddVolume did not add requested volume to VolumeSet",
-        checkVolumeExistsInVolumeSet(volume3));
+    assertTrue(checkVolumeExistsInVolumeSet(volume3),
+        "AddVolume did not add requested volume to VolumeSet");
   }
 
   @Test
@@ -151,11 +151,11 @@ public class TestVolumeSet {
     assertEquals(1, volumeSet.getVolumesList().size());
 
     // Failed volume should be added to FailedVolumeList
-    assertEquals("Failed volume not present in FailedVolumeMap",
-        1, volumeSet.getFailedVolumesList().size());
-    assertEquals("Failed Volume list did not match",
-        HddsVolumeUtil.getHddsRoot(volume1),
-        volumeSet.getFailedVolumesList().get(0).getStorageDir().getPath());
+    assertEquals(1, volumeSet.getFailedVolumesList().size(),
+        "Failed volume not present in FailedVolumeMap");
+    assertEquals(HddsVolumeUtil.getHddsRoot(volume1),
+        volumeSet.getFailedVolumesList().get(0).getStorageDir().getPath(),
+        "Failed Volume list did not match");
 
     // Failed volume should not exist in VolumeMap
     assertFalse(volumeSet.getVolumeMap().containsKey(volume1));
@@ -173,13 +173,14 @@ public class TestVolumeSet {
     // Attempting to remove a volume which does not exist in VolumeSet should
     // log a warning.
     LogCapturer logs = LogCapturer.captureLogs(
-            LoggerFactory.getLogger(MutableVolumeSet.class));
+        LoggerFactory.getLogger(MutableVolumeSet.class));
     volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
     assertEquals(1, volumeSet.getVolumesList().size());
     String expectedLogMessage = "Volume : " +
         HddsVolumeUtil.getHddsRoot(volume1) + " does not exist in VolumeSet";
-    assertTrue("Log output does not contain expected log message: "
-        + expectedLogMessage, logs.getOutput().contains(expectedLogMessage));
+    assertTrue(logs.getOutput().contains(expectedLogMessage),
+        "Log output does not contain expected log message: " +
+            expectedLogMessage);
   }
 
   @Test
@@ -193,7 +194,7 @@ public class TestVolumeSet {
     File newVolume = new File(volume3, HDDS_VOLUME_DIR);
     System.out.println("new volume root: " + newVolume);
     newVolume.mkdirs();
-    assertTrue("Failed to create new volume root", newVolume.exists());
+    assertTrue(newVolume.exists(), "Failed to create new volume root");
     File dataDir = new File(newVolume, "chunks");
     dataDir.mkdirs();
     assertTrue(dataDir.exists());
@@ -205,8 +206,8 @@ public class TestVolumeSet {
 
     assertFalse(success);
     assertEquals(2, volumeSet.getVolumesList().size());
-    assertTrue("AddVolume should fail for an inconsistent volume",
-        !checkVolumeExistsInVolumeSet(volume3));
+    assertFalse(checkVolumeExistsInVolumeSet(volume3), "AddVolume should fail" +
+        " for an inconsistent volume");
 
     // Delete volume3
     File volume = new File(volume3);

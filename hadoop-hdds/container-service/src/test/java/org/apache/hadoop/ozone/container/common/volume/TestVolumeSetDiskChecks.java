@@ -56,10 +56,13 @@ import org.apache.hadoop.util.Timer;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
+
 import static org.hamcrest.CoreMatchers.is;
+
+import org.hamcrest.MatcherAssert;
 import org.junit.jupiter.api.AfterEach;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -67,7 +70,6 @@ import static org.mockito.Mockito.when;
 import org.junit.jupiter.api.Assertions;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -118,8 +120,9 @@ public class TestVolumeSetDiskChecks {
         new MutableVolumeSet(UUID.randomUUID().toString(), conf,
             null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
-    assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
-    assertThat(volumeSet.getFailedVolumesList().size(), is(0));
+    MatcherAssert.assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
+    MatcherAssert.assertThat(
+        volumeSet.getFailedVolumesList().size(), is(0));
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(

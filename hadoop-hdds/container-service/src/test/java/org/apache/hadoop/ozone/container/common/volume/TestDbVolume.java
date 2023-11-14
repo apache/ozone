@@ -76,16 +76,16 @@ public class TestDbVolume {
     assertEquals(StorageType.DEFAULT, volume.getStorageType());
     assertEquals(HddsVolume.VolumeState.NOT_FORMATTED,
         volume.getStorageState());
-    assertFalse("Version file should not be created when clusterID is not " +
-        "known.", versionFile.exists());
+    assertFalse(versionFile.exists(), "Version file should not be created " +
+        "when clusterID is not known.");
 
     // Format the volume with clusterID.
     volume.format(CLUSTER_ID);
 
     // The state of HddsVolume after formatting with clusterID should be
     // NORMAL and the version file should exist.
-    assertTrue("Volume format should create Version file",
-        versionFile.exists());
+    assertTrue(versionFile.exists(),
+        "Volume format should create Version file");
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
     assertEquals(0, volume.getHddsVolumeIDs().size());
@@ -102,8 +102,8 @@ public class TestDbVolume {
     assertEquals(StorageType.DEFAULT, volume.getStorageType());
     assertEquals(HddsVolume.VolumeState.NOT_FORMATTED,
         volume.getStorageState());
-    assertFalse("Version file should not be created when clusterID is not " +
-        "known.", versionFile.exists());
+    assertFalse(versionFile.exists(), "Version file should not be created " +
+        "when clusterID is not known.");
 
     // Format the volume with clusterID.
     volume.format(CLUSTER_ID);

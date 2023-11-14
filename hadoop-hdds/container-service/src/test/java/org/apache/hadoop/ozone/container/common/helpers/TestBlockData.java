@@ -102,8 +102,8 @@ public class TestBlockData {
   static void assertChunks(List<ContainerProtos.ChunkInfo> expected,
       BlockData computed) {
     final List<ContainerProtos.ChunkInfo> computedChunks = computed.getChunks();
-    Assertions.assertEquals("expected=" + expected + "\ncomputed=" +
-        computedChunks, expected, computedChunks);
+    Assertions.assertEquals(expected, computedChunks,
+        "expected=" + expected + "\ncomputed=" + computedChunks);
     Assertions.assertEquals(expected.stream().mapToLong(i -> i.getLen()).sum(),
         computed.getSize());
   }

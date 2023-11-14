@@ -89,8 +89,8 @@ public class TestHandler {
     Handler kvHandler = dispatcher.getHandler(
         ContainerProtos.ContainerType.KeyValueContainer);
 
-    Assertions.assertTrue("getHandlerForContainerType returned incorrect handler",
-        (kvHandler instanceof KeyValueHandler));
+    Assertions.assertTrue((kvHandler instanceof KeyValueHandler),
+        "getHandlerForContainerType returned incorrect handler");
   }
 
   @Test
@@ -100,11 +100,11 @@ public class TestHandler {
     ContainerProtos.ContainerType invalidContainerType =
         ContainerProtos.ContainerType.forNumber(2);
 
-    Assertions.assertEquals("New ContainerType detected. Not an invalid " +
-        "containerType", invalidContainerType, null);
+    Assertions.assertNull(invalidContainerType,
+        "New ContainerType detected. Not an invalid containerType");
 
     Handler dispatcherHandler = dispatcher.getHandler(invalidContainerType);
-    Assertions.assertEquals("Get Handler for Invalid ContainerType should " +
-        "return null.", dispatcherHandler, null);
+    Assertions.assertNull(dispatcherHandler,
+        "Get Handler for Invalid ContainerType should return null.");
   }
 }

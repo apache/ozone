@@ -91,7 +91,8 @@ public class TestKeyValueContainerIntegrityChecks {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before public void setUp() throws Exception {
+  @BeforeEach
+  public void setUp() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
@@ -103,7 +104,8 @@ public class TestKeyValueContainerIntegrityChecks {
     chunkManager = containerLayoutTestInfo.createChunkManager(true, null);
   }
 
-  @After public void teardown() {
+  @AfterEach
+  public void teardown() {
     BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
