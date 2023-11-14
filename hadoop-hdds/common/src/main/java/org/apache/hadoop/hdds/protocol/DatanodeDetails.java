@@ -141,6 +141,7 @@ public class DatanodeDetails extends NodeImpl implements
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
     super(datanodeDetails.getHostName(), datanodeDetails.getNetworkLocation(),
+        datanodeDetails.getParent(), datanodeDetails.getLevel(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
     this.uuidString = uuid.toString();
