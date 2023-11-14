@@ -206,7 +206,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <stax2.version>4.2.1</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.annotation.version>1.3.5</jakarta.annotation.version>
-    <joda.time.version>2.10.6</joda.time.version>
+    <joda.time.version>2.12.5</joda.time.version>
 
     <compile-testing.version>0.19</compile-testing.version>
     <errorprone-annotations.version>2.2.0</errorprone-annotations.version>
