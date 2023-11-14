@@ -2949,7 +2949,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-            ACLType.LIST, volumeName, bucketName, null);
+            ACLType.READ, volumeName, bucketName, null);
       }
       SnapshotInfo snapshotInfo =
           metadataManager.getSnapshotInfo(volumeName, bucketName, snapshotName);
