@@ -138,7 +138,8 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setOzoneManagerRatisSnapShot(OzoneManagerRatisSnapshot omrs) {
+    public Builder setOzoneManagerRatisSnapShot(
+        OzoneManagerRatisSnapshot omrs) {
       this.rs = omrs;
       return this;
     }

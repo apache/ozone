@@ -22,13 +22,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ozone.om.S3InMemoryCache;
 import org.apache.hadoop.ozone.om.S3SecretCache;
 
-import java.time.temporal.ChronoUnit;
-
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.CACHE_MAX_SIZE;
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_MAX_SIZE;
-
 /**
  * Provider of {@link S3SecretCache}.
  */

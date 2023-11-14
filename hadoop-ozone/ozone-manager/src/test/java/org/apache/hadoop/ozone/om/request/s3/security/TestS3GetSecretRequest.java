@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import io.grpc.Status;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;

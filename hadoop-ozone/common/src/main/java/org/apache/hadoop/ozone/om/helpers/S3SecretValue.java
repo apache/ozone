@@ -75,8 +75,8 @@ public class S3SecretValue {
     return isDeleted;
   }
 
-  public void setDeleted(boolean isDeleted) {
-    this.isDeleted = isDeleted;
+  public void setDeleted(boolean status) {
+    this.isDeleted = status;
   }
 
   public String getAwsAccessKey() {

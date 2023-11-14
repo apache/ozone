@@ -104,8 +104,8 @@ public class S3RevokeSecretRequest extends OMClientRequest {
                   omResponse.setStatus(Status.OK).build());
             } else {
               LOG.info(
-                  "Secret for {} doesn't exist in table hence cannot invalidate it.",
-                  kerberosID);
+                  "Secret for {} doesn't exist in table hence cannot" +
+                      " invalidate it", kerberosID);
               return new S3RevokeSecretResponse(null,
                   s3SecretManager,
                   omResponse.setStatus(Status.S3_SECRET_NOT_FOUND).build());
