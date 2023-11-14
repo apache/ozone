@@ -48,22 +48,27 @@ all_tests_in_immediate_child_dirs() {
 ## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" || echo "")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
-       if [[ -n "${untagged}" ]]; then
-         tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
-       fi
-     fi
+      untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
+      if [[ -n "${untagged}" ]]; then
+        tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
+      fi
+    fi
 
     if [[ -z "${tests}" ]]; then
-       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
-       exit 1
+      echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
+      exit 1
     fi
   elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
-    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
+
+    if [[ -z "${tests}" ]]; then
+      echo "No tests found for filter ${OZONE_TEST_SELECTOR}"
+      exit 1
+    fi
   else
     tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
@@ -542,4 +547,27 @@ wait_for_datanode() {
     echo "SECONDS: $SECONDS"
   done
   echo "WARNING: $datanode is still not $state"
+}
+
+
+## @description wait for n root certificates
+wait_for_root_certificate(){
+  local container=$1
+  local timeout=$2
+  local count=$3
+  local command="ozone admin cert list --role=scm -c 100 | grep -v "scm-sub" | grep "scm" | wc -l"
+
+  #Reset the timer
+  SECONDS=0
+  while [[ $SECONDS -lt $timeout ]]; do
+    cert_number=`docker-compose exec -T $container /bin/bash -c "$command"`
+    if [[ $cert_number -eq $count ]]; then
+      echo "$count root certificates are found"
+      return
+    fi
+      echo "$count root certificates are not found yet"
+      sleep 1
+  done
+  echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
+  return 1
 }

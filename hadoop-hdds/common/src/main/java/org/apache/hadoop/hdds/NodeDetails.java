@@ -27,7 +27,7 @@ import java.net.InetSocketAddress;
  */
 public abstract class NodeDetails {
   private String serviceId;
-  private String nodeId;
+  private final String nodeId;
   private String hostAddress;
   private int rpcPort;
   private int ratisPort;
@@ -74,6 +74,10 @@ public abstract class NodeDetails {
 
   public String getNodeId() {
     return nodeId;
+  }
+
+  public String threadNamePrefix() {
+    return HddsUtils.threadNamePrefix(nodeId);
   }
 
   public InetSocketAddress getRpcAddress() {

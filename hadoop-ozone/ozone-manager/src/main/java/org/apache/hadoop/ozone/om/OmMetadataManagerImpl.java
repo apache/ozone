@@ -1486,6 +1486,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
           cacheIterator.next();
       omVolumeArgs = entry.getValue().getCacheValue();
+      if (omVolumeArgs == null) {
+        continue;
+      }
       volumeName = omVolumeArgs.getVolume();
 
       if (!prefixIsEmpty && !volumeName.startsWith(prefix)) {
@@ -2165,5 +2168,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
     return result;
+  }
+
+  @Override
+  public boolean containsIncompleteMPUs(String volume, String bucket)
+      throws IOException {
+    String keyPrefix =
+        OmMultipartUpload.getDbKey(volume, bucket, "");
+
+    // First check in table cache
+    if (isKeyPresentInTableCache(keyPrefix, multipartInfoTable)) {
+      return true;
+    }
+
+    // Check in table
+    if (isKeyPresentInTable(keyPrefix, multipartInfoTable)) {
+      return true;
+    }
+
+    return false;
   }
 }

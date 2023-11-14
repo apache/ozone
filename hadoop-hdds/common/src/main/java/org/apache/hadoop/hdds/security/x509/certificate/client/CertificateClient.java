@@ -262,7 +262,6 @@ public interface CertificateClient extends Closeable {
   enum InitResponse {
     SUCCESS,
     FAILURE,
-    GETCERT,
-    RECOVER
+    GETCERT
   }
 }

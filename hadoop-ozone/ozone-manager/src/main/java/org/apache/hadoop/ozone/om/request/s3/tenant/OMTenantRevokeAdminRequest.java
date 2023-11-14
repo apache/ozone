@@ -45,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -164,7 +165,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
 
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
 
     String volumeName = null;
 
@@ -206,11 +207,11 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       omClientResponse = new OMTenantRevokeAdminResponse(omResponse.build(),
           accessId, newOmDBAccessIdInfo);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeAdminResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

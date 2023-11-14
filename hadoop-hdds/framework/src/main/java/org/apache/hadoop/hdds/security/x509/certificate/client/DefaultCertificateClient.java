@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -121,6 +120,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String caCertId;
   private String rootCaCertId;
   private String component;
+  private final String threadNamePrefix;
   private List<String> pemEncodedCACerts = null;
   private Lock pemEncodedCACertsLock = new ReentrantLock();
   private KeyStoresFactory serverKeyStoresFactory;
@@ -133,12 +133,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private final Set<CertificateNotification> notificationReceivers;
   private RootCaRotationPoller rootCaRotationPoller;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected DefaultCertificateClient(
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
       Logger log,
       String certSerialId,
       String component,
+      String threadNamePrefix,
       Consumer<String> saveCertId,
       Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
@@ -148,6 +150,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
     this.component = component;
+    this.threadNamePrefix = threadNamePrefix;
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
@@ -193,10 +196,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  protected String threadNamePrefix() {
+    return threadNamePrefix;
+  }
+
   private void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
-          new HashSet<>(rootCaCertificates), scmSecurityClient);
+          new HashSet<>(rootCaCertificates), scmSecurityClient,
+          threadNamePrefix);
       rootCaRotationPoller.addRootCARotationProcessor(
           this::getRootCaRotationListener);
       rootCaRotationPoller.run();
@@ -405,39 +413,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
     } else {
       // case before certificate bundle is supported
-      X509Certificate lastInsertedCert = getCertificate();
-      chain.add(lastInsertedCert);
-      List<X509Certificate> caCertList =
-          OzoneSecurityUtil.convertToX509(listCA());
-      Set<X509Certificate> rootCaCertList = getAllRootCaCerts();
-      while (!rootCaCertList.isEmpty() &&
-          !rootCaCertList.contains(lastInsertedCert)) {
-        Optional<X509Certificate> issuerOpt =
-            getIssuerForCert(lastInsertedCert, caCertList);
-        if (issuerOpt.isPresent()) {
-          X509Certificate issuer = issuerOpt.get();
-          chain.add(issuer);
-          lastInsertedCert = issuer;
-        } else {
-          throw new CertificateException("No issuer found for certificate: " +
-              lastInsertedCert);
-        }
+      X509Certificate cert = getCertificate();
+      if (cert != null) {
+        chain.add(getCertificate());
       }
-      //add root ca to the cert chain at the end
-      chain.add(lastInsertedCert);
+      cert = getCACertificate();
+      if (cert != null) {
+        chain.add(getCACertificate());
+      }
+      cert = getRootCACertificate();
+      if (cert != null) {
+        chain.add(cert);
+      }
+      Preconditions.checkState(chain.size() > 0, "Empty trust chain");
     }
     return chain;
-  }
-
-  private Optional<X509Certificate> getIssuerForCert(X509Certificate cert,
-      Iterable<X509Certificate> issuerCerts) {
-    for (X509Certificate issuer : issuerCerts) {
-      if (cert.getIssuerX500Principal().equals(
-          issuer.getSubjectX500Principal())) {
-        return Optional.of(issuer);
-      }
-    }
-    return Optional.empty();
   }
 
   public synchronized CertPath getCACertPath() {
@@ -575,7 +565,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
             .setConfiguration(securityConfig)
-            .addInetAddresses();
+            .addInetAddresses()
+            .setDigitalEncryption(true)
+            .setDigitalSignature(true);
     return builder;
   }
 
@@ -1303,8 +1295,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         securityConfig.getCertificateLocation(getComponentName())));
   }
 
-  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
-      throws IOException {
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
   }
 
@@ -1336,8 +1327,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     if (executorService == null) {
       executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-CertificateRenewerService")
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix + getComponentName()
+                  + "-CertificateRenewerService")
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(

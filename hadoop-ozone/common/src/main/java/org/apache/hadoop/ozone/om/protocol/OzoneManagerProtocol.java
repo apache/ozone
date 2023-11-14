@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OmTenantArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -911,6 +912,23 @@ public interface OzoneManagerProtocol
                                    String startKey, long numEntries,
                                    boolean allowPartialPrefixes)
       throws IOException;
+
+  /**
+   * Lightweight listStatus API.
+   *
+   * @param keyArgs    Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @return list of file status
+   */
+  List<OzoneFileStatusLight> listStatusLight(OmKeyArgs keyArgs,
+      boolean recursive, String startKey, long numEntries,
+      boolean allowPartialPrefixes) throws IOException;
 
   /**
    * Add acl for Ozone object. Return true if acl is added successfully else

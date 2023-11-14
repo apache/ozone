@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class ScmConfigKeys {
+  public static final String OZONE_SCM_HA_PREFIX = "ozone.scm.ha";
 
   // Location of SCM DB files. For now we just support a single
   // metadata dir but in future we may support multiple for redundancy or

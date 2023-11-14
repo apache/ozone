@@ -89,7 +89,8 @@ public class TestPeriodicVolumeChecker {
 
     FakeTimer timer = new FakeTimer();
 
-    StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer);
+    StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer,
+        "");
 
     try {
       volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(

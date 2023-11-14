@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -116,8 +117,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
             ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId(),
-            ozoneManager.getMetrics());
+            ozoneManager.isGrpcBlockTokenEnabled(),
+            ozoneManager.getOMServiceId(), ozoneManager.getMetrics());
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -177,7 +178,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
 
     OmKeyInfo openKeyInfo = null;
-    IOException exception = null;
+    Exception exception = null;
     OmBucketInfo omBucketInfo = null;
     boolean acquiredLock = false;
 
@@ -244,13 +245,13 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
-            "Exception:{}", volumeName, bucketName, openKeyName, exception);
+          "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

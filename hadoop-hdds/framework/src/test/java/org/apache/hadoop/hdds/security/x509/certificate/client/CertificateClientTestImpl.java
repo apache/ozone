@@ -146,7 +146,8 @@ public class CertificateClientTestImpl implements CertificateClient {
             Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
             Date.from(start.plus(Duration.parse(certDuration))
                 .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build(), "scm1", "cluster1");
+            csrBuilder.build(), "scm1", "cluster1",
+            String.valueOf(System.nanoTime()));
     x509Certificate =
         new JcaX509CertificateConverter().getCertificate(certificateHolder);
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
@@ -337,7 +338,8 @@ public class CertificateClientTestImpl implements CertificateClient {
         approver.sign(securityConfig, rootKeyPair.getPrivate(),
             new X509CertificateHolder(rootCert.getEncoded()), start,
             new Date(start.getTime() + certDuration.toMillis()),
-            csrBuilder.build(), "scm1", "cluster1");
+            csrBuilder.build(), "scm1", "cluster1",
+            String.valueOf(System.nanoTime()));
     X509Certificate newX509Certificate =
         new JcaX509CertificateConverter().getCertificate(certificateHolder);
 

@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -42,7 +43,6 @@ import java.util.stream.Collectors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
@@ -57,7 +57,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
-import org.apache.hadoop.hdds.utils.ResourceLimitCache;
+import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -186,10 +186,13 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final CSMMetrics metrics;
 
   @SuppressWarnings("parameternumber")
-  public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
+  public ContainerStateMachine(RaftGroupId gid,
+      ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
-      XceiverServerRatis ratisServer, ConfigurationSource conf) {
+      XceiverServerRatis ratisServer,
+      ConfigurationSource conf,
+      String threadNamePrefix) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -197,18 +200,20 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    int numPendingRequests = conf
-        .getObject(DatanodeRatisServerConfig.class)
-        .getLeaderNumPendingRequests();
     long pendingRequestsBytesLimit = (long)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    int pendingRequestsMegaBytesLimit =
-        HddsUtils.roundupMb(pendingRequestsBytesLimit);
-    stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] {1, HddsUtils.roundupMb(data.size())},
-        numPendingRequests, pendingRequestsMegaBytesLimit);
+    // cache with FIFO eviction, and if element not found, this needs
+    // to be obtained from disk for slow follower
+    stateMachineDataCache = new ResourceCache<>(
+        (index, data) -> ((ByteString)data).size(),
+        pendingRequestsBytesLimit,
+        (p) -> {
+          if (p.wasEvicted()) {
+            metrics.incNumEvictedCacheCount();
+          }
+        });
 
     this.chunkExecutors = chunkExecutors;
 
@@ -225,10 +230,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
 
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(
+            threadNamePrefix + "ContainerOp-" + gid.getUuid() + "-%d")
+        .build();
     this.executor = Executors.newFixedThreadPool(numContainerOpExecutors,
-        new ThreadFactoryBuilder()
-            .setNameFormat("ContainerOp-" + gid.getUuid() + "-%d")
-            .build());
+        threadFactory);
 
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();

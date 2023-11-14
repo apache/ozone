@@ -74,7 +74,9 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.SlowTest;
 import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Slow;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -162,7 +164,6 @@ public class TestOmSnapshot {
   private static boolean disableNativeDiff;
   private static ObjectStore store;
   private static OzoneManager ozoneManager;
-  private static RDBStore rdbStore;
   private static OzoneBucket ozoneBucket;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(500);
   private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(10);
@@ -257,21 +258,26 @@ public class TestOmSnapshot {
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
     ozoneManager = cluster.getOzoneManager();
-    rdbStore = (RDBStore) ozoneManager.getMetadataManager().getStore();
 
     store = client.getObjectStore();
     writeClient = store.getClientProxy().getOzoneManagerClient();
 
-    KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
-        .getInternalState(ozoneManager, "keyManager");
-    counter = new AtomicInteger(0);
-    // stop the deletion services so that keys can still be read
-    keyManager.stop();
+    stopKeyManager();
 //    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
 
+  private static void stopKeyManager() throws IOException {
+    KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+        .getInternalState(ozoneManager, "keyManager");
+    // stop the deletion services so that keys can still be read
+    keyManager.stop();
+  }
+
+  private static RDBStore getRdbStore() {
+    return (RDBStore) ozoneManager.getMetadataManager().getStore();
+  }
 
   private static void preFinalizationChecks() throws Exception {
     // None of the snapshot APIs is usable before the upgrade finalization step
@@ -634,9 +640,14 @@ public class TestOmSnapshot {
 
   private OmKeyInfo getOmKeyInfo(String volume, String bucket,
                                  String key) throws IOException {
+    ResolvedBucket resolvedBucket = new ResolvedBucket(volume, bucket,
+        volume, bucket, "", bucketLayout);
     return cluster.getOzoneManager().getKeyManager()
-            .getKeyInfo(new OmKeyArgs.Builder().setVolumeName(volume)
-            .setBucketName(bucket).setKeyName(key).build(), null);
+            .getKeyInfo(new OmKeyArgs.Builder()
+                .setVolumeName(volume)
+                .setBucketName(bucket)
+                .setKeyName(key).build(),
+                resolvedBucket, null);
   }
 
   /**
@@ -1054,6 +1065,45 @@ public class TestOmSnapshot {
           SnapshotDiffReportOzone.getDiffReportEntry(
               SnapshotDiffReport.DiffType.CREATE, "dir1"));
     }
+    Assert.assertEquals(diff.getDiffList(), diffEntries);
+  }
+
+  /**
+   * Testing scenario:
+   * 1) Key k1 is created.
+   * 2) Snapshot snap1 created.
+   * 3) Dir dir1/dir2 is created.
+   * 4) Key k1 is renamed to key dir1/dir2/k1_renamed
+   * 5) Dir dir1 is deleted.
+   * 6) Snapshot snap2 created.
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 1 delete key entry.
+   */
+  @Test
+  public void testSnapDiffWithDirectoryDelete() throws Exception {
+    Assume.assumeTrue(bucketLayout.isFileSystemOptimized());
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+    String snap1 = "snap1";
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    bucket.createDirectory("dir1/dir2");
+    String key1Renamed = "dir1/dir2/" + key1 + "_renamed";
+    bucket.renameKey(key1, key1Renamed);
+    bucket.deleteDirectory("dir1", true);
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> diffEntries = Lists.newArrayList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.DELETE, key1));
     Assert.assertEquals(diff.getDiffList(), diffEntries);
   }
 
@@ -1887,20 +1937,20 @@ public class TestOmSnapshot {
   private static List<LiveFileMetaData> getKeyTableSstFiles()
       throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
-      return rdbStore.getDb().getSstFileList().stream().filter(
+      return getRdbStore().getDb().getSstFileList().stream().filter(
           x -> new String(x.columnFamilyName(), UTF_8).equals(
               OmMetadataManagerImpl.KEY_TABLE)).collect(Collectors.toList());
     }
-    return rdbStore.getDb().getSstFileList().stream().filter(
+    return getRdbStore().getDb().getSstFileList().stream().filter(
         x -> new String(x.columnFamilyName(), UTF_8).equals(
             OmMetadataManagerImpl.FILE_TABLE)).collect(Collectors.toList());
   }
 
   private static void flushKeyTable() throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
-      rdbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+      getRdbStore().getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
     } else {
-      rdbStore.getDb().flush(OmMetadataManagerImpl.FILE_TABLE);
+      getRdbStore().getDb().flush(OmMetadataManagerImpl.FILE_TABLE);
     }
   }
 
@@ -2008,6 +2058,7 @@ public class TestOmSnapshot {
     // Restart the OM and wait for sometime to make sure that previous snapDiff
     // job finishes.
     cluster.restartOzoneManager();
+    stopKeyManager();
     await().atMost(Duration.ofSeconds(120)).
         until(() -> cluster.getOzoneManager().isRunning());
 
@@ -2052,6 +2103,7 @@ public class TestOmSnapshot {
     // Restart the OM and no need to wait because snapDiff job finished before
     // the restart.
     cluster.restartOzoneManager();
+    stopKeyManager();
     await().atMost(Duration.ofSeconds(120)).
         until(() -> cluster.getOzoneManager().isRunning());
 
@@ -2099,8 +2151,7 @@ public class TestOmSnapshot {
   public void testCompactionDagDisableForSnapshotMetadata() throws Exception {
     String snapshotName = createSnapshot(volumeName, bucketName);
 
-    RDBStore activeDbStore =
-        (RDBStore) cluster.getOzoneManager().getMetadataManager().getStore();
+    RDBStore activeDbStore = getRdbStore();
     // RocksDBCheckpointDiffer should be not null for active DB store.
     assertNotNull(activeDbStore.getRocksDBCheckpointDiffer());
     assertEquals(2,  activeDbStore.getDbOptions().listeners().size());
@@ -2117,6 +2168,7 @@ public class TestOmSnapshot {
   }
 
   @Test
+  @Category(SlowTest.class) @Slow("HDDS-9299")
   public void testDayWeekMonthSnapshotCreationAndExpiration() throws Exception {
     String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
     String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);

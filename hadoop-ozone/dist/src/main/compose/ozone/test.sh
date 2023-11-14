@@ -48,6 +48,8 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
+execute_robot_test scm debug/ozone-debug-lease-recovery.robot
+
 execute_robot_test scm -v USERNAME:httpfs httpfs
 execute_debug_tests
 

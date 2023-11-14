@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -165,7 +166,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    IOException exception = null;
+    Exception exception = null;
 
     try {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
@@ -191,12 +192,12 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
               omResponse.setGetDelegationTokenResponse(
                   updateGetDelegationTokenRequest
                       .getGetDelegationTokenResponse()).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in Updating DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
       exception = ex;
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

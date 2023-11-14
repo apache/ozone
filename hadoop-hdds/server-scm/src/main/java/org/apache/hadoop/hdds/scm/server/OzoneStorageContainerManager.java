@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -58,4 +59,6 @@ public interface OzoneStorageContainerManager {
   InetSocketAddress getDatanodeRpcAddress();
 
   SCMNodeDetails getScmNodeDetails();
+
+  ReconfigurationHandler getReconfigurationHandler();
 }

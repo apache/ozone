@@ -26,11 +26,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,23 +39,17 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addBucketToDB;
 
 /**
- * Tests OMOpenKeysDeleteResponse.
+ * Tests the OM Response when open keys are deleted.
  */
-@RunWith(Parameterized.class)
 public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   private static final long KEY_LENGTH = 100;
-  private final BucketLayout bucketLayout;
-
-  public TestOMOpenKeysDeleteResponse(BucketLayout bucketLayout) {
-    this.bucketLayout = bucketLayout;
-  }
+  private BucketLayout bucketLayout;
 
   @Override
   public BucketLayout getBucketLayout() {
     return bucketLayout;
   }
 
-  @Parameters
   public static Collection<BucketLayout> bucketLayouts() {
     return Arrays.asList(
         BucketLayout.DEFAULT,
@@ -69,8 +61,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * Tests deleting a subset of keys from the open key table DB when the keys
    * have no associated block data.
    */
-  @Test
-  public void testAddToDBBatchWithEmptyBlocks() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testAddToDBBatchWithEmptyBlocks(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
@@ -81,16 +76,16 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     for (String key: keysToDelete.keySet()) {
       // open keys with no associated block data should have been removed
       // from the open key table, but not added to the deleted table.
-      Assert.assertFalse(
+      Assertions.assertFalse(
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
+      Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
 
     for (String key: keysToKeep.keySet()) {
       // These keys should not have been removed from the open key table.
-      Assert.assertTrue(
+      Assertions.assertTrue(
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
+      Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
   }
 
@@ -98,8 +93,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * Tests deleting a subset of keys from the open key table DB when the keys
    * have associated block data.
    */
-  @Test
-  public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testAddToDBBatchWithNonEmptyBlocks(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
@@ -112,22 +110,23 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     for (Map.Entry<String, OmKeyInfo> entry: keysToDelete.entrySet()) {
       // These keys should have been moved from the open key table to the
       // delete table.
-      Assert.assertFalse(
+      Assertions.assertFalse(
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
               entry.getKey()));
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
           entry.getValue().getObjectID(), entry.getKey());
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(deleteKey));
+      Assertions.assertTrue(omMetadataManager.getDeletedTable()
+          .isExist(deleteKey));
     }
 
     for (Map.Entry<String, OmKeyInfo> entry: keysToKeep.entrySet()) {
       // These keys should not have been moved out of the open key table.
-      Assert.assertTrue(
+      Assertions.assertTrue(
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
               entry.getKey()));
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
           entry.getValue().getObjectID(), entry.getKey());
-      Assert.assertFalse(omMetadataManager.getDeletedTable()
+      Assertions.assertFalse(omMetadataManager.getDeletedTable()
           .isExist(deleteKey));
     }
   }
@@ -137,8 +136,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * submitted response has an error status. In this case, no changes to the
    * DB should be made.
    */
-  @Test
-  public void testAddToDBBatchWithErrorResponse() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testAddToDBBatchWithErrorResponse(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
@@ -148,9 +150,9 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     for (String key: keysToDelete.keySet()) {
       // If an error occurs in the response, the batch operation moving keys
       // from the open key table to the delete table should not be committed.
-      Assert.assertTrue(
+      Assertions.assertTrue(
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
+      Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
   }
 
@@ -236,7 +238,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
             clientID, 0L, omMetadataManager);
         openKey = omMetadataManager.getOpenKey(volume, bucket, key, clientID);
       }
-      Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
+      Assertions.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(openKey));
 
       newOpenKeys.put(openKey, omKeyInfo);

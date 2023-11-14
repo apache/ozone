@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -145,7 +147,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo omKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
@@ -242,6 +244,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          commitKeyArgs.getMetadataList()));
       if (isHSync) {
         omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
             String.valueOf(commitKeyRequest.getClientID()));
@@ -326,7 +330,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           oldKeyVersionsToDeleteMap, isHSync);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
@@ -391,7 +395,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   protected void processResult(CommitKeyRequest commitKeyRequest,
                                String volumeName, String bucketName,
                                String keyName, OMMetrics omMetrics,
-                               IOException exception, OmKeyInfo omKeyInfo,
+                               Exception exception, OmKeyInfo omKeyInfo,
                                Result result) {
     switch (result) {
     case SUCCESS:

@@ -27,6 +27,8 @@ import {Om} from './views/insights/om/om';
 
 import {DiskUsage} from './views/diskUsage/diskUsage';
 import {Heatmap} from './views/heatMap/heatmap';
+import {Volumes} from './views/volumes/volumes';
+import {Buckets} from './views/buckets/buckets';
 
 export const routes: IRoute[] = [
   {
@@ -36,6 +38,14 @@ export const routes: IRoute[] = [
   {
     path: '/Datanodes',
     component: Datanodes
+  },
+  {
+    path: '/Volumes',
+    component: Volumes
+  },
+  {
+    path: '/Buckets',
+    component: Buckets
   },
   {
     path: '/Pipelines',

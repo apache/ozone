@@ -98,6 +98,7 @@ import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.KerberosAuthException;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -149,6 +150,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
@@ -638,7 +640,8 @@ final class TestSecureOzoneCluster {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token);
       assertEquals("OzoneToken", token.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(conf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token.getService().toString());
 
       // Renew delegation token
@@ -695,6 +698,7 @@ final class TestSecureOzoneCluster {
   }
 
   @Test
+  @Flaky("HDDS-9349")
   public void testGetSetRevokeS3Secret() throws Exception {
 
     // Setup secure OM for start
@@ -1179,7 +1183,8 @@ final class TestSecureOzoneCluster {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token1);
       assertEquals("OzoneToken", token1.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(newConf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token1.getService().toString());
       assertEquals(omCertId1, token1.decodeIdentifier().getOmCertSerialId());
 
@@ -1422,7 +1427,8 @@ final class TestSecureOzoneCluster {
             Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
             Date.from(start.plus(certDuration)
                 .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build(), "test", clusterId);
+            csrBuilder.build(), "test", clusterId,
+            String.valueOf(System.nanoTime()));
     return certificateHolder;
   }
 
