@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 import com.google.common.cache.Cache;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
@@ -629,14 +631,17 @@ class TestOzoneAtRestEncryption {
 
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     multipartStreamKey.write(dataBuffer, 0, length);
+    multipartStreamKey.getMetadata().put("ETag",
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+            .digest(data)).toLowerCase());
     multipartStreamKey.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         multipartStreamKey.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
-    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
+    return omMultipartCommitUploadPartInfo.getETag();
   }
 
   private String uploadPart(OzoneBucket bucket, String keyName,
@@ -644,14 +649,17 @@ class TestOzoneAtRestEncryption {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.getMetadata().put("ETag",
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+            .digest(data)).toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         ozoneOutputStream.getCommitUploadPartInfo();
 
     assertNotNull(omMultipartCommitUploadPartInfo);
-    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
-    return omMultipartCommitUploadPartInfo.getPartName();
+    assertNotNull(omMultipartCommitUploadPartInfo.getETag());
+    return omMultipartCommitUploadPartInfo.getETag();
   }
 
   private void completeMultipartUpload(OzoneBucket bucket, String keyName,

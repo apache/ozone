@@ -807,7 +807,7 @@ public class ObjectEndpoint extends EndpointBase {
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
       for (CompleteMultipartUploadRequest.Part part : partList) {
-        partsMap.put(part.getPartNumber(), part.geteTag());
+        partsMap.put(part.getPartNumber(), part.getETag());
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Parts map {}", partsMap);
@@ -955,6 +955,8 @@ public class ObjectEndpoint extends EndpointBase {
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(
                   sourceObject, ozoneOutputStream, 0, length);
+              ozoneOutputStream.getMetadata()
+                  .putAll(sourceKeyDetails.getMetadata());
               keyOutputStream = ozoneOutputStream.getKeyOutputStream();
             }
           } else {
@@ -964,6 +966,8 @@ public class ObjectEndpoint extends EndpointBase {
               metadataLatencyNs =
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
+              ozoneOutputStream.getMetadata()
+                  .putAll(sourceKeyDetails.getMetadata());
               keyOutputStream = ozoneOutputStream.getKeyOutputStream();
             }
           }
@@ -993,7 +997,7 @@ public class ObjectEndpoint extends EndpointBase {
       assert keyOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           keyOutputStream.getCommitUploadPartInfo();
-      String eTag = omMultipartCommitUploadPartInfo.getPartName();
+      String eTag = omMultipartCommitUploadPartInfo.getETag();
 
       if (copyHeader != null) {
         getMetrics().updateCopyObjectSuccessStats(startNanos);
@@ -1064,7 +1068,7 @@ public class ObjectEndpoint extends EndpointBase {
       ozoneMultipartUploadPartListParts.getPartInfoList().forEach(partInfo -> {
         ListPartsResponse.Part part = new ListPartsResponse.Part();
         part.setPartNumber(partInfo.getPartNumber());
-        part.setETag(partInfo.getPartName());
+        part.setETag(partInfo.getETag());
         part.setSize(partInfo.getSize());
         part.setLastModified(Instant.ofEpochMilli(
             partInfo.getModificationTime()));

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -56,6 +57,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -217,7 +220,8 @@ public class TestObjectStoreWithLegacyFS {
   }
 
   private OmMultipartUploadCompleteInfo uploadMPUWithDirectoryExists(
-      OzoneBucket bucket, String keyName) throws IOException {
+      OzoneBucket bucket, String keyName)
+      throws IOException, NoSuchAlgorithmException {
     OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
 
@@ -230,6 +234,9 @@ public class TestObjectStoreWithLegacyFS {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.getMetadata().put("ETag",
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+            .digest(data)).toLowerCase());
     ozoneOutputStream.close();
 
     if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
@@ -249,7 +256,7 @@ public class TestObjectStoreWithLegacyFS {
         ozoneOutputStream.getCommitUploadPartInfo();
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
-    partsMap.put(1, omMultipartCommitUploadPartInfo.getPartName());
+    partsMap.put(1, omMultipartCommitUploadPartInfo.getETag());
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
         bucket.completeMultipartUpload(keyName,
             uploadID, partsMap);

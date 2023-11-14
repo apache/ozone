@@ -65,6 +65,7 @@ public class OzoneDataStreamOutputStub extends OzoneDataStreamOutput {
 
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return closed ? new OmMultipartCommitUploadPartInfo(partName) : null;
+    return closed ? new OmMultipartCommitUploadPartInfo(partName,
+        getMetadata().get("ETag")) : null;
   }
 }

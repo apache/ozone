@@ -23,6 +23,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,6 +34,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -267,7 +270,8 @@ public class OzoneBucketStub extends OzoneBucket {
               byte[] bytes = new byte[position];
               buffer.get(bytes);
 
-              Part part = new Part(key + size, bytes);
+              Part part = new Part(key + size, bytes,
+                  getMetadata().get("ETag"));
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -425,7 +429,7 @@ public class OzoneBucketStub extends OzoneBucket {
             @Override
             public void close() throws IOException {
               Part part = new Part(key + size,
-                  toByteArray());
+                  toByteArray(), getMetadata().get("ETag"));
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -463,7 +467,7 @@ public class OzoneBucketStub extends OzoneBucket {
       for (Map.Entry<Integer, String> part: partsMap.entrySet()) {
         Part recordedPart = partsList.get(part.getKey());
         if (recordedPart == null ||
-            !recordedPart.getPartName().equals(part.getValue())) {
+            !recordedPart.getETag().equals(part.getValue())) {
           throw new OMException(ResultCodes.INVALID_PART);
         } else {
           output.write(recordedPart.getContent());
@@ -506,13 +510,21 @@ public class OzoneBucketStub extends OzoneBucket {
       int count = 0;
       int nextPartNumberMarker = 0;
       boolean truncated = false;
+      MessageDigest eTagProvider;
+      try {
+        eTagProvider = MessageDigest.getInstance("Md5");
+      } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
       while (count < maxParts && partIterator.hasNext()) {
         Map.Entry<Integer, Part> partEntry = partIterator.next();
         nextPartNumberMarker = partEntry.getKey();
         if (partEntry.getKey() > partNumberMarker) {
           PartInfo partInfo = new PartInfo(partEntry.getKey(),
               partEntry.getValue().getPartName(),
-              Time.now(), partEntry.getValue().getContent().length);
+              Time.now(), partEntry.getValue().getContent().length,
+              DatatypeConverter.printHexBinary(eTagProvider.digest(partEntry
+                  .getValue().getContent())).toLowerCase());
           partInfoList.add(partInfo);
           count++;
         }
@@ -563,9 +575,12 @@ public class OzoneBucketStub extends OzoneBucket {
     private String partName;
     private byte[] content;
 
-    public Part(String name, byte[] data) {
+    private String eTag;
+
+    public Part(String name, byte[] data, String eTag) {
       this.partName = name;
       this.content = data.clone();
+      this.eTag = eTag;
     }
 
     public String getPartName() {
@@ -575,6 +590,11 @@ public class OzoneBucketStub extends OzoneBucket {
     public byte[] getContent() {
       return content.clone();
     }
+
+    public String getETag() {
+      return eTag;
+    }
+
   }
 
   @Override

@@ -24,11 +24,14 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -173,7 +176,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testMultiPartUploadWithStream() throws IOException {
+  public void testMultiPartUploadWithStream()
+      throws IOException, NoSuchAlgorithmException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -206,6 +210,9 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         keyName, valueLength, 1, uploadID);
     ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
         valueLength);
+    ozoneStreamOutput.getMetadata().put("ETag",
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+            .digest(sampleData)).toLowerCase());
     ozoneStreamOutput.close();
 
     OzoneMultipartUploadPartListParts parts =

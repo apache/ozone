@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -479,6 +480,8 @@ class TestOpenKeyCleanupService {
                 .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
                 .setLocationInfoList(Collections.emptyList())
+                .addMetadata("ETag", DigestUtils.md5Hex(UUID.randomUUID()
+                    .toString()))
                 .build();
 
         writeClient.commitMultipartUploadPart(commitPartKeyArgs,

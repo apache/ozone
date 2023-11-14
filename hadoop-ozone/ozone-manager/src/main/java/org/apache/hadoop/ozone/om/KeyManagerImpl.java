@@ -788,7 +788,10 @@ public class KeyManagerImpl implements KeyManager {
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
                 partName,
                 partKeyInfo.getPartKeyInfo().getModificationTime(),
-                partKeyInfo.getPartKeyInfo().getDataSize());
+                partKeyInfo.getPartKeyInfo().getDataSize(),
+                partKeyInfo.getPartKeyInfo().getMetadataList().stream()
+                    .filter(keyValue -> keyValue.getKey().equals("ETag"))
+                    .findFirst().get().getValue());
             omPartInfoList.add(omPartInfo);
 
             //if there are parts, use replication type from one of the parts

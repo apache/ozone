@@ -19,12 +19,19 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -1054,14 +1061,31 @@ public final class OMRequestTestUtils {
       String bucketName, String keyName, long clientID, long size,
       String multipartUploadID, int partNumber) {
 
+    MessageDigest eTagProvider;
+    try {
+      eTagProvider = MessageDigest.getInstance("Md5");
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException(e);
+    }
+
     // Just set dummy size.
-    KeyArgs.Builder keyArgs =
-        KeyArgs.newBuilder().setVolumeName(volumeName).setKeyName(keyName)
-            .setBucketName(bucketName)
-            .setDataSize(size)
-            .setMultipartNumber(partNumber)
-            .setMultipartUploadID(multipartUploadID)
-            .addAllKeyLocations(new ArrayList<>());
+    KeyArgs.Builder  keyArgs = KeyArgs.newBuilder().setVolumeName(volumeName)
+        .setKeyName(keyName)
+        .setBucketName(bucketName)
+        .setDataSize(size)
+        .setMultipartNumber(partNumber)
+        .setMultipartUploadID(multipartUploadID)
+        .addAllKeyLocations(new ArrayList<>())
+        .addMetadata(HddsProtos.KeyValue.newBuilder()
+            .setKey("ETag")
+            .setValue(DatatypeConverter.printHexBinary(
+                new DigestInputStream(
+                    new ByteArrayInputStream(
+                        RandomStringUtils.randomAlphanumeric((int) size)
+                            .getBytes(StandardCharsets.UTF_8)),
+                    eTagProvider)
+                    .getMessageDigest().digest()))
+            .build());
     // Just adding dummy list. As this is for UT only.
 
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =

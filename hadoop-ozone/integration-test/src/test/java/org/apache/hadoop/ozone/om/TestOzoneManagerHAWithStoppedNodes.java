@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -185,11 +186,12 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), 1, uploadID);
     ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
+    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(value));
     ozoneOutputStream.close();
 
 
     Map<Integer, String> partsMap = new HashMap<>();
-    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getETag());
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
         ozoneBucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
@@ -361,7 +363,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     for (int i = 0; i < partsMap.size(); i++) {
       assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
-          partInfoList.get(i).getPartName());
+          partInfoList.get(i).getETag());
 
     }
 
@@ -378,9 +380,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), partNumber, uploadID);
     ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
+    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(value));
     ozoneOutputStream.close();
 
-    return ozoneOutputStream.getCommitUploadPartInfo().getPartName();
+    return ozoneOutputStream.getCommitUploadPartInfo().getETag();
   }
 
   @Test

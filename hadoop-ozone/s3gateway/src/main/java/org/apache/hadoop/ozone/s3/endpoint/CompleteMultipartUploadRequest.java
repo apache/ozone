@@ -66,12 +66,12 @@ public class CompleteMultipartUploadRequest {
       this.partNumber = partNumber;
     }
 
-    public String geteTag() {
+    public String getETag() {
       return eTag;
     }
 
-    public void seteTag(String eTag) {
-      this.eTag = eTag;
+    public void setETag(String eTagHash) {
+      this.eTag = eTagHash;
     }
   }
 

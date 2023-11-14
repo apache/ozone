@@ -1627,7 +1627,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .getCommitMultiPartUploadResponse();
 
     OmMultipartCommitUploadPartInfo info = new
-        OmMultipartCommitUploadPartInfo(response.getPartName());
+        OmMultipartCommitUploadPartInfo(response.getPartName(),
+          response.getETag());
     return info;
   }
 

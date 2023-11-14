@@ -502,20 +502,20 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     for (OzoneManagerProtocolProtos.Part part : partsList) {
       currentPartCount++;
       int partNumber = part.getPartNumber();
-      String partName = part.getPartName();
+      String eTag = part.getETag();
 
       PartKeyInfo partKeyInfo = partKeyInfoMap.get(partNumber);
 
-      String dbPartName = null;
+      String dbPartETag = null;
       if (partKeyInfo != null) {
-        dbPartName = partKeyInfo.getPartName();
+        dbPartETag = partKeyInfo.getPartKeyInfo().getMetadata(0).getValue();
       }
-      if (!StringUtils.equals(partName, dbPartName)) {
-        String omPartName = partKeyInfo == null ? null : dbPartName;
+      if (!StringUtils.equals(eTag, dbPartETag)) {
+        String omPartName = partKeyInfo == null ? null : dbPartETag;
         throw new OMException(
             failureMessage(requestedVolume, requestedBucket, keyName) +
-            ". Provided Part info is { " + partName + ", " + partNumber +
-            "}, whereas OM has partName " + omPartName,
+            ". Provided Part info is { " + eTag + ", " + partNumber +
+            "}, whereas OM has eTag " + omPartName,
             OMException.ResultCodes.INVALID_PART);
       }
 

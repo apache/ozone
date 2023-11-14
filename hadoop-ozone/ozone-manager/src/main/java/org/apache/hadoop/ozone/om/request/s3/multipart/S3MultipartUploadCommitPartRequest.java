@@ -242,7 +242,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
-              .setPartName(partName));
+              .setPartName(partName)
+              .setETag(omKeyInfo.getMetadata().get("ETag")));
       omClientResponse =
           getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo, omResponse.build(),

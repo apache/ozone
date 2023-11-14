@@ -28,12 +28,15 @@ public class OmPartInfo {
   private String partName;
   private long modificationTime;
   private long size;
+  private String eTag;
 
-  public OmPartInfo(int number, String name, long time, long size) {
+  public OmPartInfo(int number, String name, long time, long size,
+                    String eTag) {
     this.partNumber = number;
     this.partName = name;
     this.modificationTime = time;
     this.size = size;
+    this.eTag = eTag;
   }
 
   public int getPartNumber() {
@@ -52,9 +55,13 @@ public class OmPartInfo {
     return size;
   }
 
+  public String geteTag() {
+    return eTag;
+  }
+
   public PartInfo getProto() {
     return PartInfo.newBuilder().setPartNumber(partNumber).setPartName(partName)
        .setModificationTime(modificationTime)
-       .setSize(size).build();
+       .setSize(size).setETag(eTag).build();
   }
 }

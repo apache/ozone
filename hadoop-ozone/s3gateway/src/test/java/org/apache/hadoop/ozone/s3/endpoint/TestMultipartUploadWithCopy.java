@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -91,7 +92,11 @@ public class TestMultipartUploadWithCopy {
     try (OutputStream stream = bucket
         .createKey(EXISTING_KEY, keyContent.length,
             ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-            ReplicationFactor.THREE), new HashMap<>())) {
+            ReplicationFactor.THREE),
+            new HashMap<String, String>() {{
+              put("ETag", DigestUtils.md5Hex(EXISTING_KEY_CONTENT));
+            }}
+        )) {
       stream.write(keyContent);
     }
 
@@ -329,7 +334,7 @@ public class TestMultipartUploadWithCopy {
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString("ETag"));
     Part part = new Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString("ETag"));
     part.setPartNumber(partNumber);
 
     return part;
@@ -377,7 +382,7 @@ public class TestMultipartUploadWithCopy {
     assertNotNull(result.getETag());
     assertNotNull(result.getLastModified());
     Part part = new Part();
-    part.seteTag(result.getETag());
+    part.setETag(result.getETag());
     part.setPartNumber(partNumber);
 
     return part;

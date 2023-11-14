@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -53,6 +54,7 @@ import org.apache.ozone.test.JUnit5AwareTimeout;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -304,10 +306,13 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // This should succeed, as we check during creation of part or during
     // complete MPU.
+    ozoneOutputStream.getMetadata().put("ETag",
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+            .digest(b)).toLowerCase());
     ozoneOutputStream.close();
 
     Map<Integer, String> partsMap = new HashMap<>();
-    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getETag());
 
     // Should fail, as we have directory with same name.
     try {
