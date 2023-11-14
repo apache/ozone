@@ -74,7 +74,7 @@ public class TestNetworkTopologyImpl {
   private NetworkTopology cluster;
   private Node[] dataNodes;
   private Random random = new Random();
-  private static Consumer<List<? extends Node>> mockedShuffleOperation;
+  private Consumer<List<? extends Node>> mockedShuffleOperation;
 
   @BeforeEach
   void beforeAll() {
