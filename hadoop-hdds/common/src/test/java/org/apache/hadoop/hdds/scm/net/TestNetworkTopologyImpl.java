@@ -925,6 +925,7 @@ public class TestNetworkTopologyImpl {
   public void testSortByDistanceCostNullReader(NodeSchema[] schemas,
                                                Node[] nodeArray) {
     // GIVEN
+    // various cluster topologies with null reader
     initNetworkTopology(schemas, nodeArray);
     List<Node> nodeList = Arrays.asList(dataNodes.clone());
     final Node reader = null;
@@ -943,12 +944,14 @@ public class TestNetworkTopologyImpl {
       List<? extends Node> ret = spyCluster.sortByDistanceCost(reader,
           nodeList, length, mockedShuffleOperation);
       // THEN
+      // no actual distance cost calculated
+      // only shuffle input node list with given length limit
       verify(mockedShuffleOperation).accept(any());
       verify(spyCluster, never()).getDistanceCost(any(), any());
       assertEquals(length, ret.size());
       assertTrue(nodeList.containsAll(ret));
-      length--;
       reset(mockedShuffleOperation);
+      length--;
     }
   }
 
