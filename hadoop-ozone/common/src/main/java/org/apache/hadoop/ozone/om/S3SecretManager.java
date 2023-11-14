@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Interface to manager s3 secret.
@@ -63,7 +64,7 @@ public interface S3SecretManager {
   /**
    * Clear s3 secret cache when double buffer is flushed to the DB.
    */
-  void clearS3Cache();
+  void clearS3Cache(List<Long> epochs);
 
   /**
    * Apply provided action under write lock.
@@ -110,6 +111,13 @@ public interface S3SecretManager {
     S3SecretCache cache = cache();
     if (cache != null) {
       cache.invalidate(id);
+    }
+  }
+
+  default void clearCache(List<Long> flushedTransactionIds) {
+    S3SecretCache cache = cache();
+    if (cache != null) {
+      cache.clearCache(flushedTransactionIds);
     }
   }
 

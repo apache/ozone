@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
@@ -40,7 +41,6 @@ public class S3SecretManagerImpl implements S3SecretManager {
 
   private final S3SecretStore s3SecretStore;
   private final S3SecretCache s3SecretCache;
-  private final Set<String> updatedKerberosIDs;
 
   /**
    * Constructs S3SecretManager.
@@ -51,7 +51,6 @@ public class S3SecretManagerImpl implements S3SecretManager {
                              S3SecretCache s3SecretCache) {
     this.s3SecretStore = s3SecretStore;
     this.s3SecretCache = s3SecretCache;
-    this.updatedKerberosIDs = new HashSet<>();
   }
 
   @Override
@@ -112,8 +111,8 @@ public class S3SecretManagerImpl implements S3SecretManager {
   }
 
   @Override
-  public void clearS3Cache() {
-    clearCache();
+  public void clearS3Cache(List<Long> flushedTransactionIds) {
+    clearCache(flushedTransactionIds);
   }
 
   @Override
@@ -135,16 +134,8 @@ public class S3SecretManagerImpl implements S3SecretManager {
 
   public void updateCache(String kerberosID, S3SecretValue secret) {
     S3SecretManager.super.updateCache(kerberosID, secret);
-    // Mark the Kerberos ID as updated.
-    updatedKerberosIDs.add(kerberosID);
   }
 
-  public void clearCache() {
-    // Remove Kerberos IDs that have been updated from the cache.
-    for (String kerberosID : updatedKerberosIDs) {
-      S3SecretManager.super.invalidateCacheEntry(kerberosID);
-    }
-    updatedKerberosIDs.clear();
-  }
+
 
 }

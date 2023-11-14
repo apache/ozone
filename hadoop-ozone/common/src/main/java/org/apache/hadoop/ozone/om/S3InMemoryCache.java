@@ -21,6 +21,8 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
+import java.util.*;
+
 /**
  * S3 secret cache implementation based on in-memory cache.
  */
@@ -49,10 +51,38 @@ public class S3InMemoryCache implements S3SecretCache {
   }
 
   /**
-   * Clears the cache, removing all entries.
+   * Clears the cache by removing entries that correspond to transactions
+   * flushed by the doubleBuffer.
+   *
+   * @param flushedTransactionIds A list of transaction IDs that have been
+   *                              flushed and should be used to identify and
+   *                              remove corresponding cache entries.
    */
-  public void clearCache() {
-    cache.invalidateAll();
+  @Override
+  public void clearCache(List<Long> flushedTransactionIds) {
+    // Create a map to store transactionLogIndex-to-cacheKey mappings
+    Map<Long, Set<String>> transactionIdToCacheKeys = new HashMap<>();
+
+    // Populate the mapping based on transactionLogIndex to kerberosId.
+    // So that we do not have to do nested iteration for every transactionId.
+    cache.asMap().forEach((k, v) -> {
+      if (v != null) {
+        long transactionLogIndex = v.getTransactionLogIndex();
+        transactionIdToCacheKeys
+            .computeIfAbsent(transactionLogIndex, key -> new HashSet<>())
+            .add(k);
+      }
+    });
+
+    // Iterate over the provided transactionIds
+    for (Long transactionId : flushedTransactionIds) {
+      // Get the cache keys associated with this transactionId
+      Set<String> cacheKeys = transactionIdToCacheKeys.get(transactionId);
+      if (cacheKeys != null) {
+        // Remove the cache entries directly using the cache keys
+        cache.invalidateAll(cacheKeys);
+      }
+    }
   }
 
   @Override

@@ -20,6 +20,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 
@@ -78,10 +79,10 @@ public class S3SecretLockedManager implements S3SecretManager {
   }
 
   @Override
-  public void clearS3Cache() {
+  public void clearS3Cache(List<Long> epochs) {
     lock.acquireWriteLock(S3_SECRET_LOCK, "cache");
     try {
-      secretManager.clearS3Cache();
+      secretManager.clearS3Cache(epochs);
     } finally {
       lock.releaseWriteLock(S3_SECRET_LOCK, "cache");
     }

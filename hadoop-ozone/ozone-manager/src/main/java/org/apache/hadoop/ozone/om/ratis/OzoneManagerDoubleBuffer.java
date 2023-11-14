@@ -60,6 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
@@ -526,8 +527,10 @@ public final class OzoneManagerDoubleBuffer {
     cleanupEpochs.forEach((tableName, epochs) -> {
       Collections.sort(epochs);
       omMetadataManager.getTable(tableName).cleanupCache(epochs);
-      // Invalidate all the content in S3SecretManager cache.
-      s3SecretManager.clearS3Cache();
+      // Check if the table is S3SecretTable, if yes, then clear the cache.
+      if (tableName.equals(S3_SECRET_TABLE.getName())) {
+        s3SecretManager.clearS3Cache(epochs);
+      }
     });
   }
 
