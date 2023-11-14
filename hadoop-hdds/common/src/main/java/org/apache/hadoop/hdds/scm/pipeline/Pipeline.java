@@ -308,7 +308,7 @@ public final class Pipeline {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
       return getNodes();
     }
-      return nodesInOrder.get();
+    return nodesInOrder.get();
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {

@@ -85,8 +85,8 @@ public class TestSCMBlockProtocolServer {
 
   @Test
   public void testSortDatanodes() throws Exception {
-    List<String> nodes = new ArrayList<>();
-    nodeManager.getAllNodes().forEach(
+    List<String> nodes = new ArrayList();
+    nodeManager.getAllNodes().stream().forEach(
         node -> nodes.add(node.getNetworkName()));
 
     // sort normal datanodes
@@ -97,7 +97,7 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
+    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
 
     // illegal client 1
     client += "X";
