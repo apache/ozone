@@ -61,7 +61,7 @@ public class ContainerImporter {
   private final long containerSize;
 
   private final Set<Long> importContainerProgress
-      = Collections.synchronizedSet(new HashSet());
+      = Collections.synchronizedSet(new HashSet<>());
 
   public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
       ContainerController controller,
@@ -80,13 +80,8 @@ public class ContainerImporter {
   }
 
   public boolean isAllowedContainerImport(long containerID) {
-    if (importContainerProgress.contains(containerID)) {
-      return false;
-    }
-    if (containerSet.getContainer(containerID) != null) {
-      return false;
-    }
-    return true;
+    return !importContainerProgress.contains(containerID) &&
+        containerSet.getContainer(containerID) == null;
   }
 
   public void importContainer(long containerID, Path tarFilePath,

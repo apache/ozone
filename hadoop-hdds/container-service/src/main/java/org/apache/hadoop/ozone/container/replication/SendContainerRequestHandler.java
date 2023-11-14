@@ -70,6 +70,15 @@ class SendContainerRequestHandler
 
       assertSame(nextOffset, req.getOffset(), "offset");
 
+      // check and avoid download of container file if target already have
+      // container data and import in progress
+      if (!importer.isAllowedContainerImport(req.getContainerID())) {
+        containerId = req.getContainerID();
+        throw new StorageContainerException("Container exists or " +
+            "import in progress with container Id " + req.getContainerID(),
+            ContainerProtos.Result.CONTAINER_EXISTS);
+      }
+
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
@@ -80,14 +89,6 @@ class SendContainerRequestHandler
         compression = CopyContainerCompression.fromProto(req.getCompression());
 
         LOG.info("Accepting container {}", req.getContainerID());
-      }
-
-      // check and avoid download of container file if target already have
-      // container data and import in progress
-      if (!importer.isAllowedContainerImport(containerId)) {
-        throw new StorageContainerException("Container exists or " +
-            "import in progress with container Id " + containerId,
-            ContainerProtos.Result.CONTAINER_EXISTS);
       }
 
       assertSame(containerId, req.getContainerID(), "containerID");
