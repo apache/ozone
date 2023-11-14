@@ -25,7 +25,6 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,7 +53,7 @@ public class TestDatanodeVersionFile {
   private int lv;
 
   @TempDir
-  public Path folder;
+  private Path folder;
 
   @BeforeEach
   public void setup() throws IOException {

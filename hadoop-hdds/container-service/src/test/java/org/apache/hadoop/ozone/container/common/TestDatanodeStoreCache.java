@@ -35,7 +35,7 @@ import java.nio.file.Path;
  */
 public class TestDatanodeStoreCache {
   @TempDir
-  public Path folder;
+  private Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 

@@ -23,10 +23,8 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Path;
 import java.util.UUID;
@@ -40,9 +38,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
 public class TestReservedVolumeSpace {
 
   @TempDir
-  public Path folder;
+  private Path folder;
   @TempDir
-  public Path temp;
+  private Path temp;
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private HddsVolume.Builder volumeBuilder;
 

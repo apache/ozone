@@ -46,9 +46,9 @@ import static org.powermock.api.mockito.PowerMockito.when;
  */
 public class TestStorageVolumeUtil {
   @TempDir
-  public Path volumeDir;
+  private Path volumeDir;
   @TempDir
-  public Path dbVolumeDir;
+  private Path dbVolumeDir;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestStorageVolumeUtil.class);

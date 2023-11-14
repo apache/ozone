@@ -39,7 +39,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(ContainerReportsProto.class);
-    Assertions.assertEquals(ContainerReportPublisher.class, publisher.getClass());
+    Assertions.assertEquals(
+        ContainerReportPublisher.class, publisher.getClass());
     Assertions.assertEquals(conf, publisher.getConf());
   }
 
@@ -59,7 +60,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(CRLStatusReport.class);
-    Assertions.assertEquals(CRLStatusReportPublisher.class, publisher.getClass());
+    Assertions.assertEquals(
+        CRLStatusReportPublisher.class, publisher.getClass());
     Assertions.assertEquals(conf, publisher.getConf());
   }
 

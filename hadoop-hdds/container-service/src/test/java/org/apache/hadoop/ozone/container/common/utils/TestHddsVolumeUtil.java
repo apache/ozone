@@ -50,7 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class TestHddsVolumeUtil {
   @TempDir
-  public Path tempDir;
+  private Path tempDir;
 
   private final String datanodeId = UUID.randomUUID().toString();
   private final String clusterId = UUID.randomUUID().toString();

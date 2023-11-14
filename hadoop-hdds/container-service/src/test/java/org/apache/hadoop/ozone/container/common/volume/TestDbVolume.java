@@ -24,10 +24,8 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,7 +54,7 @@ public class TestDbVolume {
   private File versionFile;
 
   @TempDir
-  public Path folder;
+  private Path folder;
 
   @BeforeEach
   public void setup() throws Exception {

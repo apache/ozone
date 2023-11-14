@@ -53,10 +53,8 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.rules.TemporaryFolder;
 
 /**
  * Unit tests for {@link HddsVolume}.
@@ -69,7 +67,7 @@ public class TestHddsVolume {
   private static final String RESERVED_SPACE = "100B";
 
   @TempDir
-  public Path folder;
+  private Path folder;
 
   private HddsVolume.Builder volumeBuilder;
   private File versionFile;

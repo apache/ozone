@@ -45,7 +45,7 @@ import static org.mockito.Mockito.verify;
 public class TestSimpleContainerDownloader {
 
   @TempDir
-  public Path tempDir;
+  private Path tempDir;
 
   @Test
   public void testGetContainerDataFromReplicasHappyPath() throws Exception {

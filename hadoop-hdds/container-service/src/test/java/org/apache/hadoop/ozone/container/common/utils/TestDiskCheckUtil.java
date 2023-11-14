@@ -17,16 +17,11 @@
  */
 package org.apache.hadoop.ozone.container.common.utils;
 
-import org.assertj.core.util.Files;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
-import java.nio.file.Path;
 
 /**
  * Tests {@link DiskCheckUtil} does not incorrectly identify an unhealthy

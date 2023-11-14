@@ -34,10 +34,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.rules.TemporaryFolder;
 
 /**
  * Tests that DataNode will throw an exception on creation when it reads in a
@@ -46,7 +44,7 @@ import org.junit.rules.TemporaryFolder;
  */
 public class TestDataNodeStartupSlvLessThanMlv {
   @TempDir
-  public Path tempFolder;
+  private Path tempFolder;
 
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
