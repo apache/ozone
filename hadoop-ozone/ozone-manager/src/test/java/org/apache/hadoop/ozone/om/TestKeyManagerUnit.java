@@ -631,7 +631,7 @@ public class TestKeyManagerUnit {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"anyhost", ""}) // six numbers
+  @ValueSource(strings = {"anyhost", ""})
   public void sortDatanodes(String client) throws Exception {
     // GIVEN
     int pipelineCount = 3;

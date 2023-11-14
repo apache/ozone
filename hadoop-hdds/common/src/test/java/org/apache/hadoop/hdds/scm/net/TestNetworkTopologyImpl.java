@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -48,12 +49,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -867,6 +875,7 @@ public class TestNetworkTopologyImpl {
         while (length > 0) {
           List<? extends Node> ret = cluster.sortByDistanceCost(reader,
               Arrays.asList(nodeList), length, Collections::shuffle);
+          assertEquals(length, ret.size());
           for (int i = 0; i < ret.size(); i++) {
             if ((i + 1) < ret.size()) {
               int cost1 = cluster.getDistanceCost(reader, ret.get(i));
@@ -891,6 +900,7 @@ public class TestNetworkTopologyImpl {
       while (length >= 0) {
         List<? extends Node> sortedNodeList =
             cluster.sortByDistanceCost(reader, nodeList, length, Collections::shuffle);
+        assertEquals(length, sortedNodeList.size());
         for (int i = 0; i < sortedNodeList.size(); i++) {
           if ((i + 1) < sortedNodeList.size()) {
             int cost1 = cluster.getDistanceCost(reader, sortedNodeList.get(i));
@@ -907,6 +917,38 @@ public class TestNetworkTopologyImpl {
         }
         length--;
       }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("topologies")
+  public void testSortByDistanceCostNullReader(NodeSchema[] schemas,
+                                               Node[] nodeArray) {
+    // GIVEN
+    initNetworkTopology(schemas, nodeArray);
+    List<Node> nodeList = Arrays.asList(dataNodes.clone());
+    final Node reader = null;
+    NetworkTopology spyCluster = spy(cluster);
+    int length = nodeList.size();
+    Consumer<List<? extends Node>> mockedShuffleOperation =
+        Mockito.mock(Consumer.class);
+    doAnswer(args -> {
+          List<? extends Node> collection = args.getArgument(0);
+          Collections.shuffle(collection);
+          return null;
+        }
+    ).when(mockedShuffleOperation).accept(any());
+    while (length > 0) {
+      // WHEN
+      List<? extends Node> ret = spyCluster.sortByDistanceCost(reader,
+          nodeList, length, mockedShuffleOperation);
+      // THEN
+      verify(mockedShuffleOperation).accept(any());
+      verify(spyCluster, never()).getDistanceCost(any(), any());
+      assertEquals(length, ret.size());
+      assertTrue(nodeList.containsAll(ret));
+      length--;
+      reset(mockedShuffleOperation);
     }
   }
 

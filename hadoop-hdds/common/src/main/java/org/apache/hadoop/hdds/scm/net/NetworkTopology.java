@@ -244,7 +244,8 @@ public interface NetworkTopology {
    *                         nodes with equal distances
    *
    * @return list of sorted nodes if reader is not null,
-   * or shuffled input nodes otherwise
+   * or shuffled input nodes otherwise. The size of returned list is limited
+   * by activeLen parameter.
    */
   List<? extends Node> sortByDistanceCost(Node reader,
       List<? extends Node> nodes, int activeLen,

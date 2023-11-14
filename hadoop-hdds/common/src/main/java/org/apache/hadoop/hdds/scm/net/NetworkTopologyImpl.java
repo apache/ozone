@@ -752,7 +752,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
    *                         nodes with equal distances
    *
    * @return list of sorted nodes if reader is not null,
-   * or shuffled input nodes otherwise
+   * or shuffled input nodes otherwise. The size of returned list is limited
+   * by activeLen parameter.
    */
   @Override
   public List<? extends Node> sortByDistanceCost(Node reader,
@@ -760,7 +761,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       Consumer<List<? extends Node>> shuffleOperation) {
     // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      List<? extends Node> shuffledNodes = new ArrayList<>(nodes);
+      List<? extends Node> shuffledNodes = new ArrayList<>(nodes.subList(0, activeLen));
       shuffleOperation.accept(shuffledNodes);
       return shuffledNodes;
     }
