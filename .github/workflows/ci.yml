@@ -18,7 +18,7 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' }}
+  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' && !startsWith(github.ref_name, 'dependabot') }}
 jobs:
   build-info:
     runs-on: ubuntu-20.04
@@ -474,7 +474,7 @@ jobs:
   coverage:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
-    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
+    if: github.repository == 'apache/ozone' && github.event_name != 'pull_request' && !startsWith(github.ref_name, 'dependabot')
     needs:
       - unit
       - acceptance
