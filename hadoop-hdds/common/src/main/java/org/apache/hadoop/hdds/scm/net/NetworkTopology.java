@@ -240,14 +240,11 @@ public interface NetworkTopology {
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
    * @param activeLen        Number of active nodes at the front of the array
-   * @param shuffleOperation The algorithm that will be applied to randomize
-   *                         nodes with equal distances
    *
    * @return list of sorted nodes if reader is not null,
    * or shuffled input nodes otherwise. The size of returned list is limited
    * by activeLen parameter.
    */
   List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen,
-      Consumer<List<? extends Node>> shuffleOperation);
+      List<? extends Node> nodes, int activeLen);
 }

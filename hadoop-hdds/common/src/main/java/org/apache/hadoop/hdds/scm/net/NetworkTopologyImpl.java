@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.TreeMap;
@@ -57,12 +58,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final int maxLevel;
   /** Schema manager. */
   private final NodeSchemaManager schemaManager;
+  /** The algorithm to randomize nodes with equal distances */
+  private final Consumer<List<? extends Node>> shuffleOperation;
   /** Lock to coordinate cluster tree access. */
   private ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
   public NetworkTopologyImpl(ConfigurationSource conf) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
+    shuffleOperation = Collections::shuffle;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -71,8 +75,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
   }
 
   @VisibleForTesting
-  public NetworkTopologyImpl(NodeSchemaManager manager) {
+  public NetworkTopologyImpl(NodeSchemaManager manager,
+                             Consumer<List<? extends Node>> shuffleOperation) {
     schemaManager = manager;
+    this.shuffleOperation = shuffleOperation;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -748,8 +754,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
    * @param reader           Node where need the data
    * @param nodes            Available replicas with the requested data
    * @param activeLen        Number of active nodes at the front of the array
-   * @param shuffleOperation The algorithm that will be applied to randomize
-   *                         nodes with equal distances
    *
    * @return list of sorted nodes if reader is not null,
    * or shuffled input nodes otherwise. The size of returned list is limited
@@ -757,8 +761,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
    */
   @Override
   public List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen,
-      Consumer<List<? extends Node>> shuffleOperation) {
+      List<? extends Node> nodes, int activeLen) {
     // shuffle input list of nodes if reader is not defined
     if (reader == null) {
       List<? extends Node> shuffledNodes =
