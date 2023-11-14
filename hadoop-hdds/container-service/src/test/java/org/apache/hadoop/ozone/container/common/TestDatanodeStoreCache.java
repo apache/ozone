@@ -23,26 +23,29 @@ import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.junit.jupiter.api.Assertions;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Test DatanodeStoreCache.
  */
 public class TestDatanodeStoreCache {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  public Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
   public void testBasicOperations() throws IOException {
     DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-    String dbPath1 = folder.newFolder("basic1").getAbsolutePath();
-    String dbPath2 = folder.newFolder("basic2").getAbsolutePath();
+    String dbPath1 = Files.createDirectory(folder.resolve("basic1"))
+        .toFile().toString();
+    String dbPath2 = Files.createDirectory(folder.resolve("basic2"))
+        .toFile().toString();
     DatanodeStore store1 = new DatanodeStoreSchemaThreeImpl(conf, dbPath1,
         false);
     DatanodeStore store2 = new DatanodeStoreSchemaThreeImpl(conf, dbPath2,
