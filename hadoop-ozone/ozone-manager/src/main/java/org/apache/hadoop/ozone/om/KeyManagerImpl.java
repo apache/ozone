@@ -1827,7 +1827,6 @@ public class KeyManagerImpl implements KeyManager {
         LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
             clientMachine, sortedNodes);
       }
-      return sortedNodes;
     } catch (IOException e) {
       LOG.warn("Unable to sort datanodes based on distance to client, "
           + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
