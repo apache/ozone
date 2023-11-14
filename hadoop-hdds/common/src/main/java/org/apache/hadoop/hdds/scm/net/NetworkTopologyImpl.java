@@ -58,7 +58,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final int maxLevel;
   /** Schema manager. */
   private final NodeSchemaManager schemaManager;
-  /** The algorithm to randomize nodes with equal distances */
+  /** The algorithm to randomize nodes with equal distances. */
   private final Consumer<List<? extends Node>> shuffleOperation;
   /** Lock to coordinate cluster tree access. */
   private ReadWriteLock netlock = new ReentrantReadWriteLock(true);
@@ -84,6 +84,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
     clusterTree = factory.newInnerNode(ROOT, null, null,
         NetConstants.ROOT_LEVEL,
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
+  }
+
+  @VisibleForTesting
+  public NetworkTopologyImpl(NodeSchemaManager manager) {
+    this(manager, Collections::shuffle);
   }
 
   /**

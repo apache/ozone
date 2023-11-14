@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.net;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Consumer;
 
 /**
  * The interface defines a network topology.
