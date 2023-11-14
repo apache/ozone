@@ -761,7 +761,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
       Consumer<List<? extends Node>> shuffleOperation) {
     // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      List<? extends Node> shuffledNodes = new ArrayList<>(nodes.subList(0, activeLen));
+      List<? extends Node> shuffledNodes =
+          new ArrayList<>(nodes.subList(0, activeLen));
       shuffleOperation.accept(shuffledNodes);
       return shuffledNodes;
     }

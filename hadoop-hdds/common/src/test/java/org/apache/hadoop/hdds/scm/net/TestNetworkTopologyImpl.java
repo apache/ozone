@@ -899,7 +899,8 @@ public class TestNetworkTopologyImpl {
       int length = nodeList.size();
       while (length >= 0) {
         List<? extends Node> sortedNodeList =
-            cluster.sortByDistanceCost(reader, nodeList, length, Collections::shuffle);
+            cluster.sortByDistanceCost(reader, nodeList, length,
+                Collections::shuffle);
         assertEquals(length, sortedNodeList.size());
         for (int i = 0; i < sortedNodeList.size(); i++) {
           if ((i + 1) < sortedNodeList.size()) {
