@@ -751,9 +751,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
    * As an additional twist, we also randomize the nodes at each network
    * distance. This helps with load balancing when there is data skew.
    *
-   * @param reader           Node where need the data
-   * @param nodes            Available replicas with the requested data
-   * @param activeLen        Number of active nodes at the front of the array
+   * @param reader    Node where need the data
+   * @param nodes     Available replicas with the requested data
+   * @param activeLen Number of active nodes at the front of the array
    *
    * @return list of sorted nodes if reader is not null,
    * or shuffled input nodes otherwise. The size of returned list is limited
