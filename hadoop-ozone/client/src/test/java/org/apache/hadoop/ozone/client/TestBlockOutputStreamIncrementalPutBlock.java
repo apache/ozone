@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
@@ -114,21 +115,26 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     int size = 1024;
-    ByteBuffer byteBuffer = ByteBuffer.allocate(size);
+    String s = RandomStringUtils.randomAlphabetic(1024);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes());
 
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, size,
         ReplicationConfig.getDefault(config), new HashMap<>())) {
-      out.write(byteBuffer);
-      out.hsync();
+      for (int i = 0; i < 2; i++) {
+        out.write(byteBuffer);
+        out.hsync();
+      }
     }
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       ByteBuffer readBuffer = ByteBuffer.allocate(size);
-      is.read(readBuffer);
-      assertArrayEquals(readBuffer.array(), byteBuffer.array());
+      for (int i = 0; i< 2; i++) {
+        is.read(readBuffer);
+        assertArrayEquals(readBuffer.array(), byteBuffer.array());
+      }
     }
   }
 

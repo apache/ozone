@@ -116,6 +116,7 @@ public class TestHSync {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    CONF.setBoolean("ozone.client.incremental.chunk.list", true);
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -135,9 +136,9 @@ public class TestHSync {
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
   }
 
   @AfterAll

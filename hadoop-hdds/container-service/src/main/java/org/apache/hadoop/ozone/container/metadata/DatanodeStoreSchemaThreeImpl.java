@@ -236,8 +236,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     String blockKey = containerData.getBlockKey(blockID.getLocalID());
 
     // check last chunk table
-    BlockData lastChunk = getLastChunkInfoTable().
-        get(blockKey);
+    BlockData lastChunk = getLastChunkInfoTable().get(blockKey);
 
     // check block data table
     BlockData blockData = getBlockDataTable().get(blockKey);
@@ -247,11 +246,13 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         throw new StorageContainerException(
             NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
       } else {
+        LOG.info("blockData=(null)" + ", lastChunk=" + lastChunk.getChunks());
         return lastChunk;
       }
     } else {
       // append last partial chunk to the block data
       if (lastChunk != null) {
+        LOG.info("blockData=" + blockData.getChunks() + ", lastChunk=" + lastChunk.getChunks());
         Preconditions.checkState(lastChunk.getChunks().size() == 1);
         ContainerProtos.ChunkInfo lastChunkInBlockData =
             blockData.getChunks().get(blockData.getChunks().size() - 1);
@@ -259,9 +260,17 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
                 == lastChunk.getChunks().get(0).getOffset(),
             "chunk offset does not match");
-        blockData.addChunk(lastChunk.getChunks().get(0));
+
+        List<ContainerProtos.ChunkInfo> chunkInfos =
+            new ArrayList<>(blockData.getChunks());
+        chunkInfos.add(lastChunk.getChunks().get(0));
+        blockData.setChunks(chunkInfos);
+
+        //blockData.addChunk(lastChunk.getChunks().get(0));
         blockData.setBlockCommitSequenceId(
             lastChunk.getBlockCommitSequenceId());
+      } else {
+        LOG.info("blockData=" + blockData.getChunks() + ", lastChunk=(null)");
       }
     }
 
@@ -312,6 +321,12 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         // if the block did not have full chunks before,
         // the block's chunk is what received from client this time.
         blockData = data;
+
+        int next = 0;
+        for (ContainerProtos.ChunkInfo info : blockData.getChunks()) {
+          assert info.getOffset() == next;
+          next += info.getLen();
+        }
       } else {
         List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
         blockData.setChunks(new ArrayList<>(chunkInfoList));
@@ -319,6 +334,12 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
           blockData.addChunk(chunk);
         }
         blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
+
+        int next = 0;
+        for (ContainerProtos.ChunkInfo info : chunkInfoList) {
+          assert info.getOffset() == next;
+          next += info.getLen();
+        }
       }
       // delete the entry from last chunk info table
       getLastChunkInfoTable().deleteWithBatch(
@@ -344,15 +365,38 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             containerData.getBlockKey(localID));
         if (blockData == null) {
           // if the block does not exist in the block data table
+          List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>(data.getChunks());
+          chunkInfos.remove(lastChunkIndex);
+          data.setChunks(chunkInfos);
           blockData = data;
-          ContainerProtos.ChunkInfo lastPartialChunk =
-              data.getChunks().get(lastChunkIndex);
-          blockData.removeChunk(lastPartialChunk);
+
+          int next = 0;
+          for (ContainerProtos.ChunkInfo info : chunkInfos) {
+            assert info.getOffset() == next;
+            next += info.getLen();
+          }
         } else {
           // if the block exists in the block data table,
           // append chunks till except the last one (supposedly partial)
+          List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>(blockData.getChunks());
+
+          LOG.info("blockData.getChunks()=" + chunkInfos);
+          LOG.info("data.getChunks()=" + data.getChunks());
+
           for (int i = 0; i < lastChunkIndex; i++) {
-            blockData.addChunk(data.getChunks().get(i));
+            chunkInfos.add(data.getChunks().get(i));
+          }
+          blockData.setChunks(chunkInfos);
+
+          int next = 0;
+          for (ContainerProtos.ChunkInfo info : chunkInfos) {
+            if (info.getOffset() != next) {
+
+              LOG.error("blockData.getChunks()=" + chunkInfos);
+              LOG.error("data.getChunks()=" + data.getChunks());
+            }
+            assert info.getOffset() == next;
+            next += info.getLen();
           }
         }
         getBlockDataTable().putWithBatch(
