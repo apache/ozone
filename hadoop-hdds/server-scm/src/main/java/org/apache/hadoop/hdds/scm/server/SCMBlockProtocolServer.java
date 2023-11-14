@@ -24,6 +24,7 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -356,7 +357,8 @@ public class SCMBlockProtocolServer implements
         }
       });
       List<? extends Node> sortedNodeList = scm.getClusterMap()
-          .sortByDistanceCost(client, nodeList, nodeList.size());
+          .sortByDistanceCost(client, nodeList, nodeList.size(),
+              Collections::shuffle);
       return sortedNodeList.stream().map(r -> (DatanodeDetails) r).collect(
           Collectors.toList());
     } catch (Exception ex) {

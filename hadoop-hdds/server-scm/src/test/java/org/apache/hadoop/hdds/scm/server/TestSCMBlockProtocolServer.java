@@ -105,14 +105,14 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == 0);
+    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == 0);
+    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());

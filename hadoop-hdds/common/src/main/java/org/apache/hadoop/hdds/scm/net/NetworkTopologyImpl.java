@@ -26,13 +26,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
@@ -745,19 +745,26 @@ public class NetworkTopologyImpl implements NetworkTopology {
    * As an additional twist, we also randomize the nodes at each network
    * distance. This helps with load balancing when there is data skew.
    *
-   * @param reader    Node where need the data
-   * @param nodes     Available replicas with the requested data
-   * @param activeLen Number of active nodes at the front of the array
+   * @param reader           Node where need the data
+   * @param nodes            Available replicas with the requested data
+   * @param activeLen        Number of active nodes at the front of the array
+   * @param shuffleOperation The algorithm that will be applied to randomize
+   *                         nodes with equal distances
    *
-   * @return list of sorted nodes if reader is not null, or empty list otherwise
+   * @return list of sorted nodes if reader is not null,
+   * or shuffled input nodes otherwise
    */
   @Override
   public List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen) {
-    /** Sort weights for the nodes array */
+      List<? extends Node> nodes, int activeLen,
+      Consumer<List<? extends Node>> shuffleOperation) {
+    // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      return Collections.emptyList();
+      List<? extends Node> shuffledNodes = new ArrayList<>(nodes);
+      shuffleOperation.accept(shuffledNodes);
+      return shuffledNodes;
     }
+    // Sort weights for the nodes array
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
       costs[i] = getDistanceCost(reader, nodes.get(i));
@@ -778,7 +785,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     List<Node> ret = new ArrayList<>();
     for (List<Node> list: tree.values()) {
       if (list != null) {
-        Collections.shuffle(list);
+        shuffleOperation.accept(list);
         for (Node n: list) {
           ret.add(n);
         }

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.net;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * The interface defines a network topology.
@@ -238,10 +239,14 @@ public interface NetworkTopology {
    *
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
-   * @param activeLen Number of active nodes at the front of the array
+   * @param activeLen        Number of active nodes at the front of the array
+   * @param shuffleOperation The algorithm that will be applied to randomize
+   *                         nodes with equal distances
    *
-   * @return list of sorted nodes if reader is not null, or empty list otherwise
+   * @return list of sorted nodes if reader is not null,
+   * or shuffled input nodes otherwise
    */
   List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen);
+      List<? extends Node> nodes, int activeLen,
+      Consumer<List<? extends Node>> shuffleOperation);
 }

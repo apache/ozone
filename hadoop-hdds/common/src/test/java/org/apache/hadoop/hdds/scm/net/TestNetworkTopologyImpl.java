@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.net;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -865,7 +866,7 @@ public class TestNetworkTopologyImpl {
         int length = nodeList.length;
         while (length > 0) {
           List<? extends Node> ret = cluster.sortByDistanceCost(reader,
-              Arrays.asList(nodeList), length);
+              Arrays.asList(nodeList), length, Collections::shuffle);
           for (int i = 0; i < ret.size(); i++) {
             if ((i + 1) < ret.size()) {
               int cost1 = cluster.getDistanceCost(reader, ret.get(i));
@@ -889,7 +890,7 @@ public class TestNetworkTopologyImpl {
       int length = nodeList.size();
       while (length >= 0) {
         List<? extends Node> sortedNodeList =
-            cluster.sortByDistanceCost(reader, nodeList, length);
+            cluster.sortByDistanceCost(reader, nodeList, length, Collections::shuffle);
         for (int i = 0; i < sortedNodeList.size(); i++) {
           if ((i + 1) < sortedNodeList.size()) {
             int cost1 = cluster.getDistanceCost(reader, sortedNodeList.get(i));

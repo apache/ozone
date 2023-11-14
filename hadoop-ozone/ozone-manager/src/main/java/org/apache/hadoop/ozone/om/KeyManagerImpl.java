@@ -1783,7 +1783,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @VisibleForTesting
   void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
-    if (keyInfos != null && clientMachine != null && !clientMachine.isEmpty()) {
+    if (keyInfos != null && clientMachine != null) {
       Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
         OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
@@ -1819,8 +1819,9 @@ public class KeyManagerImpl implements KeyManager {
 
   private List<DatanodeDetails> sortDatanodes(String clientMachine,
       List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
+    List<DatanodeDetails> sortedNodes = null;
     try {
-      List<DatanodeDetails> sortedNodes = scmClient.getBlockClient()
+      sortedNodes = scmClient.getBlockClient()
           .sortDatanodes(nodeList, clientMachine);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
@@ -1834,7 +1835,7 @@ public class KeyManagerImpl implements KeyManager {
           keyInfo.getVolumeName(), keyInfo.getBucketName(),
           keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
     }
-    return Collections.emptyList();
+    return sortedNodes;
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
