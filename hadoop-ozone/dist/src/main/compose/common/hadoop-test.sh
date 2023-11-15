@@ -19,9 +19,8 @@ extra_compose_file=hadoop.yaml
 if [[ ${SECURITY_ENABLED} == "true" ]]; then
   extra_compose_file=hadoop-secure.yaml
 fi
-export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yaml}:../common/${extra_compose_file}
+export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
-export COMPOSE_FILE
 export HADOOP_MAJOR_VERSION=3
 export HADOOP_VERSION=unused # will be set for each test version below
 export HADOOP2_IMAGE_VERSION=2 # TEMP until tagged with specific version on Docker Hub
