@@ -24,6 +24,7 @@ export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yaml}:../common/${extra_compo
 export COMPOSE_FILE
 export HADOOP_MAJOR_VERSION=3
 export HADOOP_VERSION=unused # will be set for each test version below
+export HADOOP2_IMAGE_VERSION=2 # TEMP until tagged with specific version on Docker Hub
 export OZONE_REPLICATION_FACTOR=3
 
 # shellcheck source=/dev/null
@@ -43,10 +44,10 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-for HADOOP_VERSION in ${hadoop2.version} 3.1.2 ${hadoop.version}; do
+for HADOOP_VERSION in ${HADOOP2_IMAGE_VERSION} 3.1.2 ${hadoop.version}; do
   export HADOOP_VERSION
   export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
-  if [[ "${HADOOP_VERSION}" == "${hadoop2.version}" ]] || [[ "${HADOOP_VERSION}" == "${hadoop.version}" ]]; then
+  if [[ "${HADOOP_VERSION}" == "${HADOOP2_IMAGE_VERSION}" ]] || [[ "${HADOOP_VERSION}" == "${hadoop.version}" ]]; then
     export HADOOP_IMAGE=apache/hadoop
   else
     export HADOOP_IMAGE=flokkr/hadoop
