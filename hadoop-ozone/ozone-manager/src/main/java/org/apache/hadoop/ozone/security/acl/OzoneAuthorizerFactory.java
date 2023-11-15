@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT;
 import static org.apache.hadoop.util.ReflectionUtils.newInstance;
 
 /**
@@ -76,6 +78,13 @@ public final class OzoneAuthorizerFactory {
     if (OzoneNativeAuthorizer.class == clazz) {
       final OzoneNativeAuthorizer authorizer = new OzoneNativeAuthorizer();
       return configure(authorizer, om, km, pm);
+    }
+
+    // If authorizer isn't native and shareable tmp dir is enabled,
+    // then return the shared tmp hybrid authorizer.
+    if (conf.getBoolean(OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR,
+        OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT)) {
+      return new SharedTmpDirAuthorizer(om, conf);
     }
 
     final IAccessAuthorizer authorizer = newInstance(clazz, conf);
