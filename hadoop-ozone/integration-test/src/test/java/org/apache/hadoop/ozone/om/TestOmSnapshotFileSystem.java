@@ -256,7 +256,7 @@ public abstract class TestOmSnapshotFileSystem {
     LinkedList<String> expectedKeys;
 
     // Intermediate level keyPrefix - 2nd level
-    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a///b2///", null);
+    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/b2/", null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/");
     expectedKeys.add("a/b2/d1/");
@@ -296,7 +296,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> ozoneBucket.listKeys(keyPrefix + "a/", null));
     assertEquals(expectedMessage, exception.getMessage());
     exception = assertThrows(OMException.class,
-        () -> ozoneBucket.listKeys(keyPrefix + "a///b2///", null));
+        () -> ozoneBucket.listKeys(keyPrefix + "a/b2/", null));
     assertEquals(expectedMessage, exception.getMessage());
     exception = assertThrows(OMException.class,
         () -> ozoneBucket.listKeys(keyPrefix + "a/b2/d1", null));
