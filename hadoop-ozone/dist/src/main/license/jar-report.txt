@@ -49,6 +49,7 @@ share/ozone/lib/grpc-netty.jar
 share/ozone/lib/grpc-protobuf.jar
 share/ozone/lib/grpc-protobuf-lite.jar
 share/ozone/lib/grpc-stub.jar
+share/ozone/lib/grpc-util.jar
 share/ozone/lib/gson.jar
 share/ozone/lib/guava-jre.jar
 share/ozone/lib/guice-assistedinject.jar
