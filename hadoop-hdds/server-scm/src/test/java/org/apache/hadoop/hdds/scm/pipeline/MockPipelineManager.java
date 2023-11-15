@@ -244,6 +244,16 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public void closePipeline(PipelineID pipelineID) throws IOException {
+
+  }
+
+  @Override
+  public void deletePipeline(PipelineID pipelineID) throws IOException {
+
+  }
+
+  @Override
   public void closeStalePipelines(DatanodeDetails datanodeDetails) {
 
   }

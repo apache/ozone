@@ -26,10 +26,10 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -39,12 +39,12 @@ public class TestPipelineActionHandler {
 
   @Test
   public void testCloseActionForMissingPipeline()
-      throws PipelineNotFoundException, NotLeaderException {
+      throws IOException {
     final PipelineManager manager = Mockito.mock(PipelineManager.class);
     final EventQueue queue = Mockito.mock(EventQueue.class);
 
-    Mockito.when(manager.getPipeline(Mockito.any(PipelineID.class)))
-        .thenThrow(new PipelineNotFoundException());
+    Mockito.doThrow(new PipelineNotFoundException())
+        .when(manager).closePipeline(Mockito.any(PipelineID.class));
 
     final PipelineActionHandler actionHandler =
         new PipelineActionHandler(manager, SCMContext.emptyContext(), null);

@@ -84,8 +84,7 @@ public class PipelineActionHandler
           info.getDetailedReason());
 
       if (action == PipelineAction.Action.CLOSE) {
-        pipelineManager.closePipeline(
-            pipelineManager.getPipeline(pid), false);
+        pipelineManager.closePipeline(pid);
       } else {
         LOG.error("unknown pipeline action:{}", action);
       }

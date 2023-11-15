@@ -90,7 +90,7 @@ public class HealthyReadOnlyNodeHandler
             pipelineID, pipeline.getPipelineState(),
             HddsProtos.NodeState.HEALTHY_READONLY,
             datanodeDetails.getUuidString());
-        pipelineManager.closePipeline(pipeline, true);
+        pipelineManager.closePipeline(pipelineID);
       } catch (IOException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
             "datanode {}: ", pipelineID, datanodeDetails, ex);

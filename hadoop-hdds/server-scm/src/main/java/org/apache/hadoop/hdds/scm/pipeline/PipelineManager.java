@@ -115,8 +115,13 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 
+  @Deprecated
   void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException;
+
+  void closePipeline(PipelineID pipelineID) throws IOException;
+
+  void deletePipeline(PipelineID pipelineID) throws IOException;
 
   void closeStalePipelines(DatanodeDetails datanodeDetails);
 

@@ -87,6 +87,8 @@ public final class Pipeline {
   // suggested leader id with high priority
   private final UUID suggestedLeaderId;
 
+  private final Instant stateEnterTime;
+
   /**
    * The immutable properties of pipeline object is used in
    * ContainerStateManager#getMatchingContainerByPipeline to take a lock on
@@ -102,6 +104,7 @@ public final class Pipeline {
     this.creationTimestamp = Instant.now();
     this.suggestedLeaderId = suggestedLeaderId;
     this.replicaIndexes = new HashMap<>();
+    this.stateEnterTime = Instant.now();
   }
 
   /**
@@ -138,6 +141,10 @@ public final class Pipeline {
    */
   public Instant getCreationTimestamp() {
     return creationTimestamp;
+  }
+
+  public Instant getStateEnterTime() {
+    return stateEnterTime;
   }
 
   /**

@@ -417,7 +417,7 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.destroy.timeout";
 
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT =
-      "66s";
+      "120s";
 
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL =
       "ozone.scm.pipeline.creation.interval";
@@ -427,7 +427,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
       "ozone.scm.pipeline.scrub.interval";
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
-      "5m";
+      "60s";
 
 
   // Allow SCM to auto create factor ONE ratis pipeline.
