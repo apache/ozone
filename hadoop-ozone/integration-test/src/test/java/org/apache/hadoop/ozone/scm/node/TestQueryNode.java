@@ -68,7 +68,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test Query Node Operation.
  */
-@Unhealthy
 public class TestQueryNode {
   private static int numOfDatanodes = 5;
   private MiniOzoneCluster cluster;
