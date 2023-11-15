@@ -62,7 +62,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </organization>
 
   <properties>
-    <hadoop2.version>2.7.3</hadoop2.version>
+    <hadoop2.version>2.10.2</hadoop2.version>
     <hadoop.version>3.3.6</hadoop.version>
 
     <!-- version for hdds/ozone components -->
