@@ -66,6 +66,9 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT;
+
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
  * Ozone containers.
@@ -131,8 +134,13 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
+    final boolean zerocopyEnabled = conf.getBoolean(
+        OZONE_EC_GRPC_ZERO_COPY_ENABLED,
+        OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT);
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
+    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher,
+        zerocopyEnabled);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
@@ -140,7 +148,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .channelType(channelType)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
-            new GrpcXceiverService(dispatcher), new GrpcServerInterceptor()));
+            xceiverService.bindServiceWithZerocopy(),
+            new GrpcServerInterceptor()));
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
