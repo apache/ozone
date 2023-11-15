@@ -25,10 +25,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -147,7 +149,10 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -160,6 +165,7 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
@@ -319,6 +325,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SecretKeyManagerService secretKeyManagerService;
 
   private Clock systemClock;
+  private DNSToSwitchMapping dnsToSwitchMapping;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -703,11 +710,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .build();
     }
 
+    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+        conf.getClass(
+            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            TableMapping.class, DNSToSwitchMapping.class);
+    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+        dnsToSwitchMappingClass, conf);
+    dnsToSwitchMapping =
+        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+            : new CachedDNSToSwitchMapping(newInstance));
+
     if (configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
-          clusterMap, scmContext, scmLayoutVersionManager);
+          clusterMap, scmContext, scmLayoutVersionManager,
+          this::resolveNodeLocation);
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();
@@ -2190,4 +2208,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }
+
+  public String resolveNodeLocation(String hostname) {
+    List<String> hosts = Collections.singletonList(hostname);
+    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+      String location = resolvedHosts.get(0);
+      LOG.debug("Node {} resolved to location {}", hostname, location);
+      return location;
+    } else {
+      LOG.debug("Node resolution did not yield any result for {}", hostname);
+      return null;
+    }
+  }
+
 }
