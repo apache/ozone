@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -358,10 +359,9 @@ public class SCMBlockProtocolServer implements
         }
       });
       List<? extends Node> sortedNodeList = scm.getClusterMap()
-          .sortByDistanceCost(client, nodeList, nodes.size());
-      List<DatanodeDetails> ret = new ArrayList<>();
-      sortedNodeList.stream().forEach(node -> ret.add((DatanodeDetails)node));
-      return ret;
+          .sortByDistanceCost(client, nodeList, nodeList.size());
+      return sortedNodeList.stream().map(r -> (DatanodeDetails) r).collect(
+          Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
