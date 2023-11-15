@@ -166,14 +166,17 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
+    String grpcContextClientIpAddress =
+        GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+    String grpcContextClientHostname =
+        GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
-    } else if (GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get() != null
-        && GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get() != null) {
-      userInfo.setHostName(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get());
-      userInfo.setRemoteAddress(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY
-          .get());
+    } else if (grpcContextClientHostname != null
+        && grpcContextClientIpAddress != null) {
+      userInfo.setHostName(grpcContextClientHostname);
+      userInfo.setRemoteAddress(grpcContextClientIpAddress);
     }
 
     return userInfo.build();

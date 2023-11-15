@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -38,13 +38,15 @@ public class ClientAddressClientInterceptor implements ClientInterceptor {
         channel.newCall(methodDescriptor, callOptions)) {
       @Override
       public void start(Listener<RespT> responseListener, Metadata headers) {
-        if (GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get() != null) {
+        String ipAddress = GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
+        if (ipAddress != null) {
           headers.put(GrpcClientConstants.CLIENT_HOSTNAME_METADATA_KEY,
-              GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get());
+              ipAddress);
         }
+        String hostname = GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
         if (GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get() != null) {
           headers.put(GrpcClientConstants.CLIENT_IP_ADDRESS_METADATA_KEY,
-              GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get());
+              hostname);
         }
         super.start(responseListener, headers);
       }

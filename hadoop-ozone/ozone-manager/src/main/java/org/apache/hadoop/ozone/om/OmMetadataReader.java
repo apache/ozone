@@ -566,8 +566,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   static String getClientAddress() {
     String clientMachine = Server.getRemoteAddress();
     if (clientMachine == null) { //not a RPC client
-      if (GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get() != null) {
-        clientMachine = GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+      String clientIpAddress =
+          GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+      if (clientIpAddress != null) {
+        clientMachine = clientIpAddress;
       } else {
         clientMachine = "";
       }
@@ -581,7 +583,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return new AuditMessage.Builder()
         .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .atIp(getClientAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.SUCCESS)
@@ -594,7 +596,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return new AuditMessage.Builder()
         .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .atIp(getClientAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.FAILURE)

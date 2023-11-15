@@ -194,9 +194,9 @@ public class GrpcOmTransport implements OmTransport {
             .withValue(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY,
                 inetAddress.getHostAddress())
             .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY,
-                inetAddress.getHostName()).run(() -> {
-                  resp.set(clients.get(host.get()).submitRequest(payload));
-                });
+                inetAddress.getHostName())
+            .run(() -> resp.set(clients.get(host.get())
+                .submitRequest(payload)));
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
