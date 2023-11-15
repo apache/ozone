@@ -73,14 +73,39 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @Parameters(description = "Decimal id of the container.")
-  private long containerID;
+  @Parameters(description = "One or more container IDs separated by spaces.")
+  private String[] containerList;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    final ContainerWithPipeline container = scmClient.
-        getContainerWithPipeline(containerID);
-    Preconditions.checkNotNull(container, "Container cannot be null");
+    boolean first = true;
+    for (String id : containerList) {
+      if (!first) {
+        LOG.info(""); // Emit a blank line
+      }
+      first = false;
+      long containerID;
+      try {
+        containerID = Long.parseLong(id);
+      } catch (NumberFormatException e) {
+        LOG.error("Invalid container ID: {}", id);
+        continue;
+      }
+      printDetails(scmClient, containerID);
+    }
+  }
+
+  private void printDetails(ScmClient scmClient, long containerID)
+      throws IOException {
+    final ContainerWithPipeline container;
+    try {
+      container = scmClient.getContainerWithPipeline(containerID);
+      Preconditions.checkNotNull(container, "Container cannot be null");
+    } catch (IOException e) {
+      LOG.error("Unable to retrieve the container details for {}", containerID);
+      return;
+    }
+
     List<ContainerReplicaInfo> replicas = null;
     try {
       replicas = scmClient.getContainerReplicas(containerID);
@@ -132,7 +157,7 @@ public class InfoSubcommand extends ScmSubcommand {
 
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
-          InfoSubcommand::buildDatanodeDetails)
+              InfoSubcommand::buildDatanodeDetails)
           .collect(Collectors.joining(",\n"));
       LOG.info("Datanodes: [{}]", machinesStr);
 

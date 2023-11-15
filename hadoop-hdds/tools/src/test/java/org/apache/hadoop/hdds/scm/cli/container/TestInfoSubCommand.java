@@ -92,6 +92,29 @@ public class TestInfoSubCommand {
     testReplicaIncludedInOutput(true);
   }
 
+  @Test
+  public void testMultipleContainersCanBePassed() throws Exception {
+    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("1", "123", "456", "invalid", "789");
+    cmd.execute(scmClient);
+
+    // Ensure we have a log line for each containerID
+    List<LoggingEvent> logs = appender.getLog();
+    List<LoggingEvent> replica = logs.stream()
+        .filter(m -> m.getRenderedMessage()
+            .matches("(?s)^Container id: (1|123|456|789).*"))
+        .collect(Collectors.toList());
+    Assertions.assertEquals(4, replica.size());
+
+    replica = logs.stream()
+        .filter(m -> m.getRenderedMessage()
+            .matches("(?s)^Invalid container ID: invalid.*"))
+        .collect(Collectors.toList());
+    Assertions.assertEquals(1, replica.size());
+  }
 
   private void testReplicaIncludedInOutput(boolean includeIndex)
       throws IOException {
