@@ -21,6 +21,8 @@ import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -36,11 +38,8 @@ import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.DefaultConfiguration;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -53,9 +52,7 @@ import com.google.inject.Provider;
  * to access the DAOs easily.
  */
 public class AbstractReconSqlDBTest {
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  private Path temporaryFolder;
 
   private Injector injector;
   private DSLContext dslContext;
@@ -63,25 +60,20 @@ public class AbstractReconSqlDBTest {
 
   public AbstractReconSqlDBTest() {
     try {
-      temporaryFolder.create();
+      temporaryFolder = Files.createTempDirectory("JunitConfig");
       configurationProvider =
-          new DerbyDataSourceConfigurationProvider(temporaryFolder.newFolder());
+          new DerbyDataSourceConfigurationProvider(Files.createDirectory(
+              temporaryFolder.resolve("Config")).toFile());
     } catch (IOException e) {
-      Assert.fail();
+      Assertions.fail();
     }
   }
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
-    try {
-      temporaryFolder.create();
-      configurationProvider = provider;
-    } catch (IOException e) {
-      Assert.fail();
-    }
+    configurationProvider = provider;
   }
 
   @BeforeEach
-  @Before
   public void createReconSchemaForTest() throws IOException {
     injector = Guice.createInjector(getReconSqlDBModules());
     dslContext = DSL.using(new DefaultConfiguration().set(

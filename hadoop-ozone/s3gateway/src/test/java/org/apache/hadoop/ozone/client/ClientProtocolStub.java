@@ -578,6 +578,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setIsS3Request(boolean isS3Request) {
+
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }
@@ -641,6 +646,12 @@ public class ClientProtocolStub implements ClientProtocol {
       String bucketName, String snapshotName)
       throws IOException {
 
+  }
+
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName,
+                                       String snapshotName) throws IOException {
+    return null;
   }
 
   public String printCompactionLogDag(String fileNamePrefix,

@@ -29,6 +29,7 @@ import java.util.UUID;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -224,7 +225,7 @@ public class ReconNodeManager extends SCMNodeManager {
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo) {
+      LayoutVersionProto layoutInfo, CommandQueueReportProto queueReport) {
     List<SCMCommand> cmds = new ArrayList<>();
     long currentTime = Time.now();
     if (needUpdate(datanodeDetails, currentTime)) {
@@ -236,7 +237,8 @@ public class ReconNodeManager extends SCMNodeManager {
     }
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
-    cmds.addAll(super.processHeartbeat(datanodeDetails, layoutInfo));
+    cmds.addAll(super.processHeartbeat(datanodeDetails,
+        layoutInfo, queueReport));
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
         .collect(toList());

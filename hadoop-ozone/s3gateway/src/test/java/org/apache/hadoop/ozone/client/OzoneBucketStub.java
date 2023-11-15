@@ -512,7 +512,7 @@ public class OzoneBucketStub extends OzoneBucket {
         if (partEntry.getKey() > partNumberMarker) {
           PartInfo partInfo = new PartInfo(partEntry.getKey(),
               partEntry.getValue().getPartName(),
-              partEntry.getValue().getContent().length, Time.now());
+              Time.now(), partEntry.getValue().getContent().length);
           partInfoList.add(partInfo);
           count++;
         }

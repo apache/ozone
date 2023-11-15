@@ -66,12 +66,15 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
    * Assuming all dirObjIds belong to a bucket this function resolves absolute
    * path for a given FSO bucket.
    * @param dirObjIds Object Ids corresponding to which absolute path is needed.
+   * @param skipUnresolvedObjs boolean value to skipUnresolved objects when
+   *                           false exception will be thrown.
    * @return Map of Path corresponding to provided directory object IDs
    */
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Override
   public Map<Long, Path> getAbsolutePathForObjectIDs(
-      Optional<Set<Long>> dirObjIds) throws IOException {
+      Optional<Set<Long>> dirObjIds, boolean skipUnresolvedObjs)
+      throws IOException {
     // Root of a bucket would always have the
     // key as /volumeId/bucketId/bucketId/
     if (!dirObjIds.isPresent() || dirObjIds.get().isEmpty()) {
@@ -100,7 +103,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
       }
     }
     // Invalid directory objectId which does not exist in the given bucket.
-    if (objIds.size() > 0) {
+    if (objIds.size() > 0 && !skipUnresolvedObjs) {
       throw new IllegalArgumentException(
           "Dir object Ids required but not found in bucket: " + objIds);
     }

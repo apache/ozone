@@ -193,7 +193,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
           omResponse.build(), snapshotInfo);
-    } catch (IOException | InvalidPathException ex) {
+    } catch (IOException | InvalidPathException | IllegalStateException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -250,7 +250,9 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * it was removed at T-5.
    */
   private void addSnapshotInfoToSnapshotChainAndCache(
-      OmMetadataManagerImpl omMetadataManager, long transactionLogIndex)  {
+      OmMetadataManagerImpl omMetadataManager,
+      long transactionLogIndex
+  ) throws IOException {
     // It is synchronized on SnapshotChainManager object so that this block is
     // synchronized with OMSnapshotPurgeResponse#cleanupSnapshotChain and only
     // one of these two operation gets executed at a time otherwise we could be
@@ -259,21 +261,20 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       SnapshotChainManager snapshotChainManager =
           omMetadataManager.getSnapshotChainManager();
 
+      UUID latestPathSnapshot =
+          snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
+      UUID latestGlobalSnapshot =
+          snapshotChainManager.getLatestGlobalSnapshotId();
+
+      snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
+      snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
+
       try {
-        UUID latestPathSnapshot =
-            snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
-        UUID latestGlobalSnapshot =
-            snapshotChainManager.getLatestGlobalSnapshotId();
-
-        snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
-        snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
-
         snapshotChainManager.addSnapshot(snapshotInfo);
-
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
                 CacheValue.get(transactionLogIndex, snapshotInfo));
-      } catch (IllegalStateException illegalStateException) {
+      } catch (Exception exception) {
         // Remove snapshot from the SnapshotChainManager in case of any failure.
         // It is possible that createSnapshot request fails after snapshot gets
         // added to snapshot chain manager because couldn't add it to cache/DB.
@@ -286,7 +287,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         // added to the SnapshotInfo table.
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
-        throw illegalStateException;
+        throw new IOException(exception.getMessage(), exception);
       }
     }
   }

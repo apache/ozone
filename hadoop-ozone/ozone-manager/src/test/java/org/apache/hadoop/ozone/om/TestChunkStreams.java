@@ -20,24 +20,19 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests KeyInputStream and KeyOutputStream.
  */
 public class TestChunkStreams {
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
   @Test
   public void testReadGroupInputStream() throws Exception {

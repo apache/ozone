@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -123,6 +124,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
@@ -205,6 +207,7 @@ public class ObjectEndpoint extends EndpointBase {
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html for
    * more details.
    */
+  @SuppressWarnings("checkstyle:MethodLength")
   @PUT
   public Response put(
       @PathParam("bucket") String bucketName,
@@ -217,9 +220,6 @@ public class ObjectEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.CREATE_KEY;
 
     boolean auditSuccess = true;
-
-    OzoneOutputStream output = null;
-
     String copyHeader = null, storageType = null;
     try {
       OzoneVolume volume = getVolume();
@@ -289,6 +289,7 @@ public class ObjectEndpoint extends EndpointBase {
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new DigestInputStream(new SignedChunksInputStream(body),
             E_TAG_PROVIDER.get());
+        length = Long.parseLong(amzDecodedLength);
       } else {
         body = new DigestInputStream(body, E_TAG_PROVIDER.get());
       }
@@ -303,14 +304,16 @@ public class ObjectEndpoint extends EndpointBase {
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
-        output = getClientProtocol().createKey(volume.getName(), bucketName,
-            keyPath, length, replicationConfig, customMetadata);
-        getMetrics().updatePutKeyMetadataStats(startNanos);
-        putLength = IOUtils.copyLarge(body, output);
-        eTag = DatatypeConverter.printHexBinary(
-            ((DigestInputStream) body).getMessageDigest().digest())
-            .toLowerCase();
-        output.getMetadata().put(ETAG, eTag);
+        try (OzoneOutputStream output = getClientProtocol().createKey(
+            volume.getName(), bucketName, keyPath, length, replicationConfig,
+            customMetadata)) {
+          getMetrics().updatePutKeyMetadataStats(startNanos);
+          putLength = IOUtils.copyLarge(body, output);
+          eTag = DatatypeConverter.printHexBinary(
+                  ((DigestInputStream) body).getMessageDigest().digest())
+              .toLowerCase();
+          output.getMetadata().put(ETAG, eTag);
+        }
       }
 
       getMetrics().incPutKeySuccessLength(putLength);
@@ -352,9 +355,6 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
-      if (output != null) {
-        output.close();
-      }
       if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
@@ -845,6 +845,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   private Response createMultipartKey(OzoneVolume volume, String bucket,
                                       String key, long length, int partNumber,
                                       String uploadID, InputStream body)
@@ -852,12 +853,13 @@ public class ObjectEndpoint extends EndpointBase {
     long startNanos = Time.monotonicNowNanos();
     String copyHeader = null;
     try {
-      OzoneOutputStream ozoneOutputStream = null;
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new DigestInputStream(new SignedChunksInputStream(body),
             E_TAG_PROVIDER.get());
+        length = Long.parseLong(
+            headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER));
       } else {
         body = new DigestInputStream(body, E_TAG_PROVIDER.get());
       }
@@ -875,78 +877,96 @@ public class ObjectEndpoint extends EndpointBase {
         enableEC = true;
       }
 
-      try {
-        if (datastreamEnabled && !enableEC && copyHeader == null) {
-          getMetrics().updatePutKeyMetadataStats(startNanos);
-          return ObjectEndpointStreaming
-              .createMultipartKey(ozoneBucket, key, length, partNumber,
-                  uploadID, chunkSize, (DigestInputStream) body);
+      if (datastreamEnabled && !enableEC && copyHeader == null) {
+        getMetrics().updatePutKeyMetadataStats(startNanos);
+        return ObjectEndpointStreaming
+            .createMultipartKey(ozoneBucket, key, length, partNumber,
+                uploadID, chunkSize, (DigestInputStream) body);
+      }
+      // OmMultipartCommitUploadPartInfo can only be gotten after the
+      // OzoneOutputStream is closed, so we need to save the KeyOutputStream
+      // in the OzoneOutputStream and use it to get the
+      // OmMultipartCommitUploadPartInfo after OzoneOutputStream is closed.
+      KeyOutputStream keyOutputStream = null;
+      if (copyHeader != null) {
+        Pair<String, String> result = parseSourceHeader(copyHeader);
+        String sourceBucket = result.getLeft();
+        String sourceKey = result.getRight();
+
+        OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
+            volume.getName(), sourceBucket, sourceKey);
+        String range =
+            headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
+        RangeHeader rangeHeader = null;
+        if (range != null) {
+          rangeHeader = RangeHeaderParserUtil.parseRangeHeader(range, 0);
+          // When copy Range, the size of the target key is the
+          // length specified by COPY_SOURCE_HEADER_RANGE.
+          length = rangeHeader.getEndOffset() -
+              rangeHeader.getStartOffset() + 1;
+        } else {
+          length = sourceKeyDetails.getDataSize();
         }
-        ozoneOutputStream = getClientProtocol().createMultipartKey(
-            volume.getName(), bucket, key, length, partNumber, uploadID);
+        Long sourceKeyModificationTime = sourceKeyDetails
+            .getModificationTime().toEpochMilli();
+        String copySourceIfModifiedSince =
+            headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
+        String copySourceIfUnmodifiedSince =
+            headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
+        if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+            copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
+          throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
+        }
 
-        if (copyHeader != null) {
-          Pair<String, String> result = parseSourceHeader(copyHeader);
-
-          String sourceBucket = result.getLeft();
-          String sourceKey = result.getRight();
-
-          OzoneKeyDetails sourceKeyDetails = getClientProtocol().getKeyDetails(
-              volume.getName(), sourceBucket, sourceKey);
-          Long sourceKeyModificationTime = sourceKeyDetails
-              .getModificationTime().toEpochMilli();
-          String copySourceIfModifiedSince =
-              headers.getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
-          String copySourceIfUnmodifiedSince =
-              headers.getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-          if (!checkCopySourceModificationTime(sourceKeyModificationTime,
-              copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
-            throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
-          }
-
-          try (OzoneInputStream sourceObject = sourceKeyDetails.getContent()) {
-
-            String range =
-                headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
-            long copyLength;
-            if (range != null) {
-              RangeHeader rangeHeader =
-                  RangeHeaderParserUtil.parseRangeHeader(range, 0);
-              final long skipped =
-                  sourceObject.skip(rangeHeader.getStartOffset());
-              if (skipped != rangeHeader.getStartOffset()) {
-                throw new EOFException(
-                    "Bytes to skip: "
-                        + rangeHeader.getStartOffset() + " actual: " + skipped);
-              }
+        try (OzoneInputStream sourceObject = sourceKeyDetails.getContent()) {
+          long copyLength;
+          if (range != null) {
+            final long skipped =
+                sourceObject.skip(rangeHeader.getStartOffset());
+            if (skipped != rangeHeader.getStartOffset()) {
+              throw new EOFException(
+                  "Bytes to skip: "
+                      + rangeHeader.getStartOffset() + " actual: " + skipped);
+            }
+            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
+                .createMultipartKey(volume.getName(), bucket, key, length,
+                    partNumber, uploadID)) {
               getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
-                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset()
-                      + 1);
-            } else {
+              copyLength = IOUtils.copyLarge(
+                  sourceObject, ozoneOutputStream, 0, length);
+              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
+            }
+          } else {
+            try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
+                .createMultipartKey(volume.getName(), bucket, key, length,
+                    partNumber, uploadID)) {
               getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
+              keyOutputStream = ozoneOutputStream.getKeyOutputStream();
             }
-            getMetrics().incCopyObjectSuccessLength(copyLength);
           }
-        } else {
+          getMetrics().incCopyObjectSuccessLength(copyLength);
+        }
+      } else {
+        long putLength;
+        try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
+            .createMultipartKey(volume.getName(), bucket, key, length,
+                partNumber, uploadID)) {
           getMetrics().updatePutKeyMetadataStats(startNanos);
-          long putLength = IOUtils.copyLarge(body, ozoneOutputStream);
+          putLength = IOUtils.copyLarge(body, ozoneOutputStream);
           ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
-              .getMetadata().put("ETag", DatatypeConverter.printHexBinary(
-                  ((DigestInputStream) body).getMessageDigest().digest())
+              .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
+                      ((DigestInputStream) body).getMessageDigest().digest())
                   .toLowerCase());
-          getMetrics().incPutKeySuccessLength(putLength);
+          keyOutputStream
+              = ozoneOutputStream.getKeyOutputStream();
         }
-      } finally {
-        if (ozoneOutputStream != null) {
-          ozoneOutputStream.close();
-        }
+        getMetrics().incPutKeySuccessLength(putLength);
       }
 
-      assert ozoneOutputStream != null;
+      assert keyOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
-          ozoneOutputStream.getCommitUploadPartInfo();
+          keyOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
       if (copyHeader != null) {
