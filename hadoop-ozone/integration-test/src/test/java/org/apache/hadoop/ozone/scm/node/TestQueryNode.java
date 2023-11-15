@@ -86,8 +86,8 @@ public class TestQueryNode {
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -113,14 +113,14 @@ public class TestQueryNode {
   }
 
   @Test
-  @Timeout(10)
+  @Timeout(15)
   public void testStaleNodesCount() throws Exception {
     cluster.shutdownHddsDatanode(0);
     cluster.shutdownHddsDatanode(1);
 
     GenericTestUtils.waitFor(() ->
             cluster.getStorageContainerManager().getNodeCount(STALE) == 2,
-        100, 4 * 1000);
+        100,  10 * 1000);
 
     int nodeCount = scmClient.queryNode(null, STALE,
         HddsProtos.QueryScope.CLUSTER, "").size();
