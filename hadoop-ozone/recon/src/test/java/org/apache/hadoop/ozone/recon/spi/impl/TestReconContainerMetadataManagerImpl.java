@@ -20,12 +20,14 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,20 +39,18 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit Tests for ContainerDBServiceProviderImpl.
  */
 public class TestReconContainerMetadataManagerImpl {
 
-  @ClassRule
-  public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
+  @TempDir()
+  private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
 
@@ -58,13 +58,14 @@ public class TestReconContainerMetadataManagerImpl {
   private String keyPrefix2 = "V3/B1/K2";
   private String keyPrefix3 = "V3/B2/K1";
 
-  @BeforeClass
+  @BeforeAll
   public static void setupOnce() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(TEMP_FOLDER.newFolder()),
-        TEMP_FOLDER.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(TEMP_FOLDER)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withContainerDB()
             .withReconOm(reconOMMetadataManager)
@@ -73,7 +74,7 @@ public class TestReconContainerMetadataManagerImpl {
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // Reset containerDB before running each test
     reconContainerMetadataManager.reinitWithNewContainerDataFromOm(null);
@@ -176,15 +177,15 @@ public class TestReconContainerMetadataManagerImpl {
     }
     reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
 
-    Assert.assertEquals(1,
+    assertEquals(1,
         reconContainerMetadataManager.getCountForContainerKeyPrefix(
             ContainerKeyPrefix.get(containerId, keyPrefix1,
                 0)).longValue());
-    Assert.assertEquals(2,
+    assertEquals(2,
         reconContainerMetadataManager.getCountForContainerKeyPrefix(
             ContainerKeyPrefix.get(containerId, keyPrefix2,
                 0)).longValue());
-    Assert.assertEquals(3,
+    assertEquals(3,
         reconContainerMetadataManager.getCountForContainerKeyPrefix(
             ContainerKeyPrefix.get(containerId, keyPrefix3,
                 0)).longValue());

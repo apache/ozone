@@ -695,7 +695,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
    */
   @Override
   public int getDistanceCost(Node node1, Node node2) {
-    if ((node1 != null && node2 != null && node1.equals(node2)) ||
+    if ((node1 != null && node1.equals(node2)) ||
         (node1 == null && node2 == null))  {
       return 0;
     }
@@ -703,17 +703,23 @@ public class NetworkTopologyImpl implements NetworkTopology {
       LOG.warn("One of the nodes is a null pointer");
       return Integer.MAX_VALUE;
     }
+
+    // verify levels are in range
+    int level1 = node1.getLevel();
+    int level2 = node2.getLevel();
+    if (level1 < NetConstants.ROOT_LEVEL || level2 < NetConstants.ROOT_LEVEL) {
+      return Integer.MAX_VALUE;
+    }
+    if (level1 > maxLevel || level2 > maxLevel) {
+      return Integer.MAX_VALUE;
+    }
+
     int cost = 0;
     netlock.readLock().lock();
     try {
-      if ((node1.getAncestor(maxLevel - 1) != clusterTree) ||
-          (node2.getAncestor(maxLevel - 1) != clusterTree)) {
+      if ((node1.getAncestor(level1 - 1) != clusterTree) ||
+          (node2.getAncestor(level2 - 1) != clusterTree)) {
         LOG.debug("One of the nodes is outside of network topology");
-        return Integer.MAX_VALUE;
-      }
-      int level1 = node1.getLevel();
-      int level2 = node2.getLevel();
-      if (level1 > maxLevel || level2 > maxLevel) {
         return Integer.MAX_VALUE;
       }
       while (level1 > level2 && node1 != null) {
