@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
+import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -38,10 +39,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .VolumeInfo;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -54,8 +54,8 @@ import static org.mockito.Mockito.when;
 @SuppressWarnings("visibilitymodifier")
 public class TestOMVolumeRequest {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   protected OzoneManager ozoneManager;
   protected OMMetrics omMetrics;
@@ -67,13 +67,13 @@ public class TestOMVolumeRequest {
         return null;
       });
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
@@ -88,7 +88,7 @@ public class TestOMVolumeRequest {
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
   }
 
-  @After
+  @AfterEach
   public void stop() {
     omMetrics.unRegister();
     Mockito.framework().clearInlineMocks();

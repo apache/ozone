@@ -43,9 +43,9 @@ import org.mockito.Mockito;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * The class tests OMGetDelegationTokenRequest.
@@ -62,7 +62,7 @@ public class TestOMGetDelegationTokenRequest extends
   private OMGetDelegationTokenRequest omGetDelegationTokenRequest;
   private static final String CHECK_RESPONSE = "";
 
-  @Before
+  @BeforeEach
   public void setupGetDelegationToken() throws IOException {
     secretManager = Mockito.mock(OzoneDelegationTokenSecretManager.class);
     when(ozoneManager.getDelegationTokenMgr()).thenReturn(secretManager);
@@ -94,10 +94,10 @@ public class TestOMGetDelegationTokenRequest extends
   }
 
   private void verifyUnchangedRequest() {
-    Assert.assertEquals(
+    Assertions.assertEquals(
         originalRequest.getCmdType(),
         modifiedRequest.getCmdType());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         originalRequest.getClientId(),
         modifiedRequest.getClientId());
   }
@@ -141,16 +141,16 @@ public class TestOMGetDelegationTokenRequest extends
         .getTokenRenewInterval();
     long renewInterval = modifiedRequest.getUpdateGetDelegationTokenRequest()
         .getTokenRenewInterval();
-    Assert.assertNotEquals(originalInterval, renewInterval);
-    Assert.assertEquals(tokenRenewInterval, renewInterval);
+    Assertions.assertNotEquals(originalInterval, renewInterval);
+    Assertions.assertEquals(tokenRenewInterval, renewInterval);
 
     /* In preExecute(), if the token is nonNull
      we set GetDelegationTokenResponse with response. */
-    Assert.assertNotEquals(CHECK_RESPONSE,
+    Assertions.assertNotEquals(CHECK_RESPONSE,
         modifiedRequest.getUpdateGetDelegationTokenRequest()
             .getGetDelegationTokenResponse()
             .toString());
-    Assert.assertNotNull(modifiedRequest
+    Assertions.assertNotNull(modifiedRequest
         .getUpdateGetDelegationTokenRequest()
         .getGetDelegationTokenResponse());
   }
@@ -165,7 +165,7 @@ public class TestOMGetDelegationTokenRequest extends
 
     /* In preExecute(), if the token is null
      we do not set GetDelegationTokenResponse with response. */
-    Assert.assertEquals(CHECK_RESPONSE,
+    Assertions.assertEquals(CHECK_RESPONSE,
         modifiedRequest.getUpdateGetDelegationTokenRequest()
             .getGetDelegationTokenResponse()
             .toString());
@@ -188,9 +188,10 @@ public class TestOMGetDelegationTokenRequest extends
 
     Optional<Long> responseRenewTime = Optional.fromNullable(
         omMetadataManager.getDelegationTokenTable().get(identifier));
-    Assert.assertEquals(Optional.of(renewTime), responseRenewTime);
+    Assertions.assertEquals(Optional.of(renewTime), responseRenewTime);
 
-    Assert.assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
+    Assertions.assertEquals(Status.OK, clientResponse.getOMResponse()
+        .getStatus());
   }
 
   @Test
@@ -202,13 +203,14 @@ public class TestOMGetDelegationTokenRequest extends
 
     boolean hasResponse = modifiedRequest.getUpdateGetDelegationTokenRequest()
         .getGetDelegationTokenResponse().hasResponse();
-    Assert.assertFalse(hasResponse);
+    Assertions.assertFalse(hasResponse);
 
     Optional<Long> responseRenewTime = Optional.fromNullable(
         omMetadataManager.getDelegationTokenTable().get(identifier));
-    Assert.assertEquals(Optional.absent(), responseRenewTime);
+    Assertions.assertEquals(Optional.absent(), responseRenewTime);
 
-    Assert.assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
+    Assertions.assertEquals(Status.OK, clientResponse.getOMResponse()
+        .getStatus());
   }
 
   @Test
@@ -222,9 +224,9 @@ public class TestOMGetDelegationTokenRequest extends
 
     boolean hasResponse = modifiedRequest.getUpdateGetDelegationTokenRequest()
         .getGetDelegationTokenResponse().hasResponse();
-    Assert.assertTrue(hasResponse);
+    Assertions.assertTrue(hasResponse);
 
-    Assert.assertNotEquals(Status.OK,
+    Assertions.assertNotEquals(Status.OK,
         clientResponse.getOMResponse().getStatus());
   }
 }

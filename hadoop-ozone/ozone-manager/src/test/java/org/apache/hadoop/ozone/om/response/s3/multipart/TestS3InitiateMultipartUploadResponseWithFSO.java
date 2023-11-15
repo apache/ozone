@@ -23,8 +23,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,24 +81,26 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
 
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(multipartOpenKey);
-    Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
-    Assert.assertNotNull("Key Location is null!",
-        omKeyInfo.getLatestVersionLocations());
-    Assert.assertTrue("isMultipartKey is false!",
-        omKeyInfo.getLatestVersionLocations().isMultipartKey());
-    Assert.assertEquals("FileName mismatches!", fileName,
-            omKeyInfo.getKeyName());
-    Assert.assertEquals("ParentId mismatches!", parentID,
-            omKeyInfo.getParentObjectID());
+    Assertions.assertNotNull(omKeyInfo, "Failed to find the fileInfo");
+    Assertions.assertNotNull(omKeyInfo.getLatestVersionLocations(),
+        "Key Location is null!");
+    Assertions.assertTrue(
+        omKeyInfo.getLatestVersionLocations().isMultipartKey(),
+        "isMultipartKey is false!");
+    Assertions.assertEquals(fileName, omKeyInfo.getKeyName(),
+        "FileName mismatches!");
+    Assertions.assertEquals(parentID, omKeyInfo.getParentObjectID(),
+        "ParentId mismatches!");
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartKey);
-    Assert.assertNotNull("Failed to find the multipartFileInfo",
-            omMultipartKeyInfo);
-    Assert.assertEquals("ParentId mismatches!", parentID,
-            omMultipartKeyInfo.getParentID());
+    Assertions.assertNotNull(omMultipartKeyInfo,
+        "Failed to find the multipartFileInfo");
+    Assertions.assertEquals(parentID, omMultipartKeyInfo.getParentID(),
+        "ParentId mismatches!");
 
-    Assert.assertEquals("Upload Id mismatches!", multipartUploadID,
-            omMultipartKeyInfo.getUploadID());
+    Assertions.assertEquals(multipartUploadID,
+        omMultipartKeyInfo.getUploadID(),
+        "Upload Id mismatches!");
   }
 }

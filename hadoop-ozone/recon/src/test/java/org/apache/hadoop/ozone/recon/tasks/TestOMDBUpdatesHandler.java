@@ -21,13 +21,13 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -49,10 +49,9 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.WriteBatch;
@@ -62,30 +61,29 @@ import org.rocksdb.WriteBatch;
  */
 public class TestOMDBUpdatesHandler {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private OMMetadataManager omMetadataManager;
   private OMMetadataManager reconOmMetadataManager;
   private OMDBDefinition omdbDefinition = new OMDBDefinition();
   private Random random = new Random();
 
-  private OzoneConfiguration createNewTestPath() throws IOException {
+  private OzoneConfiguration createNewTestPath(String folderName)
+      throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      assertTrue(newFolder.mkdirs());
-    }
-    ServerUtils.setOzoneMetaDirPath(configuration, newFolder.toString());
+    Path tempDirPath =
+        Files.createDirectory(temporaryFolder.resolve(folderName));
+    ServerUtils.setOzoneMetaDirPath(configuration, tempDirPath.toString());
     return configuration;
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
-    OzoneConfiguration configuration = createNewTestPath();
+    OzoneConfiguration configuration = createNewTestPath("config");
     omMetadataManager = new OmMetadataManagerImpl(configuration, null);
 
-    OzoneConfiguration reconConfiguration = createNewTestPath();
+    OzoneConfiguration reconConfiguration = createNewTestPath("reconConfig");
     reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration,
         null);
   }

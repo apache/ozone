@@ -343,7 +343,7 @@ public class TestOmMetrics {
     assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
+    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(

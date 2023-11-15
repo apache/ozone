@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -428,7 +429,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         .setVisibility(PropertyAccessor.IS_GETTER,
             JsonAutoDetect.Visibility.NONE)
         // Exclude null values.
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
     public static final ObjectWriter WRITER;
 
     static {
