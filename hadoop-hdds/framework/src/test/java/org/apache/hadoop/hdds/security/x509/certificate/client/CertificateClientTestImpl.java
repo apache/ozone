@@ -260,8 +260,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public InitResponse init() throws CertificateException {
-    return null;
+  public void initWithRecovery() throws IOException {
   }
 
   @Override

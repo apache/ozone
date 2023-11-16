@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
@@ -393,31 +392,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           this::terminateDatanode);
       certClient = dnCertClient;
     }
-    CertificateClient.InitResponse response = certClient.init();
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful, case:{}.", response);
-      break;
-    case GETCERT:
-      CertificateSignRequest.Builder csrBuilder = certClient.getCSRBuilder();
-      String dnCertSerialId =
-          certClient.signAndStoreCertificate(csrBuilder.build());
-      // persist cert ID to VERSION file
-      datanodeDetails.setCertSerialId(dnCertSerialId);
-      persistDatanodeDetails(datanodeDetails);
-      LOG.info("Successfully stored SCM signed certificate, case:{}.",
-          response);
-      break;
-    case FAILURE:
-      LOG.error("DN security initialization failed, case:{}.", response);
-      throw new RuntimeException("DN security initialization failed.");
-    default:
-      LOG.error("DN security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("DN security initialization failed.");
-    }
-
+    certClient.initWithRecovery();
     return certClient;
   }
 
