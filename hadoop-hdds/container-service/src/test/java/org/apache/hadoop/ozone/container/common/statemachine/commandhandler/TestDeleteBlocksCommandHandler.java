@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -57,6 +58,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.DeleteBlockTransactionExecutionResult;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
@@ -262,6 +264,23 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
+  @Test
+  public void testDeleteCmdWorkerInterval() {
+    OzoneConfiguration tmpConf = new OzoneConfiguration();
+    tmpConf.setLong(BLOCK_DELETE_COMMAND_WORKER_INTERVAL, 3000);
+    OzoneContainer container = Mockito.mock(OzoneContainer.class);
+    DatanodeConfiguration dnConf =
+        tmpConf.getObject(DatanodeConfiguration.class);
+    DeleteBlocksCommandHandler commandHandler =
+        spy(new DeleteBlocksCommandHandler(
+        container, tmpConf, dnConf, "test"));
+
+    Assert.assertEquals(Long.parseLong(tmpConf.get(
+        BLOCK_DELETE_COMMAND_WORKER_INTERVAL)), 3000);
+    DeleteBlocksCommandHandler.DeleteCmdWorker deleteCmdWorker =
+        commandHandler.new DeleteCmdWorker(4000);
+    Assert.assertEquals(deleteCmdWorker.getInterval(), 4000);
+  }
 
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,
       long containerID) {

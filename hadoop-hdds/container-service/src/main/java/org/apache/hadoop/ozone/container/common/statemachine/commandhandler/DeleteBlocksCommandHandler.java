@@ -79,6 +79,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
 /**
  * Handle block deletion commands.
@@ -121,7 +123,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
-    handlerThread = new Daemon(new DeleteCmdWorker());
+    long interval = this.conf.getLong(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+        BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
+    handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
   }
 
@@ -221,6 +225,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   public final class DeleteCmdWorker implements Runnable {
 
+    private long interval;
+
+    public DeleteCmdWorker(long interval) {
+      this.interval = interval;
+    }
+
+    @VisibleForTesting
+    public long getInterval() {
+      return this.interval;
+    }
+
     @Override
     public void run() {
       while (true) {
@@ -234,7 +249,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
 
         try {
-          Thread.sleep(2000);
+          Thread.sleep(this.interval);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
