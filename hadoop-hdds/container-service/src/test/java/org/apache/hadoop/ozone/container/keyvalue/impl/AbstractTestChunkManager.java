@@ -113,7 +113,7 @@ public abstract class AbstractTestChunkManager {
   }
 
   protected DispatcherContext getDispatcherContext() {
-    return new DispatcherContext.Builder().build();
+    return null;
   }
 
   protected Buffer rewindBufferToDataStart() {

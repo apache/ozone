@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
@@ -39,11 +40,9 @@ public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
   @Test
   public void dummyManagerDoesNotWriteToFile() throws Exception {
     ChunkManager subject = createTestSubject();
-    DispatcherContext ctx = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
 
     subject.writeChunk(getKeyValueContainer(), getBlockID(), getChunkInfo(),
-        getData(), ctx);
+        getData(), WRITE_STAGE);
 
     checkChunkFileCount(0);
   }

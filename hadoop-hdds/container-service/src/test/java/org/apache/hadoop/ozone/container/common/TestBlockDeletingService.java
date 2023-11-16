@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -70,7 +69,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
@@ -109,6 +107,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
@@ -128,9 +128,8 @@ public class TestBlockDeletingService {
 
   private File testRoot;
   private String scmId;
-  private String clusterID;
   private String datanodeUuid;
-  private OzoneConfiguration conf;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
@@ -140,7 +139,6 @@ public class TestBlockDeletingService {
   public TestBlockDeletingService(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
@@ -159,7 +157,6 @@ public class TestBlockDeletingService {
       FileUtils.cleanDirectory(testRoot);
     }
     scmId = UUID.randomUUID().toString();
-    clusterID = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
@@ -174,14 +171,6 @@ public class TestBlockDeletingService {
     FileUtils.deleteDirectory(testRoot);
     CodecBuffer.assertNoLeaks();
   }
-
-  private static final DispatcherContext WRITE_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
-
-  private static final DispatcherContext COMMIT_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
   /**
    * A helper method to create some blocks and put them under deletion

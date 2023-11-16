@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.container.testutils;
+package org.apache.hadoop.ozone.container.common;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
@@ -31,8 +31,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 /**
  * A test class implementation for {@link BlockDeletingService}.
  */
-public class BlockDeletingServiceTestImpl
-    extends BlockDeletingService {
+class BlockDeletingServiceTestImpl extends BlockDeletingService {
 
   // the service timeout
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
