@@ -93,7 +93,7 @@ import static org.mockito.Mockito.verify;
  * Test-cases to verify the functionality of HddsDispatcher.
  */
 @RunWith(Parameterized.class)
-public class TestHddst Dispatcher {
+public class TestHddsDispatcher {
 
   public static final IncrementalReportSender<Container>
       NO_OP_ICR_SENDER = c -> { };
