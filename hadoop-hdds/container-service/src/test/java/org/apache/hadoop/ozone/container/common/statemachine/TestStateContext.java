@@ -85,7 +85,7 @@ public class TestStateContext {
         mock(DatanodeStateMachine.class);
 
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     ctx.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -300,7 +300,7 @@ public class TestStateContext {
   private StateContext newStateContext(OzoneConfiguration conf,
       DatanodeStateMachine datanodeStateMachineMock) {
     StateContext stateContext = new StateContext(conf,
-        DatanodeStates.getInitState(), datanodeStateMachineMock);
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     stateContext.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -328,7 +328,7 @@ public class TestStateContext {
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     StateContext stateContext = new StateContext(conf,
-        DatanodeStates.getInitState(), datanodeStateMachineMock);
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -365,7 +365,7 @@ public class TestStateContext {
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     StateContext stateContext = new StateContext(conf,
-        DatanodeStates.getInitState(), datanodeStateMachineMock);
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -429,7 +429,7 @@ public class TestStateContext {
     final AtomicBoolean taskExecuted = new AtomicBoolean();
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
-        DatanodeStates.getInitState(), mock(DatanodeStateMachine.class)) {
+        DatanodeStates.getInitState(), mock(DatanodeStateMachine.class), "") {
       @Override
       public DatanodeState<DatanodeStates> getTask() {
         // this task waits until {@code subject} is shutdown
@@ -478,7 +478,7 @@ public class TestStateContext {
   @Test
   public void testIsThreadPoolAvailable() throws Exception {
     StateContext stateContext = new StateContext(
-        new OzoneConfiguration(), null, null);
+        new OzoneConfiguration(), null, null, "");
 
     int threadPoolSize = 2;
     ExecutorService executorService = Executors.newFixedThreadPool(
@@ -514,7 +514,7 @@ public class TestStateContext {
     executorService.submit((Callable<String>) future::get);
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
-        DatanodeStates.INIT, mock(DatanodeStateMachine.class)) {
+        DatanodeStates.INIT, mock(DatanodeStateMachine.class), "") {
       @Override
       public DatanodeState<DatanodeStates> getTask() {
         // this task counts the number of execute() and await() calls
@@ -564,7 +564,7 @@ public class TestStateContext {
         mock(DatanodeStateMachine.class);
 
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     ctx.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -678,7 +678,7 @@ public class TestStateContext {
             StorageContainerDatanodeProtocolProtos
                 .ContainerReportsProto.getDefaultInstance());
     return new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
   }
 
   private static SCMCommand<?> someCommand() {

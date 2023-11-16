@@ -110,7 +110,7 @@ public final class ContainerTestUtils {
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
     return new EndpointStateMachine(address, rpcClient,
-        new LegacyHadoopConfigurationSource(conf));
+        new LegacyHadoopConfigurationSource(conf), "");
   }
 
   public static OzoneContainer getOzoneContainer(
@@ -124,7 +124,7 @@ public final class ContainerTestUtils {
       OzoneConfiguration conf) {
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
-    Mockito.when(stateMachine.getReconfigurationHandler())
+    Mockito.lenient().when(stateMachine.getReconfigurationHandler())
         .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);

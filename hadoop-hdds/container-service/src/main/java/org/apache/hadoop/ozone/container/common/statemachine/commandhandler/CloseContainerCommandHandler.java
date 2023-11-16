@@ -65,13 +65,14 @@ public class CloseContainerCommandHandler implements CommandHandler {
    * Constructs a ContainerReport handler.
    */
   public CloseContainerCommandHandler(
-      int threadPoolSize, int queueSize) {
+      int threadPoolSize, int queueSize, String threadNamePrefix) {
     executor = new ThreadPoolExecutor(
-            threadPoolSize, threadPoolSize,
-            0L, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(queueSize),
-            new ThreadFactoryBuilder()
-                .setNameFormat("CloseContainerThread-%d").build());
+        threadPoolSize, threadPoolSize,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "CloseContainerThread-%d")
+            .build());
   }
 
   /**
@@ -149,7 +150,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
           break;
         }
       } catch (NotLeaderException e) {
-        LOG.debug("Follower cannot close container #{}.", containerId);
+        LOG.info("Follower cannot close container #{}.", containerId);
       } catch (IOException e) {
         LOG.error("Can't close container #{}", containerId, e);
       } finally {

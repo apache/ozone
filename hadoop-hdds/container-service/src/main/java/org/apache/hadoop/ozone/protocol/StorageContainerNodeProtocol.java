@@ -67,6 +67,10 @@ public interface StorageContainerNodeProtocol {
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.
+   *
+   * This method is currently used only in tests.
+   * TODO: Cleanup and update tests, HDDS-9642.
+   *
    * @param datanodeDetails - Datanode ID.
    * @param layoutVersionInfo - Layout Version Proto.
    * @return Commands to be sent to the datanode.

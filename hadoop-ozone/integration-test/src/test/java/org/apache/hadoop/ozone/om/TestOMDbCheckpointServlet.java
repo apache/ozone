@@ -100,6 +100,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
@@ -283,6 +284,13 @@ public class TestOMDbCheckpointServlet {
 
     Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("getHttpMethods")
+  public void testEndpointNotRatis(String httpMethod) throws Exception {
+    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    testEndpoint(httpMethod);
   }
 
   @Test

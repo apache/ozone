@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -520,6 +521,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
+      String bucketName, String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
+    return null;
+  }
+
+  @Override
   public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     return false;
   }
@@ -566,6 +574,11 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public void setThreadLocalS3Auth(S3Auth s3Auth) {
+
+  }
+
+  @Override
+  public void setIsS3Request(boolean isS3Request) {
 
   }
 
@@ -633,6 +646,12 @@ public class ClientProtocolStub implements ClientProtocol {
       String bucketName, String snapshotName)
       throws IOException {
 
+  }
+
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName,
+                                       String snapshotName) throws IOException {
+    return null;
   }
 
   public String printCompactionLogDag(String fileNamePrefix,

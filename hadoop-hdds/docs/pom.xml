@@ -58,12 +58,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>static/slides/*</exclude>
             <exclude>themes/ozonedoc/static/js/bootstrap.min.js</exclude>
             <exclude>themes/ozonedoc/static/js/jquery-3.5.1.min.js</exclude>
+            <exclude>themes/ozonedoc/static/js/swagger-ui-bundle.js</exclude>
             <exclude>themes/ozonedoc/static/css/bootstrap-theme.min.css
             </exclude>
             <exclude>themes/ozonedoc/static/css/bootstrap.min.css.map</exclude>
             <exclude>themes/ozonedoc/static/css/bootstrap.min.css</exclude>
             <exclude>themes/ozonedoc/static/css/bootstrap-theme.min.css.map
             </exclude>
+            <exclude>themes/ozonedoc/static/css/swagger-ui.css</exclude>
             <exclude>
               themes/ozonedoc/static/fonts/glyphicons-halflings-regular.svg
             </exclude>

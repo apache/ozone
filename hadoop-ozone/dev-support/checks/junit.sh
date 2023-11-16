@@ -20,6 +20,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 : ${CHECK:="unit"}
+: ${FAIL_FAST:="false"}
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
@@ -36,7 +37,7 @@ if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
 
-if [[ "${FAIL_FAST:-}" == "true" ]]; then
+if [[ "${FAIL_FAST}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
 else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
@@ -76,6 +77,10 @@ for i in $(seq 1 ${ITERATIONS}); do
 
   if [[ ${rc} == 0 ]]; then
     rc=${irc}
+  fi
+
+  if [[ ${rc} != 0 ]] && [[ "${FAIL_FAST}" == "true" ]]; then
+    break
   fi
 done
 

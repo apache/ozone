@@ -117,8 +117,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
             ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId(),
-            ozoneManager.getMetrics());
+            ozoneManager.isGrpcBlockTokenEnabled(),
+            ozoneManager.getOMServiceId(), ozoneManager.getMetrics());
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =

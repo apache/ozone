@@ -131,7 +131,7 @@ public class TestReplicationSupervisor {
     context = new StateContext(
         new OzoneConfiguration(),
         DatanodeStateMachine.DatanodeStates.getInitState(),
-        stateMachine);
+        stateMachine, "");
     context.setTermOfLeaderSCM(CURRENT_TERM);
     datanode = MockDatanodeDetails.randomDatanodeDetails();
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
