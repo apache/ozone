@@ -41,14 +41,14 @@ class BlockDeletingServiceTestImpl extends BlockDeletingService {
   private Thread testingThread;
   private AtomicInteger numOfProcessed = new AtomicInteger(0);
 
-  public BlockDeletingServiceTestImpl(OzoneContainer container,
+  BlockDeletingServiceTestImpl(OzoneContainer container,
       int serviceInterval, ConfigurationSource conf) {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, 10, conf);
   }
 
   @VisibleForTesting
-  public void runDeletingTasks() {
+  void runDeletingTasks() {
     if (latch.getCount() > 0) {
       this.latch.countDown();
     } else {
@@ -57,11 +57,11 @@ class BlockDeletingServiceTestImpl extends BlockDeletingService {
   }
 
   @VisibleForTesting
-  public boolean isStarted() {
+  boolean isStarted() {
     return latch != null && testingThread.isAlive();
   }
 
-  public int getTimesOfProcessed() {
+  int getTimesOfProcessed() {
     return numOfProcessed.get();
   }
 
