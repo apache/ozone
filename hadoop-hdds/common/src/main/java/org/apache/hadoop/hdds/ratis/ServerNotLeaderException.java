@@ -21,8 +21,6 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Exception thrown when a server is not a leader for Ratis group.
@@ -30,11 +28,6 @@ import java.util.regex.Pattern;
 public class ServerNotLeaderException extends IOException {
   private final String currentPeerId;
   private final String leader;
-  private static final Pattern CURRENT_PEER_ID_PATTERN =
-      Pattern.compile("Server:(.*) is not the leader[.]+.*", Pattern.DOTALL);
-  private static final Pattern SUGGESTED_LEADER_PATTERN =
-      Pattern.compile(".*Suggested leader is Server:([^:]*)(:[0-9]+).*",
-          Pattern.DOTALL);
 
   public ServerNotLeaderException(RaftPeerId currentPeerId) {
     super("Server:" + currentPeerId + " is not the leader. Could not " +
@@ -51,36 +44,6 @@ public class ServerNotLeaderException extends IOException {
     this.leader = suggestedLeader;
   }
 
-  public ServerNotLeaderException(String message) {
-    super(message);
-
-    Matcher currentLeaderMatcher = CURRENT_PEER_ID_PATTERN.matcher(message);
-    if (currentLeaderMatcher.matches()) {
-      this.currentPeerId = currentLeaderMatcher.group(1);
-
-      Matcher suggestedLeaderMatcher =
-          SUGGESTED_LEADER_PATTERN.matcher(message);
-      if (suggestedLeaderMatcher.matches()) {
-        if (suggestedLeaderMatcher.groupCount() == 2) {
-          if (suggestedLeaderMatcher.group(1).isEmpty()
-              || suggestedLeaderMatcher.group(2).isEmpty()) {
-            this.leader = null;
-          } else {
-            this.leader = suggestedLeaderMatcher.group(1) +
-                suggestedLeaderMatcher.group(2);
-          }
-        } else {
-          this.leader = null;
-        }
-      } else {
-        this.leader = null;
-      }
-    } else {
-      this.currentPeerId = null;
-      this.leader = null;
-    }
-  }
-
   public String getSuggestedLeader() {
     return leader;
   }
@@ -88,9 +51,6 @@ public class ServerNotLeaderException extends IOException {
   /**
    * Convert {@link org.apache.ratis.protocol.exceptions.NotLeaderException} 
    * to {@link ServerNotLeaderException}.
-   * @param notLeaderException
-   * @param currentPeer
-   * @return ServerNotLeaderException
    */
   public static ServerNotLeaderException convertToNotLeaderException(
       NotLeaderException notLeaderException,
@@ -98,7 +58,7 @@ public class ServerNotLeaderException extends IOException {
     String suggestedLeader = notLeaderException.getSuggestedLeader() != null ?
         HddsUtils
             .getHostName(notLeaderException.getSuggestedLeader().getAddress())
-            .get() :
+            .orElse(null) :
         null;
     ServerNotLeaderException serverNotLeaderException;
     if (suggestedLeader != null) {
