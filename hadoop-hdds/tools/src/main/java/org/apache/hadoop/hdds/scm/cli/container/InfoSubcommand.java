@@ -113,6 +113,14 @@ public class InfoSubcommand extends ScmSubcommand {
       }
       LOG.info("Write PipelineId: {}",
           container.getContainerInfo().getPipelineID().getId());
+      try {
+        String pipelineState = scmClient.getPipeline(
+                container.getContainerInfo().getPipelineID().getProtobuf())
+            .getPipelineState().toString();
+        LOG.info("Write Pipeline State: {}", pipelineState);
+      } catch (IOException ioe) {
+        LOG.info("Write Pipeline State: CLOSED");
+      }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
