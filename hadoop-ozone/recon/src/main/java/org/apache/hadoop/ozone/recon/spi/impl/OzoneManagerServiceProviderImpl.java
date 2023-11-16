@@ -523,7 +523,8 @@ public class OzoneManagerServiceProviderImpl
             Thread.currentThread().interrupt();
           } catch (Exception e) {
             metrics.incrNumDeltaRequestsFailed();
-            LOG.warn("Unable to get and apply delta updates from OM.", e);
+            LOG.warn("Unable to get and apply delta updates from OM.",
+                e.getMessage());
             fullSnapshot = true;
           }
         }
