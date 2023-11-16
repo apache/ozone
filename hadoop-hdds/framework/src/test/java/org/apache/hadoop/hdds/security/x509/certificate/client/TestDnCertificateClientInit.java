@@ -61,7 +61,7 @@ public class TestDnCertificateClientInit {
 
   private KeyPair keyPair;
   private String certSerialId = "3284792342234";
-  private CertificateClient dnCertificateClient;
+  private DNCertificateClient dnCertificateClient;
   private HDDSKeyGenerator keyGenerator;
   private Path metaDirPath;
   private SecurityConfig securityConfig;
@@ -74,7 +74,7 @@ public class TestDnCertificateClientInit {
         arguments(false, false, false, GETCERT),
         arguments(false, false, true, FAILURE),
         arguments(false, true, false, FAILURE),
-        arguments(true, false, false, FAILURE),
+        arguments(true, false, false, GETCERT),
         arguments(false, true, true, FAILURE),
         arguments(true, true, false, GETCERT),
         arguments(true, false, true, SUCCESS),
