@@ -30,17 +30,14 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -51,6 +48,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -59,6 +57,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -73,6 +72,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import java.time.Duration;
@@ -438,8 +438,13 @@ public class TestHddsDispatcher {
    * @return HddsDispatcher HddsDispatcher instance.
    * @throws IOException
    */
-  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
+    return createDispatcher(dd, scmId, conf, null);
+  }
+
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+      OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -461,8 +466,8 @@ public class TestHddsDispatcher {
               containerSet, volumeSet, metrics, NO_OP_ICR_SENDER));
     }
 
-    HddsDispatcher hddsDispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, context, metrics, null);
+    final HddsDispatcher hddsDispatcher = new HddsDispatcher(conf,
+        containerSet, volumeSet, handlers, context, metrics, tokenVerifier);
     hddsDispatcher.setClusterId(scmId.toString());
     return hddsDispatcher;
   }
@@ -541,4 +546,65 @@ public class TestHddsDispatcher {
         .build();
   }
 
+  @Test
+  public void testValidateToken() throws Exception {
+    final String testDir = GenericTestUtils.getRandomizedTempPath();
+    try {
+      final OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
+
+      final DatanodeDetails dd = randomDatanodeDetails();
+      final UUID scmId = UUID.randomUUID();
+      final AtomicBoolean verified = new AtomicBoolean();
+      final TokenVerifier tokenVerifier = new TokenVerifier() {
+        private void verify() {
+          final boolean previous = verified.getAndSet(true);
+          Assert.assertFalse(previous);
+        }
+
+        @Override
+        public void verify(ContainerCommandRequestProtoOrBuilder cmd,
+            String user, String encodedToken) {
+          verify();
+        }
+
+        @Override
+        public void verify(String user, Token<?> token,
+            ContainerCommandRequestProtoOrBuilder cmd) {
+          verify();
+        }
+      };
+
+      final ContainerCommandRequestProto request = getWriteChunkRequest(
+          dd.getUuidString(), 1L, 1L);
+      final HddsDispatcher dispatcher = createDispatcher(
+          dd, scmId, conf, tokenVerifier);
+
+      final DispatcherContext applyTransactionContext = DispatcherContext
+          .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
+          .setTerm(1)
+          .setLogIndex(1)
+          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+          .setContainer2BCSIDMap(Collections.emptyMap())
+          .build();
+      Assert.assertFalse(verified.get());
+      dispatcher.dispatch(request, applyTransactionContext);
+      Assert.assertFalse(verified.get());
+
+      final DispatcherContext startTransactionContext = DispatcherContext
+          .newBuilder(DispatcherContext.Op.START_TRANSACTION)
+          .setTerm(1)
+          .setLogIndex(1)
+          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+          .setContainer2BCSIDMap(Collections.emptyMap())
+          .build();
+      Assert.assertFalse(verified.get());
+      dispatcher.dispatch(request, startTransactionContext);
+      Assert.assertTrue(verified.get());
+    } finally {
+      ContainerMetrics.remove();
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
 }

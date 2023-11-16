@@ -450,27 +450,22 @@ public class ContainerStateMachine extends BaseStateMachine {
     return response;
   }
 
-  private ContainerCommandResponseProto runCommand(
-      ContainerCommandRequestProto requestProto,
-      DispatcherContext context) {
-    return dispatchCommand(requestProto, context);
-  }
-
-  private CompletableFuture<ContainerCommandResponseProto> runCommandAsync(
+  private CompletableFuture<ContainerCommandResponseProto> link(
       ContainerCommandRequestProto requestProto, LogEntryProto entry) {
     return CompletableFuture.supplyAsync(() -> {
-      final DispatcherContext context = new DispatcherContext.Builder()
+      final DispatcherContext context = DispatcherContext
+          .newBuilder(DispatcherContext.Op.STREAM_LINK)
           .setTerm(entry.getTerm())
           .setLogIndex(entry.getIndex())
           .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
           .setContainer2BCSIDMap(container2BCSIDMap)
           .build();
 
-      return runCommand(requestProto, context);
+      return dispatchCommand(requestProto, context);
     }, executor);
   }
 
-  private CompletableFuture<Message> handleWriteChunk(
+  private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
@@ -486,8 +481,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     } catch (IOException ioe) {
       return completeExceptionally(ioe);
     }
-    DispatcherContext context =
-        new DispatcherContext.Builder()
+    final DispatcherContext context =
+        DispatcherContext
+            .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
             .setTerm(term)
             .setLogIndex(entryIndex)
             .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -499,7 +495,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
           try {
-            return runCommand(requestProto, context);
+            return dispatchCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
                 "{} logIndex {} chunkName {}", gid, write.getBlockID(),
@@ -566,7 +562,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               requestProto.getContainerID(), requestProto.getPipelineID(),
               requestProto.getTraceID());
     }
-    runCommand(requestProto, context);  // stream init
+    dispatchCommand(requestProto, context);  // stream init
     return dispatcher.getStreamDataChannel(requestProto);
   }
 
@@ -577,7 +573,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         ContainerCommandRequestProto requestProto =
             message2ContainerCommandRequestProto(request.getMessage());
         DispatcherContext context =
-            new DispatcherContext.Builder()
+            DispatcherContext
+                .newBuilder(DispatcherContext.Op.STREAM_INIT)
                 .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
                 .setContainer2BCSIDMap(container2BCSIDMap)
                 .build();
@@ -617,7 +614,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     final ContainerCommandRequestProto request =
         kvStreamDataChannel.getPutBlockRequest();
 
-    return runCommandAsync(request, entry).whenComplete((response, e) -> {
+    return link(request, entry).whenComplete((response, e) -> {
       if (e != null) {
         LOG.warn("Failed to link logEntry {} for request {}",
             TermIndex.valueOf(entry), request, e);
@@ -667,7 +664,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // CreateContainer will happen as a part of writeChunk only.
       switch (cmdType) {
       case WriteChunk:
-        return handleWriteChunk(requestProto, entry.getIndex(),
+        return writeStateMachineData(requestProto, entry.getIndex(),
             entry.getTerm(), writeStateMachineStartTime);
       default:
         throw new IllegalStateException("Cmd Type:" + cmdType
@@ -685,8 +682,8 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumQueryStateMachineOps();
       final ContainerCommandRequestProto requestProto =
           message2ContainerCommandRequestProto(request);
-      return CompletableFuture
-          .completedFuture(runCommand(requestProto, null)::toByteString);
+      return CompletableFuture.completedFuture(
+          dispatchCommand(requestProto, null)::toByteString);
     } catch (IOException e) {
       metrics.incNumQueryStateMachineFails();
       return completeExceptionally(e);
@@ -712,9 +709,11 @@ public class ContainerStateMachine extends BaseStateMachine {
         ContainerCommandRequestProto.newBuilder(requestProto)
             .setCmdType(Type.ReadChunk).setReadChunk(readChunkRequestProto)
             .build();
-    DispatcherContext context =
-        new DispatcherContext.Builder().setTerm(term).setLogIndex(index)
-            .setReadFromTmpFile(true).build();
+    final DispatcherContext context = DispatcherContext
+        .newBuilder(DispatcherContext.Op.READ_STATE_MACHINE_DATA)
+        .setTerm(term)
+        .setLogIndex(index)
+        .build();
     // read the chunk
     ContainerCommandResponseProto response =
         dispatchCommand(dataContainerCommandProto, context);
@@ -854,14 +853,14 @@ public class ContainerStateMachine extends BaseStateMachine {
     removeStateMachineDataIfNeeded(index);
   }
 
-  private CompletableFuture<ContainerCommandResponseProto> submitTask(
-      ContainerCommandRequestProto request, DispatcherContext.Builder context,
+  private CompletableFuture<ContainerCommandResponseProto> applyTransaction(
+      ContainerCommandRequestProto request, DispatcherContext context,
       Consumer<Exception> exceptionHandler) {
     final long containerId = request.getContainerID();
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
-            return runCommand(request, context.build());
+            return dispatchCommand(request, context);
           } catch (Exception e) {
             exceptionHandler.accept(e);
             throw e;
@@ -904,9 +903,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       // if waitOnBothFollower is false, remove the entry from the cache
       // as soon as its applied and such entry exists in the cache.
       removeStateMachineDataIfMajorityFollowSync(index);
-      DispatcherContext.Builder builder =
-          new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
-              .setLogIndex(index);
+      final DispatcherContext.Builder builder = DispatcherContext
+          .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
+          .setTerm(trx.getLogEntry().getTerm())
+          .setLogIndex(index);
 
       long applyTxnStartTime = Time.monotonicNowNanos();
       applyTransactionSemaphore.acquire();
@@ -939,7 +939,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // Ensure the command gets executed in a separate thread than
       // stateMachineUpdater thread which is calling applyTransaction here.
       final CompletableFuture<ContainerCommandResponseProto> future =
-          submitTask(requestProto, builder, exceptionHandler);
+          applyTransaction(requestProto, builder.build(), exceptionHandler);
       future.thenApply(r -> {
         if (trx.getServerRole() == RaftPeerRole.LEADER
             && trx.getStateMachineContext() != null) {
