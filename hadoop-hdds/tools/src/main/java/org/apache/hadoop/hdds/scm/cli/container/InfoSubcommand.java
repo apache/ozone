@@ -79,19 +79,49 @@ public class InfoSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean first = true;
+    printHeader();
     for (String id : containerList) {
       if (!first) {
-        LOG.info(""); // Emit a blank line
+        printBreak();
       }
       first = false;
       long containerID;
       try {
         containerID = Long.parseLong(id);
       } catch (NumberFormatException e) {
-        LOG.error("Invalid container ID: {}", id);
+        printError("Invalid container ID: " + id);
         continue;
       }
       printDetails(scmClient, containerID);
+    }
+    printFooter();
+  }
+
+  private void printHeader() {
+    if (json && containerList.length > 1) {
+      LOG.info("[");
+    }
+  }
+
+  private void printFooter() {
+    if (json && containerList.length > 1) {
+      LOG.info("]");
+    }
+  }
+
+  private void printError(String error) {
+    if (json) {
+      LOG.info("{ \"error\": \"" + error + "\" }");
+    } else {
+      LOG.info(error);
+    }
+  }
+
+  private void printBreak() {
+    if (json) {
+      LOG.info(",");
+    } else {
+      LOG.info("");
     }
   }
 
@@ -102,7 +132,7 @@ public class InfoSubcommand extends ScmSubcommand {
       container = scmClient.getContainerWithPipeline(containerID);
       Preconditions.checkNotNull(container, "Container cannot be null");
     } catch (IOException e) {
-      LOG.error("Unable to retrieve the container details for {}", containerID);
+      printError("Unable to retrieve the container details for " + containerID);
       return;
     }
 
@@ -110,7 +140,9 @@ public class InfoSubcommand extends ScmSubcommand {
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      LOG.error("Unable to retrieve the replica details", e);
+      if (!json) {
+        LOG.error("Unable to retrieve the replica details", e);
+      }
     }
 
     if (json) {

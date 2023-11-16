@@ -69,7 +69,7 @@ public class TestInfoSubCommand {
     scmClient = mock(ScmClient.class);
     datanodes = createDatanodeDetails(3);
     Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
-        .thenReturn(getContainerWithPipeline());
+        .then(i -> getContainerWithPipeline(i.getArgument(0)));
 
     appender = new TestAppender();
     logger = Logger.getLogger(
@@ -112,6 +112,30 @@ public class TestInfoSubCommand {
     replica = logs.stream()
         .filter(m -> m.getRenderedMessage()
             .matches("(?s)^Invalid container ID: invalid.*"))
+        .collect(Collectors.toList());
+    Assertions.assertEquals(1, replica.size());
+  }
+
+  @Test
+  public void testMultipleContainersCanBePassedJson() throws Exception {
+    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("1", "123", "456", "invalid", "789", "--json");
+    cmd.execute(scmClient);
+
+    // Ensure we have a log line for each containerID
+    List<LoggingEvent> logs = appender.getLog();
+    List<LoggingEvent> replica = logs.stream()
+        .filter(m -> m.getRenderedMessage()
+            .matches("(?s)^.*\"containerInfo\".*"))
+        .collect(Collectors.toList());
+    Assertions.assertEquals(4, replica.size());
+
+    replica = logs.stream()
+        .filter(m -> m.getRenderedMessage()
+            .matches("(?s)^.*error: \"Invalid container ID: invalid.*"))
         .collect(Collectors.toList());
     Assertions.assertEquals(1, replica.size());
   }
@@ -195,12 +219,9 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     List<LoggingEvent> logs = appender.getLog();
-    Assertions.assertEquals(2, logs.size());
-    String error = logs.get(0).getRenderedMessage();
-    String json = logs.get(1).getRenderedMessage();
+    Assertions.assertEquals(1, logs.size());
+    String json = logs.get(0).getRenderedMessage();
 
-    Assertions.assertTrue(error
-        .matches("(?s)^Unable to retrieve the replica details.*"));
     Assertions.assertFalse(json.matches("(?s).*replicas.*"));
   }
 
@@ -275,7 +296,7 @@ public class TestInfoSubCommand {
     return replicas;
   }
 
-  private ContainerWithPipeline getContainerWithPipeline() {
+  private ContainerWithPipeline getContainerWithPipeline(long containerID) {
     Pipeline pipeline = new Pipeline.Builder()
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
@@ -284,6 +305,7 @@ public class TestInfoSubCommand {
         .build();
 
     ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(containerID)
         .setSequenceId(1)
         .setPipelineID(pipeline.getId())
         .setUsedBytes(1234)
