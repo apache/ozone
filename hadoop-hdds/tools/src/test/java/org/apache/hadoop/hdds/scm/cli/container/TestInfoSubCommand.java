@@ -49,6 +49,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -95,6 +96,8 @@ public class TestInfoSubCommand {
       throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(includeIndex));
+    Mockito.when(scmClient.getPipeline(any()))
+        .thenThrow(new IOException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
@@ -135,6 +138,8 @@ public class TestInfoSubCommand {
   public void testReplicasNotOutputIfError() throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenThrow(new IOException("Error getting Replicas"));
+    Mockito.when(scmClient.getPipeline(any()))
+        .thenThrow(new IOException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
