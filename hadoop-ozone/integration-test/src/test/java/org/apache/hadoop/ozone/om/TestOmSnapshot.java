@@ -23,7 +23,6 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -147,7 +146,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Test OmSnapshot bucket interface.
  */
 @RunWith(Parameterized.class)
-@SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
 public class TestOmSnapshot {
 
   static {
