@@ -80,24 +80,29 @@ public final class OzoneAuthorizerFactory {
       return configure(authorizer, om, km, pm);
     }
 
+    final IAccessAuthorizer authorizer = newInstance(clazz, conf);
+
+    if (authorizer instanceof OzoneNativeAuthorizer) {
+      return configure((OzoneNativeAuthorizer) authorizer, om, km, pm);
+    }
+
     // If authorizer isn't native and shareable tmp dir is enabled,
     // then return the shared tmp hybrid authorizer.
     if (conf.getBoolean(OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR,
         OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT)) {
-      return new SharedTmpDirAuthorizer(om, conf);
+      return new SharedTmpDirAuthorizer(
+          configure(new OzoneNativeAuthorizer(), om, km, pm),
+          authorizer);
     }
 
-    final IAccessAuthorizer authorizer = newInstance(clazz, conf);
-    return authorizer instanceof OzoneNativeAuthorizer
-        ? configure((OzoneNativeAuthorizer) authorizer, om, km, pm)
-        : authorizer;
+    return authorizer;
   }
 
   /**
    * Configure {@link OzoneNativeAuthorizer}.
    * @return same instance for convenience
    */
-  private static IAccessAuthorizer configure(
+  private static OzoneNativeAuthorizer configure(
       OzoneNativeAuthorizer authorizer,
       OzoneManager om, KeyManager km, PrefixManager pm
   ) {

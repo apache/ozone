@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -16,48 +16,19 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
-import static org.apache.hadoop.util.ReflectionUtils.newInstance;
-
 
 /**
  * SharedTmp implementation of {@link IAccessAuthorizer}.
  */
 public class SharedTmpDirAuthorizer implements IAccessAuthorizer {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SharedTmpDirAuthorizer.class);
   private final OzoneNativeAuthorizer ozoneNativeAuthorizer;
   private final IAccessAuthorizer authorizer;
 
-  public SharedTmpDirAuthorizer(OzoneManager om, OzoneConfiguration conf) {
-    ozoneNativeAuthorizer = new OzoneNativeAuthorizer();
-    ozoneNativeAuthorizer.setVolumeManager(om.getVolumeManager());
-    ozoneNativeAuthorizer.setBucketManager(om.getBucketManager());
-    ozoneNativeAuthorizer.setKeyManager(om.getKeyManager());
-    ozoneNativeAuthorizer.setPrefixManager(om.getPrefixManager());
-    ozoneNativeAuthorizer.setAdminCheck(om::isAdmin);
-    ozoneNativeAuthorizer.setReadOnlyAdminCheck(om::isReadOnlyAdmin);
-    ozoneNativeAuthorizer.setAllowListAllVolumes(om.getAllowListAllVolumes());
-
-    Class<? extends IAccessAuthorizer> clazz =
-        conf.getClass(OZONE_ACL_AUTHORIZER_CLASS,
-            OzoneAccessAuthorizer.class,
-            IAccessAuthorizer.class);
-    LOG.info("Initializing class {} from SharedTmpDirAuthorizer", clazz);
-    authorizer = newInstance(clazz, conf);
-  }
-
-  @VisibleForTesting
   public SharedTmpDirAuthorizer(OzoneNativeAuthorizer ozoneNativeAuthorizer,
       IAccessAuthorizer authorizer) {
     this.ozoneNativeAuthorizer = ozoneNativeAuthorizer;
