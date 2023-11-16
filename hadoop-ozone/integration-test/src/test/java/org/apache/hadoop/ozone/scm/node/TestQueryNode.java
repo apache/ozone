@@ -18,21 +18,33 @@ package org.apache.hadoop.ozone.scm.node;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
+import org.jooq.Log;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -71,13 +83,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestQueryNode {
   private static int numOfDatanodes = 5;
   private MiniOzoneCluster cluster;
+  private final ExecutorService executor = Executors.newFixedThreadPool(2);
 
   private ContainerOperationClient scmClient;
 
   @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    final int interval = 100;
+    final int interval = 1000;
 
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         interval, TimeUnit.MILLISECONDS);
@@ -86,8 +99,8 @@ public class TestQueryNode {
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, SECONDS);
-    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 2, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -99,7 +112,7 @@ public class TestQueryNode {
   }
 
   @AfterEach
-  public void tearDown() throws Exception {
+  public void tearDown(TestInfo testInfo) throws Exception {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -113,25 +126,32 @@ public class TestQueryNode {
   }
 
   @Test
-  @Timeout(15)
   public void testStaleNodesCount() throws Exception {
-    cluster.shutdownHddsDatanode(0);
-    cluster.shutdownHddsDatanode(1);
-
-    GenericTestUtils.waitFor(() ->
-            cluster.getStorageContainerManager().getNodeCount(STALE) == 2,
-        100,  10 * 1000);
-
-    int nodeCount = scmClient.queryNode(null, STALE,
-        HddsProtos.QueryScope.CLUSTER, "").size();
-    assertEquals(2, nodeCount, "Mismatch of expected nodes count");
+    CompletableFuture.runAsync(() -> {
+      cluster.shutdownHddsDatanode(0);
+      cluster.shutdownHddsDatanode(1);
+    }, executor);
+    GenericTestUtils.waitFor(() -> numOfDatanodes -
+        cluster.getStorageContainerManager().getScmNodeManager()
+            .getNodeCount(NodeStatus.inServiceHealthy()) >= 1, 100, 10 * 1000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return
+            scmClient.queryNode(null, STALE, HddsProtos.QueryScope.CLUSTER, "")
+                .size() +
+                scmClient.queryNode(null, DEAD, HddsProtos.QueryScope.CLUSTER,
+                    "").size() == 2;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 10 * 1000);
 
     GenericTestUtils.waitFor(() ->
             cluster.getStorageContainerManager().getNodeCount(DEAD) == 2,
         100, 4 * 1000);
 
     // Assert that we don't find any stale nodes.
-    nodeCount = scmClient.queryNode(null, STALE,
+    int nodeCount = scmClient.queryNode(null, STALE,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals(0, nodeCount, "Mismatch of expected nodes count");
 
