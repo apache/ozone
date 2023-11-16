@@ -93,6 +93,12 @@ public final class ContainerTestUtils {
   public static final DispatcherContext COMMIT_STAGE
       = new DispatcherContext.Builder()
       .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+      .setContainer2BCSIDMap(Collections.emptyMap())
+      .build();
+
+  public static final DispatcherContext COMBINED_STAGE
+      = new DispatcherContext.Builder()
+      .setStage(DispatcherContext.WriteChunkStage.COMBINED)
       .build();
 
   /**

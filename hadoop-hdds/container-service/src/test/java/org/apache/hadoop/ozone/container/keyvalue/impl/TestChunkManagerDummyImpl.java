@@ -51,7 +51,7 @@ public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
     ChunkManager dummy = createTestSubject();
 
     ChunkBuffer dataRead = dummy.readChunk(getKeyValueContainer(),
-        getBlockID(), getChunkInfo(), getDispatcherContext());
+        getBlockID(), getChunkInfo(), null);
 
     assertNotNull(dataRead);
   }

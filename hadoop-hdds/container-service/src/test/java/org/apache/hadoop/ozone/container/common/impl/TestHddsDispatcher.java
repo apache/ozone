@@ -82,7 +82,7 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -93,7 +93,7 @@ import static org.mockito.Mockito.verify;
  * Test-cases to verify the functionality of HddsDispatcher.
  */
 @RunWith(Parameterized.class)
-public class TestHddsDispatcher {
+public class TestHddst Dispatcher {
 
   public static final IncrementalReportSender<Container>
       NO_OP_ICR_SENDER = c -> { };
@@ -319,7 +319,7 @@ public class TestHddsDispatcher {
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(HddsDispatcher.LOG);
       // send write chunk request without sending create container
-      response = hddsDispatcher.dispatch(writeChunkRequest, WRITE_STAGE);
+      response = hddsDispatcher.dispatch(writeChunkRequest, COMMIT_STAGE);
       // container should not be found
       Assert.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
