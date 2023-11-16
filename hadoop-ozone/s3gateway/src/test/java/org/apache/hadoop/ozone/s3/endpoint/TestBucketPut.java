@@ -33,11 +33,11 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class test Create Bucket functionality.
@@ -48,7 +48,7 @@ public class TestBucketPut {
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
@@ -65,8 +65,8 @@ public class TestBucketPut {
     try {
       bucketEndpoint.put(bucketName, null, null, null);
     } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      Assert.assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
     }
   }
 
@@ -79,8 +79,8 @@ public class TestBucketPut {
       // Create-bucket on an existing bucket fails
       bucketEndpoint.put(bucketName, null, null, null);
     } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_CONFLICT, ex.getHttpCode());
-      Assert.assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
+      assertEquals(HTTP_CONFLICT, ex.getHttpCode());
+      assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
     }
   }
 
@@ -89,8 +89,8 @@ public class TestBucketPut {
     try {
       bucketEndpoint.put(bucketName, null, null, null);
     } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      Assert.assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
     }
   }
 

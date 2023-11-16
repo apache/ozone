@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Testing JAXB serialization.

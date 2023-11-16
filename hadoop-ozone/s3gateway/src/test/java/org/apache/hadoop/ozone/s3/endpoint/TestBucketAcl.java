@@ -26,10 +26,10 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
@@ -44,6 +44,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 /**
@@ -60,7 +61,7 @@ public class TestBucketAcl {
   private BucketEndpoint bucketEndpoint;
   private static final String ACL_MARKER = "acl";
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
@@ -74,7 +75,7 @@ public class TestBucketAcl {
     bucketEndpoint.setClient(client);
   }
 
-  @After
+  @AfterEach
   public void clean() throws IOException {
     if (client != null) {
       client.close();
@@ -99,7 +100,7 @@ public class TestBucketAcl {
     try {
       bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, headers, null);
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception &&
+      assertTrue(e instanceof OS3Exception &&
           ((OS3Exception) e).getHttpCode() == HTTP_NOT_IMPLEMENTED);
     }
   }
@@ -231,12 +232,13 @@ public class TestBucketAcl {
         volume.getAcls().get(0).getAclList().get(0));
   }
 
-  @Test(expected = OS3Exception.class)
-  public void testAclInBodyWithGroupUser() throws Exception {
+  @Test
+  public void testAclInBodyWithGroupUser() {
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("groupAccessControlList.xml");
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, headers, inputBody);
+    assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
+        BUCKET_NAME, ACL_MARKER, headers, inputBody));
   }
 
   @Test
@@ -259,7 +261,7 @@ public class TestBucketAcl {
     try {
       bucketEndpoint.getAcl("bucket-not-exist");
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception &&
+      assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_NOT_FOUND);
     }
   }
