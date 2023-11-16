@@ -44,8 +44,6 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   private final String description;
 
-  private final MetricsRegistry registry;
-
   private final boolean quantileEnable;
 
   private final Map<KEY, AtomicLong> counters =
@@ -68,7 +66,6 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
       KEY[] values, ConfigurationSource conf) {
     this.name = name;
     this.description = description;
-    registry = new MetricsRegistry(name + "MessageMetrics");
     int[] intervals = conf.getInts(
         OzoneConfigKeys.OZONE_PROTOCOL_MESSAGE_METRICS_PERCENTILES_INTERVALS);
     quantileEnable = (intervals.length > 0);
@@ -76,14 +73,16 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
       counters.put(value, new AtomicLong(0));
       elapsedTimes.put(value, new AtomicLong(0));
       if (quantileEnable) {
+        MetricsRegistry registry =
+            new MetricsRegistry(value.toString() + "MessageMetrics");
         MutableQuantiles[] mutableQuantiles =
             new MutableQuantiles[intervals.length];
         quantiles.put(value, mutableQuantiles);
         for (int i = 0; i < intervals.length; i++) {
           mutableQuantiles[i] = registry.newQuantiles(
-              value.toString() + "RpcTime" + intervals[i] + "s" + "latencyMs",
+              intervals[i] + "s",
               value.toString() + "rpc time in milli second",
-              "ops", "latency", intervals[i]);
+              "ops", "latencyMs", intervals[i]);
         }
       }
     }
