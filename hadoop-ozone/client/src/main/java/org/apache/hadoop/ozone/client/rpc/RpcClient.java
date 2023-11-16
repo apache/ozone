@@ -1646,13 +1646,11 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OmKeyInfo keyInfo =
         getKeyInfo(volumeName, bucketName, keyName, false);
-    return getOzoneKeyDetails(keyInfo, false);
+    return getOzoneKeyDetails(keyInfo);
   }
 
   @NotNull
-  private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo,
-                                             boolean hasPartNumber)
-      throws IOException {
+  private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo) {
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
     long lastKeyOffset = 0L;
     List<OmKeyLocationInfo> omKeyLocationInfos = keyInfo
@@ -1665,31 +1663,18 @@ public class RpcClient implements ClientProtocol {
     }
 
     return new OzoneKeyDetails(keyInfo.getVolumeName(), keyInfo.getBucketName(),
-        keyInfo.getKeyName(),
-        hasPartNumber ? getTotalBytesRead(keyInfo) : keyInfo.getDataSize(),
-        keyInfo.getCreationTime(),
+        keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
         () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile());
   }
 
-  private long getTotalBytesRead(OmKeyInfo keyInfo) throws IOException {
-    OzoneInputStream keyContent = getInputStreamWithRetryFunction(keyInfo);
-    byte[] buffer = new byte[4096];
-    int bytesRead;
-    long totalBytesRead = 0;
-    while ((bytesRead = keyContent.read(buffer)) != -1) {
-      totalBytesRead += bytesRead;
-    }
-    return totalBytesRead;
-  }
-
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
     OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
-    return getOzoneKeyDetails(keyInfo, false);
+    return getOzoneKeyDetails(keyInfo);
   }
 
   @Override
@@ -1702,7 +1687,19 @@ public class RpcClient implements ClientProtocol {
             partNumber)
         .collect(Collectors.toList());
     keyInfo.updateLocationInfoList(filteredKeyLocationInfo, false);
-    return getOzoneKeyDetails(keyInfo, true);
+    keyInfo.setDataSize(getTotalBytesRead(keyInfo));
+    return getOzoneKeyDetails(keyInfo);
+  }
+
+  private long getTotalBytesRead(OmKeyInfo keyInfo) throws IOException {
+    OzoneInputStream keyContent = getInputStreamWithRetryFunction(keyInfo);
+    byte[] buffer = new byte[4096];
+    int bytesRead;
+    long totalBytesRead = 0;
+    while ((bytesRead = keyContent.read(buffer)) != -1) {
+      totalBytesRead += bytesRead;
+    }
+    return totalBytesRead;
   }
 
   @NotNull
