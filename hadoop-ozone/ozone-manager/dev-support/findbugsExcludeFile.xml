@@ -86,6 +86,10 @@
     <Bug pattern="UC_USELESS_OBJECT" />
   </Match>
   <Match>
+    <Class name="org.apache.hadoop.ozone.om.snapshot.TestFSODirectoryPathResolver"/>
+    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.om.upgrade.TestOMLayoutFeatureAspect"/>
     <Bug pattern="BC_IMPOSSIBLE_CAST" />
   </Match>
