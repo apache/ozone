@@ -46,7 +46,7 @@ L='Licen[cs]e' # sometimes misspelled
 
 # filter all allowed licenses; any remaining item indicates a possible problem
 grep '(' ${src} \
-  | grep -i -v \
+  | ( grep -i -v \
     -e "Apache ${L}" -e "Apache Software ${L}" -e "Apache v2" -e "Apache.2" \
     -e "Bouncy Castle ${L}" \
     -e "(BSD)" -e "(The BSD ${L})" -e "(BSD.[23]" -e "\<BSD ${L} [23]" -e "\<[23]\>.Clause.\<BSD\>" \
@@ -61,6 +61,7 @@ grep '(' ${src} \
     -e "Revised BSD\>" \
     -e "Unknown ${L}" \
     -e "w/ CPE\>" -e "with classpath exception" \
+    || true ) \
   | sort -u \
   | tee "${REPORT_FILE}"
 
