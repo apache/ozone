@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.container.testutils;
+package org.apache.hadoop.ozone.container.common;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
@@ -31,8 +31,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 /**
  * A test class implementation for {@link BlockDeletingService}.
  */
-public class BlockDeletingServiceTestImpl
-    extends BlockDeletingService {
+class BlockDeletingServiceTestImpl extends BlockDeletingService {
 
   // the service timeout
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
@@ -42,14 +41,14 @@ public class BlockDeletingServiceTestImpl
   private Thread testingThread;
   private AtomicInteger numOfProcessed = new AtomicInteger(0);
 
-  public BlockDeletingServiceTestImpl(OzoneContainer container,
+  BlockDeletingServiceTestImpl(OzoneContainer container,
       int serviceInterval, ConfigurationSource conf) {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, 10, conf);
   }
 
   @VisibleForTesting
-  public void runDeletingTasks() {
+  void runDeletingTasks() {
     if (latch.getCount() > 0) {
       this.latch.countDown();
     } else {
@@ -58,11 +57,11 @@ public class BlockDeletingServiceTestImpl
   }
 
   @VisibleForTesting
-  public boolean isStarted() {
+  boolean isStarted() {
     return latch != null && testingThread.isAlive();
   }
 
-  public int getTimesOfProcessed() {
+  int getTimesOfProcessed() {
     return numOfProcessed.get();
   }
 
