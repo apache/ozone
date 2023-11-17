@@ -81,7 +81,7 @@ public class BlockOutputStreamEntryPool {
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
-  private ExcludeList excludeList;
+  private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
@@ -107,7 +107,7 @@ public class BlockOutputStreamEntryPool {
         .setMultipartUploadPartNumber(partNumber).build();
     this.requestID = requestId;
     this.openID = openID;
-    setExcludeList(createExcludeList());
+    this.excludeList = createExcludeList();
 
     this.bufferPool =
         new BufferPool(config.getStreamBufferSize(),
@@ -428,9 +428,6 @@ public class BlockOutputStreamEntryPool {
     return excludeList;
   }
 
-  public void setExcludeList(ExcludeList excludeList) {
-    this.excludeList = excludeList;
-  }
   boolean isEmpty() {
     return streamEntries.isEmpty();
   }
