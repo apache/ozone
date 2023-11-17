@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
@@ -92,7 +91,7 @@ public class TestKeyValueHandler {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
-  private static final String DUMMY_PATH = "/dummy/dir/doesnt/exist";
+  private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
 
   private final ContainerLayoutVersion layout;
 
@@ -349,7 +348,6 @@ public class TestKeyValueHandler {
         ContainerProtos.Result.INVALID_CONTAINER_STATE, response.getResult());
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testDeleteContainer() throws IOException {
     final String testDir = tempDir.newFolder().getAbsolutePath();

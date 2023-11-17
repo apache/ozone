@@ -19,7 +19,6 @@
 package org.apache.ozone.test;
 
 import com.google.common.base.Preconditions;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,7 +123,7 @@ public final class LambdaTestUtils {
           | VirtualMachineError e) {
         throw e;
       } catch (Throwable e) {
-        LOG.debug("eventually() iteration {}", iterations, e);
+        LOG.debug("await() iteration {}", iterations, e);
         ex = e;
       }
       running = System.currentTimeMillis() < endTime;
@@ -184,73 +183,6 @@ public final class LambdaTestUtils {
   }
 
   /**
-   * Repeatedly execute a closure until it returns a value rather than
-   * raise an exception.
-   * Exceptions are caught and, with one exception,
-   * trigger a sleep and retry. This is similar of ScalaTest's
-   * {@code eventually(timeout, closure)} operation, though that lacks
-   * the ability to fail fast if the inner closure has determined that
-   * a failure condition is non-recoverable.
-   * <p>
-   * Example: spin until an the number of files in a filesystem is non-zero,
-   * returning the files found.
-   * The sleep interval backs off by 500 ms each iteration to a maximum of 5s.
-   * <pre>
-   * FileStatus[] files = eventually( 30 * 1000,
-   *   () -> {
-   *     FileStatus[] f = filesystem.listFiles(new Path("/"));
-   *     assertEquals(0, f.length);
-   *     return f;
-   *   },
-   *   new ProportionalRetryInterval(500, 5000));
-   * </pre>
-   * This allows for a fast exit, yet reduces probe frequency over time.
-   *
-   * @param <T> return type
-   * @param timeoutMillis timeout in milliseconds.
-   * Can be zero, in which case only one attempt is made before failing.
-   * @param eval expression to evaluate
-   * @param retry retry interval generator
-   * @return result of the first successful eval call
-   * @throws Exception the last exception thrown before timeout was triggered
-   * @throws FailFastException if raised -without any retry attempt.
-   * @throws InterruptedException if interrupted during the sleep operation.
-   * @throws OutOfMemoryError you've run out of memory.
-   */
-  @SuppressFBWarnings("DLS_DEAD_LOCAL_STORE")
-  public static <T> T eventually(int timeoutMillis,
-      Callable<T> eval,
-      Callable<Integer> retry) throws Exception {
-    Preconditions.checkArgument(timeoutMillis >= 0,
-        "timeoutMillis must be >= 0");
-    final long endTime = System.currentTimeMillis() + timeoutMillis;
-    Throwable ex;
-    boolean running;
-    int iterations = 0;
-    do {
-      iterations++;
-      try {
-        return eval.call();
-      } catch (InterruptedException
-          | FailFastException
-          | VirtualMachineError e) {
-        // these two exceptions trigger an immediate exit
-        throw e;
-      } catch (Throwable e) {
-        LOG.debug("evaluate() iteration {}", iterations, e);
-        ex = e;
-        running = System.currentTimeMillis() < endTime;
-        int sleeptime = retry.call();
-        if (running && sleeptime >= 0) {
-          Thread.sleep(sleeptime);
-        }
-      }
-    } while (running);
-    // timeout. Throw the last exception raised
-    return raise(ex);
-  }
-
-  /**
    * Take the throwable and raise it as an exception or an error, depending
    * upon its type. This allows callers to declare that they only throw
    * Exception (i.e. can be invoked by Callable) yet still rethrow a
@@ -267,70 +199,6 @@ public final class LambdaTestUtils {
     } else {
       throw (Error) throwable;
     }
-  }
-
-  /**
-   * Variant of {@link #eventually(int, Callable, Callable)} method for
-   * void lambda expressions.
-   * @param timeoutMillis timeout in milliseconds.
-   * Can be zero, in which case only one attempt is made before failing.
-   * @param eval expression to evaluate
-   * @param retry retry interval generator
-   * @throws Exception the last exception thrown before timeout was triggered
-   * @throws FailFastException if raised -without any retry attempt.
-   * @throws InterruptedException if interrupted during the sleep operation.
-   */
-  public static void eventually(int timeoutMillis,
-      VoidCallable eval,
-      Callable<Integer> retry) throws Exception {
-    eventually(timeoutMillis, new VoidCaller(eval), retry);
-  }
-
-  /**
-   * Simplified {@link #eventually(int, Callable, Callable)} method
-   * with a fixed interval.
-   * <p>
-   * Example: wait 30s until an assertion holds, sleeping 1s between each
-   * check.
-   * <pre>
-   * eventually( 30 * 1000, 1000,
-   *   () -> { assertEquals(0, filesystem.listFiles(new Path("/")).length); }
-   * );
-   * </pre>
-   *
-   * @param timeoutMillis timeout in milliseconds.
-   * Can be zero, in which case only one attempt is made before failing.
-   * @param intervalMillis interval in milliseconds
-   * @param eval expression to evaluate
-   * @return result of the first successful invocation of {@code eval()}
-   * @throws Exception the last exception thrown before timeout was triggered
-   * @throws FailFastException if raised -without any retry attempt.
-   * @throws InterruptedException if interrupted during the sleep operation.
-   */
-  public static <T> T eventually(int timeoutMillis,
-      int intervalMillis,
-      Callable<T> eval) throws Exception {
-    return eventually(timeoutMillis, eval,
-        new FixedRetryInterval(intervalMillis));
-  }
-
-  /**
-   /**
-   * Variant of {@link #eventually(int, int, Callable)} method for
-   * void lambda expressions.
-   * @param timeoutMillis timeout in milliseconds.
-   * Can be zero, in which case only one attempt is made before failing.
-   * @param intervalMillis interval in milliseconds
-   * @param eval expression to evaluate
-   * @throws Exception the last exception thrown before timeout was triggered
-   * @throws FailFastException if raised -without any retry attempt.
-   * @throws InterruptedException if interrupted during the sleep operation.
-   */
-  public static void eventually(int timeoutMillis,
-      int intervalMillis,
-      VoidCallable eval) throws Exception {
-    eventually(timeoutMillis, eval,
-        new FixedRetryInterval(intervalMillis));
   }
 
   /**
@@ -377,7 +245,6 @@ public final class LambdaTestUtils {
    * Invoke a callable; wrap all checked exceptions with an
    * AssertionError.
    * @param closure closure to execute
-   * @return the value of the closure
    * @throws AssertionError if the operation raised an IOE or
    * other checked exception.
    */
@@ -414,8 +281,7 @@ public final class LambdaTestUtils {
      * @return TimeoutException
      */
     @Override
-    public Throwable evaluate(int timeoutMillis, Throwable caught)
-        throws Throwable {
+    public Throwable evaluate(int timeoutMillis, Throwable caught) {
       String s = String.format("%s: after %d millis", message,
           timeoutMillis);
       String caughtText = caught != null
@@ -460,54 +326,7 @@ public final class LambdaTestUtils {
   }
 
   /**
-   * Gradually increase the sleep time by the initial interval, until
-   * the limit set by {@code maxIntervalMillis} is reached.
-   */
-  public static class ProportionalRetryInterval implements Callable<Integer> {
-    private final int intervalMillis;
-    private final int maxIntervalMillis;
-    private int current;
-    private int invocationCount = 0;
-
-    public ProportionalRetryInterval(int intervalMillis,
-        int maxIntervalMillis) {
-      Preconditions.checkArgument(intervalMillis > 0);
-      Preconditions.checkArgument(maxIntervalMillis > 0);
-      this.intervalMillis = intervalMillis;
-      this.current = intervalMillis;
-      this.maxIntervalMillis = maxIntervalMillis;
-    }
-
-    @Override
-    public Integer call() throws Exception {
-      invocationCount++;
-      int last = current;
-      if (last < maxIntervalMillis) {
-        current += intervalMillis;
-      }
-      return last;
-    }
-
-    public int getInvocationCount() {
-      return invocationCount;
-    }
-
-    @Override
-    public String toString() {
-      final StringBuilder sb = new StringBuilder(
-          "ProportionalRetryInterval{");
-      sb.append("interval=").append(intervalMillis);
-      sb.append(", current=").append(current);
-      sb.append(", limit=").append(maxIntervalMillis);
-      sb.append(", invocationCount=").append(invocationCount);
-      sb.append('}');
-      return sb.toString();
-    }
-  }
-
-  /**
    * An exception which triggers a fast exist from the
-   * {@link #eventually(int, Callable, Callable)} and
    * {@link #await(int, Callable, Callable, TimeoutHandler)} loops.
    */
   public static class FailFastException extends Exception {
@@ -538,24 +357,6 @@ public final class LambdaTestUtils {
   @FunctionalInterface
   public interface VoidCallable {
     void call() throws Exception;
-  }
-
-  /**
-   * Bridge class to make {@link VoidCallable} something to use in anything
-   * which takes an {@link Callable}.
-   */
-  public static class VoidCaller implements Callable<Void> {
-    private final VoidCallable callback;
-
-    public VoidCaller(VoidCallable callback) {
-      this.callback = callback;
-    }
-
-    @Override
-    public Void call() throws Exception {
-      callback.call();
-      return null;
-    }
   }
 
 }
