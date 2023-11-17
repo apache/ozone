@@ -120,7 +120,8 @@ public final class DispatcherContext {
     this.container2BCSIDMap = b.container2BCSIDMap;
   }
 
-  public Op getOp() {
+  /** Use {@link DispatcherContext#op(DispatcherContext)} for handling null. */
+  private Op getOp() {
     return op;
   }
 
