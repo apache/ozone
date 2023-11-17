@@ -709,5 +709,4 @@ public class KeyOutputStream extends OutputStream implements Syncable {
               + blockOutputStreamEntryPool.getKeyName());
     }
   }
-
 }
