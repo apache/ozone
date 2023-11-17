@@ -1693,17 +1693,6 @@ public class RpcClient implements ClientProtocol {
     return getOzoneKeyDetails(keyInfo);
   }
 
-  private long getTotalBytesRead(OmKeyInfo keyInfo) throws IOException {
-    OzoneInputStream keyContent = getInputStreamWithRetryFunction(keyInfo);
-    byte[] buffer = new byte[4096];
-    int bytesRead;
-    long totalBytesRead = 0;
-    while ((bytesRead = keyContent.read(buffer)) != -1) {
-      totalBytesRead += bytesRead;
-    }
-    return totalBytesRead;
-  }
-
   @NotNull
   private OmKeyInfo getS3KeyInfo(
       String bucketName, String keyName, boolean isHeadOp) throws IOException {
