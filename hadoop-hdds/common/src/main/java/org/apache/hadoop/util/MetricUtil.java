@@ -17,12 +17,18 @@
  */
 package org.apache.hadoop.util;
 
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Encloses helpers to deal with metrics.
@@ -62,5 +68,35 @@ public final class MetricUtil {
     } finally {
       latencySetter.accept(Time.monotonicNowNanos() - start);
     }
+  }
+
+  /**
+   * Creates MutableQuantiles metrics with one or multiple intervals.
+   *
+   * @param registry    The MetricsRegistry to register the new MutableQuantiles
+   *                   instances.
+   * @param name        The base name of the metric.
+   * @param description The description of the metric.
+   * @param sampleName of the metric (e.g., "Ops")
+   * @param valueName of the metric (e.g., "Time" or "Latency")
+   * @param intervals   An array of intervals for the quantiles.
+   * @return A list of created MutableQuantiles instances.
+   */
+  public static List<MutableQuantiles> createQuantiles(MetricsRegistry registry,
+      String name, String description, String sampleName, String valueName,
+      int... intervals) {
+    if (intervals == null) {
+      throw new IllegalArgumentException(
+          "At least one interval should be provided.");
+    }
+    if (intervals.length == 0) {
+      return new ArrayList<>();
+    }
+
+    return Arrays.stream(intervals).mapToObj(interval -> {
+      String quantileName = name + interval + "s";
+      return registry.newQuantiles(quantileName, description,
+          sampleName, valueName, interval);
+    }).collect(Collectors.toList());
   }
 }

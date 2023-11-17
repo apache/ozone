@@ -81,6 +81,9 @@ public final class S3GatewayConfigKeys {
   public static final boolean OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT =
       true;
 
+  public static final String OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY
+      = "ozone.s3g.metrics.percentiles.intervals.seconds";
+
   /**
    * Never constructed.
    */

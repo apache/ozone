@@ -147,7 +147,7 @@ final class ObjectEndpointStreaming {
                                             DigestInputStream body)
       throws IOException, OS3Exception {
     String eTag;
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
+    S3GatewayMetrics metrics = S3GatewayMetrics.getMetrics();
     // OmMultipartCommitUploadPartInfo can only be gotten after the
     // OzoneDataStreamOutput is closed, so we need to save the
     // KeyDataStreamOutput in the OzoneDataStreamOutput and use it to get the
