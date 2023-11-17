@@ -53,14 +53,12 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   @Override
   public OMLockDetails releaseWriteLock(Resource resource,
       String... resources) {
-  // Intentionally empty
     return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
   public OMLockDetails releaseReadLock(Resource resource, String... resources) {
-  // Intentionally empty
-    return null;
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
