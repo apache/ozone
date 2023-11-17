@@ -312,6 +312,37 @@ jobs:
           name: dependency
           path: target/dependency
         continue-on-error: true
+  license:
+    needs:
+      - build-info
+      - build
+    runs-on: ubuntu-20.04
+    timeout-minutes: 15
+    if: needs.build-info.outputs.needs-dependency-check == 'true'
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        uses: actions/download-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+      - name: Execute tests
+        run: |
+          hadoop-ozone/dev-support/checks/${{ github.job }}.sh
+        continue-on-error: true
+      - name: Summary of failures
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
+        if: ${{ !cancelled() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ${{ github.job }}
+          path: target/${{ github.job }}
+        continue-on-error: true
   acceptance:
     needs:
       - build-info
