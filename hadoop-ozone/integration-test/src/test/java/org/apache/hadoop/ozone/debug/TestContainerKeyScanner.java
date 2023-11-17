@@ -44,7 +44,8 @@ import java.util.Collections;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
+ * This class tests `ozone debug ldb ckscanner` CLI that reads from RocksDB
+ * and gets keys for container ids.
  */
 public class TestContainerKeyScanner {
   private static final String KEY_TABLE = "keyTable";
