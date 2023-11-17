@@ -33,10 +33,10 @@ import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import com.google.common.collect.Sets;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static java.util.Collections.singleton;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test object multi delete.
@@ -69,9 +69,9 @@ public class TestObjectMultiDelete {
     expectedResult.add("key3");
 
     //THEN
-    Assert.assertEquals(expectedResult, keysAtTheEnd);
-    Assert.assertEquals(3, response.getDeletedObjects().size());
-    Assert.assertEquals(0, response.getErrors().size());
+    assertEquals(expectedResult, keysAtTheEnd);
+    assertEquals(3, response.getDeletedObjects().size());
+    assertEquals(0, response.getErrors().size());
   }
 
   @Test
@@ -98,9 +98,9 @@ public class TestObjectMultiDelete {
         .collect(Collectors.toSet());
 
     //THEN
-    Assert.assertEquals(singleton("key3"), keysAtTheEnd);
-    Assert.assertEquals(0, response.getDeletedObjects().size());
-    Assert.assertEquals(0, response.getErrors().size());
+    assertEquals(singleton("key3"), keysAtTheEnd);
+    assertEquals(0, response.getDeletedObjects().size());
+    assertEquals(0, response.getErrors().size());
   }
 
   private OzoneBucket initTestData(OzoneClient client) throws IOException {

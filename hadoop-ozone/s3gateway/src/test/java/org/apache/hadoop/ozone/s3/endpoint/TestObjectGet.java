@@ -37,10 +37,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.commons.io.IOUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -48,6 +46,8 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIREC
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.mockito.Mockito.doReturn;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test get object.
@@ -74,7 +74,7 @@ public class TestObjectGet {
   private OzoneClient client;
   private ContainerRequestContext context;
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     //GIVEN
     client = new OzoneClientStub();
@@ -110,8 +110,8 @@ public class TestObjectGet {
     String keyContent =
         IOUtils.toString(ozoneInputStream, UTF_8);
 
-    Assert.assertEquals(CONTENT, keyContent);
-    Assert.assertEquals("" + keyContent.length(),
+    assertEquals(CONTENT, keyContent);
+    assertEquals("" + keyContent.length(),
         response.getHeaderString("Content-Length"));
 
     DateTimeFormatter.RFC_1123_DATE_TIME
@@ -125,17 +125,17 @@ public class TestObjectGet {
 
     Response response = rest.get("b1", "key1", null, 0, null);
 
-    Assert.assertEquals(CONTENT_TYPE1,
+    assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
-    Assert.assertEquals(CONTENT_LANGUAGE1,
+    assertEquals(CONTENT_LANGUAGE1,
         response.getHeaderString("Content-Language"));
-    Assert.assertEquals(EXPIRES1,
+    assertEquals(EXPIRES1,
         response.getHeaderString("Expires"));
-    Assert.assertEquals(CACHE_CONTROL1,
+    assertEquals(CACHE_CONTROL1,
         response.getHeaderString("Cache-Control"));
-    Assert.assertEquals(CONTENT_DISPOSITION1,
+    assertEquals(CONTENT_DISPOSITION1,
         response.getHeaderString("Content-Disposition"));
-    Assert.assertEquals(CONTENT_ENCODING1,
+    assertEquals(CONTENT_ENCODING1,
         response.getHeaderString("Content-Encoding"));
   }
 
@@ -158,17 +158,17 @@ public class TestObjectGet {
         .thenReturn(queryParameter);
     Response response = rest.get("b1", "key1", null, 0, null);
 
-    Assert.assertEquals(CONTENT_TYPE2,
+    assertEquals(CONTENT_TYPE2,
         response.getHeaderString("Content-Type"));
-    Assert.assertEquals(CONTENT_LANGUAGE2,
+    assertEquals(CONTENT_LANGUAGE2,
         response.getHeaderString("Content-Language"));
-    Assert.assertEquals(EXPIRES2,
+    assertEquals(EXPIRES2,
         response.getHeaderString("Expires"));
-    Assert.assertEquals(CACHE_CONTROL2,
+    assertEquals(CACHE_CONTROL2,
         response.getHeaderString("Cache-Control"));
-    Assert.assertEquals(CONTENT_DISPOSITION2,
+    assertEquals(CONTENT_DISPOSITION2,
         response.getHeaderString("Content-Disposition"));
-    Assert.assertEquals(CONTENT_ENCODING2,
+    assertEquals(CONTENT_ENCODING2,
         response.getHeaderString("Content-Encoding"));
   }
 
@@ -178,15 +178,15 @@ public class TestObjectGet {
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
 
     response = rest.get("b1", "key1", null, 0, null);
-    Assert.assertEquals("1", response.getHeaderString("Content-Length"));
-    Assert.assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
+    assertEquals("1", response.getHeaderString("Content-Length"));
+    assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
     response = rest.get("b1", "key1", null, 0, null);
-    Assert.assertEquals(String.valueOf(CONTENT.length()),
+    assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
-    Assert.assertEquals(
+    assertEquals(
         String.format("bytes 0-%s/%s", CONTENT.length() - 1, CONTENT.length()),
         response.getHeaderString("Content-Range"));
   }
@@ -195,7 +195,7 @@ public class TestObjectGet {
   public void getStatusCode() throws IOException, OS3Exception {
     Response response;
     response = rest.get("b1", "key1", null, 0, null);
-    Assert.assertEquals(response.getStatus(),
+    assertEquals(response.getStatus(),
         Response.Status.OK.getStatusCode());
 
     // https://www.rfc-editor.org/rfc/rfc7233#section-4.1
@@ -203,7 +203,7 @@ public class TestObjectGet {
     //   successfully fulfilling a range request for the target resource
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
     response = rest.get("b1", "key1", null, 0, null);
-    Assert.assertEquals(response.getStatus(),
+    assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
   }
 
@@ -235,12 +235,11 @@ public class TestObjectGet {
     bucket.createDirectory(keyPath);
 
     // WHEN
-    final OS3Exception ex =
-        Assertions.assertThrows(OS3Exception.class,
+    final OS3Exception ex = assertThrows(OS3Exception.class,
             () -> rest.get(bucketName, keyPath, null, 0, null));
 
     // THEN
-    Assertions.assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
+    assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
     bucket.deleteKey(keyPath);
   }
 }

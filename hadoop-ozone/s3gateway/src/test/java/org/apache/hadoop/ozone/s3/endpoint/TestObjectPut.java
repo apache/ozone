@@ -42,10 +42,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.http.HttpStatus;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -53,8 +51,10 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HE
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -74,7 +74,7 @@ public class TestObjectPut {
   private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     //Create client stub and object store stub.
     clientStub = new OzoneClientStub();
@@ -109,8 +109,8 @@ public class TestObjectPut {
     String keyContent =
         IOUtils.toString(ozoneInputStream, UTF_8);
 
-    Assert.assertEquals(200, response.getStatus());
-    Assert.assertEquals(CONTENT, keyContent);
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
   }
 
   @Test
@@ -128,7 +128,7 @@ public class TestObjectPut {
     Response response = objectEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
 
-    Assert.assertEquals(ecReplicationConfig,
+    assertEquals(ecReplicationConfig,
         clientStub.getObjectStore().getS3Bucket(bucketName).getKey(keyName)
             .getReplicationConfig());
     OzoneInputStream ozoneInputStream =
@@ -137,8 +137,8 @@ public class TestObjectPut {
     String keyContent =
         IOUtils.toString(ozoneInputStream, UTF_8);
 
-    Assert.assertEquals(200, response.getStatus());
-    Assert.assertEquals(CONTENT, keyContent);
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
   }
 
   @Test
@@ -153,7 +153,7 @@ public class TestObjectPut {
     long dataSize = CONTENT.length();
 
     objectEndpoint.put(bucketName, keyName, dataSize, 0, null, body);
-    Assert.assertEquals(dataSize, getKeyDataSize(keyName));
+    assertEquals(dataSize, getKeyDataSize(keyName));
   }
 
   @Test
@@ -174,7 +174,7 @@ public class TestObjectPut {
         .thenReturn("15");
     objectEndpoint.put(bucketName, keyName, chunkedContent.length(), 0, null,
         new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
-    Assert.assertEquals(15, getKeyDataSize(keyName));
+    assertEquals(15, getKeyDataSize(keyName));
   }
 
   private long getKeyDataSize(String key) throws IOException {
@@ -209,8 +209,8 @@ public class TestObjectPut {
             .readKey(keyName);
     String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
 
-    Assert.assertEquals(200, response.getStatus());
-    Assert.assertEquals("1234567890abcde", keyContent);
+    assertEquals(200, response.getStatus());
+    assertEquals("1234567890abcde", keyContent);
   }
 
   @Test
@@ -231,8 +231,8 @@ public class TestObjectPut {
 
     String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
 
-    Assert.assertEquals(200, response.getStatus());
-    Assert.assertEquals(CONTENT, keyContent);
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
 
 
     // Add copy header, and then call put
@@ -248,15 +248,15 @@ public class TestObjectPut {
 
     keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
 
-    Assert.assertEquals(200, response.getStatus());
-    Assert.assertEquals(CONTENT, keyContent);
+    assertEquals(200, response.getStatus());
+    assertEquals(CONTENT, keyContent);
 
     // source and dest same
     try {
       objectEndpoint.put(bucketName, keyName, CONTENT.length(), 1, null, body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getErrorMessage().contains("This copy request is " +
+      assertTrue(ex.getErrorMessage().contains("This copy request is " +
           "illegal"));
     }
 
@@ -268,7 +268,7 @@ public class TestObjectPut {
           body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getCode().contains("NoSuchBucket"));
+      assertTrue(ex.getCode().contains("NoSuchBucket"));
     }
 
     // dest bucket not found
@@ -278,7 +278,7 @@ public class TestObjectPut {
       objectEndpoint.put(nonexist, destkey, CONTENT.length(), 1, null, body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getCode().contains("NoSuchBucket"));
+      assertTrue(ex.getCode().contains("NoSuchBucket"));
     }
 
     //Both source and dest bucket not found
@@ -288,7 +288,7 @@ public class TestObjectPut {
       objectEndpoint.put(nonexist, destkey, CONTENT.length(), 1, null, body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getCode().contains("NoSuchBucket"));
+      assertTrue(ex.getCode().contains("NoSuchBucket"));
     }
 
     // source key not found
@@ -299,7 +299,7 @@ public class TestObjectPut {
           null, body);
       fail("test copy object failed");
     } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getCode().contains("NoSuchBucket"));
+      assertTrue(ex.getCode().contains("NoSuchBucket"));
     }
 
   }
@@ -341,7 +341,7 @@ public class TestObjectPut {
 
 
     //default type is set
-    Assert.assertEquals(ReplicationType.RATIS, key.getReplicationType());
+    assertEquals(ReplicationType.RATIS, key.getReplicationType());
   }
 
   @Test
@@ -375,7 +375,7 @@ public class TestObjectPut {
         partNumber, uploadId, body);
 
     // THEN
-    Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
     Mockito.verify(protocol).createDirectory(any(), eq(bucketName), eq(path));
   }
 
@@ -411,11 +411,11 @@ public class TestObjectPut {
         .createDirectory(any(), any(), any());
 
     // THEN
-    final OS3Exception exception = Assertions.assertThrows(OS3Exception.class,
+    final OS3Exception exception = assertThrows(OS3Exception.class,
         () -> objEndpoint
             .put(bucketName, path, length, partNumber, uploadId, body));
-    Assertions.assertEquals("Conflict", exception.getCode());
-    Assertions.assertEquals(409, exception.getHttpCode());
+    assertEquals("Conflict", exception.getCode());
+    assertEquals(409, exception.getHttpCode());
     Mockito.verify(protocol, times(1)).createDirectory(any(), any(), any());
   }
 }
