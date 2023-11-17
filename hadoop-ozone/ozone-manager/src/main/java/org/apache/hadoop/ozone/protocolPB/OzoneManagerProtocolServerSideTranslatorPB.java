@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -344,10 +343,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       ExitUtils.terminate(1, errorMessage, ex, LOG);
       Thread.currentThread().interrupt();
     }
-    OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
-    OMResponse omResponse = omClientResponse.getOMResponse();
-    return omResponse.toBuilder()
-        .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
+    return omClientResponse.getOMResponse();
   }
 
   /**

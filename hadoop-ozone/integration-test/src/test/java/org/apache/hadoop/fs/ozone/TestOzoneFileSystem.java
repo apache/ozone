@@ -1822,7 +1822,9 @@ public class TestOzoneFileSystem {
 
     int nonZeroLines = 0;
     for (String s: logContent.split("\n")) {
-      if (!s.contains("locksharedTime=0 lockexclusiveTime=0")) {
+      // The following conditions means write operations from Clients.
+      if (!s.contains("lockexclusiveTime=0") &&
+          s.contains("OzoneManagerProtocol")) {
         nonZeroLines++;
       }
     }
