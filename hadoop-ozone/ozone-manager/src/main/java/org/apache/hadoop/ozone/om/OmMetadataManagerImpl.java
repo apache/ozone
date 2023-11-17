@@ -1365,66 +1365,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
     }
 
-    TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
-
-    int count = appendSnapshotFromCacheToMap(
-        snapshotInfoMap, prefix, seek, maxListResult);
-    appendSnapshotFromDBToMap(
-        snapshotInfoMap, prefix, seek, count, maxListResult);
-
-    return new ArrayList<>(snapshotInfoMap.values());
-  }
-
-  private int appendSnapshotFromCacheToMap(
-      TreeMap snapshotInfoMap, String prefix,
-      String previous, int maxListResult) {
-    int count = 0;
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
-        snapshotInfoTable.cacheIterator();
-    while (iterator.hasNext() && count < maxListResult) {
-      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry =
-          iterator.next();
-      String snapshotKey = entry.getKey().getCacheKey();
-      SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      if (snapshotInfo != null && snapshotKey.startsWith(prefix) &&
-          snapshotKey.compareTo(previous) > 0) {
-        snapshotInfoMap.put(snapshotKey, snapshotInfo);
-        count++;
+    List<SnapshotInfo> snapshotInfos =  Lists.newArrayList();
+    try (ListIterator.MinHeapIterator snapshotIterator =
+        new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
+            bucketName, snapshotInfoTable)) {
+      while (snapshotIterator.hasNext() && maxListResult > 0) {
+        snapshotInfos.add((SnapshotInfo) snapshotIterator.next().getValue());
       }
     }
-    return count;
-  }
-
-  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap,
-                                         String prefix, String previous,
-                                         int count, int maxListResult)
-      throws IOException {
-    try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
-             snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue<String, SnapshotInfo> snapshotinfo;
-      snapshotIter.seek(previous);
-      while (snapshotIter.hasNext() && count < maxListResult) {
-        snapshotinfo = snapshotIter.next();
-        if (snapshotinfo != null &&
-            snapshotinfo.getKey().compareTo(previous) == 0) {
-          continue;
-        }
-        if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix))  {
-          CacheValue<SnapshotInfo> cacheValue =
-              snapshotInfoTable.getCacheValue(
-                  new CacheKey<>(snapshotinfo.getKey()));
-          // There is always the latest data in the cache, so don't need to add
-          // earlier data from DB. We only add data from DB if there is no data
-          // in cache.
-          if (cacheValue == null) {
-            snapshotInfoMap.put(snapshotinfo.getKey(), snapshotinfo.getValue());
-            count++;
-          }
-        } else {
-          break;
-        }
-      }
-    }
+    return snapshotInfos;
   }
 
   @Override
