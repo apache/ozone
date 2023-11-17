@@ -65,26 +65,26 @@ public class S3InMemoryCache implements S3SecretCache {
   @Override
   public void clearCache(List<Long> flushedTransactionIds) {
     // Create a map to store transactionLogIndex-to-cacheKey mappings
-    Map<Long, Set<String>> transactionIdToCacheKeys = new HashMap<>();
+    Map<Long, String> transactionIdToCacheKeys = new HashMap<>();
 
     // Populate the mapping based on transactionLogIndex to kerberosId.
     // So that we do not have to do nested iteration for every transactionId.
-    cache.asMap().forEach((k, v) -> {
-      if (v != null) {
-        long transactionLogIndex = v.getTransactionLogIndex();
-        transactionIdToCacheKeys
-            .computeIfAbsent(transactionLogIndex, key -> new HashSet<>())
-            .add(k);
+    Set<String> cacheKeys = cache.asMap().keySet();
+    for (String cacheKey : cacheKeys) {
+      S3SecretValue secretValue = cache.getIfPresent(cacheKey);
+      if (secretValue != null) {
+        transactionIdToCacheKeys.put(secretValue.getTransactionLogIndex(),
+            cacheKey);
       }
-    });
+    }
 
     // Iterate over the provided transactionIds
     for (Long transactionId : flushedTransactionIds) {
-      // Get the cache keys associated with this transactionId
-      Set<String> cacheKeys = transactionIdToCacheKeys.get(transactionId);
-      if (cacheKeys != null) {
-        // Remove the cache entries directly using the cache keys
-        cache.invalidateAll(cacheKeys);
+      // Get the cache key associated with this transactionId
+      String cacheKey = transactionIdToCacheKeys.get(transactionId);
+      if (cacheKey != null) {
+        // Remove the cache entry for this cacheKey.
+        cache.invalidate(cacheKey);
       }
     }
   }
