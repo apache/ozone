@@ -47,6 +47,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
    */
   public enum UnHealthyContainerStates {
     MISSING,
+    EMPTY_MISSING,
     UNDER_REPLICATED,
     OVER_REPLICATED,
     MIS_REPLICATED,
