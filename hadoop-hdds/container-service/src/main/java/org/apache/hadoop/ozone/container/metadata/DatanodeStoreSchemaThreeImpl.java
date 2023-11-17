@@ -246,13 +246,13 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         throw new StorageContainerException(
             NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
       } else {
-        LOG.info("blockData=(null)" + ", lastChunk=" + lastChunk.getChunks());
+        LOG.debug("blockData=(null)" + ", lastChunk=" + lastChunk.getChunks());
         return lastChunk;
       }
     } else {
       // append last partial chunk to the block data
       if (lastChunk != null) {
-        LOG.info("blockData=" + blockData.getChunks() + ", lastChunk=" + lastChunk.getChunks());
+        LOG.debug("blockData=" + blockData.getChunks() + ", lastChunk=" + lastChunk.getChunks());
         Preconditions.checkState(lastChunk.getChunks().size() == 1);
         ContainerProtos.ChunkInfo lastChunkInBlockData =
             blockData.getChunks().get(blockData.getChunks().size() - 1);
@@ -266,11 +266,10 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         chunkInfos.add(lastChunk.getChunks().get(0));
         blockData.setChunks(chunkInfos);
 
-        //blockData.addChunk(lastChunk.getChunks().get(0));
         blockData.setBlockCommitSequenceId(
             lastChunk.getBlockCommitSequenceId());
       } else {
-        LOG.info("blockData=" + blockData.getChunks() + ", lastChunk=(null)");
+        LOG.debug("blockData=" + blockData.getChunks() + ", lastChunk=(null)");
       }
     }
 
@@ -375,13 +374,14 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             assert info.getOffset() == next;
             next += info.getLen();
           }
+          LOG.debug("block " + localID + " does not have full chunks yet. Adding the chunks to it " + blockData);
         } else {
           // if the block exists in the block data table,
           // append chunks till except the last one (supposedly partial)
           List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>(blockData.getChunks());
 
-          LOG.info("blockData.getChunks()=" + chunkInfos);
-          LOG.info("data.getChunks()=" + data.getChunks());
+          LOG.debug("blockData.getChunks()=" + chunkInfos);
+          LOG.debug("data.getChunks()=" + data.getChunks());
 
           for (int i = 0; i < lastChunkIndex; i++) {
             chunkInfos.add(data.getChunks().get(i));

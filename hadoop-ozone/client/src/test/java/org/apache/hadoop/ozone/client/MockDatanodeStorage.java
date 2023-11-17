@@ -75,10 +75,10 @@ public class MockDatanodeStorage {
 
   public void putBlock(DatanodeBlockID blockID, BlockData blockData) {
     if (isIncrementalChunkList(blockData)) {
-      LOG.info("incremental chunk list");
+      LOG.debug("incremental chunk list");
       putBlockIncremental(blockID, blockData);
     } else {
-      LOG.info("full chunk list");
+      LOG.debug("full chunk list");
       putBlockFull(blockID, blockData);
     }
   }
@@ -190,7 +190,7 @@ public class MockDatanodeStorage {
       DatanodeBlockID blockID,
       ChunkInfo chunkInfo) {
     //return data.get(createKey(blockID, chunkInfo));
-    LOG.info("readChunkData: blockID=" + createKey(blockID) +
+    LOG.debug("readChunkData: blockID=" + createKey(blockID) +
         " chunkInfo offset=" + chunkInfo.getOffset() +
         " chunkInfo len=" + chunkInfo.getLen());
     ByteString str = data.get(createKey(blockID)).substring(
