@@ -130,10 +130,8 @@ public class S3SecretManagerImpl implements S3SecretManager {
     return s3SecretStore.batcher();
   }
 
+  @Override
   public void updateCache(String kerberosID, S3SecretValue secret) {
     S3SecretManager.super.updateCache(kerberosID, secret);
   }
-
-
-
 }

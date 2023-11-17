@@ -735,13 +735,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   private OMResponse handleError(OMResponse resp) throws OMException {
     if (resp.getStatus() != OK) {
-      LOG.error("OMException occurred: {}", resp.getMessage());
       throw new OMException(resp.getMessage(),
           ResultCodes.values()[resp.getStatus().ordinal()]);
     }
     return resp;
   }
-
 
   @Override
   public OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientId,
