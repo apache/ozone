@@ -65,6 +65,10 @@ public final class DispatcherContext {
     public boolean isWrite() {
       return this != COMMIT_DATA;
     }
+
+    public boolean isCommit() {
+      return this != WRITE_DATA;
+    }
   }
 
   /** Operation types. */
@@ -101,7 +105,6 @@ public final class DispatcherContext {
   private final Op op;
   // whether the chunk data needs to be written or committed or both
   private final WriteChunkStage stage;
-  // indicates whether the read from tmp chunk files is allowed
   // which term the request is being served in Ratis
   private final long term;
   // the log index in Ratis log to which the request belongs to

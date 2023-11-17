@@ -48,11 +48,11 @@ public class ChunkManagerDummyImpl implements ChunkManager {
       throws StorageContainerException {
 
     Preconditions.checkNotNull(dispatcherContext);
-    final boolean isWrite = dispatcherContext.getStage().isWrite();
+    DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     ContainerData containerData = container.getContainerData();
 
-    if (isWrite) {
+    if (stage.isWrite()) {
       ChunkUtils.validateBufferSize(info.getLen(), data.remaining());
 
       HddsVolume volume = containerData.getVolume();
@@ -61,7 +61,7 @@ public class ChunkManagerDummyImpl implements ChunkManager {
       volumeIOStats.incWriteBytes(info.getLen());
     }
 
-    if (isWrite) {
+    if (stage.isCommit()) {
       containerData.updateWriteStats(info.getLen(), false);
     }
   }
