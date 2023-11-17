@@ -79,8 +79,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
 /**
  * Handle block deletion commands.
@@ -123,8 +121,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
-    long interval = this.conf.getLong(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
-        BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
+    long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
     handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
   }

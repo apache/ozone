@@ -61,7 +61,7 @@ public class TestDatanodeConfiguration {
     int validFailedVolumesTolerated = 10;
     long validDiskCheckMinGap = 2;
     long validDiskCheckTimeout = 1;
-    long validBlockDeleteCommandWorkerInterval = 1000;
+    long validBlockDeleteCommandWorkerInterval = 1;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, validDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
@@ -76,8 +76,8 @@ public class TestDatanodeConfiguration {
         validDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
         validDiskCheckTimeout, TimeUnit.MINUTES);
-    conf.setLong(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
-        validBlockDeleteCommandWorkerInterval);
+    conf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+        validBlockDeleteCommandWorkerInterval, TimeUnit.SECONDS);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -97,7 +97,7 @@ public class TestDatanodeConfiguration {
     assertEquals(validDiskCheckTimeout,
         subject.getDiskCheckTimeout().toMinutes());
     assertEquals(validBlockDeleteCommandWorkerInterval,
-        subject.getBlockDeleteCommandWorkerInterval());
+        subject.getBlockDeleteCommandWorkerInterval().getSeconds());
   }
 
   @Test
@@ -108,6 +108,7 @@ public class TestDatanodeConfiguration {
     int invalidFailedVolumesTolerated = -2;
     long invalidDiskCheckMinGap = -1;
     long invalidDiskCheckTimeout = -1;
+    long invalidBlockDeleteCommandWorkerInterval = -1;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, invalidDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
@@ -122,7 +123,8 @@ public class TestDatanodeConfiguration {
         invalidDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
         invalidDiskCheckTimeout, TimeUnit.MINUTES);
-    conf.setLong(BLOCK_DELETE_COMMAND_WORKER_INTERVAL, -1000);
+    conf.setTimeDuration (BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+        invalidBlockDeleteCommandWorkerInterval, TimeUnit.SECONDS);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
