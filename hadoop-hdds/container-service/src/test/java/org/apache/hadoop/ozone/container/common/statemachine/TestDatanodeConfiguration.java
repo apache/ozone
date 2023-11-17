@@ -123,7 +123,7 @@ public class TestDatanodeConfiguration {
         invalidDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
         invalidDiskCheckTimeout, TimeUnit.MINUTES);
-    conf.setTimeDuration (BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+    conf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
         invalidBlockDeleteCommandWorkerInterval, TimeUnit.SECONDS);
 
     // WHEN
