@@ -1687,7 +1687,9 @@ public class RpcClient implements ClientProtocol {
             partNumber)
         .collect(Collectors.toList());
     keyInfo.updateLocationInfoList(filteredKeyLocationInfo, false);
-    keyInfo.setDataSize(getTotalBytesRead(keyInfo));
+    keyInfo.setDataSize(filteredKeyLocationInfo.stream()
+        .mapToLong(OmKeyLocationInfo::getLength)
+        .sum());
     return getOzoneKeyDetails(keyInfo);
   }
 
