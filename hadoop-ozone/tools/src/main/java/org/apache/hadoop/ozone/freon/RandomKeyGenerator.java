@@ -64,7 +64,6 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -788,7 +787,6 @@ public final class RandomKeyGenerator implements Callable<Void> {
     }
   }
 
-  @SuppressFBWarnings("REC_CATCH_EXCEPTION")
   private boolean createKey(long globalKeyNumber) {
     int globalBucketNumber = (int) (globalKeyNumber % totalBucketCount);
     long keyNumber = globalKeyNumber / totalBucketCount;

@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -83,6 +82,7 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -315,16 +315,11 @@ public class TestHddsDispatcher {
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
       Assert.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
-      DispatcherContext dispatcherContext =
-          new DispatcherContext.Builder()
-              .setContainer2BCSIDMap(Collections.emptyMap())
-              .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-              .build();
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(HddsDispatcher.LOG);
       // send write chunk request without sending create container
-      response = hddsDispatcher.dispatch(writeChunkRequest, dispatcherContext);
+      response = hddsDispatcher.dispatch(writeChunkRequest, COMMIT_STAGE);
       // container should not be found
       Assert.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());

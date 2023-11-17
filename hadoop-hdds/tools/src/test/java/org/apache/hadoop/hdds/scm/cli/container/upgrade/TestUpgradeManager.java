@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -63,6 +62,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -85,14 +86,6 @@ public class TestUpgradeManager {
   private BlockManager blockManager;
   private FilePerBlockStrategy chunkManager;
   private ContainerSet containerSet;
-
-  private static final DispatcherContext WRITE_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
-
-  private static final DispatcherContext COMMIT_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
   @Before
   public void setup() throws Exception {
