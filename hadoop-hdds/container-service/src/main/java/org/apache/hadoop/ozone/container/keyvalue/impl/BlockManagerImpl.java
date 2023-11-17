@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -92,11 +93,12 @@ public class BlockManagerImpl implements BlockManager {
   @Override
   public long putBlock(Container container, BlockData data,
       boolean endOfBlock) throws IOException {
-    return persistPutBlock(
-        (KeyValueContainer) container,
-        data,
-        config,
-        endOfBlock);
+    return TracingUtil.executeInNewSpan("BlockManagerImpl.putBlock",
+        () -> persistPutBlock(
+            (KeyValueContainer) container,
+            data,
+            config,
+            endOfBlock));
   }
 
   public static long persistPutBlock(KeyValueContainer container,

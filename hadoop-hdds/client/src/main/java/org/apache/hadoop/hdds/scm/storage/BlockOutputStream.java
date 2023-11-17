@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -544,7 +545,9 @@ public class BlockOutputStream extends OutputStream {
    */
   protected void handleFlush(boolean close) throws IOException {
     try {
-      handleFlushInternal(close);
+      TracingUtil.executeInNewSpan("BlockOutputStream.handleFlush",
+          () -> handleFlushInternal(close)
+        );
     } catch (ExecutionException e) {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
@@ -553,7 +556,10 @@ public class BlockOutputStream extends OutputStream {
     } catch (Throwable e) {
       String msg = "Failed to flush. error: " + e.getMessage();
       LOG.error(msg, e);
-      throw e;
+      if (e instanceof IOException) {
+        throw (IOException)e;
+      }
+      throw new IOException(e);
     } finally {
       if (close) {
         cleanup(false);
@@ -561,8 +567,7 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void handleFlushInternal(boolean close)
-      throws IOException, InterruptedException, ExecutionException {
+  private void handleFlushInternal(boolean close) throws Exception {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
@@ -581,8 +586,10 @@ public class BlockOutputStream extends OutputStream {
       // data since latest flush - we need to send the "EOF" flag
       executePutBlock(true, true);
     }
-    waitOnFlushFutures();
-    watchForCommit(false);
+    TracingUtil.executeInNewSpan("BlockOutputStream.waitOnFlushFutures",
+        this::waitOnFlushFutures);
+    TracingUtil.executeInNewSpan("BlockOutputStream.waitOnFlushFutures",
+        () -> watchForCommit(false));
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
 

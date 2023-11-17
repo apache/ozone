@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -94,6 +95,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.JavaUtils;
+
+import io.opentracing.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -355,9 +358,21 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public TransactionContext startTransaction(RaftClientRequest request)
       throws IOException {
-    long startTime = Time.monotonicNowNanos();
     final ContainerCommandRequestProto proto =
         message2ContainerCommandRequestProto(request.getMessage());
+    Span span = TracingUtil.importAndCreateSpan("startTransaction", proto.getTraceID());
+    try {
+      return startTransactionTraced(request, proto);
+    } finally {
+      span.finish();
+    }
+  }
+
+  private TransactionContext startTransactionTraced(RaftClientRequest request,
+      ContainerCommandRequestProto proto)
+      throws IOException {
+    long startTime = Time.monotonicNowNanos();
+
     Preconditions.checkArgument(request.getRaftGroupId().equals(gid));
     try {
       dispatcher.validateContainerCommand(proto);
@@ -498,6 +513,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // thread.
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
+          Span span = TracingUtil.importAndCreateSpan("writeStateMachineData", requestProto.getTraceID());
           try {
             return runCommand(requestProto, context);
           } catch (Exception e) {
@@ -510,6 +526,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             stateMachineHealthy.set(false);
             raftFuture.completeExceptionally(e);
             throw e;
+          } finally {
+            span.finish();
           }
         }, getChunkExecutor(requestProto.getWriteChunk()));
 
@@ -716,8 +734,13 @@ public class ContainerStateMachine extends BaseStateMachine {
         new DispatcherContext.Builder().setTerm(term).setLogIndex(index)
             .setReadFromTmpFile(true).build();
     // read the chunk
-    ContainerCommandResponseProto response =
-        dispatchCommand(dataContainerCommandProto, context);
+    Span span = TracingUtil.importAndCreateSpan("readStateMachineData", requestProto.getTraceID());
+    ContainerCommandResponseProto response;
+    try {
+      response = dispatchCommand(dataContainerCommandProto, context);
+    } finally {
+      span.finish();
+    }
     if (response.getResult() != ContainerProtos.Result.SUCCESS) {
       StorageContainerException sce =
           new StorageContainerException(response.getMessage(),
@@ -860,11 +883,14 @@ public class ContainerStateMachine extends BaseStateMachine {
     final long containerId = request.getContainerID();
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
+          Span span = TracingUtil.importAndCreateSpan("applyTransaction", request.getTraceID());
           try {
             return runCommand(request, context.build());
           } catch (Exception e) {
             exceptionHandler.accept(e);
             throw e;
+          } finally {
+            span.finish();
           }
         };
     return containerTaskQueues.submit(containerId, task, executor);
