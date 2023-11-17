@@ -260,7 +260,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     StorageContainerServiceProvider scmClientMock =
         mock(StorageContainerServiceProvider.class);
     ReconContainerMetadataManager reconContainerMetadataManager =
-       mock(ReconContainerMetadataManager.class);
+        mock(ReconContainerMetadataManager.class);
 
     // Create 2 containers. The first is OPEN will no replicas, the second is
     // CLOSED with no replicas.

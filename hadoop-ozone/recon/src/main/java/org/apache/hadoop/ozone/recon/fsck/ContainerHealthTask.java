@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -36,7 +35,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -339,10 +337,10 @@ public class ContainerHealthTask extends ReconScmTask {
               recordForState(container, UnHealthyContainerStates.MISSING,
                   time));
         } else {
-          // If the container is empty and has no replicas, it is possible it was
-          // a container which stuck in the closing state which never got any
-          // replicas created on the datanodes. In this case, we log it as EMPTY,
-          // and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
+          // If the container is empty and has no replicas, it is possible it
+          // was a container which stuck in the closing state which never got
+          // any replicas created on the datanodes. In this case, we log it as
+          // EMPTY, and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
           LOG.info("Container is missing as well as empty, mapped with {} " +
                   "number of keys and and having {} usedBytes in SCM metadata.",
               container.getNumKeys(), container.getContainer().getUsedBytes());
