@@ -86,10 +86,12 @@ public class TestSCMPipelineMetrics {
     Optional<Pipeline> pipeline = pipelineManager
         .getPipelines().stream().findFirst();
     Assertions.assertTrue(pipeline.isPresent());
-    Assertions.assertDoesNotThrow(() ->
-        cluster.getStorageContainerManager()
-            .getPipelineManager()
-            .closePipeline(pipeline.get(), false));
+    Assertions.assertDoesNotThrow(() -> {
+      PipelineManager pm = cluster.getStorageContainerManager()
+          .getPipelineManager();
+      pm.closePipeline(pipeline.get().getId());
+      pm.deletePipeline(pipeline.get().getId());
+    });
     MetricsRecordBuilder metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     assertCounter("NumPipelineDestroyed", 1L, metrics);

@@ -552,7 +552,6 @@ public class PipelineManagerImpl implements PipelineManager {
         LOG.info("Closing the stale pipeline: {}", id);
         closePipeline(id);
         deletePipeline(id);
-        LOG.info("Closed the stale pipeline: {}", id);
       } catch (IOException e) {
         LOG.error("Closing the stale pipeline failed: {}", p, e);
       }

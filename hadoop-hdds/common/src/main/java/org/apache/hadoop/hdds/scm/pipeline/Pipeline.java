@@ -93,6 +93,15 @@ public final class Pipeline {
    * The immutable properties of pipeline object is used in
    * ContainerStateManager#getMatchingContainerByPipeline to take a lock on
    * the container allocations for a particular pipeline.
+   * <br><br>
+   * Since the Pipeline class is immutable, if we want to change the state of
+   * the Pipeline we should create a new Pipeline object with the new state.
+   * Make sure that you set the value of <i>creationTimestamp</i> properly while
+   * creating the new Pipeline object.
+   * <br><br>
+   * There is no need to worry about the value of <i>stateEnterTime</i> as it's
+   * set to <i>Instant.now</i> when you crate the Pipeline object as part of
+   * state change.
    */
   private Pipeline(PipelineID id,
       ReplicationConfig replicationConfig, PipelineState state,

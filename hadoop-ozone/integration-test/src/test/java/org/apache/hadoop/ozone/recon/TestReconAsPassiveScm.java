@@ -192,7 +192,8 @@ public class TestReconAsPassiveScm {
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();
     assertTrue(pipelineToClose.isPresent());
-    scmPipelineManager.closePipeline(pipelineToClose.get(), false);
+    scmPipelineManager.closePipeline(pipelineToClose.get().getId());
+    scmPipelineManager.deletePipeline(pipelineToClose.get().getId());
 
     // Start Recon
     cluster.startRecon();

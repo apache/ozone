@@ -80,8 +80,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
        * action.
        */
       LOG.info("A dead datanode is detected. {}", datanodeDetails);
-      destroyPipelines(datanodeDetails);
       closeContainers(datanodeDetails, publisher);
+      destroyPipelines(datanodeDetails);
 
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
