@@ -170,9 +170,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   @VisibleForTesting
   public OMResponse processRequest(OMRequest request) throws ServiceException {
     OMResponse response = internalProcessRequest(request);
-    if (response.hasOmLockDetailsProto()) {
+    if (response.hasOmLockDetails()) {
       OzoneManagerProtocolProtos.OMLockDetailsProto omLockDetailsProto =
-          response.getOmLockDetailsProto();
+          response.getOmLockDetails();
       Server.Call call = Server.getCurCall().get();
       if (call != null) {
         call.getProcessingDetails().add(Timing.LOCKWAIT,
@@ -347,7 +347,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
     OMResponse omResponse = omClientResponse.getOMResponse();
     return omResponse.toBuilder()
-        .setOmLockDetailsProto(omLockDetails.toProtobufBuilder()).build();
+        .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
   }
 
   /**

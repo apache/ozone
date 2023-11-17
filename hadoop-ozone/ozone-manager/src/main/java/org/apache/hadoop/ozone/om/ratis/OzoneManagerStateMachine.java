@@ -583,7 +583,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {
         return omResponse.toBuilder()
-            .setOmLockDetailsProto(omLockDetails.toProtobufBuilder()).build();
+            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
       } else {
         return omResponse;
       }

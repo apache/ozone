@@ -402,7 +402,7 @@ message OMResponse {
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
-  optional OMLockDetailsProto                omLockDetailsProto            = 131;
+  optional OMLockDetailsProto                omLockDetails                 = 131;
 }
 
 enum Status {

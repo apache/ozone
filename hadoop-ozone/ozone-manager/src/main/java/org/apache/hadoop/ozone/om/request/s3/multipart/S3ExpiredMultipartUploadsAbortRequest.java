@@ -129,6 +129,9 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Only successfully aborted MPUs are included in the audit.
@@ -329,8 +332,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       }
     } finally {
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
     }
 
