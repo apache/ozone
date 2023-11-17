@@ -135,7 +135,7 @@ public class TestInfoSubCommand {
 
     replica = logs.stream()
         .filter(m -> m.getRenderedMessage()
-            .matches("(?s)^.*error: \"Invalid container ID: invalid.*"))
+            .matches("(?s)^.*\"error\": \"Invalid container ID: invalid.*"))
         .collect(Collectors.toList());
     Assertions.assertEquals(1, replica.size());
   }

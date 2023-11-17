@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.time.Instant;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -76,35 +77,55 @@ public class InfoSubcommand extends ScmSubcommand {
   @Parameters(description = "One or more container IDs separated by spaces.")
   private String[] containerList;
 
+  private boolean multiContainer = false;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean first = true;
+    if (containerList == null || containerList.length > 1) {
+      multiContainer = true;
+    }
     printHeader();
-    for (String id : containerList) {
-      if (!first) {
-        printBreak();
+    if (containerList == null) {
+      Scanner scanner = new Scanner(System.in, "UTF-8");
+      System.in.
+      while (scanner.hasNextLine()) {
+        String id = scanner.nextLine().trim();
+        printOutput(scmClient, id, first);
+        first = false;
       }
-      first = false;
-      long containerID;
-      try {
-        containerID = Long.parseLong(id);
-      } catch (NumberFormatException e) {
-        printError("Invalid container ID: " + id);
-        continue;
+    } else {
+      for (String id : containerList) {
+        printOutput(scmClient, id, first);
+        first = false;
       }
-      printDetails(scmClient, containerID);
     }
     printFooter();
   }
 
+  private void printOutput(ScmClient scmClient, String id, boolean first)
+      throws IOException {
+    if (!first) {
+      printBreak();
+    }
+    long containerID;
+    try {
+      containerID = Long.parseLong(id);
+    } catch (NumberFormatException e) {
+      printError("Invalid container ID: " + id);
+      return;
+    }
+    printDetails(scmClient, containerID);
+  }
+
   private void printHeader() {
-    if (json && containerList.length > 1) {
+    if (json && multiContainer) {
       LOG.info("[");
     }
   }
 
   private void printFooter() {
-    if (json && containerList.length > 1) {
+    if (json && multiContainer) {
       LOG.info("]");
     }
   }
