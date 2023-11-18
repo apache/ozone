@@ -353,6 +353,14 @@ public abstract class EndpointBase implements Auditor {
     return builder.build();
   }
 
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap, Map<String, String> performance) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
+    builder.setPerformance(performance);
+    return builder.build();
+  }
+
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {

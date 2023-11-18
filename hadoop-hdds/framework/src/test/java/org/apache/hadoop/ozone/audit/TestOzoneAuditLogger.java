@@ -223,7 +223,7 @@ public class TestOzoneAuditLogger {
     verifyLog(
         "ERROR | OMAudit | ? | user=john | "
             + "ip=192.168.0.1 | op=CREATE_VOLUME "
-            + "{key1=value1, key2=value2} | ret=FAILURE",
+            + "{key1=value1, key2=value2} performance=null | ret=FAILURE",
         "org.apache.hadoop.ozone.audit."
             + "TestOzoneAuditLogger$TestException: Dummy exception message",
         "at org.apache.hadoop.ozone.audit.TestOzoneAuditLogger"

@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -131,5 +132,10 @@ public class AuditLogger {
   private boolean shouldLogAtDebug(AuditMessage auditMessage) {
     return debugCmdSetRef.get()
         .contains(auditMessage.getOp().toLowerCase(Locale.ROOT));
+  }
+
+
+  public static String nanosToMillisString(long nanos) {
+    return Long.toString(TimeUnit.NANOSECONDS.toMillis(nanos));
   }
 }
