@@ -222,15 +222,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   public final class DeleteCmdWorker implements Runnable {
 
-    private long interval;
+    private long intervalInMs;
 
     public DeleteCmdWorker(long interval) {
-      this.interval = interval;
+      this.intervalInMs = interval;
     }
 
     @VisibleForTesting
     public long getInterval() {
-      return this.interval;
+      return this.intervalInMs;
     }
 
     @Override
@@ -246,7 +246,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
 
         try {
-          Thread.sleep(this.interval);
+          Thread.sleep(this.intervalInMs);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
