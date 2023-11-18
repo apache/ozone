@@ -103,6 +103,11 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     long startTime = Time.monotonicNow();
     int delCount = 0;
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Keys sent to SCM: {}, size: {}.",
+          keyBlocksList, keyBlocksList.size());
+    }
     List<DeleteBlockGroupResult> blockDeletionResults =
         scmClient.deleteKeyBlocks(keyBlocksList);
     if (blockDeletionResults != null) {

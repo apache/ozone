@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  * keys.
  */
 public class KeyDeletingService extends AbstractKeyDeletingService {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
   // Use only a single thread for KeyDeletion. Multiple threads would read
@@ -186,6 +186,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // Check if this is the Leader OM. If not leader, no need to execute this
       // task.
       if (shouldRun()) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Running KeyDeletingService");
+        }
         getRunCount().incrementAndGet();
 
         // Acquire active DB deletedTable write lock because of the
