@@ -855,7 +855,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private CompletableFuture<ContainerCommandResponseProto> applyTransaction(
       ContainerCommandRequestProto request, DispatcherContext context,
-      Consumer<Exception> exceptionHandler) {
+      Consumer<Throwable> exceptionHandler) {
     final long containerId = request.getContainerID();
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
@@ -928,9 +928,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       }
       CompletableFuture<Message> applyTransactionFuture =
           new CompletableFuture<>();
-      final Consumer<Exception> exceptionHandler = e -> {
-        LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
-            + "{} exception {}", gid, requestProto.getCmdType(), index, e);
+      final Consumer<Throwable> exceptionHandler = e -> {
+        LOG.error(gid + ": failed to applyTransaction at logIndex " + index
+            + " for " + requestProto.getCmdType(), e);
         stateMachineHealthy.compareAndSet(true, false);
         metrics.incNumApplyTransactionsFails();
         applyTransactionFuture.completeExceptionally(e);
@@ -991,9 +991,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         return applyTransactionFuture;
       }).whenComplete((r, t) -> {
         if (t != null) {
-          stateMachineHealthy.set(false);
-          LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
-              + "{} exception {}", gid, requestProto.getCmdType(), index, t);
+          exceptionHandler.accept(t);
         }
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletionNs(
