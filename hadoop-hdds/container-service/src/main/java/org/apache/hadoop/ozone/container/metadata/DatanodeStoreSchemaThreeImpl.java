@@ -237,7 +237,6 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
 
     // check last chunk table
     BlockData lastChunk = getLastChunkInfoTable().get(blockKey);
-
     // check block data table
     BlockData blockData = getBlockDataTable().get(blockKey);
 
@@ -250,7 +249,6 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         return lastChunk;
       }
     } else {
-      // append last partial chunk to the block data
       if (lastChunk != null) {
         reconcilePartialChunks(lastChunk, blockData);
       } else {
@@ -273,6 +271,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             == lastChunk.getChunks().get(0).getOffset(),
         "chunk offset does not match");
 
+    // append last partial chunk to the block data
     List<ContainerProtos.ChunkInfo> chunkInfos =
         new ArrayList<>(blockData.getChunks());
     chunkInfos.add(lastChunk.getChunks().get(0));
@@ -304,10 +303,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     if (data.getChunks().isEmpty()) {
       return true;
     }
-    if (isFullChunk(data.getChunks().get(data.getChunks().size() - 1))) {
-      return true;
-    }
-    return false;
+    return isFullChunk(data.getChunks().get(data.getChunks().size() - 1));
   }
 
   public void putBlockByID(BatchOperation batch, boolean incremental,

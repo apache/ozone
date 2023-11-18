@@ -872,7 +872,6 @@ public class BlockOutputStream extends OutputStream {
               " pos=" + lastChunkBuffer.position() +
               " limit=" + lastChunkBuffer.limit() +
               " capacity=" + lastChunkBuffer.capacity());
-          //LOG.error("ddd");
           throw e;
         }
 
