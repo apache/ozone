@@ -43,6 +43,8 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -59,6 +61,7 @@ public class TestDatanodeConfiguration {
     int validFailedVolumesTolerated = 10;
     long validDiskCheckMinGap = 2;
     long validDiskCheckTimeout = 1;
+    long validBlockDeleteCommandWorkerInterval = 1;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, validDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
@@ -73,6 +76,8 @@ public class TestDatanodeConfiguration {
         validDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
         validDiskCheckTimeout, TimeUnit.MINUTES);
+    conf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+        validBlockDeleteCommandWorkerInterval, TimeUnit.SECONDS);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -91,6 +96,8 @@ public class TestDatanodeConfiguration {
         subject.getDiskCheckMinGap().toMinutes());
     assertEquals(validDiskCheckTimeout,
         subject.getDiskCheckTimeout().toMinutes());
+    assertEquals(validBlockDeleteCommandWorkerInterval,
+        subject.getBlockDeleteCommandWorkerInterval().getSeconds());
   }
 
   @Test
@@ -101,6 +108,7 @@ public class TestDatanodeConfiguration {
     int invalidFailedVolumesTolerated = -2;
     long invalidDiskCheckMinGap = -1;
     long invalidDiskCheckTimeout = -1;
+    long invalidBlockDeleteCommandWorkerInterval = -1;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(CONTAINER_DELETE_THREADS_MAX_KEY, invalidDeleteThreads);
     conf.setLong(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
@@ -115,6 +123,8 @@ public class TestDatanodeConfiguration {
         invalidDiskCheckMinGap, TimeUnit.MINUTES);
     conf.setTimeDuration(DISK_CHECK_TIMEOUT_KEY,
         invalidDiskCheckTimeout, TimeUnit.MINUTES);
+    conf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
+        invalidBlockDeleteCommandWorkerInterval, TimeUnit.SECONDS);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -134,6 +144,8 @@ public class TestDatanodeConfiguration {
         subject.getDiskCheckMinGap());
     assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
         subject.getDiskCheckTimeout());
+    assertEquals(BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT,
+        subject.getBlockDeleteCommandWorkerInterval());
   }
 
   @Test
@@ -159,6 +171,8 @@ public class TestDatanodeConfiguration {
         subject.getDiskCheckMinGap());
     assertEquals(DISK_CHECK_TIMEOUT_DEFAULT,
         subject.getDiskCheckTimeout());
+    assertEquals(BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT,
+        subject.getBlockDeleteCommandWorkerInterval());
   }
 
   @Test
