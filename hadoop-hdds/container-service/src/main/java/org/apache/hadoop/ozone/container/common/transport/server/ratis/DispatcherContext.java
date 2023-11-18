@@ -93,13 +93,13 @@ public final class DispatcherContext {
 
     public boolean validateToken() {
       switch (this) {
-        case APPLY_TRANSACTION:
-        case WRITE_STATE_MACHINE_DATA:
-        case READ_STATE_MACHINE_DATA:
-        case STREAM_LINK:
-          return false;
-        default:
-          return true;
+      case APPLY_TRANSACTION:
+      case WRITE_STATE_MACHINE_DATA:
+      case READ_STATE_MACHINE_DATA:
+      case STREAM_LINK:
+        return false;
+      default:
+        return true;
       }
     }
   }
