@@ -102,20 +102,27 @@ public class MockDatanodeStorage {
         // empty chunk list. override it.
         putBlockFull(blockID, blockData);
       } else {
-        int lastChunkIndex = existing.getChunksCount() - 1;
-        // if the last chunk in the existing block is full, append after it.
-        ChunkInfo chunkInfo = existing.getChunks(lastChunkIndex);
-        if (!isFullChunk(chunkInfo)) {
-          // otherwise, remove it and append
-          existing.getChunksList().remove(lastChunkIndex);
-        }
-        existing.getChunksList().addAll(blockData.getChunksList());
+        BlockData.Builder blockDataBuilder = pruneLastPartialChunks(existing);
+        blockDataBuilder.addAllChunks(blockData.getChunksList());
+        blocks.put(id, blockDataBuilder.build());
       }
       // TODO: verify the chunk list beginning/offset/len is sane
     } else {
       // the block does not exist yet, simply add it
       putBlockFull(blockID, blockData);
     }
+  }
+
+  private BlockData.Builder pruneLastPartialChunks(BlockData existing) {
+    BlockData.Builder blockDataBuilder = BlockData.newBuilder(existing);
+    int lastChunkIndex = existing.getChunksCount() - 1;
+    // if the last chunk in the existing block is full, append after it.
+    ChunkInfo chunkInfo = existing.getChunks(lastChunkIndex);
+    if (!isFullChunk(chunkInfo)) {
+      // otherwise, remove it and append
+      blockDataBuilder.removeChunks(lastChunkIndex);
+    }
+    return blockDataBuilder;
   }
 
   public void putBlockFull(DatanodeBlockID blockID, BlockData blockData) {

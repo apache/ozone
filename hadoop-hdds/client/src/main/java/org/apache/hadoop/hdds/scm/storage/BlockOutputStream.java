@@ -803,9 +803,8 @@ public class BlockOutputStream extends OutputStream {
 
     // the last partial chunk in containerBlockData will be replaced.
     // So remove it.
-    /*long lastPartialChunkOffset = */removeLastPartialchunk();
-    //long lastPartialChunkOffset = lastChunkOffset;
-    LOG.debug("lastChunkOffset = " + lastChunkOffset);
+    removeLastPartialchunk();
+    LOG.debug("lastChunkOffset = {}", lastChunkOffset);
 
     chunk.rewind();
     LOG.debug("adding chunk pos " + chunk.position() +
@@ -855,7 +854,8 @@ public class BlockOutputStream extends OutputStream {
 
   private void appendLastChunkBuffer(ChunkBuffer chunkBuffer, int offset,
       int length) {
-    LOG.debug("copying to last chunk buffer offset=" + offset + " length " + length);
+    LOG.debug("copying to last chunk buffer offset={} length={}",
+        offset, length);
     int pos = 0;
     int uncopied = length;
     for (ByteBuffer bb : chunkBuffer.asByteBufferList()) {
@@ -863,7 +863,8 @@ public class BlockOutputStream extends OutputStream {
         int copyStart = offset < pos ? 0 : offset - pos;
         int copyLen = Math.min(uncopied, bb.remaining());
         try {
-          LOG.debug("put into last chunk buffer start = " + copyStart + " len = " + copyLen);
+          LOG.debug("put into last chunk buffer start = {} len = {}",
+              copyStart, copyLen);
           lastChunkBuffer.put(bb.array(), copyStart, copyLen);
         } catch (BufferOverflowException e) {
           LOG.error("appending from " + copyStart + " for len=" + copyLen +
@@ -906,15 +907,14 @@ public class BlockOutputStream extends OutputStream {
       throws OzoneChecksumException {
     lastChunkBuffer.flip();
     int revisedChunkSize = lastChunkBuffer.remaining();
-    long revisedOffset = lastPartialChunkOffset; //calculateNextFullChunkOffset();
     // create the chunk info to be sent in PutBlock.
     ChecksumData revisedChecksumData =
         checksum.computeChecksum(lastChunkBuffer);
 
-    long chunkID = revisedOffset / config.getStreamBufferSize();
+    long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + chunkID)
-        .setOffset(revisedOffset)
+        .setOffset(lastPartialChunkOffset)
         .setLen(revisedChunkSize)
         .setChecksumData(revisedChecksumData.getProtoBufMessage());
     // if full chunk
@@ -932,30 +932,19 @@ public class BlockOutputStream extends OutputStream {
     return chunkInfo.getLen() == config.getStreamBufferSize();
   }
 
-  private long calculateNextFullChunkOffset() {
-    // containerBlockData should not have any partial chunk.
-    if (containerBlockData.getChunksCount() > 0) {
-      ChunkInfo lastChunkInBlockData = containerBlockData.getChunks(
-          containerBlockData.getChunksCount() - 1);
-      Preconditions.checkState(isFullChunk(lastChunkInBlockData),
-          "expects full chunk");
-      return lastChunkInBlockData.getOffset() +
-          lastChunkInBlockData.getLen();
-    }
-    return 0;
-  }
-
   private void addToBlockData(ChunkInfo revisedChunkInfo) {
     for (ChunkInfo info : containerBlockData.getChunksList()) {
-      LOG.debug("containerBlockData chunk: " + info);
+      LOG.debug("containerBlockData chunk: {}", info);
     }
     if (containerBlockData.getChunksCount() > 0) {
       ChunkInfo lastChunk =
           containerBlockData.getChunks(containerBlockData.getChunksCount() - 1);
-      LOG.debug("revisedChunkInfo chunk: " + revisedChunkInfo);
-      if (lastChunk.getOffset() + lastChunk.getLen() != revisedChunkInfo.getOffset()) {
+      LOG.debug("revisedChunkInfo chunk: {}", revisedChunkInfo);
+      if (lastChunk.getOffset() + lastChunk.getLen() !=
+          revisedChunkInfo.getOffset()) {
         throw new AssertionError(
-            "lastChunk.getOffset() + lastChunk.getLen() != revisedChunkInfo.getOffset()");
+            "lastChunk.getOffset() + lastChunk.getLen() " +
+                "!= revisedChunkInfo.getOffset()");
       }
     }
     containerBlockData.addChunks(revisedChunkInfo);

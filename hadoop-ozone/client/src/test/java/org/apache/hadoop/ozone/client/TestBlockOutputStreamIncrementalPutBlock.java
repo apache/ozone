@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -116,14 +117,14 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     OzoneVolume volume = store.getVolume(volumeName);
     int size = 1024;
     String s = RandomStringUtils.randomAlphabetic(1024);
-    ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes());
+    ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
 
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, size,
         ReplicationConfig.getDefault(config), new HashMap<>())) {
-      for (int i = 0; i < 2; i++) {
+      for (int i = 0; i < 4097; i++) {
         out.write(byteBuffer);
         out.hsync();
       }
@@ -131,7 +132,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       ByteBuffer readBuffer = ByteBuffer.allocate(size);
-      for (int i = 0; i< 2; i++) {
+      for (int i = 0; i < 4097; i++) {
         is.read(readBuffer);
         assertArrayEquals(readBuffer.array(), byteBuffer.array());
       }
@@ -150,14 +151,18 @@ public class TestBlockOutputStreamIncrementalPutBlock {
 
     try (OzoneOutputStream out = bucket.createKey(keyName, size,
         ReplicationConfig.getDefault(config), new HashMap<>())) {
-      out.write(byteBuffer);
-      out.hsync();
+      for (int i = 0; i < 4; i++) {
+        out.write(byteBuffer);
+        out.hsync();
+      }
     }
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       ByteBuffer readBuffer = ByteBuffer.allocate(size);
-      is.read(readBuffer);
-      assertArrayEquals(readBuffer.array(), byteBuffer.array());
+      for (int i = 0; i < 4; i++) {
+        is.read(readBuffer);
+        assertArrayEquals(readBuffer.array(), byteBuffer.array());
+      }
     }
   }
 }

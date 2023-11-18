@@ -246,35 +246,42 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         throw new StorageContainerException(
             NO_SUCH_BLOCK_ERR_MSG + " BlockID : " + blockID, NO_SUCH_BLOCK);
       } else {
-        LOG.debug("blockData=(null)" + ", lastChunk=" + lastChunk.getChunks());
+        LOG.debug("blockData=(null), lastChunk={}", lastChunk.getChunks());
         return lastChunk;
       }
     } else {
       // append last partial chunk to the block data
       if (lastChunk != null) {
-        LOG.debug("blockData=" + blockData.getChunks() + ", lastChunk=" + lastChunk.getChunks());
-        Preconditions.checkState(lastChunk.getChunks().size() == 1);
-        ContainerProtos.ChunkInfo lastChunkInBlockData =
-            blockData.getChunks().get(blockData.getChunks().size() - 1);
-        Preconditions.checkState(
-            lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
-                == lastChunk.getChunks().get(0).getOffset(),
-            "chunk offset does not match");
-
-        List<ContainerProtos.ChunkInfo> chunkInfos =
-            new ArrayList<>(blockData.getChunks());
-        chunkInfos.add(lastChunk.getChunks().get(0));
-        blockData.setChunks(chunkInfos);
-
-        blockData.setBlockCommitSequenceId(
-            lastChunk.getBlockCommitSequenceId());
+        reconcilePartialChunks(lastChunk, blockData);
       } else {
-        LOG.debug("blockData=" + blockData.getChunks() + ", lastChunk=(null)");
+        LOG.debug("blockData={}, lastChunk=(null)", blockData.getChunks());
       }
     }
 
     return blockData;
   }
+
+  private static void reconcilePartialChunks(
+      BlockData lastChunk, BlockData blockData) {
+    LOG.debug("blockData={}, lastChunk={}",
+        blockData.getChunks(), lastChunk.getChunks());
+    Preconditions.checkState(lastChunk.getChunks().size() == 1);
+    ContainerProtos.ChunkInfo lastChunkInBlockData =
+        blockData.getChunks().get(blockData.getChunks().size() - 1);
+    Preconditions.checkState(
+        lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
+            == lastChunk.getChunks().get(0).getOffset(),
+        "chunk offset does not match");
+
+    List<ContainerProtos.ChunkInfo> chunkInfos =
+        new ArrayList<>(blockData.getChunks());
+    chunkInfos.add(lastChunk.getChunks().get(0));
+    blockData.setChunks(chunkInfos);
+
+    blockData.setBlockCommitSequenceId(
+        lastChunk.getBlockCommitSequenceId());
+  }
+
   private static boolean isPartialChunkList(BlockData data) {
     return data.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST);
   }
@@ -312,7 +319,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
           batch, containerData.getBlockKey(localID), data);
     } else if (shouldAppendLastChunk(endOfBlock, data)) {
       // if eob or if the last chunk is full,
-      // the 'data' is complete so append it to the block table's chunk info
+      // the 'data' is full so append it to the block table's chunk info
       // and then remove from lastChunkInfo
       BlockData blockData = getBlockDataTable().get(
           containerData.getBlockKey(localID));
@@ -321,11 +328,11 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         // the block's chunk is what received from client this time.
         blockData = data;
 
-        int next = 0;
+        /*int next = 0;
         for (ContainerProtos.ChunkInfo info : blockData.getChunks()) {
           assert info.getOffset() == next;
           next += info.getLen();
-        }
+        }*/
       } else {
         List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
         blockData.setChunks(new ArrayList<>(chunkInfoList));
@@ -334,11 +341,11 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
         }
         blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
 
-        int next = 0;
+        /*int next = 0;
         for (ContainerProtos.ChunkInfo info : chunkInfoList) {
           assert info.getOffset() == next;
           next += info.getLen();
-        }
+        }*/
       }
       // delete the entry from last chunk info table
       getLastChunkInfoTable().deleteWithBatch(
@@ -349,63 +356,70 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     } else {
       // incremental chunk list,
       // not end of block, has partial chunks
-      if (data.getChunks().size() == 1) {
-        // replace/update the last chunk info table
-        getLastChunkInfoTable().putWithBatch(
-            batch, containerData.getBlockKey(localID),
-            data);
+      putBlockWithPartialChunks(batch, localID, data, containerData);
+    }
+  }
+
+  private void putBlockWithPartialChunks(BatchOperation batch, long localID,
+      BlockData data, KeyValueContainerData containerData) throws IOException {
+    if (data.getChunks().size() == 1) {
+      // replace/update the last chunk info table
+      getLastChunkInfoTable().putWithBatch(
+          batch, containerData.getBlockKey(localID), data);
+    } else {
+      int lastChunkIndex = data.getChunks().size() - 1;
+      // received more than one chunk this time
+      List<ContainerProtos.ChunkInfo> lastChunkInfo =
+          Collections.singletonList(
+              data.getChunks().get(lastChunkIndex));
+      BlockData blockData = getBlockDataTable().get(
+          containerData.getBlockKey(localID));
+      if (blockData == null) {
+        // if the block does not exist in the block data table
+        List<ContainerProtos.ChunkInfo> chunkInfos =
+            new ArrayList<>(data.getChunks());
+        chunkInfos.remove(lastChunkIndex);
+        data.setChunks(chunkInfos);
+        blockData = data;
+
+        /*int next = 0;
+        for (ContainerProtos.ChunkInfo info : chunkInfos) {
+          assert info.getOffset() == next;
+          next += info.getLen();
+        }*/
+        LOG.debug("block {} does not have full chunks yet. Adding the " +
+            "chunks to it {}", localID, blockData);
       } else {
-        int lastChunkIndex = data.getChunks().size() - 1;
-        // received more than one chunk this time
-        List<ContainerProtos.ChunkInfo> lastChunkInfo =
-            Collections.singletonList(
-                data.getChunks().get(lastChunkIndex));
-        BlockData blockData = getBlockDataTable().get(
-            containerData.getBlockKey(localID));
-        if (blockData == null) {
-          // if the block does not exist in the block data table
-          List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>(data.getChunks());
-          chunkInfos.remove(lastChunkIndex);
-          data.setChunks(chunkInfos);
-          blockData = data;
+        // if the block exists in the block data table,
+        // append chunks till except the last one (supposedly partial)
+        List<ContainerProtos.ChunkInfo> chunkInfos =
+            new ArrayList<>(blockData.getChunks());
 
-          int next = 0;
-          for (ContainerProtos.ChunkInfo info : chunkInfos) {
-            assert info.getOffset() == next;
-            next += info.getLen();
-          }
-          LOG.debug("block " + localID + " does not have full chunks yet. Adding the chunks to it " + blockData);
-        } else {
-          // if the block exists in the block data table,
-          // append chunks till except the last one (supposedly partial)
-          List<ContainerProtos.ChunkInfo> chunkInfos = new ArrayList<>(blockData.getChunks());
+        LOG.debug("blockData.getChunks()={}", chunkInfos);
+        LOG.debug("data.getChunks()={}", data.getChunks());
 
-          LOG.debug("blockData.getChunks()=" + chunkInfos);
-          LOG.debug("data.getChunks()=" + data.getChunks());
-
-          for (int i = 0; i < lastChunkIndex; i++) {
-            chunkInfos.add(data.getChunks().get(i));
-          }
-          blockData.setChunks(chunkInfos);
-
-          int next = 0;
-          for (ContainerProtos.ChunkInfo info : chunkInfos) {
-            if (info.getOffset() != next) {
-
-              LOG.error("blockData.getChunks()=" + chunkInfos);
-              LOG.error("data.getChunks()=" + data.getChunks());
-            }
-            assert info.getOffset() == next;
-            next += info.getLen();
-          }
+        for (int i = 0; i < lastChunkIndex; i++) {
+          chunkInfos.add(data.getChunks().get(i));
         }
-        getBlockDataTable().putWithBatch(
-            batch, containerData.getBlockKey(localID), blockData);
-        // update the last partial chunk
-        data.setChunks(lastChunkInfo);
-        getLastChunkInfoTable().putWithBatch(
-            batch, containerData.getBlockKey(localID), data);
+        blockData.setChunks(chunkInfos);
+
+        /*int next = 0;
+        for (ContainerProtos.ChunkInfo info : chunkInfos) {
+          if (info.getOffset() != next) {
+
+            LOG.error("blockData.getChunks()={}", chunkInfos);
+            LOG.error("data.getChunks()={}", data.getChunks());
+          }
+          assert info.getOffset() == next;
+          next += info.getLen();
+        }*/
       }
+      getBlockDataTable().putWithBatch(batch,
+          containerData.getBlockKey(localID), blockData);
+      // update the last partial chunk
+      data.setChunks(lastChunkInfo);
+      getLastChunkInfoTable().putWithBatch(
+          batch, containerData.getBlockKey(localID), data);
     }
   }
 }
