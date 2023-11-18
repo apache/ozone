@@ -483,7 +483,7 @@ public class BlockOutputStream extends OutputStream {
         ContainerCommandResponseProto> flushFuture = null;
     try {
       BlockData blockData = containerBlockData.build();
-      LOG.debug("sending PutBlock " + blockData);
+      LOG.debug("sending PutBlock {}", blockData);
 
       if (config.getIncrementalChunkList()) {
         // remove any chunks in the containerBlockData list.
@@ -803,16 +803,15 @@ public class BlockOutputStream extends OutputStream {
 
     // the last partial chunk in containerBlockData will be replaced.
     // So remove it.
-    removeLastPartialchunk();
+    removeLastPartialChunk();
     LOG.debug("lastChunkOffset = {}", lastChunkOffset);
 
     chunk.rewind();
-    LOG.debug("adding chunk pos " + chunk.position() +
-        " limit " + chunk.limit() +
-        " remaining " + chunk.remaining());
-    LOG.debug("adding lastChunkBuffer pos " + lastChunkBuffer.position() +
-        " limit " + lastChunkBuffer.limit() +
-        " remaining " + lastChunkBuffer.remaining());
+    LOG.debug("adding chunk pos {} limit {} remaining {}",
+        chunk.position(), chunk.limit(), chunk.remaining());
+    LOG.debug("adding lastChunkBuffer pos {} limit {} remaining {}",
+        lastChunkBuffer.position(), lastChunkBuffer.limit(),
+        lastChunkBuffer.remaining());
 
     // Append the chunk to the last chunk buffer.
     // if the resulting size could exceed limit (4MB),
@@ -821,7 +820,7 @@ public class BlockOutputStream extends OutputStream {
         lastChunkBuffer.capacity()) {
       LOG.debug("containerBlockData one block");
       appendLastChunkBuffer(chunk, 0, chunk.remaining());
-      LOG.debug("after append, lastChunkBuffer=" + lastChunkBuffer);
+      LOG.debug("after append, lastChunkBuffer={}", lastChunkBuffer);
     } else {
       LOG.debug("containerBlockData two blocks");
       int remainingBufferSize =
@@ -830,7 +829,7 @@ public class BlockOutputStream extends OutputStream {
 
       // create chunk info for lastChunkBuffer, which is full
       ChunkInfo lastChunkInfo = createChunkInfo(lastChunkOffset);
-      LOG.debug("lastChunkInfo = " + lastChunkInfo);
+      LOG.debug("lastChunkInfo = {}", lastChunkInfo);
       //long lastChunkSize = lastChunkInfo.getLen();
       addToBlockData(lastChunkInfo);
 
@@ -838,11 +837,11 @@ public class BlockOutputStream extends OutputStream {
       appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
       lastChunkOffset += config.getStreamBufferSize();
-      LOG.debug("Updates lastChunkOffset to " + lastChunkOffset);
+      LOG.debug("Updates lastChunkOffset to {}", lastChunkOffset);
     }
     // create chunk info for lastChunkBuffer, which is partial
     ChunkInfo lastChunkInfo2 = createChunkInfo(lastChunkOffset);
-    LOG.debug("lastChunkInfo2 = " + lastChunkInfo2);
+    LOG.debug("lastChunkInfo2 = {}", lastChunkInfo2);
     long lastChunkSize = lastChunkInfo2.getLen();
     if (lastChunkSize > 0) {
       addToBlockData(lastChunkInfo2);
@@ -888,10 +887,9 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private long removeLastPartialchunk() {
-    //assert containerBlockData.getChunksList().isEmpty();
+  private void removeLastPartialChunk() {
     if (containerBlockData.getChunksList().isEmpty()) {
-      return 0;
+      return;
     }
     int lastChunkIndex = containerBlockData.getChunksCount() - 1;
     ChunkInfo lastChunkInBlockData = containerBlockData.getChunks(
@@ -899,7 +897,6 @@ public class BlockOutputStream extends OutputStream {
     if (!isFullChunk(lastChunkInBlockData)) {
       containerBlockData.removeChunks(lastChunkIndex);
     }
-    return lastChunkInBlockData.getOffset();
   }
 
   private ChunkInfo createChunkInfo(long lastPartialChunkOffset)
@@ -932,12 +929,10 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void addToBlockData(ChunkInfo revisedChunkInfo) {
-    for (ChunkInfo info : containerBlockData.getChunksList()) {
-      LOG.debug("containerBlockData chunk: {}", info);
-    }
+    LOG.debug("containerBlockData chunk: {}", containerBlockData);
     if (containerBlockData.getChunksCount() > 0) {
-      ChunkInfo lastChunk =
-          containerBlockData.getChunks(containerBlockData.getChunksCount() - 1);
+      ChunkInfo lastChunk = containerBlockData.getChunks(
+          containerBlockData.getChunksCount() - 1);
       LOG.debug("revisedChunkInfo chunk: {}", revisedChunkInfo);
       if (lastChunk.getOffset() + lastChunk.getLen() !=
           revisedChunkInfo.getOffset()) {

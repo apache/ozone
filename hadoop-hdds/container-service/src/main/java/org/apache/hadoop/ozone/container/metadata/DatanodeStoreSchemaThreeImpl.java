@@ -297,10 +297,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
   // if eob or if the last chunk is full,
   private static boolean shouldAppendLastChunk(boolean endOfBlock,
       BlockData data) {
-    if (endOfBlock) {
-      return true;
-    }
-    if (data.getChunks().isEmpty()) {
+    if (endOfBlock || data.getChunks().isEmpty()) {
       return true;
     }
     return isFullChunk(data.getChunks().get(data.getChunks().size() - 1));
@@ -310,45 +307,11 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
       long localID, BlockData data, KeyValueContainerData containerData,
       boolean endOfBlock) throws IOException {
     if (!incremental && !isPartialChunkList(data)) {
-      // old client: override chunk list.
+      // Case (1) old client: override chunk list.
       getBlockDataTable().putWithBatch(
           batch, containerData.getBlockKey(localID), data);
     } else if (shouldAppendLastChunk(endOfBlock, data)) {
-      // if eob or if the last chunk is full,
-      // the 'data' is full so append it to the block table's chunk info
-      // and then remove from lastChunkInfo
-      BlockData blockData = getBlockDataTable().get(
-          containerData.getBlockKey(localID));
-      if (blockData == null) {
-        // if the block did not have full chunks before,
-        // the block's chunk is what received from client this time.
-        blockData = data;
-
-        /*int next = 0;
-        for (ContainerProtos.ChunkInfo info : blockData.getChunks()) {
-          assert info.getOffset() == next;
-          next += info.getLen();
-        }*/
-      } else {
-        List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
-        blockData.setChunks(new ArrayList<>(chunkInfoList));
-        for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
-          blockData.addChunk(chunk);
-        }
-        blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
-
-        /*int next = 0;
-        for (ContainerProtos.ChunkInfo info : chunkInfoList) {
-          assert info.getOffset() == next;
-          next += info.getLen();
-        }*/
-      }
-      // delete the entry from last chunk info table
-      getLastChunkInfoTable().deleteWithBatch(
-          batch, containerData.getBlockKey(localID));
-      // update block data table
-      getBlockDataTable().putWithBatch(
-          batch, containerData.getBlockKey(localID), blockData);
+      moveLastChunkToBlockData(batch, localID, data, containerData);
     } else {
       // incremental chunk list,
       // not end of block, has partial chunks
@@ -356,10 +319,44 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
     }
   }
 
+  private void moveLastChunkToBlockData(BatchOperation batch, long localID,
+      BlockData data, KeyValueContainerData containerData) throws IOException {
+    // if eob or if the last chunk is full,
+    // the 'data' is full so append it to the block table's chunk info
+    // and then remove from lastChunkInfo
+    BlockData blockData = getBlockDataTable().get(
+        containerData.getBlockKey(localID));
+    if (blockData == null) {
+      // Case 2.1 if the block did not have full chunks before,
+      // the block's chunk is what received from client this time.
+      blockData = data;
+    } else {
+      // case 2.2 the block already has some full chunks
+      List<ContainerProtos.ChunkInfo> chunkInfoList = blockData.getChunks();
+      blockData.setChunks(new ArrayList<>(chunkInfoList));
+      for (ContainerProtos.ChunkInfo chunk : data.getChunks()) {
+        blockData.addChunk(chunk);
+      }
+      blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
+
+      /*int next = 0;
+      for (ContainerProtos.ChunkInfo info : chunkInfoList) {
+        assert info.getOffset() == next;
+        next += info.getLen();
+      }*/
+    }
+    // delete the entry from last chunk info table
+    getLastChunkInfoTable().deleteWithBatch(
+        batch, containerData.getBlockKey(localID));
+    // update block data table
+    getBlockDataTable().putWithBatch(batch,
+        containerData.getBlockKey(localID), blockData);
+  }
+
   private void putBlockWithPartialChunks(BatchOperation batch, long localID,
       BlockData data, KeyValueContainerData containerData) throws IOException {
     if (data.getChunks().size() == 1) {
-      // replace/update the last chunk info table
+      // Case (3.1) replace/update the last chunk info table
       getLastChunkInfoTable().putWithBatch(
           batch, containerData.getBlockKey(localID), data);
     } else {
@@ -371,22 +368,16 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
       BlockData blockData = getBlockDataTable().get(
           containerData.getBlockKey(localID));
       if (blockData == null) {
-        // if the block does not exist in the block data table
+        // Case 3.2: if the block does not exist in the block data table
         List<ContainerProtos.ChunkInfo> chunkInfos =
             new ArrayList<>(data.getChunks());
         chunkInfos.remove(lastChunkIndex);
         data.setChunks(chunkInfos);
         blockData = data;
-
-        /*int next = 0;
-        for (ContainerProtos.ChunkInfo info : chunkInfos) {
-          assert info.getOffset() == next;
-          next += info.getLen();
-        }*/
         LOG.debug("block {} does not have full chunks yet. Adding the " +
             "chunks to it {}", localID, blockData);
       } else {
-        // if the block exists in the block data table,
+        // Case 3.3: if the block exists in the block data table,
         // append chunks till except the last one (supposedly partial)
         List<ContainerProtos.ChunkInfo> chunkInfos =
             new ArrayList<>(blockData.getChunks());
@@ -398,6 +389,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
           chunkInfos.add(data.getChunks().get(i));
         }
         blockData.setChunks(chunkInfos);
+        blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
 
         /*int next = 0;
         for (ContainerProtos.ChunkInfo info : chunkInfos) {
