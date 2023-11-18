@@ -489,6 +489,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void validateContainerCommand(
       ContainerCommandRequestProto msg) throws StorageContainerException {
+    try {
+      validateToken(msg);
+    } catch (IOException ioe) {
+      throw new StorageContainerException(
+          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED
+          + ": " + ioe.getMessage(), ioe,
+          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+    }
+
     long containerID = msg.getContainerID();
     Container container = getContainer(containerID);
     if (container == null) {
@@ -532,14 +541,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           "Container " + containerID + " in " + containerState + " state");
       audit(action, eventType, params, AuditEventStatus.FAILURE, iex);
       throw iex;
-    }
-
-    try {
-      validateToken(msg);
-    } catch (IOException ioe) {
-      throw new StorageContainerException(
-          "Block token verification failed. " + ioe.getMessage(), ioe,
-          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
     }
   }
 

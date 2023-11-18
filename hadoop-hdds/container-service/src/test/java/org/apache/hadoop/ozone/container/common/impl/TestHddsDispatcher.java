@@ -30,10 +30,10 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -49,33 +49,36 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
-
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
-import java.time.Duration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
@@ -94,6 +97,8 @@ import static org.mockito.Mockito.verify;
  */
 @RunWith(Parameterized.class)
 public class TestHddsDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestHddsDispatcher.class);
 
   public static final IncrementalReportSender<Container>
       NO_OP_ICR_SENDER = c -> { };
@@ -581,30 +586,50 @@ public class TestHddsDispatcher {
       final HddsDispatcher dispatcher = createDispatcher(
           dd, scmId, conf, tokenVerifier);
 
-      final DispatcherContext applyTransactionContext = DispatcherContext
-          .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
-          .setTerm(1)
-          .setLogIndex(1)
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-          .setContainer2BCSIDMap(Collections.emptyMap())
-          .build();
-      Assert.assertFalse(verified.get());
-      dispatcher.dispatch(request, applyTransactionContext);
-      Assert.assertFalse(verified.get());
+      final DispatcherContext[] notVerify = {
+          newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA),
+          newContext(Op.READ_STATE_MACHINE_DATA),
+          newContext(Op.APPLY_TRANSACTION),
+          newContext(Op.STREAM_LINK, WriteChunkStage.COMMIT_DATA)
+      };
+      for (DispatcherContext context : notVerify) {
+        LOG.info("notVerify {}", context);
+        Assert.assertFalse(verified.get());
+        dispatcher.dispatch(request, context);
+        Assert.assertFalse(verified.get());
+      }
 
-      final DispatcherContext startTransactionContext = DispatcherContext
-          .newBuilder(DispatcherContext.Op.START_TRANSACTION)
-          .setTerm(1)
-          .setLogIndex(1)
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-          .setContainer2BCSIDMap(Collections.emptyMap())
-          .build();
-      Assert.assertFalse(verified.get());
-      dispatcher.dispatch(request, startTransactionContext);
-      Assert.assertTrue(verified.get());
+      final Op[] verify = {
+          Op.NULL,
+          Op.HANDLE_GET_SMALL_FILE,
+          Op.HANDLE_PUT_SMALL_FILE,
+          Op.HANDLE_READ_CHUNK,
+          Op.HANDLE_WRITE_CHUNK,
+          Op.STREAM_INIT,
+      };
+
+      for (Op op : verify) {
+        final DispatcherContext context = newContext(op);
+        Assert.assertFalse(verified.get());
+        dispatcher.dispatch(request, context);
+        Assert.assertTrue(verified.getAndSet(false));
+      }
     } finally {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
+  }
+
+  static DispatcherContext newContext(Op op) {
+    return newContext(op, WriteChunkStage.COMBINED);
+  }
+
+  static DispatcherContext newContext(Op op, WriteChunkStage stage) {
+    return DispatcherContext.newBuilder(op)
+        .setTerm(1)
+        .setLogIndex(1)
+        .setStage(stage)
+        .setContainer2BCSIDMap(new HashMap<>())
+        .build();
   }
 }

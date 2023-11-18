@@ -82,8 +82,6 @@ public final class DispatcherContext {
 
     READ_STATE_MACHINE_DATA,
     WRITE_STATE_MACHINE_DATA,
-
-    START_TRANSACTION,
     APPLY_TRANSACTION,
 
     STREAM_INIT,
@@ -94,7 +92,15 @@ public final class DispatcherContext {
     }
 
     public boolean validateToken() {
-      return this != APPLY_TRANSACTION;
+      switch (this) {
+        case APPLY_TRANSACTION:
+        case WRITE_STATE_MACHINE_DATA:
+        case READ_STATE_MACHINE_DATA:
+        case STREAM_LINK:
+          return false;
+        default:
+          return true;
+      }
     }
   }
 
