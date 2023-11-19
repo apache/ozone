@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -51,7 +52,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -69,14 +69,17 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.LoggerFactory;
@@ -104,6 +107,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
@@ -118,11 +123,13 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestBlockDeletingService {
 
+  @Rule
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
+
   private File testRoot;
   private String scmId;
-  private String clusterID;
   private String datanodeUuid;
-  private OzoneConfiguration conf;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
@@ -132,7 +139,6 @@ public class TestBlockDeletingService {
   public TestBlockDeletingService(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
@@ -151,7 +157,6 @@ public class TestBlockDeletingService {
       FileUtils.cleanDirectory(testRoot);
     }
     scmId = UUID.randomUUID().toString();
-    clusterID = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
@@ -166,14 +171,6 @@ public class TestBlockDeletingService {
     FileUtils.deleteDirectory(testRoot);
     CodecBuffer.assertNoLeaks();
   }
-
-  private static final DispatcherContext WRITE_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
-
-  private static final DispatcherContext COMMIT_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
   /**
    * A helper method to create some blocks and put them under deletion
@@ -856,7 +853,7 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf);
+        10, conf, "", mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data
@@ -901,7 +898,7 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @Test(timeout = 30000)
+  @Test
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
@@ -967,7 +964,7 @@ public class TestBlockDeletingService {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testContainerMaxLockHoldingTime() throws Exception {
     GenericTestUtils.LogCapturer log =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -1025,7 +1022,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testBlockThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 5

@@ -44,28 +44,23 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
  * parsing logic is in
  * {@link org.apache.hadoop.hdds.scm.client.HddsClientUtils}.
  */
+@Timeout(300)
 public class TestHddsClientUtils {
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   /**
    * Verify client endpoint lookup failure if it is not configured.
@@ -73,8 +68,8 @@ public class TestHddsClientUtils {
   @Test
   public void testMissingScmClientAddress() {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    thrown.expect(ConfigurationException.class);
-    HddsUtils.getScmAddressForClients(conf);
+    assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
   }
 
   /**
@@ -133,7 +128,7 @@ public class TestHddsClientUtils {
       int port) {
     Iterator<InetSocketAddress> scmAddrIterator =
         HddsUtils.getScmAddressForClients(conf).iterator();
-    Assert.assertTrue(scmAddrIterator.hasNext());
+    assertTrue(scmAddrIterator.hasNext());
     InetSocketAddress scmAddr = scmAddrIterator.next();
     assertThat(scmAddr.getHostString(), is(address));
     assertThat(scmAddr.getPort(), is(port));
@@ -186,7 +181,7 @@ public class TestHddsClientUtils {
     conf.set(OZONE_SCM_NAMES, scmHost);
     final Collection<InetSocketAddress> address =
         HddsUtils.getScmAddressForClients(conf);
-    Assert.assertTrue(address.iterator().hasNext());
+    assertTrue(address.iterator().hasNext());
     InetSocketAddress socketAddress = address.iterator().next();
     assertEquals(scmHost, socketAddress.getHostName());
     assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, socketAddress.getPort());
@@ -205,7 +200,7 @@ public class TestHddsClientUtils {
     conf.set(OZONE_SCM_NAMES, scmHost);
     final Collection<InetSocketAddress> address =
         HddsUtils.getScmAddressForClients(conf);
-    Assert.assertTrue(address.iterator().hasNext());
+    assertTrue(address.iterator().hasNext());
     InetSocketAddress socketAddress = address.iterator().next();
     assertEquals(scmHost.split(":")[0],
         socketAddress.getHostName());

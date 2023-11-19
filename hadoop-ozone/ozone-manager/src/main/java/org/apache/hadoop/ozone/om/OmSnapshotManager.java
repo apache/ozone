@@ -40,6 +40,7 @@ import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.ThrowableFunction;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -96,6 +97,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
@@ -462,28 +464,6 @@ public final class OmSnapshotManager implements AutoCloseable {
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
     }
 
-    final RocksDBCheckpointDiffer dbCpDiffer =
-        store.getRocksDBCheckpointDiffer();
-
-    if (dbCpDiffer != null) {
-      final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
-
-      Objects.requireNonNull(snapshotInfo.getSnapshotId(),
-          "SnapshotId is null for snapshot: " + snapshotInfo.getName());
-      // Write snapshot generation (latest sequence number) to compaction log.
-      // This will be used for DAG reconstruction as snapshotGeneration.
-      dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-          snapshotInfo.getSnapshotId().toString(),
-          snapshotInfo.getCreationTime());
-
-      // Set compaction log filename to the latest DB sequence number
-      // right after taking the RocksDB checkpoint for Ozone snapshot.
-      //
-      // Note it doesn't matter if sequence number hasn't increased (even though
-      // it shouldn't happen), since the writer always appends the file.
-      dbCpDiffer.setCurrentCompactionLog(dbLatestSequenceNumber);
-    }
-
     return dbCheckpoint;
   }
 
@@ -495,50 +475,24 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param bucketName bucket name
    */
   private static void deleteKeysFromDelDirTableInSnapshotScope(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
+      OMMetadataManager omMetadataManager, String volumeName,
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    final String beginKey = getOzonePathKeyWithVolumeBucketNames(
-        omMetadataManager, volumeName, bucketName);
-    // Range delete end key (exclusive). To be calculated
-    String endKey;
+    final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
+        volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-         iter = omMetadataManager.getDeletedDirTable().iterator()) {
-      endKey = findEndKeyGivenPrefix(iter, beginKey);
+         iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
+      performOperationOnKeys(iter,
+          entry -> {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
+            }
+            omMetadataManager.getDeletedDirTable().delete(entry.getKey());
+            return null;
+          });
     }
-
-    // Clean up deletedDirectoryTable
-    deleteRangeInclusive(omMetadataManager.getDeletedDirTable(),
-        beginKey, endKey);
-  }
-
-  /**
-   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
-   * volume name and bucket name as a prefix in FSO deletedDirectoryTable.
-   * Follows:
-   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
-   * <p>
-   * Note: Currently, this is only intended to be a special use case in
-   * {@link OmSnapshotManager}. If this is used elsewhere, consider moving this
-   * to {@link OMMetadataManager}.
-   *
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @return /volumeId/bucketId/
-   *    e.g. /-9223372036854772480/-9223372036854771968/
-   */
-  @VisibleForTesting
-  public static String getOzonePathKeyWithVolumeBucketNames(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
-      String bucketName) throws IOException {
-
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
-    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
   @VisibleForTesting
@@ -552,52 +506,37 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to locate the end key with the given prefix and iterator.
+   * Helper method to perform operation on keys with a given iterator.
    * @param keyIter TableIterator
-   * @param keyPrefix DB key prefix String
-   * @return endKey String, or null if no keys with such prefix is found
+   * @param operationFunction operation to be performed for each key.
    */
-  private static String findEndKeyGivenPrefix(
+  private static void performOperationOnKeys(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
-      String keyPrefix) throws IOException {
-
-    String endKey;
-    keyIter.seek(keyPrefix);
+      ThrowableFunction<Table.KeyValue<String, ?>,
+      Void, IOException> operationFunction) throws IOException {
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place
-    if (!keyIter.hasNext()) {
-      // No key matching keyPrefix. No need to do delete or deleteRange at all.
-      endKey = null;
-    } else {
-      // Remember the last key with a matching prefix
-      endKey = keyIter.next().getKey();
-
-      // Loop until prefix mismatches.
-      // TODO: [SNAPSHOT] Try to seek to next predicted bucket name instead of
-      //  the while-loop for a potential speed up?
-      // Start performance tracking timer
-      long startTime = System.nanoTime();
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, ?> entry = keyIter.next();
-        String dbKey = entry.getKey();
-        if (dbKey.startsWith(keyPrefix)) {
-          endKey = dbKey;
-        }
-      }
-      // Time took for the iterator to finish (in ns)
-      long timeElapsed = System.nanoTime() - startTime;
-      if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
-        // Print time elapsed
-        LOG.warn("Took {} ns to find endKey. Caller is {}", timeElapsed,
-            new Throwable().fillInStackTrace().getStackTrace()[1]
-                .getMethodName());
-      }
+    // Loop until prefix matches.
+    // Start performance tracking timer
+    long startTime = System.nanoTime();
+    while (keyIter.hasNext()) {
+      Table.KeyValue<String, ?> entry = keyIter.next();
+      operationFunction.apply(entry);
     }
-    return endKey;
+    // Time took for the iterator to finish (in ns)
+    long timeElapsed = System.nanoTime() - startTime;
+    if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
+      // Print time elapsed
+      LOG.warn("Took {} ns to find endKey. Caller is {}", timeElapsed,
+          new Throwable().fillInStackTrace().getStackTrace()[1]
+              .getMethodName());
+    }
   }
 
   /**
    * Helper method to do deleteRange on a table, including endKey.
+   * TODO: Do remove this method, it is not used anywhere. Need to check if
+   *       deleteRange causes RocksDB corruption.
    * TODO: Move this into {@link Table} ?
    * @param table Table
    * @param beginKey begin key
@@ -622,24 +561,24 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param bucketName bucket name
    */
   private static void deleteKeysFromDelKeyTableInSnapshotScope(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
+      OMMetadataManager omMetadataManager, String volumeName,
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    final String beginKey =
+    final String keyPrefix =
         omMetadataManager.getOzoneKey(volumeName, bucketName, "");
-    // Range delete end key (exclusive). To be found
-    String endKey;
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             iter = omMetadataManager.getDeletedTable().iterator()) {
-      endKey = findEndKeyGivenPrefix(iter, beginKey);
+             iter = omMetadataManager.getDeletedTable().iterator(keyPrefix)) {
+      performOperationOnKeys(iter, entry -> {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Removing key {} from DeletedTable", entry.getKey());
+        }
+        omMetadataManager.getDeletedTable().delete(entry.getKey());
+        return null;
+      });
     }
-
-    // Clean up deletedTable
-    deleteRangeInclusive(omMetadataManager.getDeletedTable(), beginKey, endKey);
 
     // No need to invalidate deletedTable (or deletedDirectoryTable) table
     // cache since entries are not added to its table cache in the first place.

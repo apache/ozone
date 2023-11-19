@@ -1392,6 +1392,55 @@
   </property>
 
   <property>
+    <name>ozone.om.open.mpu.cleanup.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically checks inactive multipart info
+      send multipart upload abort requests for them.
+      This entry controls the interval of this
+      cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A timeout value of multipart upload cleanup service. If this is set
+      greater than 0, the service will stop waiting for the multipart info abort
+      completion after this time. If timeout happens to a large proportion of
+      multipart aborts, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.expire.threshold</name>
+    <value>30d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long multipart upload is considered active. Specifically, if a multipart info
+      has been ongoing longer than the value of this config entry, that multipart info is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.parts.cleanup.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of parts, rounded up to the nearest
+      number of expired multipart upload. This property is used
+      to approximately throttle the number of MPU parts sent
+      to the OM.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1858,6 +1907,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Timeout for ozone grpc client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.ec.grpc.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone ec grpc client during write.
     </description>
   </property>
 
@@ -2810,10 +2868,10 @@
   </property>
   <property>
     <name>ozone.om.transport.class</name>
-    <value>org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory</value>
+    <value>org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory</value>
     <tag>OM, MANAGEMENT</tag>
     <description>
-      Enable Ozone Manager S3G Grpc channel.
+      Property to determine the transport protocol for the client to Ozone Manager channel.
     </description>
   </property>
   <property>

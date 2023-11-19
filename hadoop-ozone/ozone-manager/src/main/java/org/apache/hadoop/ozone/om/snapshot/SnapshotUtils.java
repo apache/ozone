@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -32,8 +34,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.NoSuchElementException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
@@ -135,24 +144,99 @@ public final class SnapshotUtils {
   public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
       SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
       throws IOException {
-    while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotId())) {
 
-      UUID nextPathSnapshot =
-          chainManager.nextPathSnapshot(
-              snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
+    // If the snapshot is deleted in the previous run, then the in-memory
+    // SnapshotChainManager might throw NoSuchElementException as the snapshot
+    // is removed in-memory but OMDoubleBuffer has not flushed yet.
+    try {
+      while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
+          snapInfo.getSnapshotId())) {
 
-      String tableKey = chainManager.getTableKey(nextPathSnapshot);
-      SnapshotInfo nextSnapshotInfo =
-          omSnapshotManager.getSnapshotInfo(tableKey);
+        UUID nextPathSnapshot =
+            chainManager.nextPathSnapshot(
+                snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
 
-      if (nextSnapshotInfo.getSnapshotStatus().equals(
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-        return nextSnapshotInfo;
+        String tableKey = chainManager.getTableKey(nextPathSnapshot);
+        SnapshotInfo nextSnapshotInfo =
+            omSnapshotManager.getSnapshotInfo(tableKey);
+
+        if (nextSnapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          return nextSnapshotInfo;
+        }
+
+        snapInfo = nextSnapshotInfo;
       }
-
-      snapInfo = nextSnapshotInfo;
+    } catch (NoSuchElementException ex) {
+      LOG.error("The snapshot {} is not longer in snapshot chain, It " +
+              "maybe removed in the previous Snapshot purge request.",
+          snapInfo.getTableKey());
     }
     return null;
+  }
+
+  /**
+   * Return a map column family to prefix for the keys in the table for
+   * the given volume and bucket.
+   * Column families, map is returned for, are keyTable, dirTable and fileTable.
+   */
+  public static Map<String, String> getColumnFamilyToKeyPrefixMap(
+      OMMetadataManager omMetadataManager,
+      String volumeName,
+      String bucketName
+  ) throws IOException {
+    String keyPrefix = getOzonePathKey(volumeName, bucketName);
+    String keyPrefixFso = getOzonePathKeyForFso(omMetadataManager, volumeName,
+        bucketName);
+
+    Map<String, String> columnFamilyToPrefixMap = new HashMap<>();
+    columnFamilyToPrefixMap.put(KEY_TABLE, keyPrefix);
+    columnFamilyToPrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
+    columnFamilyToPrefixMap.put(FILE_TABLE, keyPrefixFso);
+    return columnFamilyToPrefixMap;
+  }
+
+  /**
+   * Helper method to generate /volumeName/bucketBucket/ DB key prefix from
+   * given volume name and bucket name as a prefix for legacy and OBS buckets.
+   * Follows:
+   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
+   * <p>
+   * Note: Currently, this is only intended to be a special use case in
+   * Snapshot. If this is used elsewhere, consider moving this to
+   * @link OMMetadataManager}.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return /volumeName/bucketName/
+   */
+  public static String getOzonePathKey(String volumeName,
+                                       String bucketName) throws IOException {
+    return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX;
+  }
+
+  /**
+   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
+   * volume name and bucket name as a prefix for FSO buckets.
+   * Follows:
+   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
+   * <p>
+   * Note: Currently, this is only intended to be a special use case in
+   * Snapshot. If this is used elsewhere, consider moving this to
+   * {@link OMMetadataManager}.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
+   */
+  public static String getOzonePathKeyForFso(OMMetadataManager metadataManager,
+                                             String volumeName,
+                                             String bucketName)
+      throws IOException {
+    final long volumeId = metadataManager.getVolumeId(volumeName);
+    final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 }

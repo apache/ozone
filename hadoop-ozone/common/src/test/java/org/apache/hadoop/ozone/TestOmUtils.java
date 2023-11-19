@@ -18,14 +18,19 @@
 
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
@@ -33,33 +38,24 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
-
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Unit tests for {@link OmUtils}.
  */
+@Timeout(60)
 public class TestOmUtils {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public Timeout timeout = Timeout.seconds(60);
-
+  @TempDir
+  private Path folder;
 
   @Test
   public void createOMDirCreatesDirectoryIfNecessary() throws IOException {
-    File parent = folder.newFolder();
+    File parent = folder.toFile();
     File omDir = new File(new File(parent, "sub"), "dir");
     assertFalse(omDir.exists());
 
@@ -70,7 +66,7 @@ public class TestOmUtils {
 
   @Test
   public void createOMDirDoesNotThrowIfAlreadyExists() throws IOException {
-    File omDir = folder.newFolder();
+    File omDir = folder.toFile();
     assertTrue(omDir.exists());
 
     OmUtils.createOMDir(omDir.getAbsolutePath());
@@ -78,15 +74,16 @@ public class TestOmUtils {
     assertTrue(omDir.exists());
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void createOMDirThrowsIfCannotCreate() throws IOException {
-    File parent = folder.newFolder();
-    File omDir = new File(new File(parent, "sub"), "dir");
-    assumeTrue(parent.setWritable(false, false));
+  @Test
+  public void createOMDirThrowsIfCannotCreate() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> {
+      File parent = folder.toFile();
+      File omDir = new File(new File(parent, "sub"), "dir");
+      assumeTrue(parent.setWritable(false, false));
 
-    OmUtils.createOMDir(omDir.getAbsolutePath());
-
-    // expecting exception
+      OmUtils.createOMDir(omDir.getAbsolutePath());
+      // expecting exception
+    });
   }
 
   @Test
@@ -127,7 +124,7 @@ public class TestOmUtils {
     configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om3");
     try {
       getOzoneManagerServiceId(configuration);
-      Assert.fail();
+      Assertions.fail();
     } catch (IOException ioEx) {
       assertTrue(ioEx.getMessage()
           .contains("Cannot find the internal service id om1 in [om2, om3]"));
@@ -145,7 +142,7 @@ public class TestOmUtils {
     configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
     try {
       getOzoneManagerServiceId(configuration);
-      Assert.fail();
+      Assertions.fail();
     } catch (IOException ioEx) {
       assertTrue(ioEx.getMessage()
           .contains("More than 1 OzoneManager ServiceID (ozone.om.service" +
@@ -155,7 +152,7 @@ public class TestOmUtils {
 
   @Test
   public void checkMaxTransactionID() {
-    Assert.assertEquals((long) (Math.pow(2, 54) - 2), OmUtils.MAX_TRXN_ID);
+    Assertions.assertEquals((long) (Math.pow(2, 54) - 2), OmUtils.MAX_TRXN_ID);
   }
 
   @Test
@@ -173,16 +170,16 @@ public class TestOmUtils {
     conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId2 + ".om1", "om1-host");
 
     Set<String> hosts = getOmHostsFromConfig(conf, serviceId);
-    Assert.assertEquals(3, hosts.size());
-    Assert.assertTrue(hosts.contains("omA-host"));
-    Assert.assertTrue(hosts.contains("omB-host"));
-    Assert.assertTrue(hosts.contains("omC-host"));
+    Assertions.assertEquals(3, hosts.size());
+    Assertions.assertTrue(hosts.contains("omA-host"));
+    Assertions.assertTrue(hosts.contains("omB-host"));
+    Assertions.assertTrue(hosts.contains("omC-host"));
 
     hosts = getOmHostsFromConfig(conf, serviceId2);
-    Assert.assertEquals(1, hosts.size());
-    Assert.assertTrue(hosts.contains("om1-host"));
+    Assertions.assertEquals(1, hosts.size());
+    Assertions.assertTrue(hosts.contains("om1-host"));
 
-    Assert.assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
+    Assertions.assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
   }
 }
 

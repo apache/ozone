@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import React from 'react';
-import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker, Form } from 'antd';
+import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker, Form, Result } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import { showDataFetchError } from 'utils/common';
@@ -46,7 +46,6 @@ interface IChildren {
 interface ITreeState {
   isLoading: boolean;
   treeResponse: ITreeResponse[];
-  showPanel: boolean;
   inputRadio: number;
   inputPath: string;
   entityType: string;
@@ -54,6 +53,11 @@ interface ITreeState {
   treeEndpointFailed: boolean;
   inputPathValid: inputPathValidity;
   helpMessage: string;
+  isHeatmapEnabled: boolean;
+}
+
+interface ResponseError extends Error {
+  status?: number;
 }
 
 let minSize = Infinity;
@@ -93,13 +97,13 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     this.state = {
       isLoading: false,
       treeResponse: [],
-      showPanel: false,
       entityType: CONSTANTS.ENTITY_TYPES[0],
       inputPath: CONSTANTS.ROOT_PATH,
       date: CONSTANTS.TIME_PERIODS[0],
       treeEndpointFailed: false,
       inputPathValid: undefined,
-      helpMessage: ""
+      helpMessage: "",
+      isHeatmapEnabled: this.props.location.state ? this.props.location.state.isHeatmapEnabled : false
     };
   }
 
@@ -162,24 +166,36 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       const { request, controller } = AxiosGetHelper(treeEndpoint, cancelHeatmapSignal)
       cancelHeatmapSignal = controller;
       request.then(response => {
-        minSize = this.minmax(response.data)[0];
-        maxSize = this.minmax(response.data)[1];
-        let treeResponse: ITreeResponse = this.updateSize(response.data);
-        console.log("Final treeResponse--", treeResponse);
-        this.setState({
-          isLoading: false,
-          showPanel: false,
-          treeResponse
-        });
+        if (response && response.status === 200)
+        {
+          minSize = this.minmax(response.data)[0];
+          maxSize = this.minmax(response.data)[1];
+          let treeResponse: ITreeResponse = this.updateSize(response.data);
+          console.log("Final treeResponse--", treeResponse);
+          this.setState({
+            isLoading: false,
+            isHeatmapEnabled: true,
+            treeResponse
+          });
+        }
+        else {
+          let error = new Error((response.status).toString()) as ResponseError;
+          error.status = response.status;
+          error.message = `Failed to fetch Heatmap Response with status ${error.status}`
+          throw error;
+        }
       }).catch(error => {
         this.setState({
           isLoading: false,
           inputPath: '',
           entityType: '',
           date: '',
-          treeEndpointFailed: true
+          treeEndpointFailed: true,
+          isHeatmapEnabled: (error.response.status === 404) ? false : true,
         });
-        showDataFetchError(error.toString());
+        if (error.response.status !== 404) {
+          showDataFetchError(error.message.toString());
+        }
       });
     }
     else {
@@ -298,8 +314,15 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   };
 
   render() {
-    const { treeResponse, isLoading, inputPath, date, treeEndpointFailed, inputPathValid, helpMessage } = this.state;
-    
+    const {
+      treeResponse,
+      isLoading,
+      inputPath,
+      date,
+      isHeatmapEnabled,
+      treeEndpointFailed,
+      inputPathValid,
+      helpMessage } = this.state;
     const menuCalendar = (
       <Menu
         defaultSelectedKeys={[date]}
@@ -342,70 +365,81 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     );
 
     return (
-      <div className='heatmap-container'>
-        <div className='page-header'>
-          Tree Map for Entities
-        </div>
-        <div className='content-div'>
-          {isLoading ? <span><Icon type='loading' /> Loading...</span> : (
-            <div>
-              {treeEndpointFailed ? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br /></div> :
-                (Object.keys(treeResponse).length > 0 && (treeResponse.label !== null || treeResponse.path !== null)) ?
-                  <div>
-                    <div className='heatmap-header-container'>
-                      <Row>
-                        <div className='go-back-button'>
-                          <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo' /></Button>
-                        </div>
-                        <div className='path-input-container'>
-                          <h4 style={{ marginTop: "10px" }}>Path</h4>
-                          <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
-                            <Form.Item  className='path-input-element' validateStatus={inputPathValid} help={helpMessage}>
-                              <Input placeholder={CONSTANTS.ROOT_PATH} name="inputPath" value={inputPath} onChange={this.handleChange}/>
-                            </Form.Item>
-                          </form>
-                        </div>
-                        <div className='entity-dropdown-button'>
-                          <Dropdown overlay={entityTypeMenu} placement='bottomCenter'>
-                            <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
-                          </Dropdown>
-                        </div>
-                        <div className='date-dropdown-button'>
-                          <Dropdown overlay={menuCalendar} placement='bottomLeft'>
-                            <Button>Last &nbsp;{date > 100 ? new Date(date * 1000).toLocaleString() : date}<DownOutlined /></Button>
-                          </Dropdown>
-                        </div>
-                      </Row>
-                      <div className='heatmap-legend-container'>
-                        <div className='heatmap-legend-item'>
-                          <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][0]}`, marginRight: "5px" }}> </div>
-                          <span>Less Accessed</span>
-                        </div>
-                        <div className='heatmap-legend-item'>
-                          <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][8]}`, marginRight: "5px" }}> </div>
-                          <span>Moderate Accessed</span>
-                        </div>
-                        <div className='heatmap-legend-item'>
-                          <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][20]}`, marginRight: "5px" }}> </div>
-                          <span>Most Accessed</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div id="heatmap-chart-container">
-                      <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
-                    </div>
-                  </div>
-                  :
-                  <div className='heatmapinformation'><br />
-                    No Data Available. {' '}<br />
-                  </div>
-              }
-
+      <>
+        {isLoading ? <span><Icon type='loading' /> Loading...</span> : (
+          <div className='heatmap-container'>
+            <div className='page-header'>
+              Tree Map for Entities
             </div>
-          )
-          }
-        </div>
-      </div>
+            <div className='content-div'>
+              <div>
+                {!isHeatmapEnabled
+                  ? <Result
+                    status="error"
+                    title="Heatmap Not Available"
+                    subTitle="Please check if Heatmap is enabled or not and you have sufficient permissions" />
+                  : <>
+                    {treeEndpointFailed
+                      ? <Result
+                        status="error"
+                        title="Failed to fetch Heatmap"/>
+                      :
+                      (Object.keys(treeResponse).length > 0 && (treeResponse.label !== null || treeResponse.path !== null)) ?
+                        <div>
+                          <div className='heatmap-header-container'>
+                            <Row>
+                              <div className='go-back-button'>
+                                <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo' /></Button>
+                              </div>
+                              <div className='path-input-container'>
+                                <h4 style={{ marginTop: "10px" }}>Path</h4>
+                                <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
+                                  <Form.Item className='path-input-element' validateStatus={inputPathValid} help={helpMessage}>
+                                    <Input placeholder={CONSTANTS.ROOT_PATH} name="inputPath" value={inputPath} onChange={this.handleChange} />
+                                  </Form.Item>
+                                </form>
+                              </div>
+                              <div className='entity-dropdown-button'>
+                                <Dropdown overlay={entityTypeMenu} placement='bottomCenter'>
+                                  <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
+                                </Dropdown>
+                              </div>
+                              <div className='date-dropdown-button'>
+                                <Dropdown overlay={menuCalendar} placement='bottomLeft'>
+                                  <Button>Last &nbsp;{date > 100 ? new Date(date * 1000).toLocaleString() : date}<DownOutlined /></Button>
+                                </Dropdown>
+                              </div>
+                            </Row>
+                            <div className='heatmap-legend-container'>
+                              <div className='heatmap-legend-item'>
+                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][0]}`, marginRight: "5px" }}> </div>
+                                <span>Less Accessed</span>
+                              </div>
+                              <div className='heatmap-legend-item'>
+                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][8]}`, marginRight: "5px" }}> </div>
+                                <span>Moderate Accessed</span>
+                              </div>
+                              <div className='heatmap-legend-item'>
+                                <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][20]}`, marginRight: "5px" }}> </div>
+                                <span>Most Accessed</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div id="heatmap-chart-container">
+                            <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
+                          </div>
+                        </div>
+                        :
+                        <div className='heatmapinformation'><br />
+                          No Data Available. {' '}<br />
+                        </div>
+                    }</>}
+              </div>
+            </div>
+          </div>
+        )
+        }
+      </>
     );
   }
 }

@@ -95,9 +95,10 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -129,7 +130,7 @@ public class TestContainerPersistence {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
@@ -200,10 +201,6 @@ public class TestContainerPersistence {
 
   private long getTestContainerID() {
     return ContainerTestHelper.getTestContainerID();
-  }
-
-  private DispatcherContext getDispatcherContext() {
-    return new DispatcherContext.Builder().build();
   }
 
   private KeyValueContainer addContainer(ContainerSet cSet, long cID)
@@ -379,9 +376,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNotNull(blockTable
+      Assert.assertNotNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNotNull(metadataTable
+      Assert.assertNotNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -401,9 +398,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNull(blockTable
+      Assert.assertNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNull(metadataTable
+      Assert.assertNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -608,7 +605,7 @@ public class TestContainerPersistence {
     commitBytesBefore = container.getContainerData()
         .getVolume().getCommittedBytes();
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     commitBytesAfter = container.getContainerData()
         .getVolume().getCommittedBytes();
     commitDecrement = commitBytesBefore - commitBytesAfter;
@@ -655,7 +652,7 @@ public class TestContainerPersistence {
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
-          getDispatcherContext());
+          DispatcherContext.getHandleWriteChunk());
       chunks.add(info);
       blockData.addChunk(info.getProtoBufMessage());
     }
@@ -672,8 +669,8 @@ public class TestContainerPersistence {
     // Read chunk via ReadChunk call.
     for (int x = 0; x < chunkCount; x++) {
       ChunkInfo info = chunks.get(x);
-      ChunkBuffer data = chunkManager
-          .readChunk(container, blockID, info, getDispatcherContext());
+      final ChunkBuffer data = chunkManager.readChunk(container, blockID, info,
+          DispatcherContext.getHandleReadChunk());
       ChecksumData checksumData = checksum.computeChecksum(data);
       Assert.assertEquals(info.getChecksumData(), checksumData);
     }
@@ -700,15 +697,15 @@ public class TestContainerPersistence {
     ChunkBuffer data = getData(datalen);
     setDataChecksum(info, data);
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     data.rewind();
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     data.rewind();
     // With the overwrite flag it should work now.
     info.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     long bytesUsed = container.getContainerData().getBytesUsed();
     Assert.assertEquals(datalen, bytesUsed);
 
@@ -735,10 +732,11 @@ public class TestContainerPersistence {
     ChunkBuffer data = getData(datalen);
     setDataChecksum(info, data);
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     chunkManager.deleteChunk(container, blockID, info);
     exception.expect(StorageContainerException.class);
-    chunkManager.readChunk(container, blockID, info, getDispatcherContext());
+    chunkManager.readChunk(container, blockID, info,
+        DispatcherContext.getHandleReadChunk());
   }
 
   /**
@@ -846,7 +844,7 @@ public class TestContainerPersistence {
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
-          getDispatcherContext());
+          DispatcherContext.getHandleWriteChunk());
       totalSize += datalen;
       chunkList.add(info);
     }

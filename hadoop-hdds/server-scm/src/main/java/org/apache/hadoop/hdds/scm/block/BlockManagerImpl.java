@@ -104,11 +104,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         scm.getSequenceIdGen(),
         metrics);
 
+
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
             scm.getSCMServiceManager(), conf,
-            metrics, scm.getSystemClock());
+            metrics, scm.getSystemClock(), scm.getReconfigurationHandler());
   }
 
   /**

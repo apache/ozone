@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.HashSet;
 import com.google.gson.GsonBuilder;
 import com.google.gson.Gson;
@@ -134,11 +133,16 @@ public class ChunkKeyHandler extends KeyHandler implements
         ContainerProtos.DatanodeBlockID datanodeBlockID =
             keyLocation.getBlockID().getDatanodeBlockIDProtobuf();
         // doing a getBlock on all nodes
-        HashMap<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
+        Map<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
             responses = null;
+        Map<DatanodeDetails, ContainerProtos.ReadContainerResponseProto>
+            readContainerResponses = null;
         try {
           responses = ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
               datanodeBlockID, keyLocation.getToken());
+          readContainerResponses =
+              containerOperationClient.readContainerFromAllNodes(
+                  keyLocation.getContainerID(), pipeline);
         } catch (InterruptedException e) {
           LOG.error("Execution interrupted due to " + e);
           Thread.currentThread().interrupt();
@@ -146,6 +150,7 @@ public class ChunkKeyHandler extends KeyHandler implements
         JsonArray responseFromAllNodes = new JsonArray();
         for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
             entry : responses.entrySet()) {
+          chunkPaths.clear();
           JsonObject jsonObj = new JsonObject();
           if (entry.getValue() == null) {
             LOG.error("Cant execute getBlock on this node");
@@ -153,8 +158,7 @@ public class ChunkKeyHandler extends KeyHandler implements
           }
           tempchunks = entry.getValue().getBlockData().getChunksList();
           ContainerProtos.ContainerDataProto containerData =
-              containerOperationClient.readContainer(keyLocation
-                  .getContainerID(), pipeline);
+              readContainerResponses.get(entry.getKey()).getContainerData();
           for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
             String fileName = containerLayoutVersion.getChunkFile(new File(
                     getChunkLocationPath(containerData.getContainerPath())),

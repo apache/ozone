@@ -23,12 +23,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
@@ -43,14 +43,14 @@ public class TestSnapshotInfo {
   private static final UUID EXPECTED_SNAPSHOT_ID = UUID.randomUUID();
   private static final UUID EXPECTED_PREVIOUS_SNAPSHOT_ID = UUID.randomUUID();
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS,
-        folder.getRoot().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(conf, null);
   }
 
@@ -74,7 +74,7 @@ public class TestSnapshotInfo {
   public void testTableExists() throws Exception {
     Table<String, SnapshotInfo> snapshotInfo =
         omMetadataManager.getSnapshotInfoTable();
-    Assert.assertTrue(snapshotInfo.isEmpty());
+    Assertions.assertTrue(snapshotInfo.isEmpty());
   }
 
   @Test
@@ -82,7 +82,7 @@ public class TestSnapshotInfo {
     Table<String, SnapshotInfo> snapshotInfo =
         omMetadataManager.getSnapshotInfoTable();
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, createSnapshotInfo());
-    Assert.assertEquals(EXPECTED_SNAPSHOT_ID,
+    Assertions.assertEquals(EXPECTED_SNAPSHOT_ID,
         snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getSnapshotId());
   }
 
@@ -91,11 +91,11 @@ public class TestSnapshotInfo {
     Table<String, SnapshotInfo> snapshotInfo =
         omMetadataManager.getSnapshotInfoTable();
 
-    Assert.assertFalse(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
+    Assertions.assertFalse(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, createSnapshotInfo());
-    Assert.assertTrue(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
+    Assertions.assertTrue(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
     snapshotInfo.delete(EXPECTED_SNAPSHOT_KEY);
-    Assert.assertFalse(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
+    Assertions.assertFalse(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
   }
 
   @Test
@@ -105,9 +105,11 @@ public class TestSnapshotInfo {
     SnapshotInfo info  = createSnapshotInfo();
     info.setSstFiltered(false);
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
-    Assert.assertFalse(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
+    Assertions.assertFalse(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY)
+        .isSstFiltered());
     info.setSstFiltered(true);
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
-    Assert.assertTrue(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
+    Assertions.assertTrue(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY)
+        .isSstFiltered());
   }
 }

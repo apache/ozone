@@ -266,15 +266,10 @@ public class TestContainerCommandsEC {
     scm.getPipelineManager().closePipeline(orphanPipeline, false);
 
     // Find the datanode hosting Replica index = 2
-    DatanodeDetails dn2 = null;
     HddsDatanodeService dn2Service = null;
     List<DatanodeDetails> pipelineNodes = orphanPipeline.getNodes();
-    for (DatanodeDetails node : pipelineNodes) {
-      if (orphanPipeline.getReplicaIndex(node) == 2) {
-        dn2 = node;
-        break;
-      }
-    }
+    DatanodeDetails dn2 = findDatanodeWithIndex(
+        orphanPipeline, pipelineNodes, 2);
     // Find the Cluster node corresponding to the datanode hosting index = 2
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       if (dn.getDatanodeDetails().equals(dn2)) {
@@ -363,8 +358,9 @@ public class TestContainerCommandsEC {
     }
 
     try (ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-            null, ECReconstructionMetrics.create())) {
+             new ECReconstructionCoordinator(config, certClient,
+                 secretKeyClient, null,
+                 ECReconstructionMetrics.create(), "")) {
 
       // Attempt to reconstruct the container.
       coordinator.reconstructECContainerGroup(orphanContainerID,
@@ -388,6 +384,16 @@ public class TestContainerCommandsEC {
       Assert.assertEquals(0L, count);
       Assert.assertEquals(0, response.getBlockDataList().size());
     }
+  }
+
+  private DatanodeDetails findDatanodeWithIndex(Pipeline orphanPipeline,
+      List<DatanodeDetails> pipelineNodes, int index) {
+    for (DatanodeDetails node : pipelineNodes) {
+      if (orphanPipeline.getReplicaIndex(node) == index) {
+        return node;
+      }
+    }
+    return null;
   }
 
   @Test
@@ -581,7 +587,7 @@ public class TestContainerCommandsEC {
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
             new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-                 null, ECReconstructionMetrics.create())) {
+                null, ECReconstructionMetrics.create(), "2")) {
 
       ECReconstructionMetrics metrics =
           coordinator.getECReconstructionMetrics();
@@ -776,8 +782,9 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       try (ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient,  secretKeyClient,
-              null, ECReconstructionMetrics.create())) {
+               new ECReconstructionCoordinator(config, certClient,
+                   secretKeyClient,
+                   null, ECReconstructionMetrics.create(), "")) {
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
             sourceNodeMap, targetNodeMap);

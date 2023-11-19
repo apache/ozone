@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -56,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -164,9 +166,17 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
+    String grpcContextClientIpAddress =
+        GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+    String grpcContextClientHostname =
+        GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+    } else if (grpcContextClientHostname != null
+        && grpcContextClientIpAddress != null) {
+      userInfo.setHostName(grpcContextClientHostname);
+      userInfo.setRemoteAddress(grpcContextClientIpAddress);
     }
 
     return userInfo.build();
@@ -434,7 +444,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return error response need to be returned to client - OMResponse.
    */
   protected OMResponse createErrorOMResponse(
-      @Nonnull OMResponse.Builder omResponse, @Nonnull IOException ex) {
+      @Nonnull OMResponse.Builder omResponse, @Nonnull Exception ex) {
 
     omResponse.setSuccess(false);
     String errorMsg = exceptionErrorMessage(ex);
@@ -460,8 +470,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  private String exceptionErrorMessage(IOException ex) {
-    if (ex instanceof OMException) {
+  private String exceptionErrorMessage(Exception ex) {
+    if (ex instanceof OMException || ex instanceof InvalidPathException) {
       return ex.getMessage();
     } else {
       return org.apache.hadoop.util.StringUtils.stringifyException(ex);

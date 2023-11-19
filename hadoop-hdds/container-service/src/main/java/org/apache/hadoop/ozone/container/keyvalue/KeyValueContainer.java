@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -683,14 +684,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       ContainerPacker<KeyValueContainerData> packer) throws IOException {
     writeLock();
     try {
-      // Closed/ Quasi closed containers are considered for replication by
-      // replication manager if they are under-replicated.
+      // Closed/ Quasi closed and unhealthy containers are considered for
+      // replication by replication manager if they are under-replicated.
       ContainerProtos.ContainerDataProto.State state =
           getContainerData().getState();
       if (!(state == ContainerProtos.ContainerDataProto.State.CLOSED ||
-          state == ContainerDataProto.State.QUASI_CLOSED)) {
+          state == ContainerDataProto.State.QUASI_CLOSED
+          || state == ContainerDataProto.State.UNHEALTHY)) {
         throw new IllegalStateException(
-            "Only (quasi)closed containers can be exported, but " +
+            "Only (quasi)closed and unhealthy containers can be exported. " +
                 "ContainerId=" + getContainerData().getContainerID() +
                 " is in state " + state);
       }
@@ -786,6 +788,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void writeLockInterruptibly() throws InterruptedException {
     this.lock.writeLock().lockInterruptibly();
 
+  }
+
+  public boolean writeLockTryLock(long time, TimeUnit unit)
+      throws InterruptedException {
+    return this.lock.writeLock().tryLock(time, unit);
   }
 
   /**

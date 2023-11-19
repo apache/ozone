@@ -88,7 +88,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
       OzoneConfiguration configuration) {
-    super(KeyDeletingService.class.getSimpleName(), interval, unit,
+    super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
         DIR_DELETING_CORE_POOL_SIZE, serviceTimeout, ozoneManager, null);
     this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
@@ -212,7 +212,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
               allSubDirList, purgePathRequestList, null, startTime,
-              ratisByteLimit - consumedSize);
+              ratisByteLimit - consumedSize,
+              getOzoneManager().getKeyManager());
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +

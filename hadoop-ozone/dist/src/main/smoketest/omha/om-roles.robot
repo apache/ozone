@@ -46,7 +46,7 @@ List om roles as JSON with OM service ID passed
     ${output_with_id_passed} =      Execute                         ozone admin om roles --service-id=omservice --json
                                     Assert Leader Present in JSON   ${output_with_id_passed}
     ${output_with_id_passed} =      Execute                         ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice --json
-                                    Parse json output               ${output_with_id_passed}
+                                    Assert Leader Present in JSON   ${output_with_id_passed}
 
 List om roles as JSON without OM service ID passed
     ${output_without_id_passed} =   Execute                         ozone admin om roles --json

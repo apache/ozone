@@ -74,11 +74,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -91,7 +90,6 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -154,9 +152,7 @@ public class KeyValueHandler extends Handler {
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
     try {
-      volumeChoosingPolicy = conf.getClass(
-          HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
-              .class, VolumeChoosingPolicy.class).newInstance();
+      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -710,7 +706,7 @@ public class KeyValueHandler extends Handler {
       checkContainerIsHealthy(kvContainer, blockID, Type.ReadChunk);
       BlockUtils.verifyBCSId(kvContainer, blockID);
       if (dispatcherContext == null) {
-        dispatcherContext = new DispatcherContext.Builder().build();
+        dispatcherContext = DispatcherContext.getHandleReadChunk();
       }
 
       boolean isReadChunkV0 = getReadChunkVersion(request.getReadChunk())
@@ -728,7 +724,7 @@ public class KeyValueHandler extends Handler {
       // Validate data only if the read chunk is issued by Ratis for its
       // internal logic.
       //  For client reads, the client is expected to validate.
-      if (dispatcherContext.isReadFromTmpFile()) {
+      if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
         validateChunkChecksumData(data, chunkInfo);
       }
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
@@ -781,8 +777,7 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     if (validateChunkChecksumData) {
       try {
-        Checksum.verifyChecksum(data.toByteString(byteBufferToByteString),
-            info.getChecksumData(), 0);
+        Checksum.verifyChecksum(data, info.getChecksumData(), 0);
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
       }
@@ -815,11 +810,10 @@ public class KeyValueHandler extends Handler {
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
-        dispatcherContext = new DispatcherContext.Builder().build();
+        dispatcherContext = DispatcherContext.getHandleWriteChunk();
       }
-      WriteChunkStage stage = dispatcherContext.getStage();
-      if (stage == WriteChunkStage.WRITE_DATA ||
-          stage == WriteChunkStage.COMBINED) {
+      final boolean isWrite = dispatcherContext.getStage().isWrite();
+      if (isWrite) {
         data =
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
         validateChunkChecksumData(data, chunkInfo);
@@ -828,8 +822,7 @@ public class KeyValueHandler extends Handler {
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
       // We should increment stats after writeChunk
-      if (stage == WriteChunkStage.WRITE_DATA ||
-          stage == WriteChunkStage.COMBINED) {
+      if (isWrite) {
         metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
             .getChunkData().getLen());
       }
@@ -877,7 +870,7 @@ public class KeyValueHandler extends Handler {
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
       if (dispatcherContext == null) {
-        dispatcherContext = new DispatcherContext.Builder().build();
+        dispatcherContext = DispatcherContext.getHandlePutSmallFile();
       }
 
       BlockID blockID = blockData.getBlockID();
@@ -935,8 +928,8 @@ public class KeyValueHandler extends Handler {
 
       ContainerProtos.ChunkInfo chunkInfoProto = null;
       List<ByteString> dataBuffers = new ArrayList<>();
-      DispatcherContext dispatcherContext =
-          new DispatcherContext.Builder().build();
+      final DispatcherContext dispatcherContext
+          = DispatcherContext.getHandleGetSmallFile();
       for (ContainerProtos.ChunkInfo chunk : responseData.getChunks()) {
         // if the block is committed, all chunks must have been committed.
         // Tmp chunk files won't exist here.
