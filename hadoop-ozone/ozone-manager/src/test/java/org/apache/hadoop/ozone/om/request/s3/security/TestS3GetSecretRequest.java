@@ -24,14 +24,7 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ipc.Server.Call;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OMMultiTenantManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.S3SecretLockedManager;
-import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
-import org.apache.hadoop.ozone.om.TenantOp;
+import org.apache.hadoop.ozone.om.*;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -223,6 +216,31 @@ public class TestS3GetSecretRequest {
         ).build();
   }
 
+
+  @Test
+  public void testS3CacheRecordsTransactionIndex() throws IOException {
+    // Create secrets for "alice" and "carol".
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    when(ozoneManager.isS3Admin(ugiCarol)).thenReturn(true);
+
+    String userPrincipalIdAlice = USER_ALICE;
+    String userPrincipalIdBob = USER_CAROL;
+
+    // Request the creation of secrets for "alice" and "bob".
+    processSuccessSecretRequest(userPrincipalIdAlice, 1, true);
+    processSuccessSecretRequest(userPrincipalIdBob, 2, true);
+
+    // Verify that the transaction index is added to the cache for "alice".
+    S3SecretCache cache = ozoneManager.getS3SecretManager().cache();
+    Assert.assertNotNull(cache.get(userPrincipalIdAlice));
+    Assert.assertEquals(1,
+        cache.get(userPrincipalIdAlice).getTransactionLogIndex());
+
+    // Verify that the transaction index is added to the cache for "bob".
+    Assert.assertNotNull(cache.get(userPrincipalIdBob));
+    Assert.assertEquals(2,
+        cache.get(userPrincipalIdBob).getTransactionLogIndex());
+  }
 
   @Test
   public void testFetchSecretForRevokedUser() throws IOException {
