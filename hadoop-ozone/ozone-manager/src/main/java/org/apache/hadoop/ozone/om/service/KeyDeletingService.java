@@ -186,10 +186,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // Check if this is the Leader OM. If not leader, no need to execute this
       // task.
       if (shouldRun()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Running KeyDeletingService");
-        }
-        getRunCount().incrementAndGet();
+        final long run = getRunCount().incrementAndGet();
+        LOG.debug("Running KeyDeletingService {}", run);
 
         // Acquire active DB deletedTable write lock because of the
         // deletedTable read-write here to avoid interleaving with

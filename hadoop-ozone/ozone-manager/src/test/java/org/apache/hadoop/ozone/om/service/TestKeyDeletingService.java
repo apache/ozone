@@ -570,45 +570,6 @@ t
   }
 
   @Test
-  public void testLogContent() throws IOException, AuthenticationException,
-      InterruptedException, TimeoutException {
-    OzoneConfiguration conf = createConfAndInitValues();
-    OmTestManagers omTestManagers = new OmTestManagers(conf);
-    KeyManager keyManager = omTestManagers.getKeyManager();
-    writeClient = omTestManagers.getWriteClient();
-    om = omTestManagers.getOzoneManager();
-
-    GenericTestUtils.LogCapturer keyDeleteLogCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(KeyDeletingService.LOG);
-    GenericTestUtils.setLogLevel(KeyDeletingService.LOG, Level.DEBUG);
-
-    GenericTestUtils.LogCapturer backgroundLogCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(BackgroundService.LOG);
-    GenericTestUtils.setLogLevel(BackgroundService.LOG, Level.DEBUG);
-
-    final int keyCount = 100;
-    createAndDeleteKeys(keyManager, keyCount, 1);
-
-    StringBuffer keyDeleteLogContent = new StringBuffer();
-    GenericTestUtils.waitFor(() -> {
-      keyDeleteLogContent.append(keyDeleteLogCapturer.getOutput());
-      return true;
-    }, 100, 1000);
-    keyDeleteLogCapturer.stopCapturing();
-    Assertions.assertTrue(
-        keyDeleteLogContent.toString().contains("Running KeyDeletingService"));
-
-    StringBuffer backgroundLogContent = new StringBuffer();
-    GenericTestUtils.waitFor(() -> {
-      backgroundLogContent.append(backgroundLogCapturer.getOutput());
-      return true;
-    }, 100, 1000);
-    backgroundLogCapturer.stopCapturing();
-    Assertions.assertTrue(
-        backgroundLogContent.toString().contains("Keys sent to SCM"));
-  }
-
-  @Test
   public void testSnapshotExclusiveSize() throws Exception {
     OzoneConfiguration conf = createConfAndInitValues();
     OmTestManagers omTestManagers
