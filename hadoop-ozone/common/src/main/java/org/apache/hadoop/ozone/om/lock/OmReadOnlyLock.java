@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 
+import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
+
 /**
  * Read only "lock" for snapshots
  * Uses no lock.  Always returns true when acquiring
@@ -27,13 +30,14 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 public class OmReadOnlyLock implements IOzoneManagerLock {
 
   @Override
-  public boolean acquireReadLock(Resource resource, String... resources) {
-    return true;
+  public OMLockDetails acquireReadLock(Resource resource, String... resources) {
+    return EMPTY_DETAILS_LOCK_ACQUIRED;
   }
 
   @Override
-  public boolean acquireWriteLock(Resource resource, String... resources) {
-    return false;
+  public OMLockDetails acquireWriteLock(Resource resource,
+      String... resources) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
@@ -47,13 +51,14 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
-  public void releaseWriteLock(Resource resource, String... resources) {
-  // Intentionally empty
+  public OMLockDetails releaseWriteLock(Resource resource,
+      String... resources) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
-  public void releaseReadLock(Resource resource, String... resources) {
-  // Intentionally empty
+  public OMLockDetails releaseReadLock(Resource resource, String... resources) {
+    return EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   @Override
