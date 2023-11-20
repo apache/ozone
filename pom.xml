@@ -142,7 +142,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.67</bouncycastle.version>
     <cglib.version>3.2.0</cglib.version>
-    <derby.version>10.14.2.0</derby.version>
+    <derby.version>10.17.1.0</derby.version>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
     <dropwizard-metrics.version>3.2.4</dropwizard-metrics.version>
     <jacoco.version>0.8.5</jacoco.version>
