@@ -74,8 +74,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestQueryNode {
   private static int numOfDatanodes = 5;
   private MiniOzoneCluster cluster;
-  private final ExecutorService executor = Executors.newFixedThreadPool(2);
-
   private ContainerOperationClient scmClient;
 
   @BeforeEach
@@ -118,13 +116,11 @@ public class TestQueryNode {
 
   @Test
   public void testStaleNodesCount() throws Exception {
-    CompletableFuture.runAsync(() -> {
+    ExecutorService executor = Executors.newFixedThreadPool(1);
+    executor.execute(() -> {
       cluster.shutdownHddsDatanode(0);
       cluster.shutdownHddsDatanode(1);
-    }, executor);
-    GenericTestUtils.waitFor(() -> numOfDatanodes -
-        cluster.getStorageContainerManager().getScmNodeManager()
-            .getNodeCount(NodeStatus.inServiceHealthy()) >= 1, 100, 10 * 1000);
+    });
     GenericTestUtils.waitFor(() -> {
       try {
         return
