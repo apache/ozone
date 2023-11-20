@@ -32,8 +32,25 @@
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
-            var protocol = "";
-            var portNo = "";
+
+            function get_protocol(URLScheme, value, baseProto, fallbackProto) {
+                let protocol = "unknown"
+                let port = -1;
+                if (URLScheme.toLowerCase() === baseProto) {
+                    let portSpec = value && value.find((element) => element.key.toLowerCase() === baseProto)
+                    if (portSpec) {
+                        port = portSpec.value
+                        protocol = baseProto
+                        return { proto : protocol, port: port }
+                    }
+                    portSpec = value && value.find((element) => element.key.toLowerCase() === fallbackProto);
+                    if (portSpec) {
+                        port = portSpec.value
+                        protocol = fallbackProto
+                    }
+                }
+                return { proto : protocol, port: port }
+            }
 
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
                 .then(function (result) {
@@ -42,24 +59,18 @@
 
                     $scope.nodeStatus = ctrl.nodemanagermetrics
                         && ctrl.nodemanagermetrics.NodeStatusInfo
-                        && ctrl.nodemanagermetrics.NodeStatusInfo.map(
-                            ({ key, value }) => {
-                                value.map(({key, value}) => {
-                                    if (key == "HTTP") {
-                                        protocol = key;
-                                        portNo = value;
-                                    }
-                                    if (key == "HTTPS"){
-                                        protocol = key.toLowerCase() === URLScheme ? key : "HTTP";
-                                        portNo = value;
-                                    }
-                                });
+                        && ctrl.nodemanagermetrics.NodeStatusInfo
+                            .map(({ key, value }) => {
+                                let portSpec = get_protocol(URLScheme, value, "https", "http")
+                                if (portSpec.port === -1) {
+                                    portSpec = get_protocol(URLScheme, value, "http", "https")
+                                }
                                 return {
                                     hostname: key,
-                                    opstate: value && value.find((element) => element.key == "OPSTATE").value,
-                                    comstate: value && value.find((element) => element.key == "COMSTATE").value,
-                                    portno: portNo,
-                                    portval: protocol
+                                    opstate: value && value.find((element) => element.key === "OPSTATE").value,
+                                    comstate: value && value.find((element) => element.key === "COMSTATE").value,
+                                    port: portSpec.port,
+                                    protocol: portSpec.proto
                                 }
                             });
 
