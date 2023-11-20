@@ -16,22 +16,23 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import org.springframework.util.unit.DataSize;
-import org.springframework.util.unit.DataUnit;
+import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import picocli.CommandLine.ITypeConverter;
 
 /**
  * A Picocli custom converter for parsing command line string values into
- * DataSize objects.
+ * StorageSize objects.
  */
 
-public class DataSizeConverter implements ITypeConverter<DataSize> {
+public class StorageSizeConverter implements ITypeConverter<StorageSize> {
+
+  public static final String STORAGE_SIZE_DESCRIPTION = "You can specify the " +
+      "size using data units like 'GB', 'MB', 'KB', etc. Size is in base 2 " +
+      "binary.";
+
   @Override
-  public DataSize convert(String value) throws Exception {
-    try {
-      return DataSize.parse(value, DataUnit.BYTES);
-    } catch (IllegalArgumentException e) {
-      throw new Exception("Invalid data size format: " + value);
-    }
+  public StorageSize convert(String value) {
+    return StorageSize.parse(value, StorageUnit.BYTES);
   }
 }

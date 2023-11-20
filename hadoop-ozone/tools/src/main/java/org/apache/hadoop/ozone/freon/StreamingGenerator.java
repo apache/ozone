@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerDestination;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerSource;
 import org.apache.hadoop.ozone.container.stream.StreamingClient;
 import org.apache.hadoop.ozone.container.stream.StreamingServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine;
 
 import java.io.FileOutputStream;
@@ -62,11 +62,11 @@ public class StreamingGenerator extends BaseFreonGenerator
   private int numberOfFiles;
 
   @CommandLine.Option(names = {"--size"},
-      description = "Size of the generated files. You can specify the size " +
-          "using data units like 'GB', 'MB', 'KB', etc.",
+      description = "Size of the generated files. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "100MB",
-      converter = DataSizeConverter.class)
-  private DataSize fileSize;
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   private static final String SUB_DIR_NAME = "dir1";
 

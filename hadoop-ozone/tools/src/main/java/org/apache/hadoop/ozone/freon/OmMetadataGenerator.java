@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -50,7 +51,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -98,11 +98,10 @@ public class OmMetadataGenerator extends BaseFreonGenerator
 
   @Option(names = {"-s", "--size"},
       description = "The size in byte of a file for the Create File/Key op. " +
-          "You can specify the size using data units like 'GB', 'MB', 'KB', " +
-          "etc.",
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "0",
-      converter = DataSizeConverter.class)
-  private DataSize dataSize;
+      converter = StorageSizeConverter.class)
+  private StorageSize dataSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",

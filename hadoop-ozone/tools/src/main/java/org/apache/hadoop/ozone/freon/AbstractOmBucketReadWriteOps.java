@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Option;
 
 import java.io.IOException;
@@ -48,11 +48,10 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
 
   @Option(names = {"-g", "--size"},
       description = "Generated data size of each key/file to be written. " +
-          "You can specify the size using data units like 'GB', 'MB', 'KB', " +
-          "etc.",
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "256B",
-      converter = DataSizeConverter.class)
-  private DataSize size;
+      converter = StorageSizeConverter.class)
+  private StorageSize size;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used for generating the key/file content.",

@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
-import org.springframework.util.unit.DataSize;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -50,11 +50,11 @@ public class HadoopFsGenerator extends BaseFreonGenerator
   private String rootPath;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated files. You can specify the size " +
-          "using data units like 'GB', 'MB', 'KB', etc.",
+      description = "Size of the generated files. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
-      converter = DataSizeConverter.class)
-  private DataSize fileSize;
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used store the generated key content",

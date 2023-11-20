@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -70,7 +71,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -147,12 +147,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
   @Option(
       names = {"--key-size", "--keySize"},
       description = "Specifies the size of Key in bytes to be created. Full" +
-          " name --keySize will be removed in later versions. You can" +
-          " specify the size using data units like 'GB', 'MB', 'KB', etc.",
+          " name --keySize will be removed in later versions. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
-      converter = DataSizeConverter.class
+      converter = StorageSizeConverter.class
   )
-  private DataSize keySize;
+  private StorageSize keySize;
 
   @Option(
       names = {"--validate-writes", "--validateWrites"},

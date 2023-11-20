@@ -23,9 +23,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -69,12 +69,11 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
   @Option(names = {"-g", "--file-size", "--fileSize"},
       description = "Generated data size of each file to be " +
-          "written in each directory. You can specify the size using data " +
-          "units like 'GB', 'MB', 'KB', etc. Full name --fileSize will be " +
-          "removed in later versions.",
+          "written in each directory. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "4KB",
-      converter = DataSizeConverter.class)
-  private DataSize fileSize;
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   @Option(names = {"-b", "--buffer"},
           description = "Size of buffer used to generated the file content.",

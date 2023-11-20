@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -31,7 +32,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -61,11 +61,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private String bucketName;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated key. You can specify the size " +
-          "using data units like 'GB', 'MB', 'KB', etc.",
+      description = "Size of the generated key. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
-      converter = DataSizeConverter.class)
-  private DataSize keySize;
+      converter = StorageSizeConverter.class)
+  private StorageSize keySize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",

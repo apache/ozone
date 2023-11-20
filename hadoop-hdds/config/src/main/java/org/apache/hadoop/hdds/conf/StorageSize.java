@@ -91,6 +91,19 @@ public class StorageSize {
 
   }
 
+  public static StorageSize parse(String value, StorageUnit defaultUnit) {
+    try {
+      return parse(value);
+    } catch (IllegalArgumentException e) {
+      try {
+        return parse(value + defaultUnit.getShortName());
+      } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(value + " is not in expected " +
+            "format. Expected format is <number><unit>. e.g. 1000MB");
+      }
+    }
+  }
+
   public StorageUnit getUnit() {
     return unit;
   }
@@ -99,4 +112,7 @@ public class StorageSize {
     return value;
   }
 
+  public long toBytes() {
+    return (long) unit.toBytes(value);
+  }
 }

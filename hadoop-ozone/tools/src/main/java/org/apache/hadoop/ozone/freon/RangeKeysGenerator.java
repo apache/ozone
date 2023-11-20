@@ -22,11 +22,11 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.unit.DataSize;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
@@ -80,11 +80,11 @@ public class RangeKeysGenerator extends BaseFreonGenerator
   private String encodeFormat;
 
   @CommandLine.Option(names = {"-g", "--size"},
-          description = "Generated object size. You can specify the size " +
-              "using data units like 'GB', 'MB', 'KB', etc.",
+          description = "Generated object size. " +
+              StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
           defaultValue = "1B",
-          converter = DataSizeConverter.class)
-  private DataSize objectSize;
+          converter = StorageSizeConverter.class)
+  private StorageSize objectSize;
 
   @CommandLine.Option(names = {"--buffer"},
       description = "Size of buffer used to generate object content.",
