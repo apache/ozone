@@ -25,12 +25,12 @@ import org.apache.hadoop.metrics2.lib.MutableStat;
 import java.util.List;
 
 /**
- * The {@code AggregatedMetrics} class encapsulates a collection of related
+ * The {@code PerformanceMetrics} class encapsulates a collection of related
  * metrics including a MutableStat, MutableQuantiles, and a MutableMinMax.
  * This class provides methods to update these metrics and to
  * snapshot their values for reporting.
  */
-public class AggregatedMetrics {
+public class PerformanceMetrics {
   private final MutableStat stat;
   private final List<MutableQuantiles> quantiles;
   private final MutableMinMax minMax;
@@ -46,22 +46,22 @@ public class AggregatedMetrics {
       MetricsRegistry registry, String sampleName, String valueName,
       int[] intervals) {
     try {
-      AggregatedMetricsInitializer.initialize(
+      PerformanceMetricsInitializer.initialize(
           source, registry, sampleName, valueName, intervals);
     } catch (IllegalAccessException e) {
-      throw new RuntimeException("Failed to initialize AggregatedMetrics", e);
+      throw new RuntimeException("Failed to initialize PerformanceMetrics", e);
     }
   }
 
   /**
-   * Constructs an instance of AggregatedMetrics with the specified MutableStat,
+   * Constructs an instance of PerformanceMetrics with the specified MutableStat,
    * MutableQuantiles, and MutableMinMax.
    *
    * @param stat the stat metric
    * @param quantiles the quantiles metrics
    * @param minMax the min/max tracker
    */
-  public AggregatedMetrics(MutableStat stat,
+  public PerformanceMetrics(MutableStat stat,
       List<MutableQuantiles> quantiles, MutableMinMax minMax) {
     this.stat = stat;
     this.quantiles = quantiles;

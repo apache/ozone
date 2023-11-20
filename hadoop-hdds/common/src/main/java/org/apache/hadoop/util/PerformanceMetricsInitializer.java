@@ -23,10 +23,10 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import java.lang.reflect.Field;
 
 /**
- * Utility class for initializing AggregatedMetrics in a MetricsSource.
+ * Utility class for initializing PerformanceMetrics in a MetricsSource.
  */
-public final class AggregatedMetricsInitializer {
-  private AggregatedMetricsInitializer() { }
+public final class PerformanceMetricsInitializer {
+  private PerformanceMetricsInitializer() { }
 
   /**
    * Initializes aggregated metrics in the given metrics source.
@@ -44,23 +44,23 @@ public final class AggregatedMetricsInitializer {
     Field[] fields = source.getClass().getDeclaredFields();
 
     for (Field field : fields) {
-      if (field.getType() == AggregatedMetrics.class) {
+      if (field.getType() == PerformanceMetrics.class) {
         Metric annotation = field.getAnnotation(Metric.class);
         if (annotation != null) {
           String description = annotation.about();
           String name = field.getName();
-          AggregatedMetrics aggregatedMetrics =
-              getAggregatedMetrics(registry, name, description,
+          PerformanceMetrics performanceMetrics =
+              getMetrics(registry, name, description,
                   sampleName, valueName, intervals);
           field.setAccessible(true);
-          field.set(source, aggregatedMetrics);
+          field.set(source, performanceMetrics);
         }
       }
     }
   }
 
   /**
-   * Helper method to create AggregatedMetrics.
+   * Helper method to create PerformanceMetrics.
    *
    * @param registry the metrics registry
    * @param name metric name
@@ -68,12 +68,12 @@ public final class AggregatedMetricsInitializer {
    * @param sampleName sample name
    * @param valueName value name
    * @param intervals intervals for quantiles
-   * @return an instance of AggregatedMetrics
+   * @return an instance of PerformanceMetrics
    */
-  private static AggregatedMetrics getAggregatedMetrics(
+  private static PerformanceMetrics getMetrics(
       MetricsRegistry registry, String name, String description,
       String sampleName, String valueName, int[] intervals) {
-    return new AggregatedMetrics(
+    return new PerformanceMetrics(
         registry.newStat(
             name, description, sampleName, valueName, false),
         MetricUtil.createQuantiles(

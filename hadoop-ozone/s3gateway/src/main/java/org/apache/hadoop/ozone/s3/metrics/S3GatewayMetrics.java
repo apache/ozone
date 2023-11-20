@@ -30,7 +30,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
-import org.apache.hadoop.util.AggregatedMetrics;
+import org.apache.hadoop.util.PerformanceMetrics;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -97,150 +97,150 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   @Metric(about = "Latency for successfully retrieving an S3 bucket in " +
       "nanoseconds")
-  private AggregatedMetrics getBucketSuccessLatencyNs;
+  private PerformanceMetrics getBucketSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to retrieve an S3 bucket in nanoseconds")
-  private AggregatedMetrics getBucketFailureLatencyNs;
+  private PerformanceMetrics getBucketFailureLatencyNs;
 
   @Metric(about = "Latency for successfully creating an S3 bucket in " +
       "nanoseconds")
-  private AggregatedMetrics createBucketSuccessLatencyNs;
+  private PerformanceMetrics createBucketSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to create an S3 bucket in nanoseconds")
-  private AggregatedMetrics createBucketFailureLatencyNs;
+  private PerformanceMetrics createBucketFailureLatencyNs;
 
   @Metric(about = "Latency for successfully checking the existence of an " +
       "S3 bucket in nanoseconds")
-  private AggregatedMetrics headBucketSuccessLatencyNs;
+  private PerformanceMetrics headBucketSuccessLatencyNs;
 
   @Metric(about = "Latency for successfully deleting an S3 bucket in " +
       "nanoseconds")
-  private AggregatedMetrics deleteBucketSuccessLatencyNs;
+  private PerformanceMetrics deleteBucketSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to delete an S3 bucket in nanoseconds")
-  private AggregatedMetrics deleteBucketFailureLatencyNs;
+  private PerformanceMetrics deleteBucketFailureLatencyNs;
 
   @Metric(about = "Latency for successfully retrieving an S3 bucket ACL " +
       "in nanoseconds")
-  private AggregatedMetrics getAclSuccessLatencyNs;
+  private PerformanceMetrics getAclSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to retrieve an S3 bucket ACL " +
       "in nanoseconds")
-  private AggregatedMetrics getAclFailureLatencyNs;
+  private PerformanceMetrics getAclFailureLatencyNs;
 
   @Metric(about = "Latency for successfully setting an S3 bucket ACL " +
       "in nanoseconds")
-  private AggregatedMetrics putAclSuccessLatencyNs;
+  private PerformanceMetrics putAclSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to set an S3 bucket ACL " +
       "in nanoseconds")
-  private AggregatedMetrics putAclFailureLatencyNs;
+  private PerformanceMetrics putAclFailureLatencyNs;
 
   @Metric(about = "Latency for successfully listing multipart uploads " +
       "in nanoseconds")
-  private AggregatedMetrics listMultipartUploadsSuccessLatencyNs;
+  private PerformanceMetrics listMultipartUploadsSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to list multipart uploads " +
       "in nanoseconds")
-  private AggregatedMetrics listMultipartUploadsFailureLatencyNs;
+  private PerformanceMetrics listMultipartUploadsFailureLatencyNs;
 
   // RootEndpoint
 
   @Metric(about = "Latency for successfully listing S3 buckets " +
       "in nanoseconds")
-  private AggregatedMetrics listS3BucketsSuccessLatencyNs;
+  private PerformanceMetrics listS3BucketsSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to list S3 buckets " +
       "in nanoseconds")
-  private AggregatedMetrics listS3BucketsFailureLatencyNs;
+  private PerformanceMetrics listS3BucketsFailureLatencyNs;
 
   // ObjectEndpoint
 
   @Metric(about = "Latency for successfully creating a multipart object key " +
       "in nanoseconds")
-  private AggregatedMetrics createMultipartKeySuccessLatencyNs;
+  private PerformanceMetrics createMultipartKeySuccessLatencyNs;
 
   @Metric(about = "Latency for failing to create a multipart object key in " +
       "nanoseconds")
-  private AggregatedMetrics createMultipartKeyFailureLatencyNs;
+  private PerformanceMetrics createMultipartKeyFailureLatencyNs;
 
   @Metric(about = "Latency for successfully copying an S3 object in " +
       "nanoseconds")
-  private AggregatedMetrics copyObjectSuccessLatencyNs;
+  private PerformanceMetrics copyObjectSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to copy an S3 object in nanoseconds")
-  private AggregatedMetrics copyObjectFailureLatencyNs;
+  private PerformanceMetrics copyObjectFailureLatencyNs;
 
   @Metric(about = "Latency for successfully creating an S3 object key in " +
       "nanoseconds")
-  private AggregatedMetrics createKeySuccessLatencyNs;
+  private PerformanceMetrics createKeySuccessLatencyNs;
 
   @Metric(about = "Latency for failing to create an S3 object key in " +
       "nanoseconds")
-  private AggregatedMetrics createKeyFailureLatencyNs;
+  private PerformanceMetrics createKeyFailureLatencyNs;
 
   @Metric(about = "Latency for successfully listing parts of a multipart " +
       "upload in nanoseconds")
-  private AggregatedMetrics listPartsSuccessLatencyNs;
+  private PerformanceMetrics listPartsSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to list parts of a multipart upload " +
       "in nanoseconds")
-  private AggregatedMetrics listPartsFailureLatencyNs;
+  private PerformanceMetrics listPartsFailureLatencyNs;
 
   @Metric(about = "Latency for successfully retrieving an S3 object in " +
       "nanoseconds")
-  private AggregatedMetrics getKeySuccessLatencyNs;
+  private PerformanceMetrics getKeySuccessLatencyNs;
 
   @Metric(about = "Latency for failing to retrieve an S3 object in nanoseconds")
-  private AggregatedMetrics getKeyFailureLatencyNs;
+  private PerformanceMetrics getKeyFailureLatencyNs;
 
   @Metric(about = "Latency for successfully retrieving metadata for an S3 " +
       "object in nanoseconds")
-  private AggregatedMetrics headKeySuccessLatencyNs;
+  private PerformanceMetrics headKeySuccessLatencyNs;
 
   @Metric(about = "Latency for failing to retrieve metadata for an S3 object " +
       "in nanoseconds")
-  private AggregatedMetrics headKeyFailureLatencyNs;
+  private PerformanceMetrics headKeyFailureLatencyNs;
 
   @Metric(about = "Latency for successfully initiating a multipart upload in " +
       "nanoseconds")
-  private AggregatedMetrics initMultipartUploadSuccessLatencyNs;
+  private PerformanceMetrics initMultipartUploadSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to initiate a multipart upload in " +
       "nanoseconds")
-  private AggregatedMetrics initMultipartUploadFailureLatencyNs;
+  private PerformanceMetrics initMultipartUploadFailureLatencyNs;
 
   @Metric(about = "Latency for successfully completing a multipart upload in " +
       "nanoseconds")
-  private AggregatedMetrics completeMultipartUploadSuccessLatencyNs;
+  private PerformanceMetrics completeMultipartUploadSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to complete a multipart upload in " +
       "nanoseconds")
-  private AggregatedMetrics completeMultipartUploadFailureLatencyNs;
+  private PerformanceMetrics completeMultipartUploadFailureLatencyNs;
 
   @Metric(about = "Latency for successfully aborting a multipart upload in " +
       "nanoseconds")
-  private AggregatedMetrics abortMultipartUploadSuccessLatencyNs;
+  private PerformanceMetrics abortMultipartUploadSuccessLatencyNs;
 
   @Metric(about = "Latency for failing to abort a multipart upload in " +
       "nanoseconds")
-  private AggregatedMetrics abortMultipartUploadFailureLatencyNs;
+  private PerformanceMetrics abortMultipartUploadFailureLatencyNs;
 
   @Metric(about = "Latency for successfully deleting an S3 object in " +
       "nanoseconds")
-  private AggregatedMetrics deleteKeySuccessLatencyNs;
+  private PerformanceMetrics deleteKeySuccessLatencyNs;
 
   @Metric(about = "Latency for failing to delete an S3 object in nanoseconds")
-  private AggregatedMetrics deleteKeyFailureLatencyNs;
+  private PerformanceMetrics deleteKeyFailureLatencyNs;
 
   @Metric(about = "Latency for put metadata of an key in nanoseconds")
-  private AggregatedMetrics putKeyMetadataLatencyNs;
+  private PerformanceMetrics putKeyMetadataLatencyNs;
 
   @Metric(about = "Latency for get metadata of an key in nanoseconds")
-  private AggregatedMetrics getKeyMetadataLatencyNs;
+  private PerformanceMetrics getKeyMetadataLatencyNs;
 
   @Metric(about = "Latency for copy metadata of an key in nanoseconds")
-  private AggregatedMetrics copyKeyMetadataLatencyNs;
+  private PerformanceMetrics copyKeyMetadataLatencyNs;
 
   /**
    * Private constructor.
@@ -249,7 +249,7 @@ public final class S3GatewayMetrics implements MetricsSource {
     this.registry = new MetricsRegistry(SOURCE_NAME);
     int[] intervals = conf.getInts(S3GatewayConfigKeys
         .OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
-    AggregatedMetrics.initializeMetrics(
+    PerformanceMetrics.initializeMetrics(
         this, registry, "Ops", "Time", intervals);
   }
 
