@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -55,14 +56,14 @@ public class ListIterator {
    * Entry to be added to the heap.
    */
   public static class HeapEntry implements Comparable<HeapEntry> {
-    private final int entryInteratorId;
+    private final int entryIteratorId;
     private final String tableName;
     private final String key;
     private final Object value;
 
-    HeapEntry(int entryInteratorId, String tableName, String key,
+    HeapEntry(int entryIteratorId, String tableName, String key,
               Object value) {
-      this.entryInteratorId = entryInteratorId;
+      this.entryIteratorId = entryIteratorId;
       this.tableName = tableName;
       this.key = key;
       this.value = value;
@@ -72,8 +73,8 @@ public class ListIterator {
       return this.key;
     }
 
-    private int getEntryInteratorId() {
-      return this.entryInteratorId;
+    private int getEntryIteratorId() {
+      return this.entryIteratorId;
     }
 
     public String getTableName() {
@@ -86,7 +87,7 @@ public class ListIterator {
 
     public int compareTo(HeapEntry other) {
       return Comparator.comparing(HeapEntry::getKey)
-          .thenComparing(HeapEntry::getEntryInteratorId).compare(this, other);
+          .thenComparing(HeapEntry::getEntryIteratorId).compare(this, other);
     }
 
     public boolean equals(Object other) {
@@ -109,11 +110,11 @@ public class ListIterator {
   }
 
   /**
-   * Iterator for DB entries in a Dir and File Table.
+   * Iterator for DB entries from a given rocksDB table.
    */
   public static class RawIter<Value> implements
       ClosableIterator {
-    private final int entryInteratorId;
+    private final int entryIteratorId;
     private final String prefixKey;
     private final TableIterator<String,
         ? extends Table.KeyValue<String, Value>> tableIterator;
@@ -121,9 +122,9 @@ public class ListIterator {
     private final Table<String, Value> table;
     private HeapEntry currentKey;
 
-    RawIter(int entryInteratorId, Table<String, Value> table,
+    RawIter(int entryIteratorId, Table<String, Value> table,
             String prefixKey, String startKey) throws IOException {
-      this.entryInteratorId = entryInteratorId;
+      this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
       this.prefixKey = prefixKey;
@@ -150,8 +151,8 @@ public class ListIterator {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
         if (entryKey.startsWith(prefixKey)) {
-          if (!KeyManagerImpl.isKeyDeleted(entryKey, table)) {
-            currentKey = new HeapEntry(entryInteratorId,
+          if (!KeyManagerImpl.isKeyInCache(entryKey, table)) {
+            currentKey = new HeapEntry(entryIteratorId,
                 table.getName(), entryKey, entry.getValue());
           }
         } else {
@@ -203,9 +204,9 @@ public class ListIterator {
     private final String startKey;
     private final String tableName;
 
-    private final int entryInteratorId;
+    private final int entryIteratorId;
 
-    CacheIter(int entryInteratorId, String tableName,
+    CacheIter(int entryIteratorId, String tableName,
               Iterator<Map.Entry<CacheKey<String>,
                   CacheValue<Value>>> cacheIter, String startKey,
               String prefixKey) {
@@ -215,7 +216,7 @@ public class ListIterator {
       this.startKey = startKey;
       this.prefixKey = prefixKey;
       this.tableName = tableName;
-      this.entryInteratorId = entryInteratorId;
+      this.entryIteratorId = entryIteratorId;
 
       getCacheValues();
 
@@ -258,7 +259,7 @@ public class ListIterator {
 
     public HeapEntry next() {
       Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
-      return new HeapEntry(this.entryInteratorId, this.tableName,
+      return new HeapEntry(this.entryIteratorId, this.tableName,
           entry.getKey(), entry.getValue());
     }
 
@@ -311,9 +312,7 @@ public class ListIterator {
           iterators.add(new CacheIter<>(iteratorId, table.getName(),
                   table.cacheIterator(), startKey, prefixKey));
           iteratorId++;
-          iterators.add(new RawIter<>(iteratorId,
-                  omMetadataManager.getDirectoryTable(),
-                  prefixKey, startKey));
+          iterators.add(new RawIter<>(iteratorId, table, prefixKey, startKey));
           iteratorId++;
         }
       } finally {
@@ -338,7 +337,7 @@ public class ListIterator {
       HeapEntry heapEntry = minHeap.remove();
       // remove the least element and
       // reinsert the next element from the same iterator
-      Iterator<HeapEntry> iter = iterators.get(heapEntry.getEntryInteratorId());
+      Iterator<HeapEntry> iter = iterators.get(heapEntry.getEntryIteratorId());
       if (iter.hasNext()) {
         minHeap.add(iter.next());
       }
@@ -347,9 +346,7 @@ public class ListIterator {
     }
 
     public void close() throws IOException {
-      for (ClosableIterator iterator : iterators) {
-        iterator.close();
-      }
+      iterators.forEach(IOUtils::closeQuietly);
     }
   }
 }
