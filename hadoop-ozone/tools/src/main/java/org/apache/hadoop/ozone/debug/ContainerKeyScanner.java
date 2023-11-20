@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.debug;
 import com.google.common.collect.Sets;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -117,6 +118,7 @@ public class ContainerKeyScanner implements Callable<Void>,
   //  and to return pair of objectId and path instead of a map.
   //  Further optimization could be done to reuse db
   //  and not connect to it for every method call
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public Map<Long, Path> getAbsolutePathForObjectIDs(
       long bucketId, String prefix, Optional<Set<Long>> dirObjIds,
       String dbPath)
