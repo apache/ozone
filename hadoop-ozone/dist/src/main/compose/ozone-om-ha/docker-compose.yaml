@@ -27,7 +27,7 @@ services:
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
       command: sh -c "sudo /usr/sbin/sshd -E /tmp/sshd.log && /opt/hadoop/bin/ozone datanode"
       env_file:
         - ./docker-config

@@ -33,7 +33,7 @@ services:
   datanode:
     <<: *common-config
     ports:
-      - 9864
+      - 19864
       - 9882
     environment:
       <<: *replication

@@ -29,7 +29,7 @@ services:
   datanode:
     <<: *old-config
     ports:
-      - 9864
+      - 19864
       - 9882
     environment:
       HADOOP_OPTS:

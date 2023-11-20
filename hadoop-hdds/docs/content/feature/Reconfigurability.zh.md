@@ -83,17 +83,17 @@ ozone.administrators
 ## Datanode 动态配置
 >例如, 在`ozone-site.xml`文件中修改`ozone.example.config`的值并执行:
 >
-> $ `ozone admin reconfig --address=hadoop1:9864 start`<br>
-Datanode: Started reconfiguration task on node [hadoop1:9864].
+> $ `ozone admin reconfig --address=hadoop1:19864 start`<br>
+Datanode: Started reconfiguration task on node [hadoop1:19864].
 >
->$ `ozone admin reconfig --address=hadoop1:9864 status`<br>
-Datanode: Reconfiguring status for node [hadoop1:9864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
+>$ `ozone admin reconfig --address=hadoop1:19864 status`<br>
+Datanode: Reconfiguring status for node [hadoop1:19864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
 SUCCESS: Changed property ozone.example.config<br>
 From: "old"<br>
 To: "new"
 >
-> $ `ozone admin reconfig --address=hadoop1:9864 properties`<br>
-Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
+> $ `ozone admin reconfig --address=hadoop1:19864 properties`<br>
+Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
 ozone.example.config
 
 
@@ -105,10 +105,10 @@ ozone.example.config
 
 >例如, 列出 Datanode 所有可配置的属性:<br>
 > $ `ozone admin reconfig --in-service-datanodes properties`<br>
-Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
+Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
-Datanode: Node [hadoop2:9864] Reconfigurable properties:<br>
+Datanode: Node [hadoop2:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
-Datanode: Node [hadoop3:9864] Reconfigurable properties:<br>
+Datanode: Node [hadoop3:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
 Reconfig successfully 3 nodes, failure 0 nodes.<br>

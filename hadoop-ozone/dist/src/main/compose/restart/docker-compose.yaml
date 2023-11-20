@@ -34,7 +34,7 @@ x-datanode:
   environment:
     <<: *replication
   ports:
-    - 9864
+    - 19864
     - 9882
 
 services:

@@ -2811,7 +2811,7 @@
   </property>
   <property>
     <name>hdds.datanode.client.port</name>
-    <value>9864</value>
+    <value>19864</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The port number of the Ozone Datanode client service.

@@ -29,7 +29,7 @@ services:
   datanode:
     <<: *new-config
     ports:
-      - 9864
+      - 19864
       - 9882
     environment:
       OZONE_OPTS:

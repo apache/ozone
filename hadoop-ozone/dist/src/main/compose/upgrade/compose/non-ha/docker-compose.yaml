@@ -36,7 +36,7 @@ x-datanode:
   environment:
     <<: *environment
   ports:
-    - 9864
+    - 19864
     - 9882
 
 x-volumes:
