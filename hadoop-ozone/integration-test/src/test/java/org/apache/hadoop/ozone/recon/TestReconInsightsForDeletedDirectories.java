@@ -88,7 +88,7 @@ public class TestReconInsightsForDeletedDirectories {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
+    conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
     conf.setInt(OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
@@ -327,6 +327,8 @@ public class TestReconInsightsForDeletedDirectories {
     // Verify the entries in the Recon tables after sync.
     assertTableRowCount(reconFileTable, 3, true);
     assertTableRowCount(reconDirTable, 2, true);
+    // Add a sleep to wait for the deleted directory to be added to the table.
+    Thread.sleep(1000);
     assertTableRowCount(reconDeletedDirTable, 1, true);
 
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
