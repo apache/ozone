@@ -141,6 +141,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+        S3GatewayConfigKeys.OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY,
         HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT
     ));
   }
