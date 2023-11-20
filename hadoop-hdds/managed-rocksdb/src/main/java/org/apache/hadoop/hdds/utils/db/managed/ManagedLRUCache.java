@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.LRUCache;
 
+import javax.annotation.Nullable;
+
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
@@ -29,6 +31,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.ge
  */
 public class ManagedLRUCache extends LRUCache {
 
+  @Nullable
   private final StackTraceElement[] elements = getStackTrace();
 
   public ManagedLRUCache(long capacity) {

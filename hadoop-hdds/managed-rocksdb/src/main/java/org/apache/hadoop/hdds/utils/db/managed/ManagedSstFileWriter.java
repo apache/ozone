@@ -22,6 +22,8 @@ import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.SstFileWriter;
 
+import javax.annotation.Nullable;
+
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
@@ -31,6 +33,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.ge
  */
 public class ManagedSstFileWriter extends SstFileWriter {
 
+  @Nullable
   private final StackTraceElement[] elements = getStackTrace();
 
   public ManagedSstFileWriter(EnvOptions envOptions,
