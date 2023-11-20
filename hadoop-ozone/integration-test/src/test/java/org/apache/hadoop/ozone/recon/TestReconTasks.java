@@ -154,10 +154,11 @@ public class TestReconTasks {
             .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
 
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-    reconContainerMetadataManager
-        .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 2L);
-    reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      reconContainerMetadataManager
+          .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 2L);
+      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+    }
 
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
