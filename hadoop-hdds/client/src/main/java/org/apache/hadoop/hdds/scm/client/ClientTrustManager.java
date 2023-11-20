@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
@@ -34,6 +37,9 @@ import java.util.List;
  * tbd.
  */
 public class ClientTrustManager extends X509ExtendedTrustManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClientTrustManager.class);
 
   private final CACertificateProvider client;
   private X509ExtendedTrustManager trustManager;
@@ -84,13 +90,14 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     }
   }
 
-  private List<X509Certificate> loadCerts(CACertificateProvider serviceInfo)
+  private List<X509Certificate> loadCerts(CACertificateProvider caCertsProvider)
       throws CertificateException {
     try {
-      if (serviceInfo == null) {
+      LOG.info("Loading certificates for client.");
+      if (caCertsProvider == null) {
         return client.provideCACerts();
       }
-      return serviceInfo.provideCACerts();
+      return caCertsProvider.provideCACerts();
     } catch (IOException e) {
       throw new CertificateException(e);
     }
@@ -102,6 +109,8 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     try {
       trustManager.checkServerTrusted(chain, authType, socket);
     } catch (CertificateException e) {
+      LOG.info("CheckServerTrusted call failed, trying to re-fetch " +
+          "rootCA certificate", e);
       initialize(loadCerts(null));
       trustManager.checkServerTrusted(chain, authType, socket);
     }
@@ -113,6 +122,8 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     try {
       trustManager.checkServerTrusted(chain, authType, engine);
     } catch (CertificateException e) {
+      LOG.info("CheckServerTrusted call failed, trying to re-fetch " +
+          "rootCA certificate", e);
       initialize(loadCerts(null));
       trustManager.checkServerTrusted(chain, authType, engine);
     }
@@ -124,6 +135,8 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     try {
       trustManager.checkServerTrusted(chain, authType);
     } catch (CertificateException e) {
+      LOG.info("CheckServerTrusted call failed, trying to re-fetch " +
+          "rootCA certificate", e);
       initialize(loadCerts(null));
       trustManager.checkServerTrusted(chain, authType);
     }

@@ -67,7 +67,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
-  private final ScmClientConfig clientConfig;
   private final Cache<String, XceiverClientSpi> clientCache;
   private final CacheMetrics cacheMetrics;
   private ClientTrustManager trustManager;
@@ -91,7 +90,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       ClientTrustManager trustManager) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
-    this.clientConfig = clientConf;
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
