@@ -46,6 +46,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
@@ -165,35 +166,41 @@ public class TestPipelineClose {
 
   @Test
   public void testPipelineCloseWithPipelineAction() throws Exception {
-    List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
-    PipelineActionsFromDatanode
-        pipelineActionsFromDatanode = HddsTestUtils
-        .getPipelineActionFromDatanode(dns.get(0),
-            ratisContainer.getPipeline().getId());
-    // send closing action for pipeline
-    PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(
-            pipelineManager, SCMContext.emptyContext(), conf);
-    pipelineActionHandler
-        .onMessage(pipelineActionsFromDatanode, new EventQueue());
-    Thread.sleep(5000);
+    final List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
+    final PipelineID pipelineID = ratisContainer.getPipeline().getId();
 
-    OzoneContainer ozoneContainer =
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer();
-    List<PipelineReport> pipelineReports =
-        ozoneContainer.getPipelineReport().getPipelineReportList();
-    for (PipelineReport pipelineReport : pipelineReports) {
-      // ensure the pipeline is not reported by any dn
-      Assert.assertNotEquals(
-          PipelineID.getFromProtobuf(pipelineReport.getPipelineID()),
-          ratisContainer.getPipeline().getId());
-    }
+    final PipelineActionsFromDatanode pipelineActionsFromDatanode =
+        HddsTestUtils.getPipelineActionFromDatanode(dns.get(0), pipelineID);
+
+    // send closing action for pipeline
+    final PipelineActionHandler pipelineActionHandler =
+        new PipelineActionHandler(pipelineManager,
+            SCMContext.emptyContext(), conf);
+
+    pipelineActionHandler.onMessage(
+        pipelineActionsFromDatanode, new EventQueue());
+
+    final OzoneContainer ozoneContainer = cluster.getHddsDatanodes()
+        .get(0).getDatanodeStateMachine().getContainer();
+    final HddsProtos.PipelineID pid = pipelineID.getProtobuf();
+
+    // ensure the pipeline is not reported by the dn
+    GenericTestUtils
+        .waitFor(() -> {
+          final List<PipelineReport> pipelineReports = ozoneContainer
+              .getPipelineReport().getPipelineReportList();
+          for (PipelineReport pipelineReport : pipelineReports) {
+            if (pipelineReport.getPipelineID().equals(pid)) {
+              return false;
+            }
+          }
+          return true;
+        }, 500, 5000);
 
     try {
       pipelineManager.getPipeline(ratisContainer.getPipeline().getId());
-      Assert.fail("Pipeline should not exist in SCM");
-    } catch (PipelineNotFoundException e) {
+      Assertions.fail("Pipeline should not exist in SCM");
+    } catch (PipelineNotFoundException ignored) {
     }
   }
 
