@@ -39,8 +39,10 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,7 +121,12 @@ public class InfoSubcommand extends ScmSubcommand {
             .getPipelineState().toString();
         LOG.info("Write Pipeline State: {}", pipelineState);
       } catch (IOException ioe) {
-        LOG.info("Write Pipeline State: CLOSED");
+        if (SCMHAUtils.unwrapException(
+            ioe) instanceof PipelineNotFoundException) {
+          LOG.info("Write Pipeline State: CLOSED");
+        } else {
+          LOG.error("Failed to retrieve pipeline info");
+        }
       }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
