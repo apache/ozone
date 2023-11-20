@@ -19,6 +19,9 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+
 /**
  * In-memory OzoneClient for testing.
  */
@@ -29,6 +32,7 @@ public class OzoneClientStub extends OzoneClient {
 
   public OzoneClientStub(ObjectStoreStub objectStoreStub) {
     super(objectStoreStub, new ClientProtocolStub(objectStoreStub));
+    S3GatewayMetrics.create(new OzoneConfiguration());
   }
 
   @Override
