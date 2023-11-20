@@ -140,7 +140,7 @@ public class BlockOutputStreamEntryPool {
 
     currentStreamIndex = 0;
     openID = -1;
-    excludeList = new ExcludeList();
+    excludeList = createExcludeList();
     this.clientMetrics = clientMetrics;
   }
 

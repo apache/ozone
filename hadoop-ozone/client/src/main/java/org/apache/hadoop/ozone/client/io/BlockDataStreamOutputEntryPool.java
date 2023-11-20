@@ -35,6 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -82,7 +84,7 @@ public class BlockDataStreamOutputEntryPool {
         .setMultipartUploadPartNumber(partNumber).build();
     this.requestID = requestId;
     this.openID = openID;
-    this.excludeList = new ExcludeList();
+    this.excludeList = createExcludeList();
     this.bufferList = new ArrayList<>();
   }
 
@@ -287,4 +289,14 @@ public class BlockDataStreamOutputEntryPool {
     }
     return totalDataLen;
   }
+
+  OzoneClientConfig getConfig() {
+    return config;
+  }
+
+  ExcludeList createExcludeList() {
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
+  }
+
 }
