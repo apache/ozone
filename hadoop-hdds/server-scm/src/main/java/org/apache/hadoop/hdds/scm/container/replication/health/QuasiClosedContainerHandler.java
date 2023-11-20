@@ -69,7 +69,9 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
 
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     if (canForceCloseContainer(containerInfo, replicas)) {
-      forceCloseContainer(containerInfo, replicas);
+      if (!request.isReadOnly()) {
+        forceCloseContainer(containerInfo, replicas);
+      }
       return true;
     } else {
       LOG.debug("Container {} cannot be force closed and is stuck in " +

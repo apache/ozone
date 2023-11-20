@@ -191,13 +191,17 @@ public class TestClosingContainerHandler {
 
     ReplicationManagerReport report = new ReplicationManagerReport();
 
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+    ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(report)
         .setContainerInfo(containerInfo)
-        .setContainerReplicas(containerReplicas)
-        .build();
+        .setContainerReplicas(containerReplicas);
+    ContainerCheckRequest request = builder.build();
 
+    builder.setReadOnly(true);
+    ContainerCheckRequest readRequest = builder.build();
+
+    assertAndVerify(readRequest, true, 0);
     assertAndVerify(request, true, 3);
     report.getStats().forEach((k, v) -> Assertions.assertEquals(0L, v));
   }

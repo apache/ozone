@@ -126,24 +126,32 @@ public class TestDeletingContainerHandler {
         HddsProtos.ReplicationFactor.THREE), 1);
 
     //ec container
-    //since updateContainerState is called once when testing
-    //ratis container, so here should be 1+1 = 2 times
-    cleanupIfNoReplicaExist(ecReplicationConfig, 2);
+    cleanupIfNoReplicaExist(ecReplicationConfig, 1);
   }
 
 
   private void cleanupIfNoReplicaExist(
       ReplicationConfig replicationConfig, int times) {
+    Mockito.clearInvocations(replicationManager);
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, DELETING);
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+    ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
-        .setContainerReplicas(containerReplicas)
-        .build();
+        .setContainerReplicas(containerReplicas);
+
+    ContainerCheckRequest request = builder.build();
+
+    builder.setReadOnly(true);
+    ContainerCheckRequest readRequest = builder.build();
+
+    Assertions.assertTrue(deletingContainerHandler.handle(readRequest));
+    Mockito.verify(replicationManager, Mockito.times(0))
+        .updateContainerState(Mockito.any(ContainerID.class),
+            Mockito.any(HddsProtos.LifeCycleEvent.class));
 
     Assertions.assertTrue(deletingContainerHandler.handle(request));
     Mockito.verify(replicationManager, Mockito.times(times))

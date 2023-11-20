@@ -60,14 +60,16 @@ public class EmptyContainerHandler extends AbstractCheck {
       request.getReport()
           .incrementAndSample(ReplicationManagerReport.HealthState.EMPTY,
               containerInfo.containerID());
-      LOG.debug("Container {} is empty and closed, marking as DELETING",
-          containerInfo);
-      // delete replicas if they are closed and empty
-      deleteContainerReplicas(containerInfo, replicas);
+      if (!request.isReadOnly()) {
+        LOG.debug("Container {} is empty and closed, marking as DELETING",
+            containerInfo);
+        // delete replicas if they are closed and empty
+        deleteContainerReplicas(containerInfo, replicas);
 
-      // Update the container's state
-      replicationManager.updateContainerState(
-          containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+        // Update the container's state
+        replicationManager.updateContainerState(
+            containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+      }
       return true;
     } else if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED
         && containerInfo.getNumberOfKeys() == 0 && replicas.isEmpty()) {
