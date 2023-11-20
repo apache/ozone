@@ -21,12 +21,16 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+
 /**
  * Managed ColumnFamilyOptions.
  */
 public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
-  private final StackTraceElement[] elements;
+  private final StackTraceElement[] elements = getStackTrace();
 
   /**
    * Indicate if this ColumnFamilyOptions is intentionally used across RockDB
@@ -35,12 +39,11 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   private boolean reused = false;
 
   public ManagedColumnFamilyOptions() {
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
+    super();
   }
 
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
@@ -80,7 +83,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
+    assertClosed(this, formatStackTrace(elements));
     super.finalize();
   }
 
@@ -96,9 +99,5 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
       ((ManagedBlockBasedTableConfig) tableFormatConfig).close();
     }
     options.close();
-  }
-
-  private String getStackTrace() {
-    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

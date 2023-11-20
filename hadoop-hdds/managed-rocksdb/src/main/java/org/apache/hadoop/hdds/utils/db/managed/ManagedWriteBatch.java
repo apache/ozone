@@ -20,29 +20,28 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.WriteBatch;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+
 /**
  * Managed WriteBatch.
  */
 public class ManagedWriteBatch extends WriteBatch {
 
-  private final StackTraceElement[] elements;
+  private final StackTraceElement[] elements = getStackTrace();
 
   public ManagedWriteBatch() {
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
+    super();
   }
 
   public ManagedWriteBatch(byte[] data) {
     super(data);
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
+    assertClosed(this, formatStackTrace(elements));
     super.finalize();
-  }
-
-  private String getStackTrace() {
-    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

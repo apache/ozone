@@ -43,12 +43,9 @@ public class ManagedSlice extends Slice {
   protected void finalize() throws Throwable {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (isOwningHandle()) {
-      ManagedRocksObjectUtils.reportLeak(this, getStackTrace());
+      ManagedRocksObjectUtils.reportLeak(this, formatStackTrace(elements));
     }
     super.finalize();
   }
 
-  private String getStackTrace() {
-    return formatStackTrace(elements);
-  }
 }

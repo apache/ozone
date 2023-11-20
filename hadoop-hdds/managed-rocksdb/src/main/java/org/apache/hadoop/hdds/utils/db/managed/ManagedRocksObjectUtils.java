@@ -71,7 +71,7 @@ public final class ManagedRocksObjectUtils {
     return HddsUtils.getStackTrace(LOG);
   }
 
-  static String formatStackTrace(StackTraceElement[] elements) {
+  static String formatStackTrace(@Nullable StackTraceElement[] elements) {
     return HddsUtils.formatStackTrace(elements, 3);
   }
 

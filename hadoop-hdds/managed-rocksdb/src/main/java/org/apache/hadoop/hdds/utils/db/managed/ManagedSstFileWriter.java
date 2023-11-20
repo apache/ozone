@@ -22,26 +22,25 @@ import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.SstFileWriter;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+
 /**
  * Managed SstFileWriter.
  */
 public class ManagedSstFileWriter extends SstFileWriter {
 
-  private final StackTraceElement[] elements;
+  private final StackTraceElement[] elements = getStackTrace();
 
   public ManagedSstFileWriter(EnvOptions envOptions,
                               Options options) {
     super(envOptions, options);
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
+    assertClosed(this, formatStackTrace(elements));
     super.finalize();
-  }
-
-  private String getStackTrace() {
-    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

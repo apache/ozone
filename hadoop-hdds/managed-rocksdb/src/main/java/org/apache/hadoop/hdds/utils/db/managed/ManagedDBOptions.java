@@ -20,24 +20,20 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.DBOptions;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+
 /**
  * Managed DBOptions.
  */
 public class ManagedDBOptions extends DBOptions {
 
-  private final StackTraceElement[] elements;
-
-  public ManagedDBOptions() {
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
-  }
+  private final StackTraceElement[] elements = getStackTrace();
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
+    assertClosed(this, formatStackTrace(elements));
     super.finalize();
-  }
-
-  private String getStackTrace() {
-    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }
