@@ -40,7 +40,9 @@ public class PerformanceMetrics {
    *
    * @param source the metrics source
    * @param registry the metrics registry
-   * @param intervals the intervals for quantiles computation
+   * @param intervals the intervals for quantiles computation. Note, each
+   *        interval in 'intervals' increases memory usage, as it corresponds
+   *        to a separate quantile calculator.
    */
   public static synchronized <T> void initializeMetrics(T source,
       MetricsRegistry registry, String sampleName, String valueName,
@@ -54,7 +56,7 @@ public class PerformanceMetrics {
   }
 
   /**
-   * Constructs an instance of PerformanceMetrics with the specified MutableStat,
+   * Construct an instance of PerformanceMetrics with the specified MutableStat,
    * MutableQuantiles, and MutableMinMax.
    *
    * @param stat the stat metric
