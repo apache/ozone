@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.collect.Maps;
 import com.google.common.primitives.UnsignedLong;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
@@ -288,7 +287,6 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       this.value = value;
     }
 
-    @SuppressFBWarnings("EI_EXPOSE_REP")
     public byte[] getKey() {
       return key;
     }
@@ -301,7 +299,6 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       return type;
     }
 
-    @SuppressFBWarnings("EI_EXPOSE_REP")
     public byte[] getValue() {
       return value;
     }

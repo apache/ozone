@@ -19,7 +19,6 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -192,8 +191,6 @@ public class TestBackgroundContainerDataScanner extends
    */
   @Test
   @Override
-  // Override findbugs warning about Mockito.verify
-  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
   public void testWithVolumeFailure() throws Exception {
     Mockito.when(vol.isFailed()).thenReturn(true);
     // Run the scanner thread in the background. It should be terminated on
