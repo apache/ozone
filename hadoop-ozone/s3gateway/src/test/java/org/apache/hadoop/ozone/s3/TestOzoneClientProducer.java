@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test class for @{@link OzoneClientProducer}.
@@ -44,7 +44,8 @@ public class TestOzoneClientProducer {
 
   @Test
   public void testGetClientFailure() {
-    assertThrows(IOException.class, () -> producer.createClient(), "testGetClientFailure");
+    assertThrows(IOException.class, () -> producer.createClient(),
+        "testGetClientFailure");
   }
 
   @Test
