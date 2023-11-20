@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import java.time.temporal.TemporalAccessor;
+import org.junit.jupiter.api.Test;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for RFC1123 util.
@@ -38,7 +38,7 @@ public class TestRFC1123Util {
     String formatted = RFC1123Util.FORMAT.format(date);
 
     //two digits day
-    Assert.assertEquals("Mon, 05 Nov 2018 15:04:05 GMT", formatted);
+    assertEquals("Mon, 05 Nov 2018 15:04:05 GMT", formatted);
 
   }
 }

@@ -34,9 +34,8 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import javax.ws.rs.container.ContainerRequestContext;
@@ -58,6 +57,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
@@ -80,7 +80,7 @@ public class TestS3GatewayMetrics {
   private ContainerRequestContext context;
 
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
@@ -198,8 +198,8 @@ public class TestS3GatewayMetrics {
       fail();
 
     } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_CONFLICT, ex.getHttpCode());
-      Assert.assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
+      assertEquals(HTTP_CONFLICT, ex.getHttpCode());
+      assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
 
       long curMetric = metrics.getCreateBucketFailure();
       assertEquals(1L, curMetric - oriMetric);
@@ -593,7 +593,7 @@ public class TestS3GatewayMetrics {
       keyEndpoint.put(bucketName, keyName, CONTENT.length(), 1, null, body);
       fail("Test for CopyObjectMetric failed");
     } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getErrorMessage().contains("This copy request is " +
+      assertTrue(ex.getErrorMessage().contains("This copy request is " +
           "illegal"));
     }
     curMetric = metrics.getCopyObjectFailure();
