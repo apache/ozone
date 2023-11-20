@@ -112,7 +112,7 @@ public class ListIterator {
   /**
    * Iterator for DB entries from a given rocksDB table.
    */
-  public static class RawIter<Value> implements
+  public static class DbTableIter<Value> implements
       ClosableIterator {
     private final int entryIteratorId;
     private final String prefixKey;
@@ -122,8 +122,8 @@ public class ListIterator {
     private final Table<String, Value> table;
     private HeapEntry currentKey;
 
-    RawIter(int entryIteratorId, Table<String, Value> table,
-            String prefixKey, String startKey) throws IOException {
+    DbTableIter(int entryIteratorId, Table<String, Value> table,
+                String prefixKey, String startKey) throws IOException {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
@@ -312,7 +312,7 @@ public class ListIterator {
           iterators.add(new CacheIter<>(iteratorId, table.getName(),
                   table.cacheIterator(), startKey, prefixKey));
           iteratorId++;
-          iterators.add(new RawIter<>(iteratorId, table, prefixKey, startKey));
+          iterators.add(new DbTableIter<>(iteratorId, table, prefixKey, startKey));
           iteratorId++;
         }
       } finally {
