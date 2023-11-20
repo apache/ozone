@@ -1605,4 +1605,20 @@ public final class OMRequestTestUtils {
         .thenReturn(validator);
     doCallRealMethod().when(ozoneManager).validateReplicationConfig(any());
   }
+
+  public static OMRequest createRequestWithS3Credentials(String accessId,
+                                                         String signature,
+                                                         String stringToSign) {
+    return OMRequest.newBuilder()
+        .setS3Authentication(
+            OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+                .setAccessId(accessId)
+                .setSignature(signature)
+                .setStringToSign(stringToSign)
+                .build())
+        .setCmdType(Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
 }

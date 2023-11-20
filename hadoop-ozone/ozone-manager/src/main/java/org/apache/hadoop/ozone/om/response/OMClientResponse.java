@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -38,6 +39,7 @@ public abstract class OMClientResponse {
 
   private OMResponse omResponse;
   private CompletableFuture<Void> flushFuture = null;
+  private OMLockDetails omLockDetails;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMClientResponse.class);
@@ -100,5 +102,14 @@ public abstract class OMClientResponse {
     return flushFuture;
   }
 
+
+  public OMLockDetails getOmLockDetails() {
+    return omLockDetails;
+  }
+
+  public void setOmLockDetails(
+      OMLockDetails omLockDetails) {
+    this.omLockDetails = omLockDetails;
+  }
 }
 

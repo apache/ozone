@@ -101,7 +101,7 @@ public class TestObjectGet {
   @Test
   public void get() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get("b1", "key1", null, 0, null);
+    Response response = rest.get("b1", "key1", 0, null, 0, null);
 
     //THEN
     OzoneInputStream ozoneInputStream =
@@ -123,7 +123,7 @@ public class TestObjectGet {
   public void inheritRequestHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    Response response = rest.get("b1", "key1", null, 0, null);
+    Response response = rest.get("b1", "key1", 0, null, 0, null);
 
     assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
@@ -156,7 +156,7 @@ public class TestObjectGet {
 
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryParameter);
-    Response response = rest.get("b1", "key1", null, 0, null);
+    Response response = rest.get("b1", "key1", 0, null, 0, null);
 
     assertEquals(CONTENT_TYPE2,
         response.getHeaderString("Content-Type"));

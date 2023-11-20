@@ -38,8 +38,8 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.ReferenceCountedObject;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +100,7 @@ public class TestKeyValueStreamDataChannel {
     buf.writeBytes(protoLengthBuf);
 
     final ContainerCommandRequestProto proto = readPutBlockRequest(buf);
-    Assert.assertEquals(PUT_BLOCK_PROTO, proto);
+    Assertions.assertEquals(PUT_BLOCK_PROTO, proto);
   }
 
   @Test
@@ -138,7 +138,7 @@ public class TestKeyValueStreamDataChannel {
 
   static void runTestBuffers(int dataSize, int max, int seed, String name)
       throws Exception {
-    Assert.assertTrue(max >= PUT_BLOCK_PROTO_SIZE);
+    Assertions.assertTrue(max >= PUT_BLOCK_PROTO_SIZE);
 
     // random data
     final byte[] data = new byte[dataSize];
@@ -166,18 +166,18 @@ public class TestKeyValueStreamDataChannel {
     // check output
     final ByteBuf outBuf = out.getOutBuf();
     LOG.info("outBuf = {}", outBuf);
-    Assert.assertEquals(dataSize, outBuf.readableBytes());
+    Assertions.assertEquals(dataSize, outBuf.readableBytes());
     for (int i = 0; i < dataSize; i++) {
-      Assert.assertEquals(data[i], outBuf.readByte());
+      Assertions.assertEquals(data[i], outBuf.readByte());
     }
     outBuf.release();
   }
 
   static void assertReply(DataStreamReply reply, int byteWritten,
       ContainerCommandRequestProto proto) {
-    Assert.assertTrue(reply.isSuccess());
-    Assert.assertEquals(byteWritten, reply.getBytesWritten());
-    Assert.assertEquals(proto, ((Reply)reply).getPutBlockRequest());
+    Assertions.assertTrue(reply.isSuccess());
+    Assertions.assertEquals(byteWritten, reply.getBytesWritten());
+    Assertions.assertEquals(proto, ((Reply)reply).getPutBlockRequest());
   }
 
   static class Output implements DataStreamOutput {

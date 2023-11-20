@@ -134,7 +134,7 @@ public class TestSCMBlockProtocolServer {
 
     // sort normal datanodes
     String client;
-    client = nodes.get(0);
+    client = nodeManager.getAllNodes().get(0).getIpAddress();
     List<DatanodeDetails> datanodeDetails =
         server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
@@ -159,6 +159,7 @@ public class TestSCMBlockProtocolServer {
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
+    client = nodeManager.getAllNodes().get(0).getIpAddress();
     ScmBlockLocationProtocolProtos.SortDatanodesRequestProto request =
         ScmBlockLocationProtocolProtos.SortDatanodesRequestProto
             .newBuilder()
