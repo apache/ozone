@@ -309,10 +309,15 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      RaftClientRequest raftClientRequest =
-          createRaftClientRequestForPurge(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest,
-          raftClientRequest);
+      if (isRatisEnabled()) {
+        RaftClientRequest raftClientRequest =
+            createRaftClientRequestForPurge(omRequest);
+        ozoneManager.getOmRatisServer().submitRequest(omRequest,
+            raftClientRequest);
+      } else {
+        getOzoneManager().getOmServerProtocol()
+            .submitRequest(null, omRequest);
+      }
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
@@ -445,8 +450,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    // TODO: need to handle delete with non-ratis
-    if (isRatisEnabled() && !purgePathRequestList.isEmpty()) {
+    if (!purgePathRequestList.isEmpty()) {
       submitPurgePaths(purgePathRequestList, snapTableKey);
     }
 
