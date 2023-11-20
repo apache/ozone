@@ -113,7 +113,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -1408,31 +1407,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
 
-    CertificateClient certClient =
+    OMCertificateClient certClient =
         new OMCertificateClient(
             new SecurityConfig(conf), scmSecurityClient, omStore, omInfo,
-            "", scmId, null, null);
-    CertificateClient.InitResponse response = certClient.init();
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful.");
-      break;
-    case GETCERT:
-      // Sign and persist OM cert.
-      CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
-      omStore.setOmCertSerialId(
-          certClient.signAndStoreCertificate(builder.build()));
-      LOG.info("Successfully stored SCM signed certificate.");
-      break;
-    case FAILURE:
-      LOG.error("OM security initialization failed.");
-      throw new RuntimeException("OM security initialization failed.");
-    default:
-      LOG.error("OM security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("OM security initialization failed.");
-    }
+            "", scmId,
+            certId -> {
+              try {
+                omStore.setOmCertSerialId(certId);
+              } catch (IOException e) {
+                LOG.error("Failed to set new certificate ID", e);
+                throw new RuntimeException("Failed to set new certificate ID");
+              }
+            }, null);
+    certClient.initWithRecovery();
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
@@ -2942,6 +2929,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
+                                      String snapshotName) throws IOException {
+    metrics.incNumSnapshotInfos();
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    try {
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, volumeName, bucketName, null);
+      }
+      SnapshotInfo snapshotInfo =
+          metadataManager.getSnapshotInfo(volumeName, bucketName, snapshotName);
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.SNAPSHOT_INFO, auditMap));
+      return snapshotInfo;
+    } catch (Exception ex) {
+      metrics.incNumSnapshotInfoFails();
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.SNAPSHOT_INFO,
+          auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
   public List<SnapshotInfo> listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
@@ -4096,8 +4108,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
         omRatisServer.checkLeaderStatus();
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-    RaftPeerId raftLeaderId = omRatisServer.getRaftLeaderId();
-    String raftLeaderAddress = omRatisServer.getRaftLeaderAddress();
+    RaftPeerId raftLeaderId = null;
+    String raftLeaderAddress = null;
+    RaftPeer leader = omRatisServer.getLeader();
+    if (null != leader) {
+      raftLeaderId = leader.getId();
+      raftLeaderAddress = omRatisServer.getRaftLeaderAddress(leader);
+    }
 
     switch (raftServerStatus) {
     case LEADER_AND_READY: return;

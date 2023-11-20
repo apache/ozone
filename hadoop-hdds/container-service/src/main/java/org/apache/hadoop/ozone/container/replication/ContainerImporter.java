@@ -61,7 +61,7 @@ public class ContainerImporter {
   private final long containerSize;
 
   private final Set<Long> importContainerProgress
-      = Collections.synchronizedSet(new HashSet());
+      = Collections.synchronizedSet(new HashSet<>());
 
   public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
       ContainerController controller,
@@ -77,6 +77,11 @@ public class ContainerImporter {
     containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+  }
+
+  public boolean isAllowedContainerImport(long containerID) {
+    return !importContainerProgress.contains(containerID) &&
+        containerSet.getContainer(containerID) == null;
   }
 
   public void importContainer(long containerID, Path tarFilePath,

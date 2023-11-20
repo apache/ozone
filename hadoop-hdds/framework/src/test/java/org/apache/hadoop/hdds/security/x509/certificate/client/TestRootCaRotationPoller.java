@@ -16,12 +16,13 @@
  * limitations under the License.
  *
  */
-package org.apache.hadoop.hdds.security.x509.certificate.utils;
+package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.RootCaRotationPoller;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -69,6 +70,7 @@ public class TestRootCaRotationPoller {
 
   @Test
   public void testPollerDoesNotInvokeRootCaProcessor() throws Exception {
+    //Given the root ca poller that knows a set of root ca certificates
     X509Certificate knownCert = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
@@ -77,24 +79,30 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
-
+    //When the scm returns the same set of root ca certificates, and they poll
+    //for them
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
-    AtomicBoolean atomicBoolean = new AtomicBoolean();
-    atomicBoolean.set(false);
+    CompletableFuture<Void> processingResult = new CompletableFuture<>();
+    AtomicBoolean isProcessed = new AtomicBoolean(false);
     poller.addRootCARotationProcessor(
-        certificates -> CompletableFuture.supplyAsync(() -> {
-          atomicBoolean.set(true);
-          Assertions.assertEquals(certificates.size(), 2);
-          return null;
-        }));
-    poller.run();
+        certificates -> {
+          isProcessed.set(true);
+          processingResult.complete(null);
+          return processingResult;
+        }
+    );
+    poller.pollRootCas();
+    //Then the certificates are not processed. Note that we can't invoke
+    // processingResult.join before as it never gets completed
     Assertions.assertThrows(TimeoutException.class, () ->
-        GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000));
+        GenericTestUtils.waitFor(isProcessed::get, 50, 5000));
   }
 
   @Test
   public void testPollerInvokesRootCaProcessors() throws Exception {
+    //Given the root ca poller knowing a root ca certificate, and an unknown
+    //root ca certificate
     X509Certificate knownCert = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
     X509Certificate newRootCa = generateX509Cert(
@@ -106,22 +114,28 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
-    poller.run();
+    //when the scm returns the unknown certificate to the poller
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
-    AtomicBoolean atomicBoolean = new AtomicBoolean();
-    atomicBoolean.set(false);
+    CompletableFuture<Void> processingResult = new CompletableFuture<>();
+    AtomicBoolean isProcessed = new AtomicBoolean(false);
     poller.addRootCARotationProcessor(
-        certificates -> CompletableFuture.supplyAsync(() -> {
-          atomicBoolean.set(true);
-          Assertions.assertEquals(certificates.size(), 2);
-          return null;
-        }));
-    GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
+        certificates -> {
+          isProcessed.set(true);
+          processingResult.complete(null);
+          return processingResult;
+        }
+    );
+    poller.pollRootCas();
+    processingResult.join();
+    //The root ca processors are invoked
+    Assertions.assertTrue(isProcessed.get());
   }
 
   @Test
   public void testPollerRetriesAfterFailure() throws Exception {
+    //Given a the root ca poller knowing about a root ca certificate and the
+    // SCM providing a new one
     X509Certificate knownCert = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
     X509Certificate newRootCa = generateX509Cert(
@@ -133,27 +147,30 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
-    poller.run();
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
-    AtomicBoolean atomicBoolean = new AtomicBoolean();
-    atomicBoolean.set(false);
-    //Set that the first certificate renewal encountered an error
+    CompletableFuture<Void> processingResult = new CompletableFuture<>();
+    //When encountering an error for the first run:
     AtomicInteger runNumber = new AtomicInteger(1);
     poller.addRootCARotationProcessor(
-        certificates -> CompletableFuture.supplyAsync(() -> {
+        certificates -> {
           if (runNumber.getAndIncrement() < 2) {
             poller.setCertificateRenewalError();
           }
-          atomicBoolean.set(true);
           Assertions.assertEquals(certificates.size(), 2);
-          return null;
-        }));
-    //Assert for the poller success even if there was an error at first
-    GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
-    //And that we see the error in the logs
+          processingResult.complete(null);
+          return processingResult;
+        }
+    );
+    //Then the first run encounters an error
+    poller.pollRootCas();
+    processingResult.join();
     Assertions.assertTrue(logCapturer.getOutput().contains(
         "There was a caught exception when trying to sign the certificate"));
+    //And then the second clean run is successful.
+    poller.pollRootCas();
+    Assertions.assertTrue(logCapturer.getOutput().contains(
+        "Certificate processing was successful."));
   }
 
   private X509Certificate generateX509Cert(

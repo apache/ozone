@@ -73,7 +73,14 @@ public class RootCaRotationPoller implements Runnable, Closeable {
     certificateRenewalError = new AtomicBoolean(false);
   }
 
-  private void pollRootCas() {
+  /**
+   * Polls the SCM for root ca certificates and compares them to the known
+   * set of root ca certificates. If there are new root ca certificates it
+   * invokes the necessary handlers provided in rootCaRotationProcessors.
+   *
+   * @return returns true if the SCM provided a new root ca certificate.
+   */
+  void pollRootCas() {
     try {
       List<String> pemEncodedRootCaList =
           scmSecureClient.getAllRootCaCertificates();
@@ -99,8 +106,9 @@ public class RootCaRotationPoller implements Runnable, Closeable {
       allRootCAProcessorFutures.whenComplete((unused, throwable) -> {
         if (throwable == null && !certificateRenewalError.get()) {
           knownRootCerts = new HashSet<>(rootCAsFromSCM);
+          LOG.info("Certificate processing was successful.");
         } else {
-          LOG.info("Certificate consumption was unsuccesfull. " +
+          LOG.info("Certificate consumption was unsuccessful. " +
               (certificateRenewalError.get() ?
                   "There was a caught exception when trying to sign the " +
                       "certificate" :

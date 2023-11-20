@@ -120,6 +120,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -992,6 +993,28 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  public OzoneSnapshot getSnapshotInfo(String volumeName,
+                                       String bucketName,
+                                       String snapshotName) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(snapshotName),
+        "snapshot name can't be null or empty.");
+    SnapshotInfo snapshotInfo = ozoneManagerClient.getSnapshotInfo(volumeName,
+        bucketName, snapshotName);
+    return OzoneSnapshot.fromSnapshotInfo(snapshotInfo);
+  }
+
+  /**
    * Create an image of the current compaction log DAG in the OM.
    * @param fileNamePrefix  file name prefix of the image file.
    * @param graphType       type of node name to use in the graph image.
@@ -1623,7 +1646,6 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OmKeyInfo keyInfo =
         getKeyInfo(volumeName, bucketName, keyName, false);
-
     return getOzoneKeyDetails(keyInfo);
   }
 
@@ -1652,6 +1674,22 @@ public class RpcClient implements ClientProtocol {
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
     OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
+    return getOzoneKeyDetails(keyInfo);
+  }
+
+  @Override
+  public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                         int partNumber) throws IOException {
+    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
+    List<OmKeyLocationInfo> filteredKeyLocationInfo = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly().stream()
+        .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
+            partNumber)
+        .collect(Collectors.toList());
+    keyInfo.updateLocationInfoList(filteredKeyLocationInfo, false);
+    keyInfo.setDataSize(filteredKeyLocationInfo.stream()
+        .mapToLong(OmKeyLocationInfo::getLength)
+        .sum());
     return getOzoneKeyDetails(keyInfo);
   }
 

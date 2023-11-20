@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
@@ -46,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -93,7 +91,7 @@ public class TestKeyValueHandler {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
-  private static final String DUMMY_PATH = "/dummy/dir/doesnt/exist";
+  private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
 
   private final ContainerLayoutVersion layout;
 
@@ -147,9 +145,8 @@ public class TestKeyValueHandler {
 
     KeyValueContainer container = Mockito.mock(KeyValueContainer.class);
 
-    DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
-        .dispatchRequest(handler, createContainerRequest, container, context);
+        .dispatchRequest(handler, createContainerRequest, container, null);
     Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
@@ -157,7 +154,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto readContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadContainer);
     KeyValueHandler
-        .dispatchRequest(handler, readContainerRequest, container, context);
+        .dispatchRequest(handler, readContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleReadContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -165,7 +162,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto updateContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.UpdateContainer);
     KeyValueHandler
-        .dispatchRequest(handler, updateContainerRequest, container, context);
+        .dispatchRequest(handler, updateContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleUpdateContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -173,7 +170,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto deleteContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.DeleteContainer);
     KeyValueHandler
-        .dispatchRequest(handler, deleteContainerRequest, container, context);
+        .dispatchRequest(handler, deleteContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleDeleteContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -181,7 +178,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto listContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListContainer);
     KeyValueHandler
-        .dispatchRequest(handler, listContainerRequest, container, context);
+        .dispatchRequest(handler, listContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
@@ -189,7 +186,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto closeContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.CloseContainer);
     KeyValueHandler
-        .dispatchRequest(handler, closeContainerRequest, container, context);
+        .dispatchRequest(handler, closeContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleCloseContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -197,7 +194,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto putBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.PutBlock);
     KeyValueHandler
-        .dispatchRequest(handler, putBlockRequest, container, context);
+        .dispatchRequest(handler, putBlockRequest, container, null);
     Mockito.verify(handler, times(1)).handlePutBlock(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -205,7 +202,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto getBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetBlock);
     KeyValueHandler
-        .dispatchRequest(handler, getBlockRequest, container, context);
+        .dispatchRequest(handler, getBlockRequest, container, null);
     Mockito.verify(handler, times(1)).handleGetBlock(
         any(ContainerCommandRequestProto.class), any());
 
@@ -215,7 +212,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto listBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
-        .dispatchRequest(handler, listBlockRequest, container, context);
+        .dispatchRequest(handler, listBlockRequest, container, null);
     Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
@@ -223,7 +220,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto readChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadChunk);
     KeyValueHandler
-        .dispatchRequest(handler, readChunkRequest, container, context);
+        .dispatchRequest(handler, readChunkRequest, container, null);
     Mockito.verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -234,7 +231,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto writeChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.WriteChunk);
     KeyValueHandler
-        .dispatchRequest(handler, writeChunkRequest, container, context);
+        .dispatchRequest(handler, writeChunkRequest, container, null);
     Mockito.verify(handler, times(1)).handleWriteChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -242,7 +239,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto listChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
-        .dispatchRequest(handler, listChunkRequest, container, context);
+        .dispatchRequest(handler, listChunkRequest, container, null);
     Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
@@ -250,7 +247,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto putSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.PutSmallFile);
     KeyValueHandler
-        .dispatchRequest(handler, putSmallFileRequest, container, context);
+        .dispatchRequest(handler, putSmallFileRequest, container, null);
     Mockito.verify(handler, times(1)).handlePutSmallFile(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -258,7 +255,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto getSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetSmallFile);
     KeyValueHandler
-        .dispatchRequest(handler, getSmallFileRequest, container, context);
+        .dispatchRequest(handler, getSmallFileRequest, container, null);
     Mockito.verify(handler, times(1)).handleGetSmallFile(
         any(ContainerCommandRequestProto.class), any());
   }
@@ -351,7 +348,6 @@ public class TestKeyValueHandler {
         ContainerProtos.Result.INVALID_CONTAINER_STATE, response.getResult());
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testDeleteContainer() throws IOException {
     final String testDir = tempDir.newFolder().getAbsolutePath();

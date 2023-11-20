@@ -51,6 +51,7 @@ public class ServerNotLeaderException extends IOException {
     this.leader = suggestedLeader;
   }
 
+  // required for creation by RemoteException#unwrapRemoteException
   public ServerNotLeaderException(String message) {
     super(message);
 

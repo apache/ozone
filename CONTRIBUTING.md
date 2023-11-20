@@ -159,18 +159,6 @@ Some scripts require third-party tools, but most of these are installed during t
 
 Most scripts (except `build.sh`) output results in `target/<name>`, e.g. `target/docs`.
 
-### False positive findbugs violation
-
-If you have __very good__ reasons, you can ignore any Fingbugs warning. Your good reason can be persisted with the `@SuppressFBWarnings` annotation.
-
-```java
-@SuppressFBWarnings(value="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-      justification="The method is synchronized and this is the only place "+
-          "dnsToUuidMap is modified")
-private synchronized void addEntryTodnsToUuidMap(
-...
-```
-
 ## Using IDE
 
 As Ozone uses Apache Maven it can be developed from any IDE.  IntelliJ IDEA is a common choice, here are some suggestions to use it for Ozone development.

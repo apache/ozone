@@ -17,8 +17,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
@@ -30,13 +28,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
@@ -47,31 +41,20 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.util.TimeDuration;
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
-import java.security.cert.CertPath;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
-import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
-import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 /**
  * Utilities for SCM HA security.
@@ -99,142 +82,21 @@ public final class HASecurityUtils {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-        getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
-    try (SCMCertificateClient certClient =
+        getScmSecurityClientWithFixedDuration(conf);
+    try (CertificateClient certClient =
         new SCMCertificateClient(securityConfig, scmSecurityClient,
             scmStorageConfig.getScmId(), scmStorageConfig.getClusterID(),
-            scmStorageConfig.getScmCertSerialId(), scmHostname)) {
-      InitResponse response = certClient.init();
-      LOG.info("Init response: {}", response);
-      switch (response) {
-      case SUCCESS:
-        LOG.info("Initialization successful.");
-        break;
-      case GETCERT:
-        if (!primaryscm) {
-          getRootCASignedSCMCert(conf, certClient, securityConfig,
-              scmStorageConfig, scmHostname);
-        } else {
-          getPrimarySCMSelfSignedCert(certClient, securityConfig,
-              scmStorageConfig, scmHostname);
-        }
-        LOG.info("Successfully stored SCM signed certificate.");
-        break;
-      case FAILURE:
-        LOG.error("SCM security initialization failed.");
-        throw new RuntimeException("OM security initialization failed.");
-      default:
-        LOG.error("SCM security initialization failed. Init response: {}",
-            response);
-        throw new RuntimeException("SCM security initialization failed.");
-      }
+            scmStorageConfig.getScmCertSerialId(), scmHostname, primaryscm,
+            certIDString -> {
+              try {
+                scmStorageConfig.setScmCertSerialId(certIDString);
+              } catch (IOException e) {
+                LOG.error("Failed to set new certificate ID", e);
+                throw new RuntimeException("Failed to set new certificate ID");
+              }
+            })) {
+      certClient.initWithRecovery();
     }
-  }
-
-  /**
-   * For bootstrapped SCM get sub-ca signed certificate and root CA
-   * certificate using scm security client and store it using certificate
-   * client.
-   */
-  private static void getRootCASignedSCMCert(
-      OzoneConfiguration configuration, SCMCertificateClient client,
-      SecurityConfig securityConfig,
-      SCMStorageConfig scmStorageConfig, String scmHostname) {
-    try {
-      // Create SCM security client.
-      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          getScmSecurityClientWithFixedDuration(configuration);
-
-      // Generate CSR.
-      PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          securityConfig, scmHostname);
-
-      ScmNodeDetailsProto scmNodeDetailsProto =
-          ScmNodeDetailsProto.newBuilder()
-              .setClusterId(scmStorageConfig.getClusterID())
-              .setHostName(scmHostname)
-              .setScmNodeId(scmStorageConfig.getScmId()).build();
-
-      // Get SCM sub CA cert.
-      SCMGetCertResponseProto response = secureScmClient.
-          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
-      String pemEncodedCert = response.getX509Certificate();
-
-      // Store SCM sub CA and root CA certificate.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedRootCert = response.getX509CACertificate();
-        client.storeCertificate(
-            pemEncodedRootCert, CAType.SUBORDINATE);
-        client.storeCertificate(pemEncodedCert, CAType.NONE);
-        //note: this does exactly the same as store certificate
-        persistSubCACertificate(securityConfig, client,
-            pemEncodedCert);
-
-        X509Certificate certificate =
-            CertificateCodec.getX509Certificate(pemEncodedCert);
-        // Persist scm cert serial ID.
-        scmStorageConfig.setScmCertSerialId(certificate.getSerialNumber()
-            .toString());
-      } else {
-        throw new RuntimeException("Unable to retrieve SCM certificate chain");
-      }
-    } catch (IOException | CertificateException e) {
-      LOG.error("Error while fetching/storing SCM signed certificate.", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-
-  /**
-   * For primary SCM get sub-ca signed certificate and root CA certificate by
-   * root CA certificate server and store it using certificate client.
-   */
-  private static void getPrimarySCMSelfSignedCert(SCMCertificateClient client,
-      SecurityConfig config, SCMStorageConfig scmStorageConfig,
-      String scmHostname) {
-    try {
-      CertificateServer rootCAServer =
-          initializeRootCertificateServer(config, null, scmStorageConfig,
-              new DefaultCAProfile());
-
-      // First SCM sub CA certificate ID 2
-      String certId = BigInteger.ONE.add(BigInteger.ONE).toString();
-
-      PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmHostname);
-
-      CertPath subSCMCertHolderList = rootCAServer.
-          requestCertificate(csr, KERBEROS_TRUSTED, SCM, certId).get();
-
-      CertPath rootCACertificatePath =
-          rootCAServer.getCaCertPath();
-
-      String pemEncodedCert =
-          CertificateCodec.getPEMEncodedString(subSCMCertHolderList);
-
-      String pemEncodedRootCert =
-          CertificateCodec.getPEMEncodedString(rootCACertificatePath);
-
-      client.storeCertificate(
-          pemEncodedRootCert, CAType.SUBORDINATE);
-      client.storeCertificate(pemEncodedCert, CAType.NONE);
-      //note: this does exactly the same as store certificate
-      persistSubCACertificate(config, client, pemEncodedCert);
-      X509Certificate cert =
-          (X509Certificate) subSCMCertHolderList.getCertificates().get(0);
-      X509CertificateHolder subSCMCertHolder =
-          CertificateCodec.getCertificateHolder(cert);
-
-      // Persist scm cert serial ID.
-      scmStorageConfig.setScmCertSerialId(subSCMCertHolder.getSerialNumber()
-          .toString());
-    } catch (InterruptedException | ExecutionException | IOException |
-        CertificateException  e) {
-      LOG.error("Error while fetching/storing SCM signed certificate.", e);
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    }
-
   }
 
   /**
@@ -282,49 +144,6 @@ public final class HASecurityUtils {
     return initializeRootCertificateServer(config, scmCertStore,
         scmStorageConfig, BigInteger.ONE, pkiProfile,
         SCM_ROOT_CA_COMPONENT_NAME);
-  }
-
-  /**
-   * Generate CSR to obtain SCM sub CA certificate.
-   */
-  private static PKCS10CertificationRequest generateCSR(
-      SCMCertificateClient client, SCMStorageConfig scmStorageConfig,
-      SecurityConfig config, String scmHostname)
-      throws IOException {
-    CertificateSignRequest.Builder builder = client.getCSRBuilder();
-
-    // Get host name.
-    String subject = SCM_SUB_CA_PREFIX + scmHostname;
-
-    builder.setConfiguration(config)
-        .setScmID(scmStorageConfig.getScmId())
-        .setClusterID(scmStorageConfig.getClusterID())
-        .setSubject(subject);
-
-    LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", scmHostname, scmStorageConfig.getScmId(),
-        scmStorageConfig.getClusterID(), subject);
-
-    return builder.build();
-  }
-
-  /**
-   * Persists the sub SCM signed certificate to the location which can be
-   * read by sub CA Certificate server.
-   *
-   * @param config
-   * @param certificateClient
-   * @param certificateHolder
-   * @throws IOException
-   */
-  private static void persistSubCACertificate(SecurityConfig config,
-      CertificateClient certificateClient,
-      String certificateHolder) throws IOException {
-    CertificateCodec certCodec =
-        new CertificateCodec(config, certificateClient.getComponentName());
-
-    certCodec.writeCertificate(certCodec.getLocation().toAbsolutePath(),
-        config.getCertificateFileName(), certificateHolder);
   }
 
   /**

@@ -376,6 +376,7 @@ public class ObjectEndpoint extends EndpointBase {
   public Response get(
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath,
+      @QueryParam("partNumber") int partNumber,
       @QueryParam("uploadId") String uploadId,
       @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
       @QueryParam("part-number-marker") String partNumberMarker)
@@ -393,8 +394,9 @@ public class ObjectEndpoint extends EndpointBase {
             partMarker, maxParts);
       }
 
-      OzoneKeyDetails keyDetails = getClientProtocol()
-          .getS3KeyDetails(bucketName, keyPath);
+      OzoneKeyDetails keyDetails = (partNumber != 0) ?
+          getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
+          getClientProtocol().getS3KeyDetails(bucketName, keyPath);
 
       isFile(keyPath, keyDetails);
 

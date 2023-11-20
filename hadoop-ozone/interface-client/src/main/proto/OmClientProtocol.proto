@@ -145,6 +145,7 @@ enum Type {
   AbortExpiredMultiPartUploads = 127;
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
+  GetSnapshotInfo = 130;
 }
 
 enum SafeMode {
@@ -279,6 +280,7 @@ message OMRequest {
 
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
+  optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
 }
 
 message OMResponse {
@@ -399,6 +401,7 @@ message OMResponse {
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
+  optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
 }
 
 enum Status {
@@ -1859,6 +1862,12 @@ message DeleteSnapshotRequest {
   optional uint64 deletionTime = 4;
 }
 
+message SnapshotInfoRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+}
+
 message PrintCompactionLogDagRequest {
   optional string fileNamePrefix = 1;
   optional string graphType = 2;
@@ -1963,6 +1972,10 @@ message ListSnapshotDiffJobResponse {
 
 message DeleteSnapshotResponse {
 
+}
+
+message SnapshotInfoResponse {
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message PrintCompactionLogDagResponse {
