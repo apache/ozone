@@ -24,13 +24,20 @@ import org.rocksdb.WriteOptions;
  * Managed WriteBatch.
  */
 public class ManagedWriteOptions extends WriteOptions {
+
+  private final StackTraceElement[] elements;
+
   public ManagedWriteOptions() {
-    super();
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

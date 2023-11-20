@@ -25,9 +25,19 @@ import org.rocksdb.CompactRangeOptions;
  */
 public class ManagedCompactRangeOptions extends CompactRangeOptions {
 
+  private final StackTraceElement[] elements;
+
+  public ManagedCompactRangeOptions() {
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
+  }
+
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

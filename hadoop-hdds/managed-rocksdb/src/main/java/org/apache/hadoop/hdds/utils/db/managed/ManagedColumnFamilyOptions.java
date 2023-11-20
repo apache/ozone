@@ -25,9 +25,8 @@ import org.rocksdb.TableFormatConfig;
  * Managed ColumnFamilyOptions.
  */
 public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
-  public ManagedColumnFamilyOptions() {
-    super();
-  }
+
+  private final StackTraceElement[] elements;
 
   /**
    * Indicate if this ColumnFamilyOptions is intentionally used across RockDB
@@ -35,8 +34,13 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
    */
   private boolean reused = false;
 
+  public ManagedColumnFamilyOptions() {
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
+  }
+
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
@@ -76,7 +80,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
   }
 
@@ -92,5 +96,9 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
       ((ManagedBlockBasedTableConfig) tableFormatConfig).close();
     }
     options.close();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

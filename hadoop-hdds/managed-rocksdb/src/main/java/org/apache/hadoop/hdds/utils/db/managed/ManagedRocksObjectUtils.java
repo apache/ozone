@@ -44,10 +44,6 @@ public final class ManagedRocksObjectUtils {
   private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
 
-  static void assertClosed(RocksObject rocksObject) {
-    assertClosed(rocksObject, null);
-  }
-
   public static void assertClosed(ManagedObject<?> object) {
     assertClosed(object.get(), object.getStackTrace());
   }

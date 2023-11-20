@@ -26,9 +26,19 @@ import org.rocksdb.IngestExternalFileOptions;
 public class ManagedIngestExternalFileOptions extends
     IngestExternalFileOptions {
 
+  private final StackTraceElement[] elements;
+
+  public ManagedIngestExternalFileOptions() {
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
+  }
+
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

@@ -24,13 +24,21 @@ import org.rocksdb.LRUCache;
  * Managed LRUCache.
  */
 public class ManagedLRUCache extends LRUCache {
+
+  private final StackTraceElement[] elements;
+
   public ManagedLRUCache(long capacity) {
     super(capacity);
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

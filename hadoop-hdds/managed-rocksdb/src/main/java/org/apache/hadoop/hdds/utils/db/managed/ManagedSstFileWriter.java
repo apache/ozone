@@ -26,14 +26,22 @@ import org.rocksdb.SstFileWriter;
  * Managed SstFileWriter.
  */
 public class ManagedSstFileWriter extends SstFileWriter {
+
+  private final StackTraceElement[] elements;
+
   public ManagedSstFileWriter(EnvOptions envOptions,
                               Options options) {
     super(envOptions, options);
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

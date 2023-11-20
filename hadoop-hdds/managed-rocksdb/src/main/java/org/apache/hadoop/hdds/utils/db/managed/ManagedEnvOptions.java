@@ -24,9 +24,20 @@ import org.rocksdb.EnvOptions;
  * Managed EnvOptions.
  */
 public class ManagedEnvOptions extends EnvOptions {
+
+  private final StackTraceElement[] elements;
+
+  public ManagedEnvOptions() {
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
+  }
+
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

@@ -25,17 +25,24 @@ import org.rocksdb.WriteBatch;
  */
 public class ManagedWriteBatch extends WriteBatch {
 
+  private final StackTraceElement[] elements;
+
   public ManagedWriteBatch() {
-    super();
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   public ManagedWriteBatch(byte[] data) {
     super(data);
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }

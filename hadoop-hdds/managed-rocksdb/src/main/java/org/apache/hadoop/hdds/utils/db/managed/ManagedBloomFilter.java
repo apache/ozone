@@ -25,9 +25,19 @@ import org.rocksdb.BloomFilter;
  */
 public class ManagedBloomFilter extends BloomFilter {
 
+  private final StackTraceElement[] elements;
+
+  public ManagedBloomFilter() {
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
+  }
+
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    ManagedRocksObjectUtils.assertClosed(this, getStackTrace());
     super.finalize();
+  }
+
+  private String getStackTrace() {
+    return ManagedRocksObjectUtils.formatStackTrace(elements);
   }
 }
