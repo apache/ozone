@@ -326,9 +326,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       String startKey, String keyPrefix, int maxKeys) throws IOException {
     long startNanos = Time.monotonicNowNanos();
     ResolvedBucket bucket = captureLatencyNs(
-            perfMetrics.getListKeysResolveBucketLatencyNs(),
-            () -> ozoneManager.resolveBucketLink(
-        Pair.of(volumeName, bucketName)));
+        perfMetrics.getListKeysResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(
+            Pair.of(volumeName, bucketName)));
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit();
