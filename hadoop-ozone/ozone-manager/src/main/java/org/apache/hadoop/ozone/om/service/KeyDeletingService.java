@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  * keys.
  */
 public class KeyDeletingService extends AbstractKeyDeletingService {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
   // Use only a single thread for KeyDeletion. Multiple threads would read
