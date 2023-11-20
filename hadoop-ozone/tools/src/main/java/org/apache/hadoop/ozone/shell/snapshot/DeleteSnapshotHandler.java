@@ -26,7 +26,7 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * ozone snapshot delete.
+ * ozone sh snapshot delete.
  */
 @CommandLine.Command(name = "delete",
     description = "Delete a snapshot")

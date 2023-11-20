@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.NoSuchElementException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -143,23 +144,33 @@ public final class SnapshotUtils {
   public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
       SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
       throws IOException {
-    while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotId())) {
 
-      UUID nextPathSnapshot =
-          chainManager.nextPathSnapshot(
-              snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
+    // If the snapshot is deleted in the previous run, then the in-memory
+    // SnapshotChainManager might throw NoSuchElementException as the snapshot
+    // is removed in-memory but OMDoubleBuffer has not flushed yet.
+    try {
+      while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
+          snapInfo.getSnapshotId())) {
 
-      String tableKey = chainManager.getTableKey(nextPathSnapshot);
-      SnapshotInfo nextSnapshotInfo =
-          omSnapshotManager.getSnapshotInfo(tableKey);
+        UUID nextPathSnapshot =
+            chainManager.nextPathSnapshot(
+                snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
 
-      if (nextSnapshotInfo.getSnapshotStatus().equals(
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-        return nextSnapshotInfo;
+        String tableKey = chainManager.getTableKey(nextPathSnapshot);
+        SnapshotInfo nextSnapshotInfo =
+            omSnapshotManager.getSnapshotInfo(tableKey);
+
+        if (nextSnapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          return nextSnapshotInfo;
+        }
+
+        snapInfo = nextSnapshotInfo;
       }
-
-      snapInfo = nextSnapshotInfo;
+    } catch (NoSuchElementException ex) {
+      LOG.error("The snapshot {} is not longer in snapshot chain, It " +
+              "maybe removed in the previous Snapshot purge request.",
+          snapInfo.getTableKey());
     }
     return null;
   }

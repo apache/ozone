@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -38,7 +39,9 @@ import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPublicKeySpec;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -328,7 +331,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * @return public key or Null if there is no data.
    */
   @Override
-  public PublicKey getPublicKey() {
+  public synchronized PublicKey getPublicKey() {
     if (publicKey != null) {
       return publicKey;
     }
@@ -657,39 +660,48 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. Generates and stores a keypair.
    * 3. Try to recover public key if private key and certificate is present
    *    but public key is missing.
+   * 4. Try to refetch certificate if public key and private key are present
+   *    but certificate is missing.
+   * 5. Try to recover public key from private key(RSA only) if private key
+   *    is present but public key and certificate are missing, and refetch
+   *    certificate.
    *
    * Truth table:
-   *  +--------------+-----------------+--------------+----------------+
-   *  | Private Key  | Public Keys     | Certificate  |   Result       |
-   *  +--------------+-----------------+--------------+----------------+
-   *  | False  (0)   | False   (0)     | False  (0)   |   GETCERT  000 |
-   *  | False  (0)   | False   (0)     | True   (1)   |   FAILURE  001 |
-   *  | False  (0)   | True    (1)     | False  (0)   |   FAILURE  010 |
-   *  | False  (0)   | True    (1)     | True   (1)   |   FAILURE  011 |
-   *  | True   (1)   | False   (0)     | False  (0)   |   FAILURE  100 |
-   *  | True   (1)   | False   (0)     | True   (1)   |   SUCCESS  101 |
-   *  | True   (1)   | True    (1)     | False  (0)   |   GETCERT  110 |
-   *  | True   (1)   | True    (1)     | True   (1)   |   SUCCESS  111 |
+   *  +--------------+---------------+--------------+---------------------+
+   *  | Private Key  | Public Keys   | Certificate  |   Result            |
+   *  +--------------+---------------+--------------+---------------------+
+   *  | False  (0)   | False   (0)   | False  (0)   |   GETCERT->SUCCESS  |
+   *  | False  (0)   | False   (0)   | True   (1)   |   FAILURE           |
+   *  | False  (0)   | True    (1)   | False  (0)   |   FAILURE           |
+   *  | False  (0)   | True    (1)   | True   (1)   |   FAILURE           |
+   *  | True   (1)   | False   (0)   | False  (0)   |   GETCERT->SUCCESS  |
+   *  | True   (1)   | False   (0)   | True   (1)   |   SUCCESS           |
+   *  | True   (1)   | True    (1)   | False  (0)   |   GETCERT->SUCCESS  |
+   *  | True   (1)   | True    (1)   | True   (1)   |   SUCCESS           |
    *  +--------------+-----------------+--------------+----------------+
    *
-   * @return InitResponse
-   * Returns FAILURE in following cases:
-   * 1. If private key is missing but public key or certificate is available.
-   * 2. If public key and certificate is missing.
-   *
-   * Returns SUCCESS in following cases:
+   * Success in following cases:
    * 1. If keypair as well certificate is available.
    * 2. If private key and certificate is available and public key is
    *    recovered successfully.
+   * 3. If private key and public key are present while certificate is
+   *    missing, certificate is refetched successfully.
+   * 4. If private key is present while public key and certificate are missing,
+   *    public key is recovered and certificate is refetched successfully.
    *
-   * Returns GETCERT in following cases:
-   * 1. First time when keypair and certificate is not available, keypair
-   *    will be generated and stored at configured location.
-   * 2. When keypair (public/private key) is available but certificate is
-   *    missing.
+   * Throw exception in following cases:
+   * 1. If private key is missing.
+   * 2. If private key or certificate is present, public key is missing,
+   *    and cannot recover public key from private key or certificate
+   * 3. If refetch certificate fails.
    */
   @Override
-  public synchronized InitResponse init() throws CertificateException {
+  public synchronized void initWithRecovery() throws IOException {
+    recoverStateIfNeeded(init());
+  }
+
+  @VisibleForTesting
+  public synchronized InitResponse init() throws IOException {
     int initCase = 0;
     PrivateKey pvtKey = getPrivateKey();
     PublicKey pubKey = getPublicKey();
@@ -737,9 +749,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     case PRIVATE_KEY:
       getLogger().info("Found private key but public key and certificate " +
           "is missing.");
-      // TODO: Recovering public key from private might be possible in some
-      //  cases.
-      return FAILURE;
+      if (recoverPublicKeyFromPrivateKey()) {
+        return GETCERT;
+      } else {
+        return FAILURE;
+      }
     case PUBLICKEY_CERT:
       getLogger().error("Found public key and certificate but private " +
           "key is missing.");
@@ -772,8 +786,40 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     default:
       getLogger().error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));
-
       return FAILURE;
+    }
+  }
+
+
+  /**
+   * Recover the state if needed.
+   * */
+  protected void recoverStateIfNeeded(InitResponse state) throws IOException {
+    String upperCaseComponent = component.toUpperCase();
+    getLogger().info("Init response: {}", state);
+    switch (state) {
+    case SUCCESS:
+      getLogger().info("Initialization successful, case:{}.", state);
+      break;
+    case GETCERT:
+      String certId = signAndStoreCertificate(getCSRBuilder().build());
+      if (certIdSaveCallback != null) {
+        certIdSaveCallback.accept(certId);
+      } else {
+        throw new RuntimeException(upperCaseComponent + " doesn't have " +
+            "the certIdSaveCallback set. The new " +
+            "certificate ID " + certId + " cannot be persisted to " +
+            "the VERSION file");
+      }
+      getLogger().info("Successfully stored {} signed certificate, case:{}.",
+          upperCaseComponent, state);
+      break;
+    case FAILURE:
+    default:
+      getLogger().error("{} security initialization failed. " +
+          "Init response: {}", upperCaseComponent, state);
+      throw new RuntimeException(upperCaseComponent +
+          " security initialization failed.");
     }
   }
 
@@ -823,6 +869,39 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
+   * Tries to recover public key from private key. Also validates recovered
+   * public key.
+   * */
+  protected boolean recoverPublicKeyFromPrivateKey()
+      throws CertificateException {
+    PrivateKey priKey = getPrivateKey();
+    try {
+      if (priKey != null && priKey instanceof RSAPrivateCrtKey) {
+        // if it's RSA private key
+        RSAPrivateCrtKey rsaCrtKey = (RSAPrivateCrtKey) priKey;
+        RSAPublicKeySpec rsaPublicKeySpec = new RSAPublicKeySpec(
+            rsaCrtKey.getModulus(), rsaCrtKey.getPublicExponent());
+        PublicKey pubKey = KeyFactory.getInstance(securityConfig.getKeyAlgo())
+            .generatePublic(rsaPublicKeySpec);
+        if (validateKeyPair(pubKey)) {
+          keyCodec.writePublicKey(pubKey);
+          publicKey = pubKey;
+          getLogger().info("Public key is recovered from the private key.");
+          return true;
+        }
+      }
+    } catch (InvalidKeySpecException | NoSuchAlgorithmException |
+             IOException e) {
+      throw new CertificateException("Error while trying to recover " +
+          "public key.", e, BOOTSTRAP_ERROR);
+    }
+
+    getLogger().error("Can't recover public key " +
+        "corresponding to private key.");
+    return false;
+  }
+
+  /**
    * Validates public and private key of certificate client.
    *
    * @param pubKey
@@ -831,7 +910,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws CertificateException {
     byte[] challenge =
         RandomStringUtils.random(1000, 0, 0, false, false, null,
-                new SecureRandom()).getBytes(StandardCharsets.UTF_8);
+            new SecureRandom()).getBytes(StandardCharsets.UTF_8);
     return verifySignature(challenge, signData(challenge), pubKey);
   }
 
