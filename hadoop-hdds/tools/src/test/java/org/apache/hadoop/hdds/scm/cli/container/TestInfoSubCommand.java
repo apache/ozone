@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -97,7 +98,7 @@ public class TestInfoSubCommand {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(includeIndex));
     Mockito.when(scmClient.getPipeline(any()))
-        .thenThrow(new IOException("Pipeline not found."));
+        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
@@ -139,7 +140,7 @@ public class TestInfoSubCommand {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenThrow(new IOException("Error getting Replicas"));
     Mockito.when(scmClient.getPipeline(any()))
-        .thenThrow(new IOException("Pipeline not found."));
+        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
