@@ -42,7 +42,7 @@ import static org.mockito.Mockito.when;
 public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
 
   private static GlobalStatsDao globalStatsDao;
-  private static OmTableInsightTask2 omTableInsightTask;
+  private static OmTableInsightTask omTableInsightTask;
   private static DSLContext dslContext;
   private boolean isSetupDone = false;
   private static ReconOMMetadataManager reconOMMetadataManager;
@@ -104,7 +104,7 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
     reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
 
-    omTableInsightTask = new OmTableInsightTask2(
+    omTableInsightTask = new OmTableInsightTask(
         globalStatsDao, getConfiguration(), reconOMMetadataManager,
         reconNamespaceSummaryManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
