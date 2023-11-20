@@ -217,7 +217,7 @@ public class TestOzoneContainerUpgradeShell {
         List<OzoneConfiguration> dnConfigs = cluster.getHddsDatanodes().stream()
             .map(HddsDatanodeService::getConf).collect(Collectors.toList());
 
-        DatanodeStoreCache.changeMiniClusterMode(false);
+        DatanodeStoreCache.setMiniClusterMode(false);
 
         cluster.stop();
         ContainerCache.getInstance(conf).shutdownCache();

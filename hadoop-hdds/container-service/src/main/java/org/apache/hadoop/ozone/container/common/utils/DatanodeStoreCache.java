@@ -62,7 +62,7 @@ public final class DatanodeStoreCache {
   }
 
   @VisibleForTesting
-  public static synchronized void changeMiniClusterMode(boolean isMiniCluster) {
+  public static synchronized void setMiniClusterMode(boolean isMiniCluster) {
     getInstance().miniClusterMode = isMiniCluster;
   }
 
