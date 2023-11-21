@@ -79,7 +79,7 @@ public class MutableMinMax extends MutableMetric {
   }
 
   @Override
-  public void snapshot(MetricsRecordBuilder builder, boolean all) {
+  public synchronized void snapshot(MetricsRecordBuilder builder, boolean all) {
     if (all || this.changed()) {
       builder.addGauge(iMinInfo, lastMinMax().min());
       builder.addGauge(iMaxInfo, lastMinMax().max());
