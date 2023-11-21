@@ -177,13 +177,13 @@ public class TestObjectGet {
     Response response;
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
 
-    response = rest.get("b1", "key1", null, 0, null);
+    response = rest.get("b1", "key1", 0,null, 0, null);
     assertEquals("1", response.getHeaderString("Content-Length"));
     assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
-    response = rest.get("b1", "key1", null, 0, null);
+    response = rest.get("b1", "key1", 0,null, 0, null);
     assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
     assertEquals(
@@ -194,7 +194,7 @@ public class TestObjectGet {
   @Test
   public void getStatusCode() throws IOException, OS3Exception {
     Response response;
-    response = rest.get("b1", "key1", null, 0, null);
+    response = rest.get("b1", "key1", 0,null, 0, null);
     assertEquals(response.getStatus(),
         Response.Status.OK.getStatusCode());
 
@@ -202,7 +202,7 @@ public class TestObjectGet {
     // The 206 (Partial Content) status code indicates that the server is
     //   successfully fulfilling a range request for the target resource
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
-    response = rest.get("b1", "key1", null, 0, null);
+    response = rest.get("b1", "key1", 0,null, 0, null);
     assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
   }
@@ -236,7 +236,7 @@ public class TestObjectGet {
 
     // WHEN
     final OS3Exception ex = assertThrows(OS3Exception.class,
-            () -> rest.get(bucketName, keyPath, null, 0, null));
+            () -> rest.get(bucketName, keyPath, 0,null, 0, null));
 
     // THEN
     assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
