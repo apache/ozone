@@ -99,14 +99,6 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquireLock = getOmLockDetails().isLockAcquired();
