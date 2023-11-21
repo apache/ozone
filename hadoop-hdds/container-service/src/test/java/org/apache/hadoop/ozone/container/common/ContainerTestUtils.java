@@ -85,6 +85,20 @@ public final class ContainerTestUtils {
   private ContainerTestUtils() {
   }
 
+  public static final DispatcherContext WRITE_STAGE = DispatcherContext
+      .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
+      .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
+      .build();
+
+  public static final DispatcherContext COMMIT_STAGE = DispatcherContext
+      .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
+      .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+      .setContainer2BCSIDMap(Collections.emptyMap())
+      .build();
+
+  public static final DispatcherContext COMBINED_STAGE
+      = DispatcherContext.getHandleWriteChunk();
+
   /**
    * Creates an Endpoint class for testing purpose.
    *

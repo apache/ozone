@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -128,6 +129,9 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Only successfully aborted MPUs are included in the audit.
@@ -197,9 +201,11 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmBucketInfo omBucketInfo = null;
     BucketLayout bucketLayout = null;
+    OMLockDetails omLockDetails = null;
     try {
-      acquiredLock = omMetadataManager.getLock()
+      omLockDetails = omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
+      acquiredLock = omLockDetails.isLockAcquired();
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
@@ -326,8 +332,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       }
     } finally {
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
     }
 
