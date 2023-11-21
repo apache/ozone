@@ -34,6 +34,9 @@ import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
 
@@ -109,6 +112,7 @@ public class ReconUtils {
       String fileName = sourceDir.concat(".tar");
       fileOutputStream = new FileOutputStream(fileName);
       tarOs = new TarArchiveOutputStream(fileOutputStream);
+      tarOs.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       File folder = new File(sourceDir);
       File[] filesInDir = folder.listFiles();
       if (filesInDir != null) {
@@ -294,20 +298,43 @@ public class ReconUtils {
     }
     // The smallest file size being tracked for count
     // is 1 KB i.e. 1024 = 2 ^ 10.
-    int binIndex = getBinIndex(fileSize);
+    int binIndex = getFileSizeBinIndex(fileSize);
     return (long) Math.pow(2, (10 + binIndex));
   }
 
-  public static int getBinIndex(long fileSize) {
+  public static long getContainerSizeUpperBound(long containerSize) {
+    if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
+      return Long.MAX_VALUE;
+    }
+    // The smallest container size being tracked for count
+    // is 512MB i.e. 536870912L = 2 ^ 29.
+    int binIndex = getContainerSizeBinIndex(containerSize);
+    return (long) Math.pow(2, (29 + binIndex));
+  }
+
+
+  public static int getFileSizeBinIndex(long fileSize) {
     // if the file size is larger than our track scope,
     // we map it to the last bin
     if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
-      return ReconConstants.NUM_OF_BINS - 1;
+      return ReconConstants.NUM_OF_FILE_SIZE_BINS - 1;
     }
     int index = nextClosestPowerIndexOfTwo(fileSize);
     // if the file size is smaller than our track scope,
     // we map it to the first bin
     return index < 10 ? 0 : index - 10;
+  }
+
+  public static int getContainerSizeBinIndex(long containerSize) {
+    // if the container size is larger than our track scope,
+    // we map it to the last bin
+    if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
+      return ReconConstants.NUM_OF_CONTAINER_SIZE_BINS - 1;
+    }
+    int index = nextClosestPowerIndexOfTwo(containerSize);
+    // if the container size is smaller than our track scope,
+    // we map it to the first bin
+    return index < 29 ? 0 : index - 29;
   }
 
   private static int nextClosestPowerIndexOfTwo(long dataSize) {
@@ -317,5 +344,13 @@ public class ReconUtils {
       index += 1;
     }
     return index;
+  }
+
+  public SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        HddsServerUtil.getReconDataNodeBindAddress(conf));
+    return builder.build();
   }
 }

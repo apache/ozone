@@ -19,12 +19,13 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,6 +39,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 
 
+import java.nio.file.Path;
+
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -47,8 +51,8 @@ import static org.mockito.Mockito.when;
  */
 @SuppressWarnings("visibilityModifier")
 public class TestBucketRequest {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   protected OzoneManager ozoneManager;
   protected OMMetrics omMetrics;
@@ -62,31 +66,40 @@ public class TestBucketRequest {
       });
 
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     ozoneManager = Mockito.mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
         BucketLayout.fromString(
             OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT));
+
+    setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
+
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+        .thenAnswer(invocation -> new ResolvedBucket(
+            invocation.getArgument(0), invocation.getArgument(0),
+            "", BucketLayout.DEFAULT));
   }
 
-  @After
+  @AfterEach
   public void stop() {
     omMetrics.unRegister();
     Mockito.framework().clearInlineMocks();

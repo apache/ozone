@@ -27,14 +27,15 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -66,7 +67,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public Timeout timeout = Timeout.seconds(600);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -94,9 +95,11 @@ public class TestKeyValueContainerMarkUnhealthy {
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
-    HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
-        .toString()).build();
+    String dataDir = folder.newFolder("data").getAbsolutePath();
+    HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)
+        .conf(conf)
+        .datanodeUuid(datanodeId.toString())
+        .build();
     hddsVolume.format(scmId);
     hddsVolume.createWorkingDir(scmId, null);
 
@@ -109,8 +112,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
-    final File metaDir = GenericTestUtils.getRandomizedTestDir();
-    metaDir.mkdirs();
+    final File metaDir = folder.newFolder("meta");
     keyValueContainerData.setMetadataPath(metaDir.getPath());
 
 

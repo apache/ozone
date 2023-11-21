@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -45,7 +44,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.SpyInputStream;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.AfterClass;
@@ -59,6 +57,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Test the tar/untar for a given container.
@@ -308,7 +307,7 @@ public class TestTarContainerPacker {
 
     File containerFile = packContainerWithSingleFile(file, entryName);
 
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> unpackContainerData(containerFile));
   }
 
@@ -325,7 +324,7 @@ public class TestTarContainerPacker {
 
     File containerFile = packContainerWithSingleFile(file, entryName);
 
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> unpackContainerData(containerFile));
   }
 
@@ -381,7 +380,9 @@ public class TestTarContainerPacker {
     File targetFile = TEMP_DIR.resolve("container.tar").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
          OutputStream compressed = packer.compress(output);
-         ArchiveOutputStream archive = new TarArchiveOutputStream(compressed)) {
+         TarArchiveOutputStream archive =
+             new TarArchiveOutputStream(compressed)) {
+      archive.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       TarContainerPacker.includeFile(file, entryName, archive);
     }
     return targetFile;

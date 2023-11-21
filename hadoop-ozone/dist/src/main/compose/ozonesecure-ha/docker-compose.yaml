@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.8"
 services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}

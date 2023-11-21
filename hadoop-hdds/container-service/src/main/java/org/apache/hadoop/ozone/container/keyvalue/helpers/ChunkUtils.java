@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
@@ -59,6 +61,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,6 +183,15 @@ public final class ChunkUtils {
     }
   }
 
+  public static ChunkBuffer readData(long len, int bufferCapacity,
+      CheckedConsumer<ByteBuffer[], StorageContainerException> readMethod)
+      throws StorageContainerException {
+    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len,
+        bufferCapacity);
+    readMethod.accept(buffers);
+    return ChunkBuffer.wrap(Arrays.asList(buffers));
+  }
+
   /**
    * Reads data from an existing chunk file into a list of ByteBuffers.
    *
@@ -259,6 +271,33 @@ public final class ChunkUtils {
     return false;
   }
 
+
+  /**
+   * Validates chunk data and returns a boolean value that indicates if the
+   * chunk data should be overwritten.
+   *
+   * @param chunkFile - FileChannel of the chunkFile to write data into.
+   * @param info - chunk info.
+   * @return true if the chunkOffset is less than the chunkFile length,
+   *         false otherwise.
+   */
+  public static boolean validateChunkForOverwrite(FileChannel chunkFile,
+                                                  ChunkInfo info) {
+
+    if (isOverWriteRequested(chunkFile, info)) {
+      if (!isOverWritePermitted(info)) {
+        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
+            "without explicit request. {}", info);
+      }
+      return true;
+    }
+
+    // TODO: when overwriting a chunk, we should ensure that the new chunk
+    //  size is same as the old chunk size
+
+    return false;
+  }
+
   /**
    * Checks if we are getting a request to overwrite an existing range of
    * chunk.
@@ -276,6 +315,30 @@ public final class ChunkUtils {
 
     long offset = chunkInfo.getOffset();
     return offset < chunkFile.length();
+  }
+
+  /**
+   * Checks if a request to overwrite an existing range of a chunk has been
+   * received.
+   *
+   * @param channel - FileChannel of the file to check
+   * @param chunkInfo - Chunk information containing the offset
+   * @return true if the offset is less than the file length, indicating
+   *         a request to overwrite an existing range; false otherwise
+   */
+  public static boolean isOverWriteRequested(FileChannel channel, ChunkInfo
+      chunkInfo) {
+    long fileLen;
+    try {
+      fileLen = channel.size();
+    } catch (IOException e) {
+      String msg = "IO error encountered while getting the file size";
+      LOG.error(msg, e.getMessage());
+      throw new UncheckedIOException("IO error encountered while " +
+          "getting the file size for ", e);
+    }
+    long offset = chunkInfo.getOffset();
+    return offset < fileLen;
   }
 
   /**

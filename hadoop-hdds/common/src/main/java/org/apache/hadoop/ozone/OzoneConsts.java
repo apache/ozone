@@ -25,6 +25,7 @@ import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
@@ -101,6 +102,7 @@ public final class OzoneConsts {
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+  public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
 
 
   public static final String CONTAINER_EXTENSION = ".container";
@@ -141,9 +143,15 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
+  public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
+      "includeSnapshotData";
+  public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
+      "toExcludeSST";
 
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
+
+  public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
 
   /**
    * Supports Bucket Versioning.
@@ -193,6 +201,7 @@ public final class OzoneConsts {
   public static final String OM_KEY_PREFIX = "/";
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
+  public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
   public static final String OM_S3_VOLUME_PREFIX = "s3";
   public static final String OM_S3_SECRET = "S3Secret:";
   public static final String OM_PREFIX = "Prefix:";
@@ -287,9 +296,6 @@ public final class OzoneConsts {
   // but have containerID as key prefixes.
   public static final String SCHEMA_V3 = "3";
 
-  public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
-
   // Supported store types.
   public static final String OZONE = "ozone";
   public static final String S3 = "s3";
@@ -321,6 +327,7 @@ public final class OzoneConsts {
   public static final String ADD_ACLS = "addAcls";
   public static final String REMOVE_ACLS = "removeAcls";
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
+  public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String TO_KEY_NAME = "toKeyName";
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
@@ -372,6 +379,10 @@ public final class OzoneConsts {
   // For Multipart upload
   public static final int OM_MULTIPART_MIN_SIZE = 5 * 1024 * 1024;
 
+  // refer to :
+  // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
+  public static final int MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD = 10000;
+
   // GRPC block token metadata header and context key
   public static final String OZONE_BLOCK_TOKEN = "blocktoken";
   public static final Context.Key<UserGroupInformation> UGI_CTX_KEY =
@@ -418,12 +429,12 @@ public final class OzoneConsts {
    * contains illegal characters when creating/renaming key.
    *
    * Avoid the following characters in a key name:
-   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
-   * and Non-printable ASCII characters (128–255 decimal characters).
-   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   * "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", Quotation
+   * marks and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
    */
   public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
-          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
+          Pattern.compile("^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff]+$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX = "._COPYING_";
 
@@ -456,6 +467,10 @@ public final class OzoneConsts {
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
 
+  // RocksDB snapshot
+  public static final String SNAPSHOT_CANDIDATE_DIR = ".candidate";
+  public static final String ROCKSDB_SST_SUFFIX = ".sst";
+
   // SCM default service Id and node Id in non-HA where config is not defined
   // in non-HA style.
   public static final String SCM_DUMMY_NODEID = "scmNodeId";
@@ -471,8 +486,11 @@ public final class OzoneConsts {
   public static final String SCM_ROOT_CA_COMPONENT_NAME =
       Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
 
-  public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
-  public static final String SCM_ROOT_CA_PREFIX = "scm@";
+  // %s to distinguish different certificates
+  public static final String SCM_SUB_CA = "scm-sub";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "@";
+  public static final String SCM_ROOT_CA = "scm";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "@";
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
@@ -562,11 +580,15 @@ public final class OzoneConsts {
   public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
 
   public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_CHECKPOINT_DIR = "db.checkpoints";
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "diffState";
+
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
-
-  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
 
   /**
    * Name of the SST file backup directory placed under metadata dir.
@@ -586,4 +608,9 @@ public final class OzoneConsts {
    */
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
+  /**
+   * DB compaction log table name. Referenced in RDBStore.
+   */
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
 }

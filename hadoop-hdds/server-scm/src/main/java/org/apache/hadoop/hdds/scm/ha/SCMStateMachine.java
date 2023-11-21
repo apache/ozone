@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Collection;
 import java.util.Optional;
@@ -31,12 +32,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -62,6 +65,8 @@ import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * The SCMStateMachine is the state machine for SCMRatisServer. It is
  * responsible for applying ratis committed transactions to
@@ -83,9 +88,10 @@ public class SCMStateMachine extends BaseStateMachine {
   // ensures serializable between notifyInstallSnapshotFromLeader()
   // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
+  private List<ManagedSecretKey> installingSecretKeys = null;
 
   private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
-  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean(false);
+  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean();
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
@@ -99,7 +105,11 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.info("Updated lastAppliedTermIndex {} with transactionInfo term and" +
           "Index", latestTrxInfo);
     }
-    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
+    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat(scm.threadNamePrefix() + "SCMInstallSnapshot-%d")
+            .build()
+    );
     isInitialized = true;
   }
 
@@ -243,12 +253,23 @@ public class SCMStateMachine extends BaseStateMachine {
             return null;
           }
 
+          List<ManagedSecretKey> secretKeys;
+          try {
+            secretKeys =
+                scm.getScmHAManager().getSecretKeysFromLeader(leaderNodeId);
+            LOG.info("Got secret keys from leaders {}", secretKeys);
+          } catch (IOException ex) {
+            LOG.error("Failed to get secret keys from SCM leader {}",
+                leaderNodeId, ex);
+            return null;
+          }
+
           TermIndex termIndex =
               scm.getScmHAManager().verifyCheckpointFromLeader(
                   leaderNodeId, checkpoint);
 
           if (termIndex != null) {
-            setInstallingDBCheckpoint(checkpoint);
+            setInstallingSnapshotData(checkpoint, secretKeys);
           }
           return termIndex;
         },
@@ -283,6 +304,8 @@ public class SCMStateMachine extends BaseStateMachine {
         deletedBlockLog instanceof DeletedBlockLogImpl);
     ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
+
+    scm.scmHAMetricsUpdate(newLeaderId.toString());
   }
 
   @Override
@@ -379,9 +402,11 @@ public class SCMStateMachine extends BaseStateMachine {
   public void reinitialize() throws IOException {
     Preconditions.checkNotNull(installingDBCheckpoint);
     DBCheckpoint checkpoint = installingDBCheckpoint;
+    List<ManagedSecretKey> secretKeys = installingSecretKeys;
 
     // explicitly set installingDBCheckpoint to be null
     installingDBCheckpoint = null;
+    installingSecretKeys = null;
 
     TermIndex termIndex = null;
     try {
@@ -398,6 +423,10 @@ public class SCMStateMachine extends BaseStateMachine {
       this.setLastAppliedTermIndex(termIndex);
     } catch (IOException ioe) {
       LOG.error("Failed to unpause ", ioe);
+    }
+
+    if (secretKeys != null) {
+      requireNonNull(scm.getSecretKeyManager()).reinitialize(secretKeys);
     }
 
     getLifeCycle().transition(LifeCycle.State.STARTING);
@@ -423,8 +452,10 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
-  public void setInstallingDBCheckpoint(DBCheckpoint checkpoint) {
+  public void setInstallingSnapshotData(DBCheckpoint checkpoint,
+      List<ManagedSecretKey> secretKeys) {
     Preconditions.checkArgument(installingDBCheckpoint == null);
     installingDBCheckpoint = checkpoint;
+    installingSecretKeys = secretKeys;
   }
 }

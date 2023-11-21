@@ -36,8 +36,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -47,7 +45,6 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -56,7 +53,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +66,7 @@ import java.util.ArrayList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 /**
  * This class is used to test OzoneContainer.
@@ -122,7 +119,7 @@ public class TestOzoneContainer {
   }
 
   @After
-  public void cleanUp() throws Exception {
+  public void cleanUp() {
     BlockUtils.shutdownCache(conf);
 
     if (volumeSet != null) {
@@ -168,17 +165,8 @@ public class TestOzoneContainer {
           Long.valueOf(volCommitBytes + freeBytes));
     }
     BlockUtils.shutdownCache(conf);
-
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
-    // When OzoneContainer is started, the containers from disk should be
-    // loaded into the containerSet.
-    // Also expected to initialize committed space for each volume.
-    OzoneContainer ozoneContainer = new
-        OzoneContainer(datanodeDetails, conf, context, null);
+    OzoneContainer ozoneContainer = ContainerTestUtils
+        .getOzoneContainer(datanodeDetails, conf);
 
     ContainerSet containerset = ozoneContainer.getContainerSet();
     assertEquals(numTestContainers, containerset.containerCount());
@@ -203,17 +191,8 @@ public class TestOzoneContainer {
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         dbDirString.toString());
     ContainerTestUtils.enableSchemaV3(conf);
-
-    DatanodeStateMachine stateMachine = Mockito.mock(
-            DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
-    // When OzoneContainer is started, the containers from disk should be
-    // loaded into the containerSet.
-    // Also expected to initialize committed space for each volume.
-    OzoneContainer ozoneContainer = new
-            OzoneContainer(datanodeDetails, conf, context, null);
+    OzoneContainer ozoneContainer = ContainerTestUtils
+        .getOzoneContainer(datanodeDetails, conf);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
             ozoneContainer.getNodeReport().getStorageReportList().size());
     Assert.assertEquals(3,
@@ -225,16 +204,8 @@ public class TestOzoneContainer {
 
   @Test
   public void testBuildNodeReportWithDefaultRatisLogDir() throws Exception {
-    DatanodeStateMachine stateMachine = Mockito.mock(
-            DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
-    // When OzoneContainer is started, the containers from disk should be
-    // loaded into the containerSet.
-    // Also expected to initialize committed space for each volume.
-    OzoneContainer ozoneContainer = new
-            OzoneContainer(datanodeDetails, conf, context, null);
+    OzoneContainer ozoneContainer = ContainerTestUtils
+        .getOzoneContainer(datanodeDetails, conf);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
             ozoneContainer.getNodeReport().getStorageReportList().size());
     Assert.assertEquals(1,
@@ -263,15 +234,11 @@ public class TestOzoneContainer {
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
 
-    // we expect an out of space Exception
-    StorageContainerException e = LambdaTestUtils.intercept(
+    StorageContainerException e = assertThrows(
         StorageContainerException.class,
         () -> keyValueContainer.
             create(volumeSet, volumeChoosingPolicy, clusterId)
     );
-    if (!DISK_OUT_OF_SPACE.equals(e.getResult())) {
-      LOG.info("Unexpected error during container creation", e);
-    }
     assertEquals(DISK_OUT_OF_SPACE, e.getResult());
   }
 

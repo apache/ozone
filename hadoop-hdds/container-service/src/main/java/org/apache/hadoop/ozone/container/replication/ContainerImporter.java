@@ -17,9 +17,19 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -27,20 +37,12 @@ import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 
 /**
  * Imports container from tarball.
@@ -58,6 +60,9 @@ public class ContainerImporter {
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long containerSize;
 
+  private final Set<Long> importContainerProgress
+      = Collections.synchronizedSet(new HashSet<>());
+
   public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
       ContainerController controller,
       MutableVolumeSet volumeSet) {
@@ -65,9 +70,7 @@ public class ContainerImporter {
     this.controller = controller;
     this.volumeSet = volumeSet;
     try {
-      volumeChoosingPolicy = conf.getClass(
-          HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
-              .class, VolumeChoosingPolicy.class).newInstance();
+      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -76,17 +79,37 @@ public class ContainerImporter {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
+  public boolean isAllowedContainerImport(long containerID) {
+    return !importContainerProgress.contains(containerID) &&
+        containerSet.getContainer(containerID) == null;
+  }
+
   public void importContainer(long containerID, Path tarFilePath,
       HddsVolume hddsVolume, CopyContainerCompression compression)
       throws IOException {
-
-    HddsVolume targetVolume = hddsVolume;
-    if (targetVolume == null) {
-      targetVolume = chooseNextVolume();
+    if (!importContainerProgress.add(containerID)) {
+      deleteFileQuietely(tarFilePath);
+      LOG.warn("Container import in progress with container Id {}",
+          containerID);
+      throw new StorageContainerException("Container " +
+          "import in progress with container Id " + containerID,
+          ContainerProtos.Result.CONTAINER_EXISTS);
     }
-    try {
-      KeyValueContainerData containerData;
 
+    try {
+      if (containerSet.getContainer(containerID) != null) {
+        LOG.warn("Container already exists with container Id {}", containerID);
+        throw new StorageContainerException("Container already exists " +
+            "with container Id " + containerID,
+            ContainerProtos.Result.CONTAINER_EXISTS);
+      }
+
+      HddsVolume targetVolume = hddsVolume;
+      if (targetVolume == null) {
+        targetVolume = chooseNextVolume();
+      }
+
+      KeyValueContainerData containerData;
       TarContainerPacker packer = new TarContainerPacker(compression);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
@@ -103,12 +126,17 @@ public class ContainerImporter {
         containerSet.addContainer(container);
       }
     } finally {
-      try {
-        Files.delete(tarFilePath);
-      } catch (Exception ex) {
-        LOG.error("Got exception while deleting temporary container file: "
-            + tarFilePath.toAbsolutePath(), ex);
-      }
+      importContainerProgress.remove(containerID);
+      deleteFileQuietely(tarFilePath);
+    }
+  }
+
+  private static void deleteFileQuietely(Path tarFilePath) {
+    try {
+      Files.delete(tarFilePath);
+    } catch (Exception ex) {
+      LOG.error("Got exception while deleting temporary container file: "
+          + tarFilePath.toAbsolutePath(), ex);
     }
   }
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -47,10 +48,29 @@ public class ConfigurationExample extends ConfigurationExampleParent {
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
   private long waitTime = 1;
 
+  @Config(key = "time.duration", type = ConfigType.TIME, timeUnit =
+      TimeUnit.MINUTES, defaultValue = "1h", description = "N/A",
+      tags = ConfigTag.MANAGEMENT)
+  private Duration duration = Duration.ofSeconds(5);
+
+  @Config(key = "size.small", type = ConfigType.SIZE, defaultValue = "42MB",
+      tags = {},
+      description = "Testing SIZE with int field")
+  private int smallSize;
+
+  @Config(key = "size.large", type = ConfigType.SIZE,
+      defaultValue = "5GB", tags = {},
+      description = "Testing SIZE with long field")
+  private long largeSize;
+
   @Config(key = "threshold", type = ConfigType.DOUBLE, defaultValue = "10",
       description = "Threshold (To test DOUBLE config type)",
       tags = ConfigTag.MANAGEMENT)
   private double threshold = 10;
+
+  @Config(key = "dynamic", reconfigurable = true, defaultValue = "original",
+      description = "Test dynamic property", tags = {})
+  private String dynamic;
 
   public void setClientAddress(String clientAddress) {
     this.clientAddress = clientAddress;
@@ -96,7 +116,15 @@ public class ConfigurationExample extends ConfigurationExampleParent {
     return waitTime;
   }
 
+  public Duration getDuration() {
+    return duration;
+  }
+
   public double getThreshold() {
     return threshold;
+  }
+
+  public String getDynamic() {
+    return dynamic;
   }
 }

@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -50,7 +50,7 @@ public class MockApprover extends BaseApprover {
       X509CertificateHolder caCertificate,
       Date validFrom, Date validTill,
       PKCS10CertificationRequest request,
-      String scmId, String clusterId)
+      String scmId, String clusterId, String certId)
       throws IOException, OperatorCreationException {
     return null;
   }

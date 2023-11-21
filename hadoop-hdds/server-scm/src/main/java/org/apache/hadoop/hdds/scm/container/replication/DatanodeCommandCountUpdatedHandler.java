@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 public class DatanodeCommandCountUpdatedHandler implements
     EventHandler<DatanodeDetails> {
 
-  private ReplicationManager replicationManager;
+  private final ReplicationManager replicationManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeCommandCountUpdatedHandler.class);
 
@@ -41,7 +41,7 @@ public class DatanodeCommandCountUpdatedHandler implements
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
-    LOG.debug("DatanodeCommandCountUpdatedHandler called with datanode {}",
+    LOG.trace("DatanodeCommandCountUpdatedHandler called with datanode {}",
         datanodeDetails);
     replicationManager.datanodeCommandCountUpdated(datanodeDetails);
   }

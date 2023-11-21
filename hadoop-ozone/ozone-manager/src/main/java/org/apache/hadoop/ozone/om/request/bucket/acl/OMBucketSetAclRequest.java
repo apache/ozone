@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -52,17 +51,9 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMBucketSetAclRequest.class);
 
-  private static BooleanBiFunction< List<OzoneAcl>,
-        OmBucketInfo > bucketAddAclOp;
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
-
-  static {
-    bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
-      return omBucketInfo.setAcls(ozoneAcls);
-    };
-  }
+  private final String path;
+  private final List<OzoneAcl> ozoneAcls;
+  private final OzoneObj obj;
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
@@ -78,7 +69,7 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   }
 
   public OMBucketSetAclRequest(OMRequest omRequest) {
-    super(omRequest, bucketAddAclOp);
+    super(omRequest, (acls, omBucketInfo) -> omBucketInfo.setAcls(acls));
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
     obj = OzoneObjInfo.fromProtobuf(setAclRequest.getObj());
@@ -118,7 +109,7 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
+  void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,

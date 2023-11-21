@@ -18,13 +18,12 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -48,18 +47,19 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateD
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,8 +70,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestOMDirectoryCreateRequestWithFSO {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
@@ -83,15 +83,16 @@ public class TestOMDirectoryCreateRequestWithFSO {
             return null;
           });
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ozoneManager = Mockito.mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-            folder.newFolder().getAbsolutePath());
+            folder.toAbsolutePath().toString());
     OMRequestTestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = Mockito.mock(AuditLogger.class);
@@ -99,10 +100,12 @@ public class TestOMDirectoryCreateRequestWithFSO {
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
             any(OMClientRequest.class)))
-            .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
+            .thenReturn(new ResolvedBucket("", "",
+                    "", "", "",
+                    BucketLayout.DEFAULT));
   }
 
-  @After
+  @AfterEach
   public void stop() {
     omMetrics.unRegister();
     Mockito.framework().clearInlineMocks();
@@ -127,7 +130,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirectoryCreateRequestWithFSO.preExecute(ozoneManager);
 
     // As in preExecute, we modify original request.
-    Assert.assertNotEquals(omRequest, modifiedOmRequest);
+    Assertions.assertNotEquals(omRequest, modifiedOmRequest);
   }
 
   @Test
@@ -162,13 +165,13 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.OK);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.OK);
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
         .get(omMetadataManager.getBucketKey(volumeName, bucketName));
-    Assert.assertEquals(OzoneFSUtils.getFileCount(keyName),
+    Assertions.assertEquals(OzoneFSUtils.getFileCount(keyName),
         bucketInfo.getUsedNamespace());
   }
 
@@ -202,8 +205,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMClientResponse omClientResponse =
         omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   @Test
@@ -230,12 +233,12 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(VOLUME_NOT_FOUND,
+    Assertions.assertEquals(VOLUME_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
 
     // Key should not exist in DB
-    Assert.assertTrue("Unexpected directory entries!",
-            omMetadataManager.getDirectoryTable().isEmpty());
+    Assertions.assertTrue(omMetadataManager.getDirectoryTable().isEmpty(),
+        "Unexpected directory entries!");
 
   }
 
@@ -262,12 +265,12 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
     // Key should not exist in DB
-    Assert.assertTrue("Unexpected directory entries!",
-            omMetadataManager.getDirectoryTable().isEmpty());
+    Assertions.assertTrue(omMetadataManager.getDirectoryTable().isEmpty(),
+        "Unexpected directory entries!");
   }
 
   @Test
@@ -316,8 +319,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.OK);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.OK);
 
     // Key should exist in DB and cache.
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
@@ -370,11 +373,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
 
-    Assert.assertEquals("Wrong OM numKeys metrics",
-            0, ozoneManager.getMetrics().getNumKeys());
+    Assertions.assertEquals(0, ozoneManager.getMetrics().getNumKeys(),
+        "Wrong OM numKeys metrics");
 
     // Key should exist in DB and doesn't added to cache.
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
@@ -430,7 +433,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneFileName),
-            new CacheValue<>(Optional.of(omKeyInfo), txnID));
+            CacheValue.get(txnID, omKeyInfo));
     omMetadataManager.getKeyTable(getBucketLayout())
         .put(ozoneFileName, omKeyInfo);
 
@@ -450,18 +453,19 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
 
-    Assert.assertEquals("Wrong OM numKeys metrics",
-            0, ozoneManager.getMetrics().getNumKeys());
+    Assertions.assertEquals(0, ozoneManager.getMetrics().getNumKeys(),
+        "Wrong OM numKeys metrics");
 
     // Key should not exist in DB
-    Assert.assertNotNull(
+    Assertions.assertNotNull(
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneFileName));
     // Key should not exist in DB
-    Assert.assertEquals("Wrong directories count!", 3,
-            omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
+    Assertions.assertEquals(3,
+            omMetadataManager.getDirectoryTable().getEstimatedKeyCount(),
+        "Wrong directories count!");
   }
 
 
@@ -509,7 +513,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), txnID));
+            CacheValue.get(txnID, omKeyInfo));
     omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
@@ -528,20 +532,21 @@ public class TestOMDirectoryCreateRequestWithFSO {
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue("Invalid response code:" +
-                    omClientResponse.getOMResponse().getStatus(),
-            omClientResponse.getOMResponse().getStatus()
-                    == OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS,
+        "Invalid response code:" + omClientResponse.getOMResponse()
+            .getStatus());
 
-    Assert.assertEquals("Wrong OM numKeys metrics",
-            0, ozoneManager.getMetrics().getNumKeys());
+    Assertions.assertEquals(0, ozoneManager.getMetrics().getNumKeys(),
+        "Wrong OM numKeys metrics");
 
     // Key should not exist in DB
-    Assert.assertTrue(
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey) != null);
+    Assertions.assertNotNull(
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
     // Key should not exist in DB
-    Assert.assertEquals("Wrong directories count!",
-            1, omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
+    Assertions.assertEquals(1,
+        omMetadataManager.getDirectoryTable().getEstimatedKeyCount(),
+        "Wrong directories count!");
   }
 
   @Test
@@ -569,17 +574,17 @@ public class TestOMDirectoryCreateRequestWithFSO {
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    Assert.assertEquals(0L, omMetrics.getNumKeys());
+    Assertions.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
 
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
-    Assert.assertEquals(dirs.size(), omMetrics.getNumKeys());
+    Assertions.assertEquals(dirs.size(), omMetrics.getNumKeys());
   }
 
   @Test
@@ -604,18 +609,19 @@ public class TestOMDirectoryCreateRequestWithFSO {
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    Assert.assertEquals(0L, omMetrics.getNumKeys());
+    Assertions.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager,
                     100L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
             omClientResponse.getOMResponse().getStatus());
 
-    Assert.assertEquals("Unexpected directories!", 0,
-            omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
+    Assertions.assertEquals(0,
+            omMetadataManager.getDirectoryTable().getEstimatedKeyCount(),
+        "Unexpected directories!");
 
-    Assert.assertEquals(0, omMetrics.getNumKeys());
+    Assertions.assertEquals(0, omMetrics.getNumKeys());
   }
 
   @Test
@@ -643,19 +649,101 @@ public class TestOMDirectoryCreateRequestWithFSO {
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    Assert.assertEquals(0L, omMetrics.getNumKeys());
+    Assertions.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
             omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
 
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
-    Assert.assertEquals(dirs.size(), omMetrics.getNumKeys());
+    Assertions.assertEquals(dirs.size(), omMetrics.getNumKeys());
   }
 
+  @Test
+  public void testCreateDirectoryInheritParentDefaultAcls() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    List<String> dirs = new ArrayList<>();
+    String keyName = createDirKey(dirs, 3);
+
+    List<OzoneAcl> acls = new ArrayList<>();
+    acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
+    acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
+
+    // Create bucket with DEFAULT acls
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setAcls(acls));
+
+    // Verify bucket has DEFAULT acls.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
+        .get(bucketKey).getAcls();
+    Assertions.assertEquals(acls, bucketAcls);
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+
+    // Create dir with acls inherited from parent DEFAULT acls
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+        keyName);
+    OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    OMRequest modifiedOmReq = omDirCreateReqFSO.preExecute(ozoneManager);
+
+    omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMClientResponse omClientResponse =
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.OK);
+
+    // Verify sub dirs inherit parent DEFAULT acls.
+    verifyDirectoriesInheritAcls(dirs, volumeId, bucketId, bucketAcls);
+
+  }
+
+  private void verifyDirectoriesInheritAcls(List<String> dirs,
+      long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
+      throws IOException {
+    // bucketID is the parent
+    long parentID = bucketId;
+    List<OzoneAcl> expectedInheritAcls = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .collect(Collectors.toList());
+    System.out.println("expectedInheritAcls: " + expectedInheritAcls);
+
+    // dir should inherit parent DEFAULT acls and self has DEFAULT scope
+    // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
+    for (int indx = 0; indx < dirs.size(); indx++) {
+      String dirName = dirs.get(indx);
+      String dbKey;
+      // for index=0, parentID is bucketID
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+          parentID, dirName);
+      OmDirectoryInfo omDirInfo =
+          omMetadataManager.getDirectoryTable().get(dbKey);
+      List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
+      System.out.println(
+          "  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
+
+      Assertions.assertEquals(expectedInheritAcls, omDirAcls,
+          "Failed to inherit parent DEFAULT acls!");
+
+      parentID = omDirInfo.getObjectID();
+      expectedInheritAcls = omDirAcls;
+    }
+  }
 
   @NotNull
   private String createDirKey(List<String> dirs, int depth) {
@@ -678,16 +766,17 @@ public class TestOMDirectoryCreateRequestWithFSO {
     long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, dirName);
       OmDirectoryInfo omDirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
-      Assert.assertNotNull("Invalid directory!", omDirInfo);
-      Assert.assertEquals("Invalid directory!", dirName, omDirInfo.getName());
-      Assert.assertEquals("Invalid dir path!",
-              parentID + "/" + dirName, omDirInfo.getPath());
+      Assertions.assertNotNull(omDirInfo, "Invalid directory!");
+      Assertions.assertEquals(dirName, omDirInfo.getName(),
+          "Invalid directory!");
+      Assertions.assertEquals(parentID + "/" + dirName, omDirInfo.getPath(),
+          "Invalid dir path!");
       parentID = omDirInfo.getObjectID();
     }
   }
@@ -699,14 +788,14 @@ public class TestOMDirectoryCreateRequestWithFSO {
     long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, dirName);
       CacheValue<OmDirectoryInfo> omDirInfoCacheValue =
               omMetadataManager.getDirectoryTable()
                       .getCacheValue(new CacheKey<>(dbKey));
-      Assert.assertNull("Unexpected directory!", omDirInfoCacheValue);
+      Assertions.assertNull(omDirInfoCacheValue, "Unexpected directory!");
     }
   }
 

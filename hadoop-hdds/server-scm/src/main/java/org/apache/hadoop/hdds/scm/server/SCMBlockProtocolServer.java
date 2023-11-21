@@ -24,9 +24,11 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -70,6 +72,8 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -233,6 +237,7 @@ public class SCMBlockProtocolServer implements
       LOG.debug("SCM is informed by OM to delete {} blocks",
           keyBlocksInfoList.size());
     }
+
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
@@ -305,6 +310,7 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public boolean addSCM(AddSCMRequest request) throws IOException {
+    scm.checkAdminAccess(getRemoteUser(), false);
     LOG.debug("Adding SCM {} addr {} cluster id {}",
         request.getScmId(), request.getRatisAddr(), request.getClusterId());
 
@@ -332,8 +338,11 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
-      String clientMachine) throws IOException {
+      String clientMachine) {
     boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put("client", clientMachine);
+    auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
       Node client = null;
@@ -350,20 +359,19 @@ public class SCMBlockProtocolServer implements
         }
       });
       List<? extends Node> sortedNodeList = scm.getClusterMap()
-          .sortByDistanceCost(client, nodeList, nodes.size());
-      List<DatanodeDetails> ret = new ArrayList<>();
-      sortedNodeList.stream().forEach(node -> ret.add((DatanodeDetails)node));
-      return ret;
+          .sortByDistanceCost(client, nodeList, nodeList.size());
+      return sortedNodeList.stream().map(r -> (DatanodeDetails) r).collect(
+          Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, null, ex)
+          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, auditMap, ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, null)
+            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, auditMap)
         );
       }
     }

@@ -18,9 +18,17 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT;
 
 /**
  * Class that wraps the space df of the Datanode Volumes used by SCM
@@ -31,6 +39,8 @@ public class VolumeUsage implements SpaceUsageSource {
   private final CachingSpaceUsageSource source;
   private boolean shutdownComplete;
   private long reservedInBytes;
+
+  private static final Logger LOG = LoggerFactory.getLogger(VolumeUsage.class);
 
   VolumeUsage(SpaceUsageCheckParams checkParams) {
     source = new CachingSpaceUsageSource(checkParams);
@@ -53,6 +63,11 @@ public class VolumeUsage implements SpaceUsageSource {
   @Override
   public long getAvailable() {
     return source.getAvailable() - getRemainingReserved();
+  }
+
+  public long getAvailable(PrecomputedVolumeSpace precomputedVolumeSpace) {
+    long available = precomputedVolumeSpace.getAvailable();
+    return available - getRemainingReserved(precomputedVolumeSpace);
   }
 
   @Override
@@ -79,8 +94,19 @@ public class VolumeUsage implements SpaceUsageSource {
     return Math.max(totalUsed - source.getUsedSpace(), 0L);
   }
 
+  private long getOtherUsed(PrecomputedVolumeSpace precomputedVolumeSpace) {
+    long totalUsed = precomputedVolumeSpace.getCapacity() -
+        precomputedVolumeSpace.getAvailable();
+    return Math.max(totalUsed - source.getUsedSpace(), 0L);
+  }
+
   private long getRemainingReserved() {
     return Math.max(reservedInBytes - getOtherUsed(), 0L);
+  }
+
+  private long getRemainingReserved(
+      PrecomputedVolumeSpace precomputedVolumeSpace) {
+    return Math.max(reservedInBytes - getOtherUsed(precomputedVolumeSpace), 0L);
   }
 
   public synchronized void start() {
@@ -100,5 +126,68 @@ public class VolumeUsage implements SpaceUsageSource {
 
   public void setReserved(long reserved) {
     this.reservedInBytes = reserved;
+  }
+
+  /**
+   * If 'hdds.datanode.volume.min.free.space' is defined,
+   * it will be honored first. If it is not defined and
+   * 'hdds.datanode.volume.min.free.space.' is defined,it will honor this
+   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   */
+  public static long getMinVolumeFreeSpace(ConfigurationSource conf,
+      long capacity) {
+    if (conf.isConfigured(
+        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE) && conf.isConfigured(
+        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
+      LOG.error(
+          "Both {} and {} are set. Set either one, not both. If both are set,"
+              + "it will use default value which is {} as min free space",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+    }
+
+    if (conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE)) {
+      return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
+    } else if (conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
+      float volumeMinFreeSpacePercent = Float.parseFloat(
+          conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+      return (long) (capacity * volumeMinFreeSpacePercent);
+    }
+    // either properties are not configured,then return
+    // HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
+    return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
+
+  }
+
+  /**
+   * Class representing precomputed space values of a volume.
+   * This class is intended to store precomputed values, such as capacity
+   * and available space of a volume, to avoid recalculating these
+   * values multiple times and to make method signatures simpler.
+   */
+  public static class PrecomputedVolumeSpace {
+    private final long capacity;
+    private final long available;
+
+    public PrecomputedVolumeSpace(long capacity, long available) {
+      this.capacity = capacity;
+      this.available = available;
+    }
+
+    public long getCapacity() {
+      return capacity;
+    }
+
+    public long getAvailable() {
+      return available;
+    }
+  }
+
+  public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
+    return new PrecomputedVolumeSpace(source.getCapacity(),
+        source.getAvailable());
   }
 }

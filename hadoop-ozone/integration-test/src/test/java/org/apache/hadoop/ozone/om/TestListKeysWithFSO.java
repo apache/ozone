@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +36,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +47,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
@@ -68,7 +72,7 @@ public class TestListKeysWithFSO {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -261,6 +265,11 @@ public class TestListKeysWithFSO {
     expectedKeys =
         getExpectedKeyList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
     checkKeyList("a1", "a1/b3/e3/e31.tx", expectedKeys, fsoOzoneBucket);
+
+    // case-10: keyPrefix corresponds an exist file
+    expectedKeys =
+        getExpectedKeyList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
+    checkKeyList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -403,6 +412,71 @@ public class TestListKeysWithFSO {
     checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
   }
 
+  @Test
+  public void testShallowListKeys() throws Exception {
+    List<String> expectedKeys;
+
+    // case-1: startKey not reaches last key
+    String keyPrefix = "a1/b1/";
+    String startKey = "a1/b1/c12/c2.tx";
+    // a1/b1/c12/
+    // a1/b1/c1222.tx
+    // a1/b1/c1333.tx
+    // a1/b1/c1444.tx
+    // a1/b1/c1555.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-2: startKey reaches last key
+    keyPrefix = "a1/b1/";
+    startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    // a1/b1/c1333.tx
+    // a1/b1/c1444.tx
+    // a1/b1/c1555.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-3: keyPrefix non-exist and startKey not reaches last key
+    keyPrefix = "a1/b";
+    startKey = "a1/b1/c1444.tx";
+    // a1/b1/
+    // a1/b2/
+    // a1/b3/
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-4: keyPrefix non-exist and startKey reaches last key
+    keyPrefix = "a1/b";
+    startKey = "a1/b1/c1555.tx";
+    // a1/b2/
+    // a1/b3/
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-5: keyPrefix corresponds to multiple existing keys.
+    keyPrefix = "a1/b1/c12";
+    startKey = "";
+    // a1/b1/c12/
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-6: keyPrefix corresponds to multiple existing keys and
+    // startKey reaches last key
+    keyPrefix = "a1/b1/c12";
+    startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+  }
+
   /**
    * Verify listKeys at different levels.
    *
@@ -476,9 +550,10 @@ public class TestListKeysWithFSO {
 
 
   private static List<String> getExpectedKeyList(String keyPrefix,
-      String startKey, OzoneBucket legacyBucket) throws Exception {
+      String startKey, OzoneBucket legacyBucket, boolean shallow)
+      throws Exception {
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        legacyBucket.listKeys(keyPrefix, startKey);
+        legacyBucket.listKeys(keyPrefix, startKey, shallow);
 
     List<String> keys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
@@ -488,15 +563,31 @@ public class TestListKeysWithFSO {
     return keys;
   }
 
+  private static List<String> getExpectedKeyList(String keyPrefix,
+      String startKey, OzoneBucket legacyBucket)
+      throws Exception {
+    return getExpectedKeyList(keyPrefix, startKey, legacyBucket, false);
+  }
+
+  private static List<String> getExpectedKeyShallowList(String keyPrefix,
+      String startKey, OzoneBucket legacyBucket) throws Exception {
+    return getExpectedKeyList(keyPrefix, startKey, legacyBucket, true);
+  }
+
   private void checkKeyList(String keyPrefix, String startKey,
-      List<String> keys, OzoneBucket fsoBucket) throws Exception {
+      List<String> keys, OzoneBucket fsoBucket, boolean shallow)
+      throws Exception {
 
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        fsoBucket.listKeys(keyPrefix, startKey);
+        fsoBucket.listKeys(keyPrefix, startKey, shallow);
+    ReplicationConfig expectedReplication =
+        Optional.ofNullable(fsoBucket.getReplicationConfig())
+            .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
+      Assert.assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
       keyLists.add(ozoneKey.getName());
     }
     LinkedList outputKeysList = new LinkedList(keyLists);
@@ -508,6 +599,16 @@ public class TestListKeysWithFSO {
     System.out.println("END:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
     Assert.assertEquals(keys, outputKeysList);
+  }
+
+  private void checkKeyList(String keyPrefix, String startKey,
+      List<String> keys, OzoneBucket fsoBucket) throws Exception {
+    checkKeyList(keyPrefix, startKey, keys, fsoBucket, false);
+  }
+
+  private void checkKeyShallowList(String keyPrefix, String startKey,
+      List<String> keys, OzoneBucket fsoBucket) throws Exception {
+    checkKeyList(keyPrefix, startKey, keys, fsoBucket, true);
   }
 
   private static void createKeys(OzoneBucket ozoneBucket, List<String> keys)

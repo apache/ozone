@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestStorageContainerManagerHelper;
+import org.apache.hadoop.ozone.scm.TestStorageContainerManagerHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -43,13 +43,16 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,20 +61,21 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore("HDDS-3260")
+@Category(UnhealthyTest.class) @Unhealthy("HDDS-3260")
 public class TestScmSafeMode {
 
   private static final Logger LOG = LoggerFactory
@@ -86,7 +90,7 @@ public class TestScmSafeMode {
 
 
   @Rule
-  public Timeout timeout = Timeout.seconds(200);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -129,7 +133,7 @@ public class TestScmSafeMode {
     }
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSafeModeOperations() throws Exception {
     // Create {numKeys} random names keys.
     TestStorageContainerManagerHelper helper =
@@ -172,16 +176,17 @@ public class TestScmSafeMode {
             .getBucket(bucketName);
 
 // As cluster is restarted with out datanodes restart
-    LambdaTestUtils.intercept(IOException.class,
-        "SafeModePrecheck failed for allocateBlock",
+    IOException ioException = assertThrows(IOException.class,
         () -> bucket1.createKey(keyName, 1000, RATIS, ONE,
             new HashMap<>()));
+    assertTrue(ioException.getMessage()
+        .contains("SafeModePrecheck failed for allocateBlock"));
   }
 
   /**
    * Tests inSafeMode & forceExitSafeMode api calls.
    */
-  @Test(timeout = 300_000)
+  @Test
   public void testIsScmInSafeModeAndForceExit() throws Exception {
     // Test 1: SCM should be out of safe mode.
     Assert.assertFalse(storageContainerLocationClient.inSafeMode());
@@ -214,7 +219,7 @@ public class TestScmSafeMode {
 
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSCMSafeMode() throws Exception {
     // Test1: Test safe mode  when there are no containers in system.
     cluster.stop();
@@ -252,8 +257,7 @@ public class TestScmSafeMode {
             HddsProtos.LifeCycleEvent.FINALIZE);
         mapping.updateContainerState(c.containerID(),
             LifeCycleEvent.CLOSE);
-      } catch (IOException | InvalidStateTransitionException |
-               TimeoutException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         LOG.info("Failed to change state of open containers.", e);
       }
     });
@@ -293,20 +297,19 @@ public class TestScmSafeMode {
     assertFalse(scm.isInSafeMode());
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSCMSafeModeRestrictedOp() throws Exception {
     cluster.stop();
     cluster = builder.build();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     assertTrue(scm.isInSafeMode());
 
-    LambdaTestUtils.intercept(SCMException.class,
-        "SafeModePrecheck failed for allocateContainer", () -> {
-          scm.getClientProtocolServer()
-              .allocateContainer(ReplicationType.STAND_ALONE,
-                  ReplicationFactor.ONE, "");
-        });
-
+    SCMException scmException = assertThrows(SCMException.class,
+        () -> scm.getClientProtocolServer()
+            .allocateContainer(ReplicationType.STAND_ALONE,
+                ReplicationFactor.ONE, ""));
+    assertTrue(scmException.getMessage()
+        .contains("SafeModePrecheck failed for allocateContainer"));
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
@@ -320,21 +323,22 @@ public class TestScmSafeMode {
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());
     final List<ContainerInfo> containers = scm.getContainerManager()
         .getContainers();
-    GenericTestUtils.waitFor(() -> {
-      return clientProtocolServer.getSafeModeStatus();
-    }, 50, 1000 * 30);
+    GenericTestUtils.waitFor(clientProtocolServer::getSafeModeStatus,
+        50, 1000 * 30);
     assertTrue(clientProtocolServer.getSafeModeStatus());
 
     cluster.shutdownHddsDatanodes();
     Thread.sleep(30000);
-    LambdaTestUtils.intercept(SCMException.class,
-        "Open container " + containers.get(0).getContainerID() + " "
-            + "doesn't have enough replicas to service this operation in Safe"
-            + " mode.", () -> clientProtocolServer
-            .getContainerWithPipeline(containers.get(0).getContainerID()));
+    scmException = assertThrows(SCMException.class,
+        () -> clientProtocolServer.getContainerWithPipeline(containers.get(0)
+            .getContainerID()));
+
+    assertEquals("Open container " + containers.get(0).getContainerID() +
+        " doesn't have enough replicas to service this operation in Safe" +
+        " mode.", scmException.getMessage());
   }
 
-  @Test(timeout = 300_000)
+  @Test
   public void testSCMSafeModeDisabled() throws Exception {
     cluster.shutdown();
 

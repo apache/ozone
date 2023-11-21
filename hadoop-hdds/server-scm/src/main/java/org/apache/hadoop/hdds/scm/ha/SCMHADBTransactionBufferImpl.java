@@ -21,12 +21,15 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -42,7 +45,10 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
-  private SnapshotInfo latestSnapshot;
+  private final AtomicReference<SnapshotInfo> latestSnapshot
+      = new AtomicReference<>();
+  private final AtomicLong txFlushPending = new AtomicLong(0);
+  private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
@@ -60,6 +66,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     rwLock.readLock().lock();
     try {
+      txFlushPending.getAndIncrement();
       table.putWithBatch(getCurrentBatchOperation(), key, value);
     } finally {
       rwLock.readLock().unlock();
@@ -71,6 +78,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       throws IOException {
     rwLock.readLock().lock();
     try {
+      txFlushPending.getAndIncrement();
       table.deleteWithBatch(getCurrentBatchOperation(), key);
     } finally {
       rwLock.readLock().unlock();
@@ -94,12 +102,17 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
-    return latestSnapshot;
+    return latestSnapshot.get();
   }
 
   @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
-    this.latestSnapshot = latestSnapshot;
+    this.latestSnapshot.set(latestSnapshot);
+  }
+
+  @Override
+  public AtomicReference<SnapshotInfo> getLatestSnapshotRef() {
+    return latestSnapshot;
   }
 
   @Override
@@ -114,7 +127,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
       metadataStore.getStore().commitBatchOperation(currentBatchOperation);
       currentBatchOperation.close();
-      this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
+      this.latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
       // reset batch operation
       currentBatchOperation = metadataStore.getStore().initBatchOperation();
 
@@ -124,6 +137,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           deletedBlockLog instanceof DeletedBlockLogImpl);
       ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
     } finally {
+      txFlushPending.set(0);
+      lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
     }
   }
@@ -134,6 +149,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
     rwLock.writeLock().lock();
     try {
+      IOUtils.closeQuietly(currentBatchOperation);
+
       // initialize a batch operation during construction time
       currentBatchOperation = this.metadataStore.getStore().
           initBatchOperation();
@@ -148,9 +165,22 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
                 .setCurrentTerm(0)
                 .build();
       }
-      latestSnapshot = latestTrxInfo.toSnapshotInfo();
+      latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
     } finally {
+      txFlushPending.set(0);
+      lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
+    }
+  }
+  
+  @Override
+  public boolean shouldFlush(long snapshotWaitTime) {
+    rwLock.readLock().lock();
+    try {
+      long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
+      return txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
+    } finally {
+      rwLock.readLock().unlock();
     }
   }
 

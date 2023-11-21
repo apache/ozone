@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -41,7 +42,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +68,7 @@ public class TestContainerStateMachineFlushDelay {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -117,6 +120,7 @@ public class TestContainerStateMachineFlushDelay {
             .setStreamBufferSizeUnit(StorageUnit.BYTES)
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
+            .setSecretKeyClient(new SecretKeyTestClient())
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();

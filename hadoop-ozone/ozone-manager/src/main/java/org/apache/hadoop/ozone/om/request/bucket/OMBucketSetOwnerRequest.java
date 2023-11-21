@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -47,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -107,7 +107,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
@@ -119,8 +119,9 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       }
 
       // acquire lock.
-      acquiredBucketLock =  omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo omBucketInfo =
@@ -161,13 +162,13 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
 
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMBucketSetOwnerResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketSetOwnerResponse(
@@ -176,8 +177,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

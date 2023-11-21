@@ -21,7 +21,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.OUTOFSERVICE_FACTOR_DEFAULT;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_MAX_STREAMS_DEFAULT;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_OUTOFSERVICE_FACTOR_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -34,22 +36,30 @@ public class TestReplicationConfig {
   public void acceptsValidValues() {
     // GIVEN
     int validReplicationLimit = 123;
+    double validOutOfServiceFactor = 3.0;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, validReplicationLimit);
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        validOutOfServiceFactor);
 
     // WHEN
     ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
 
     // THEN
     assertEquals(validReplicationLimit, subject.getReplicationMaxStreams());
+    assertEquals(validOutOfServiceFactor, subject.getOutOfServiceFactor(),
+        0.001);
   }
 
   @Test
   public void overridesInvalidValues() {
     // GIVEN
     int invalidReplicationLimit = -5;
+    double invalidOutOfServiceFactor = 0.5;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(REPLICATION_STREAMS_LIMIT_KEY, invalidReplicationLimit);
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        invalidOutOfServiceFactor);
 
     // WHEN
     ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
@@ -57,6 +67,8 @@ public class TestReplicationConfig {
     // THEN
     assertEquals(REPLICATION_MAX_STREAMS_DEFAULT,
         subject.getReplicationMaxStreams());
+    assertEquals(OUTOFSERVICE_FACTOR_DEFAULT,
+        subject.getOutOfServiceFactor(), 0.001);
   }
 
   @Test
@@ -70,6 +82,8 @@ public class TestReplicationConfig {
     // THEN
     assertEquals(REPLICATION_MAX_STREAMS_DEFAULT,
         subject.getReplicationMaxStreams());
+    assertEquals(OUTOFSERVICE_FACTOR_DEFAULT,
+        subject.getOutOfServiceFactor(), 0.001);
   }
 
 }

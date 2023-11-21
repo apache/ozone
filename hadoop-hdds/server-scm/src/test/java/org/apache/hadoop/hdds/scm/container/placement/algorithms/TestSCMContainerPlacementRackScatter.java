@@ -48,6 +48,7 @@ import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -63,6 +64,8 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -105,7 +108,41 @@ public class TestSCMContainerPlacementRackScatter {
     setup(datanodeCount, NODE_PER_RACK);
   }
 
-  private void setup(int datanodeCount, int nodesPerRack) {
+  /**
+   * Sets up cluster in a way such that there's one datanode per rack, except
+   * the last rack, which has datanodesInLastRackCount number of datanodes.
+   * @param rackCount number of racks this cluster should have, including the
+   * last rack
+   * @param datanodesInLastRackCount number of datanodes that should be in
+   * the last rack
+   */
+  private void setupOneDatanodePerRackWithExtraInLastRack(int rackCount,
+      int datanodesInLastRackCount) {
+    setupConfiguration();
+
+    String rack = "/rack";
+    String hostname = "node";
+    // add a datanode per rack to each rack except the last one
+    for (int i = 0; i < rackCount - 1; i++) {
+      DatanodeDetails datanodeDetails =
+          MockDatanodeDetails.createDatanodeDetails(
+              hostname + i, rack + i);
+      setupDatanode(datanodeDetails);
+    }
+
+    // add datanodesInLastRackCount number of datanodes to the last rack
+    for (int i = 0; i < datanodesInLastRackCount; i++) {
+      DatanodeDetails datanodeDetails =
+          MockDatanodeDetails.createDatanodeDetails(
+              hostname + (rackCount - 1 + i), rack + (rackCount - 1));
+      setupDatanode(datanodeDetails);
+    }
+
+    createMocksAndUpdateStorageReports(
+        rackCount - 1 + datanodesInLastRackCount);
+  }
+
+  private void setupConfiguration() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
     // We are using small units here
@@ -115,7 +152,10 @@ public class TestSCMContainerPlacementRackScatter {
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+  }
 
+  private void setup(int datanodeCount, int nodesPerRack) {
+    setupConfiguration();
     // build datanodes, and network topology
     String rack = "/rack";
     String hostname = "node";
@@ -123,28 +163,40 @@ public class TestSCMContainerPlacementRackScatter {
       // Totally 6 racks, each has 5 datanodes
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / nodesPerRack));
-
-      datanodes.add(datanodeDetails);
-      cluster.add(datanodeDetails);
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
-          datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
-
-      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
-          STORAGE_CAPACITY, 0, 100L, null);
-      MetadataStorageReportProto metaStorage1 =
-          HddsTestUtils.createMetadataStorageReport(
-          "/metadata1-" + datanodeInfo.getUuidString(),
-          STORAGE_CAPACITY, 0, 100L, null);
-      datanodeInfo.updateStorageReports(
-          new ArrayList<>(Arrays.asList(storage1)));
-      datanodeInfo.updateMetaDataStorageReports(
-          new ArrayList<>(Arrays.asList(metaStorage1)));
-      dnInfos.add(datanodeInfo);
+              hostname + i, rack + (i / nodesPerRack));
+      setupDatanode(datanodeDetails);
     }
 
+    createMocksAndUpdateStorageReports(datanodeCount);
+  }
+
+  /**
+   * Adds the datanode to class level data structures and Network Topology.
+   * Creates a DatanodeInfo object and storage reports for it.
+   * @param datanodeDetails the datanode to setup
+   */
+  private void setupDatanode(DatanodeDetails datanodeDetails) {
+    datanodes.add(datanodeDetails);
+    cluster.add(datanodeDetails);
+    DatanodeInfo datanodeInfo = new DatanodeInfo(
+        datanodeDetails, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultLayoutVersionProto());
+
+    StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+        datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+        STORAGE_CAPACITY, 0, 100L, null);
+    MetadataStorageReportProto metaStorage1 =
+        HddsTestUtils.createMetadataStorageReport(
+            "/metadata1-" + datanodeInfo.getUuidString(),
+            STORAGE_CAPACITY, 0, 100L, null);
+    datanodeInfo.updateStorageReports(
+        new ArrayList<>(Collections.singletonList(storage1)));
+    datanodeInfo.updateMetaDataStorageReports(
+        new ArrayList<>(Collections.singletonList(metaStorage1)));
+    dnInfos.add(datanodeInfo);
+  }
+
+  private void createMocksAndUpdateStorageReports(int datanodeCount) {
     if (datanodeCount > 4) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
           dnInfos.get(2).getUuid(),
@@ -191,7 +243,7 @@ public class TestSCMContainerPlacementRackScatter {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
     when(nodeManager.getClusterNetworkTopologyMap())
@@ -351,34 +403,11 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
     excludedNodes.add(datanodes.get(5));
-    if (datanodeCount == 6) {
-      /*
-      * when datanodeCount is 6, the clusterMap will be
-      * /rack0/node0
-      * /rack0/node1
-      * /rack0/node2
-      * /rack0/node3
-      * /rack0/node4
-      * /rack1/node5
-      * if we select node0 and node5 as the excluded datanode,
-      * only datanode in rack0 will be chosen when calling
-      * `policy.chooseDatanodes` and the placement will not be
-      *  met since there are two racks exist, but only one
-      * of them is chosen
-      * */
-      SCMException e = assertThrows(SCMException.class,
-          () -> policy.chooseDatanodes(excludedNodes, null, 3, 0, 15));
-      String message = e.getMessage();
-      assertTrue(message.contains("Chosen nodes size from Unique Racks: 1," +
-              " but required nodes to choose from Unique Racks: " +
-              "2 do not match."));
-    } else {
-      datanodeDetails = policy.chooseDatanodes(
-          excludedNodes, null, nodeNum, 0, 15);
-      Assertions.assertEquals(nodeNum, datanodeDetails.size());
-      Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
-          Math.min(totalNum, rackNum));
-    }
+    datanodeDetails = policy.chooseDatanodes(
+        excludedNodes, null, nodeNum, 0, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+        Math.min(totalNum, rackNum));
   }
 
   @ParameterizedTest
@@ -486,7 +515,7 @@ public class TestSCMContainerPlacementRackScatter {
     Assertions.assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
     for (DatanodeInfo dn: dnInfoList) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
 
@@ -607,34 +636,96 @@ public class TestSCMContainerPlacementRackScatter {
             true, 0);
   }
 
+  /**
+   * The expectation is that one datanode should be chosen, even though the
+   * placement policy ideally requires two more racks.
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-9011">...</a>
+   */
   @Test
-  public void testChooseNodesWithUsedNodesWithInsufficientRequiredNodeCount() {
+  public void shouldChooseNodeIfNodesRequiredLessThanAdditionalRacksRequired()
+      throws SCMException {
+    setup(5, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+
+    List<DatanodeDetails> chosenNodes =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNodes.size());
+    /*
+    The chosen node should be node4 from the third rack because we prefer to
+    choose from racks that don't have used or excluded nodes.
+     */
+    Assertions.assertEquals(datanodes.get(4), chosenNodes.get(0));
+  }
+
+  /**
+   * Scenario:
+   * rack0 -> node0
+   * rack1 -> node1
+   * rack2 -> node2
+   * rack3 -> node3
+   * rack4 -> node4
+   * rack5 -> node5, node6
+   * <p>
+   * node0, node1, node5, node6 are used nodes. node2 is excluded. We are
+   * asking the placement policy for one more node. Expectation is that an
+   * SCMException should be thrown if fallback is false because we're asking
+   * for one more node while placement policy requires two more racks. Else,
+   * either node3 or node4 should be returned.
+   */
+  @Test
+  public void shouldChooseNodeWhenOneNodeRequiredAndTwoRacksRequired()
+      throws SCMException {
+    setupOneDatanodePerRackWithExtraInLastRack(6, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1, 5,
+        5));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+
+    List<DatanodeDetails> chosenNode =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNode.size());
+    Assertions.assertTrue(chosenNode.get(0).equals(datanodes.get(3)) ||
+        chosenNode.get(0).equals(datanodes.get(4)));
+  }
+
+  @Test
+  public void testChooseNodesWithInsufficientNodesAvailable() {
     setup(5, 2);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
     List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
     SCMException exception = Assertions.assertThrows(SCMException.class, () ->
-            policy.chooseDatanodes(usedDns, excludedDns,
-                    null, 1, 0, 5));
-    assertEquals("Required nodes size: 1 is less than " +
-            "required number of racks to choose: 2.", exception.getMessage());
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 3, 0, 5));
+    assertThat(exception.getMessage(),
+        matchesPattern("^No enough datanodes to choose.*"));
     assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
-            exception.getResult());
+        exception.getResult());
   }
 
+  /**
+   * Simulate a scenario with three racks and two datanodes per rack.
+   * Two new nodes are required and the only available ones are on the same
+   * rack. The expectation is that both these nodes on the same rack should be
+   * chosen, since max replicas allowed per rack in this situation is 2.
+   */
   @Test
-  public void testInValidChooseNodesWithUsedNodesWithInsufficientRacks() {
+  public void chooseNodesOnTheSameRackWhenInSufficientRacks()
+      throws SCMException {
     setup(6, 2);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
     updateStorageInDatanode(4, 99, 1);
     List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(5));
-    SCMException exception = Assertions.assertThrows(SCMException.class, () ->
-            policy.chooseDatanodes(usedDns, excludedDns,
-                    null, 2, 0, 5));
-    assertEquals("Chosen nodes size from Unique Racks: 1, but required " +
-            "nodes to choose from Unique Racks: 2 do not match.",
-            exception.getMessage());
-    assertEquals(FAILED_TO_FIND_HEALTHY_NODES,
-            exception.getResult());
+
+    List<DatanodeDetails> chosenDatanodes =
+        policy.chooseDatanodes(usedDns, excludedDns, null, 2, 0, 5);
+
+    Assertions.assertEquals(2, chosenDatanodes.size());
+    for (DatanodeDetails dn : chosenDatanodes) {
+      Assertions.assertTrue(
+          dn.equals(datanodes.get(2)) || dn.equals(datanodes.get(3)));
+    }
   }
 
   @Test
@@ -690,6 +781,56 @@ public class TestSCMContainerPlacementRackScatter {
         excludedNodes, null, nodeNum, 0, 5);
     Assertions.assertEquals(nodeNum, datanodeDetails.size());
   }
+
+  @Test
+  public void testAllNodesOnRackExcludedReducesRackCount()
+      throws SCMException {
+    setup(10, 2);
+    // Here we have the following nodes / racks. Note that rack 4 is all
+    // excluded, so this test ensures we still get a node returned on the
+    // reduced set of racks.
+    // /rack0/node0 - used
+    // /rack0/node1 - free
+    // /rack1/node2 - used
+    // /rack1/node3 - free
+    // /rack2/node4 - used
+    // /rack2/node5 - free
+    // /rack3/node6 - used
+    // /rack3/node7 - free
+    // /rack4/node8 - excluded
+    // /rack4/node9 - excluded
+
+    List<DatanodeDetails> usedDns =
+        getDatanodes(Lists.newArrayList(0, 2, 4, 6));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(8, 9));
+
+    List<DatanodeDetails> chosenNodes =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNodes.size());
+  }
+
+  @Test
+  public void testAllNodesOnRackExcludedReducesRackCount2()
+      throws SCMException {
+    setup(5, 2);
+    // Here we have a setup like this, which is like a Ratis container with a
+    // decommissioning node on rack 2. This makes rack 2 excluded, so we should
+    // get a node returned on rack 0 or 1 instead.
+    // /rack0/node0 - used
+    // /rack0/node1 - free
+    // /rack1/node2 - used
+    // /rack1/node3 - free
+    // /rack2/node4 - excluded (eg decommissioning)
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 2));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(4));
+
+    List<DatanodeDetails> chosenNodes =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNodes.size());
+  }
+
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {
     Set<Node> racks = new HashSet<>();

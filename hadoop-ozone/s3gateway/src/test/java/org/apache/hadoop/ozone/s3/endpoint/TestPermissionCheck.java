@@ -35,6 +35,8 @@ import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +47,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
@@ -168,7 +171,8 @@ public class TestPermissionCheck {
   public void testListKey() throws IOException {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listKeys(anyString());
+    doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
+        anyBoolean());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 
@@ -263,8 +267,7 @@ public class TestPermissionCheck {
     objectEndpoint.setOzoneConfiguration(conf);
 
     try {
-      objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker",
-          null);
+      objectEndpoint.get("bucketName", "keyPath", 0, null, 1000, "marker");
       Assert.fail("Should fail");
     } catch (Exception e) {
       e.printStackTrace();
@@ -285,7 +288,8 @@ public class TestPermissionCheck {
     objectEndpoint.setOzoneConfiguration(conf);
 
     try {
-      objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
+      objectEndpoint.put("bucketName", "keyPath", 1024, 0, null,
+          new ByteArrayInputStream(new byte[]{}));
       Assert.fail("Should fail");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof OS3Exception);

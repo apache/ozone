@@ -22,8 +22,11 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -61,14 +64,16 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.assertj.core.util.Lists;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.mockito.Mockito;
 
 /**
@@ -80,7 +85,7 @@ public class TestOmMetrics {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
   private OzoneConfiguration conf;
@@ -237,7 +242,7 @@ public class TestOmMetrics {
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
     Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(),
-        any(), anyInt());
+        any(), anyInt(), eq(false));
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
@@ -323,14 +328,14 @@ public class TestOmMetrics {
     writeClient.deleteKey(keyArgs);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
-        new ECReplicationConfig("rs-6-4-1024K"));
+        new ECReplicationConfig("rs-6-3-1024K"));
     try {
       keySession = writeClient.openKey(keyArgs);
       writeClient.commitKey(keyArgs, keySession.getId());
     } catch (Exception e) {
       //Expected Failure in preExecute due to not enough datanode
       Assertions.assertTrue(e.getMessage()
-          .contains("No enough datanodes to choose"));
+          .contains("No enough datanodes to choose"), e::getMessage);
     }
 
     omMetrics = getMetrics("OMMetrics");
@@ -338,12 +343,13 @@ public class TestOmMetrics {
     assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
+    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
-    OmMetadataReader omMetadataReader = ozoneManager.getOmMetadataReader();
+    OmMetadataReader omMetadataReader =
+        (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
 
@@ -391,8 +397,7 @@ public class TestOmMetrics {
 
   @Test
   public void testSnapshotOps() throws Exception {
-    // This tests needs enough datanodes to allocate the
-    // blocks for the keys.
+    // This tests needs enough dataNodes to allocate the blocks for the keys.
     clusterBuilder.setNumDatanodes(3);
     startCluster();
 
@@ -420,10 +425,10 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotCreates", 1L, omMetrics);
     assertCounter("NumSnapshotListFails", 0L, omMetrics);
     assertCounter("NumSnapshotLists", 0L, omMetrics);
-
     assertCounter("NumSnapshotActive", 1L, omMetrics);
     assertCounter("NumSnapshotDeleted", 0L, omMetrics);
-    assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
+    assertCounter("NumSnapshotDiffJobs", 0L, omMetrics);
+    assertCounter("NumSnapshotDiffJobFails", 0L, omMetrics);
 
     // Create second key
     OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
@@ -434,13 +439,37 @@ public class TestOmMetrics {
     // Create second snapshot
     writeClient.createSnapshot(volumeName, bucketName, snapshot2);
 
+    // Snapshot diff
+    while (true) {
+      SnapshotDiffResponse response =
+          writeClient.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+              null, 100, false, false);
+      if (response.getJobStatus() == SnapshotDiffResponse.JobStatus.DONE) {
+        break;
+      } else {
+        Thread.sleep(response.getWaitTimeInMs());
+      }
+    }
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotDiffJobs", 1L, omMetrics);
+    assertCounter("NumSnapshotDiffJobFails", 0L, omMetrics);
+
     // List snapshots
-    writeClient.listSnapshot(volumeName, bucketName);
+    writeClient.listSnapshot(
+        volumeName, bucketName, null, null, Integer.MAX_VALUE);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumSnapshotActive", 2L, omMetrics);
     assertCounter("NumSnapshotCreates", 2L, omMetrics);
     assertCounter("NumSnapshotLists", 1L, omMetrics);
+    assertCounter("NumSnapshotListFails", 0L, omMetrics);
+
+    // List snapshot: invalid bucket case.
+    assertThrows(OMException.class, () -> writeClient.listSnapshot(volumeName,
+        "invalidBucket", null, null, Integer.MAX_VALUE));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotLists", 2L, omMetrics);
+    assertCounter("NumSnapshotListFails", 1L, omMetrics);
 
     // restart OM
     cluster.restartOzoneManager();
@@ -560,18 +589,18 @@ public class TestOmMetrics {
         new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
             IAccessAuthorizer.ACLType.ALL, ACCESS));
 
-    Assert.assertEquals(initialValue + 1, metrics.getNumAddAcl());
+    assertEquals(initialValue + 1, metrics.getNumAddAcl());
 
     // Test setAcl
     initialValue = metrics.getNumSetAcl();
 
     objectStore.setAcl(volObj, acls);
-    Assert.assertEquals(initialValue + 1, metrics.getNumSetAcl());
+    assertEquals(initialValue + 1, metrics.getNumSetAcl());
 
     // Test removeAcl
     initialValue = metrics.getNumRemoveAcl();
     objectStore.removeAcl(volObj, acls.get(0));
-    Assert.assertEquals(initialValue + 1, metrics.getNumRemoveAcl());
+    assertEquals(initialValue + 1, metrics.getNumRemoveAcl());
   }
 
   /**
@@ -624,7 +653,7 @@ public class TestOmMetrics {
     }
 
     try {
-      ozoneManager.listBuckets(info.getVolumeName(), null, null, 0);
+      ozoneManager.listBuckets(info.getVolumeName(), null, null, 0, false);
     } catch (IOException ignored) {
     }
 

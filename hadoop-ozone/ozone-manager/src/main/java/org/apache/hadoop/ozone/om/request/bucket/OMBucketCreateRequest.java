@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -93,7 +94,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
     // Verify resource name
-    OmUtils.validateBucketName(bucketInfo.getBucketName());
+    OmUtils.validateBucketName(bucketInfo.getBucketName(),
+        ozoneManager.isStrictS3());
 
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
@@ -126,6 +128,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
     if (hasSourceBucket && bucketInfo.hasBeinfo()) {
       throw new OMException("Encryption cannot be set for bucket links",
           OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    if (bucketInfo.hasDefaultReplicationConfig()) {
+      DefaultReplicationConfig drc = DefaultReplicationConfig.fromProto(
+          bucketInfo.getDefaultReplicationConfig());
+      ozoneManager.validateReplicationConfig(drc.getReplicationConfig());
     }
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
@@ -175,7 +183,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     String volumeKey = metadataManager.getVolumeKey(volumeName);
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false;
     boolean acquiredVolumeLock = false;
     OMClientResponse omClientResponse = null;
@@ -188,10 +196,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
             volumeName, bucketName, null);
       }
 
-      acquiredVolumeLock =
-          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock = metadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(
+          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+
+      mergeOmLockDetails(metadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs =
           metadataManager.getVolumeTable().getReadCopy(volumeKey);
@@ -230,15 +241,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
           omBucketInfo, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -246,11 +257,16 @@ public class OMBucketCreateRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+                bucketName));
       }
       if (acquiredVolumeLock) {
-        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -379,7 +395,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
-        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {

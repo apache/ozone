@@ -16,42 +16,71 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.util.Objects;
+import java.util.UUID;
+
 /**
  * SnapshotChain supporting SnapshotInfo class.
- *
+ * <p>
  * Defines and provides the interface to the SnapshotChainInfo
  * entry that comprises a SnapshotChain.
  * Getters / setters for current, prev, next element in snapshot chain.
  */
 public class SnapshotChainInfo {
-  private String snapshotID;
-  private String previousSnapshotID;
-  private String nextSnapshotID;
+  private final UUID snapshotId;
+  private UUID previousSnapshotId;
+  private UUID nextSnapshotId;
 
-  public SnapshotChainInfo(String snapshotID, String prev, String next) {
-    this.snapshotID = snapshotID;
-    previousSnapshotID = prev;
-    nextSnapshotID = next;
+  public SnapshotChainInfo(UUID snapshotID, UUID prev, UUID next) {
+    this.snapshotId = snapshotID;
+    this.previousSnapshotId = prev;
+    this.nextSnapshotId = next;
   }
 
-  public void setNextSnapshotID(String snapsID) {
-    nextSnapshotID = snapsID;
+  public void setNextSnapshotId(UUID snapsID) {
+    nextSnapshotId = snapsID;
   }
 
-  public void setPreviousSnapshotID(String snapsID) {
-    previousSnapshotID = snapsID;
+  public void setPreviousSnapshotId(UUID snapsID) {
+    previousSnapshotId = snapsID;
   }
 
-  public String getSnapshotID() {
-    return snapshotID;
+  public UUID getSnapshotId() {
+    return snapshotId;
   }
 
-  public String getNextSnapshotID() {
-    return nextSnapshotID;
+  public UUID getNextSnapshotId() {
+    return nextSnapshotId;
   }
 
-  public String getPreviousSnapshotID() {
-    return previousSnapshotID;
+  public boolean hasNextSnapshotId() {
+    return Objects.nonNull(getNextSnapshotId());
   }
 
+  public boolean hasPreviousSnapshotId() {
+    return Objects.nonNull(getPreviousSnapshotId());
+  }
+
+  public UUID getPreviousSnapshotId() {
+    return previousSnapshotId;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    SnapshotChainInfo that = (SnapshotChainInfo) o;
+    return Objects.equals(snapshotId, that.snapshotId) &&
+        Objects.equals(previousSnapshotId, that.previousSnapshotId) &&
+        Objects.equals(nextSnapshotId, that.nextSnapshotId);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(snapshotId, previousSnapshotId, nextSnapshotId);
+  }
 }

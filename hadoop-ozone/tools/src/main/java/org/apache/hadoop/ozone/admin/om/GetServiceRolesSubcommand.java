@@ -20,13 +20,18 @@ package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import picocli.CommandLine;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
@@ -44,8 +49,13 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
 
   @CommandLine.Option(names = {"-id", "--service-id"},
       description = "OM Service ID",
-      required = true)
+      required = false)
   private String omServiceId;
+
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
 
   private OzoneManagerProtocol ozoneManagerClient;
 
@@ -53,7 +63,11 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     try {
       ozoneManagerClient =  parent.createOmClient(omServiceId);
-      getOmServerRoles(ozoneManagerClient.getServiceList());
+      if (json) {
+        printOmServerRolesAsJson(ozoneManagerClient.getServiceList());
+      } else {
+        printOmServerRoles(ozoneManagerClient.getServiceList());
+      }
     } catch (OzoneClientException ex) {
       System.out.printf("Error: %s", ex.getMessage());
     } finally {
@@ -64,16 +78,36 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     return null;
   }
 
-  private void getOmServerRoles(List<ServiceInfo> serviceList) {
+  private void printOmServerRoles(List<ServiceInfo> serviceList) {
     for (ServiceInfo serviceInfo : serviceList) {
       OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
       if (omRoleInfo != null &&
           serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
         System.out.println(
-            serviceInfo.getOmRoleInfo().getNodeId() + " : " +
-                serviceInfo.getOmRoleInfo().getServerRole() + " (" +
+            omRoleInfo.getNodeId() + " : " +
+                omRoleInfo.getServerRole() + " (" +
                 serviceInfo.getHostname() + ")");
       }
     }
+  }
+
+  private void printOmServerRolesAsJson(List<ServiceInfo> serviceList)
+      throws IOException {
+    List<Map<String, Map<String, String>>> omServiceList = new ArrayList<>();
+    for (ServiceInfo serviceInfo : serviceList) {
+      OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
+      if (omRoleInfo != null &&
+          serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
+        Map<String, Map<String, String>> omService = new HashMap<>();
+        omService.put(omRoleInfo.getNodeId(),
+            new HashMap<String, String>() {{
+              put("serverRole", omRoleInfo.getServerRole());
+              put("hostname", serviceInfo.getHostname());
+            }});
+        omServiceList.add(omService);
+      }
+    }
+    System.out.print(
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(omServiceList));
   }
 }

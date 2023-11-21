@@ -28,14 +28,20 @@ import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -45,16 +51,19 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -69,6 +78,8 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private UserGroupInformation userGroupInformation;
   private InetAddress inetAddress;
+  private final ThreadLocal<OMLockDetails> omLockDetails =
+      ThreadLocal.withInitial(OMLockDetails::new);
 
   /**
    * Stores the result of request execution in
@@ -83,6 +94,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientRequest(OMRequest omRequest) {
     Preconditions.checkNotNull(omRequest);
     this.omRequest = omRequest;
+    this.omLockDetails.get().clear();
   }
   /**
    * Perform pre-execute steps on a OMRequest.
@@ -158,9 +170,17 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
+    String grpcContextClientIpAddress =
+        GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+    String grpcContextClientHostname =
+        GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+    } else if (grpcContextClientHostname != null
+        && grpcContextClientIpAddress != null) {
+      userInfo.setHostName(grpcContextClientHostname);
+      userInfo.setRemoteAddress(grpcContextClientIpAddress);
     }
 
     return userInfo.build();
@@ -258,50 +278,26 @@ public abstract class OMClientRequest implements RequestAuditor {
           obj.getVolumeName(),
           obj.getBucketName(), contextBuilder.getAclRights(),
           obj.getResourceType());
-      UserGroupInformation currentUser = createUGI();
+      UserGroupInformation currentUser = createUGIForApi();
       contextBuilder.setClientUgi(currentUser);
       contextBuilder.setIp(getRemoteAddress());
       contextBuilder.setHost(getHostName());
       contextBuilder.setAclType(IAccessAuthorizer.ACLIdentityType.USER);
 
       boolean isVolOwner = isOwner(currentUser, volumeOwner);
-      IAccessAuthorizer.ACLType parentAclRight = aclType;
       if (isVolOwner) {
         contextBuilder.setOwnerName(volumeOwner);
       } else {
         contextBuilder.setOwnerName(bucketOwner);
       }
-      if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
-        if (aclType == IAccessAuthorizer.ACLType.CREATE ||
-                aclType == IAccessAuthorizer.ACLType.DELETE ||
-                aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
-          parentAclRight = IAccessAuthorizer.ACLType.WRITE;
-        } else if (aclType == IAccessAuthorizer.ACLType.READ_ACL ||
-                aclType == IAccessAuthorizer.ACLType.LIST) {
-          parentAclRight = IAccessAuthorizer.ACLType.READ;
-        }
-      } else {
-        parentAclRight = IAccessAuthorizer.ACLType.READ;
 
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+          ozoneManager.getOmMetadataReader()) {
+        OmMetadataReader omMetadataReader =
+            (OmMetadataReader) rcMetadataReader.get();
+
+        omMetadataReader.checkAcls(obj, contextBuilder.build(), true);
       }
-      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
-              .setResType(OzoneObj.ResourceType.VOLUME)
-              .setStoreType(OzoneObj.StoreType.OZONE)
-              .setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setKeyName(keyName).build();
-      RequestContext volumeContext = RequestContext.newBuilder()
-              .setClientUgi(currentUser)
-              .setIp(getRemoteAddress())
-              .setHost(getHostName())
-              .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-              .setAclRights(parentAclRight)
-              .setOwnerName(volumeOwner)
-              .build();
-      ozoneManager.getOmMetadataReader().checkAcls(volumeObj,
-          volumeContext, true);
-      ozoneManager.getOmMetadataReader().checkAcls(obj,
-          contextBuilder.build(), true);
     }
   }
 
@@ -336,7 +332,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       String vol, String bucket, String key, String volOwner)
       throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress(), getHostName(), true,
+        createUGIForApi(), getRemoteAddress(), getHostName(), true,
         volOwner);
   }
 
@@ -361,10 +357,13 @@ public abstract class OMClientRequest implements RequestAuditor {
       String bucketOwner)
       throws IOException {
 
-    OzoneAclUtils.checkAllAcls(ozoneManager.getOmMetadataReader(),
-            resType, storeType, aclType,
-            vol, bucket, key, volOwner, bucketOwner, createUGI(),
-            getRemoteAddress(), getHostName());
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+        ozoneManager.getOmMetadataReader()) {
+      OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(),
+          resType, storeType, aclType,
+          vol, bucket, key, volOwner, bucketOwner, createUGIForApi(),
+          getRemoteAddress(), getHostName());
+    }
   }
 
   /**
@@ -373,7 +372,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return UserGroupInformation.
    */
   @VisibleForTesting
-  public UserGroupInformation createUGI() {
+  public UserGroupInformation createUGI() throws AuthenticationException {
 
     if (userGroupInformation != null) {
       return userGroupInformation;
@@ -384,10 +383,26 @@ public abstract class OMClientRequest implements RequestAuditor {
           omRequest.getUserInfo().getUserName());
       return userGroupInformation;
     } else {
-      // This will never happen, as for every OM request preExecute, we
-      // should add userInfo.
-      return null;
+      throw new AuthenticationException("User info is not set."
+          + " Please check client auth credentials");
     }
+  }
+
+  /**
+   * Crete a UGI from request and wrap the AuthenticationException
+   * to OMException in case of empty credentials.
+   * @return UserGroupInformation
+   * @throws OMException exception about an empty user credential
+   *                      (unauthorized request)
+   */
+  public UserGroupInformation createUGIForApi() throws OMException {
+    UserGroupInformation ugi;
+    try {
+      ugi = createUGI();
+    } catch (AuthenticationException e) {
+      throw new OMException(e, UNAUTHORIZED);
+    }
+    return ugi;
   }
 
   /**
@@ -433,7 +448,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return error response need to be returned to client - OMResponse.
    */
   protected OMResponse createErrorOMResponse(
-      @Nonnull OMResponse.Builder omResponse, @Nonnull IOException ex) {
+      @Nonnull OMResponse.Builder omResponse, @Nonnull Exception ex) {
 
     omResponse.setSuccess(false);
     String errorMsg = exceptionErrorMessage(ex);
@@ -459,8 +474,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  private String exceptionErrorMessage(IOException ex) {
-    if (ex instanceof OMException) {
+  private String exceptionErrorMessage(Exception ex) {
+    if (ex instanceof OMException || ex instanceof InvalidPathException) {
       return ex.getMessage();
     } else {
       return org.apache.hadoop.util.StringUtils.stringifyException(ex);
@@ -534,7 +549,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * ":", ".", "..", "//", "". If it has any of these characters throws
    * OMException, else return the path.
    */
-  private static String isValidKeyPath(String path) throws OMException {
+  public static String isValidKeyPath(String path) throws OMException {
     boolean isValid = true;
 
     // If keyName is empty string throw error.
@@ -568,5 +583,13 @@ public abstract class OMClientRequest implements RequestAuditor {
     } else {
       throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
     }
+  }
+
+  public OMLockDetails getOmLockDetails() {
+    return omLockDetails.get();
+  }
+
+  public void mergeOmLockDetails(OMLockDetails details) {
+    omLockDetails.get().merge(details);
   }
 }

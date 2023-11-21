@@ -19,10 +19,10 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -95,9 +95,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
-    // In production this will never happen, this request will be called only
-    // when we have quota in bytes is set in setVolumePropertyRequest.
-    if (!setVolumePropertyRequest.hasQuotaInBytes()) {
+    if (!setVolumePropertyRequest.hasQuotaInBytes()
+        && !setVolumePropertyRequest.hasQuotaInNamespace()) {
       omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
           .setSuccess(false);
       return new OMVolumeSetQuotaResponse(omResponse.build());
@@ -114,7 +113,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquireVolumeLock = false;
     OMClientResponse omClientResponse = null;
     try {
@@ -125,8 +124,9 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
             null, null);
       }
 
-      acquireVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquireVolumeLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
       if (checkQuotaBytesValid(omMetadataManager,
@@ -136,8 +136,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       } else {
         omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
-      if (checkQuotaNamespaceValid(
-          setVolumePropertyRequest.getQuotaInNamespace())) {
+      if (checkQuotaNamespaceValid(omMetadataManager,
+          setVolumePropertyRequest.getQuotaInNamespace(), volume)) {
         omVolumeArgs.setQuotaInNamespace(
             setVolumePropertyRequest.getQuotaInNamespace());
       } else {
@@ -152,13 +152,13 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());
       omClientResponse = new OMVolumeSetQuotaResponse(omResponse.build(),
           omVolumeArgs);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
@@ -166,7 +166,11 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquireVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -202,8 +206,11 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
-        volumeName, null, null, Integer.MAX_VALUE);
+        volumeName, null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
+      if (bucketInfo.isLink()) {
+        continue;
+      }
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
@@ -229,10 +236,23 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     return true;
   }
 
-  public boolean checkQuotaNamespaceValid(long quotaInNamespace) {
-
+  public boolean checkQuotaNamespaceValid(OMMetadataManager metadataManager,
+      long quotaInNamespace, String volumeName) throws IOException {
     if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
       return false;
+    }
+
+    // if volume quota is for reset, no need further check
+    if (quotaInNamespace == OzoneConsts.QUOTA_RESET) {
+      return true;
+    }
+
+    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
+        volumeName, null, null, Integer.MAX_VALUE, false);
+    if (bucketList.size() > quotaInNamespace) {
+      throw new OMException("Total number of buckets " + bucketList.size() +
+          " in this volume should not be greater than volume namespace quota "
+          + quotaInNamespace, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
   }

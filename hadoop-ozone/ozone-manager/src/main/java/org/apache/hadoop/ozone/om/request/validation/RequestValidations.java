@@ -17,9 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.protobuf.ServiceException;
-import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -33,7 +31,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateSnapshot;
 
 /**
  * Main class to configure and set up and access the request/response
@@ -68,7 +65,7 @@ public class RequestValidations {
     List<Method> validations = registry.validationsFor(
         conditions(request), request.getCmdType(), PRE_PROCESS);
 
-    OMRequest validatedRequest = createValidationRequest(request);
+    OMRequest validatedRequest = request.toBuilder().build();
     try {
       for (Method m : validations) {
         LOG.debug("Running the {} request pre-process validation from {}.{}",
@@ -112,26 +109,5 @@ public class RequestValidations {
     return Arrays.stream(ValidationCondition.values())
         .filter(c -> c.shouldApply(request, context))
         .collect(Collectors.toList());
-  }
-
-  /**
-   * Clones client request with updated parameters needed at server side.
-   * <p>
-   * e.g. For CreateSnapshot request, it clones the client request and adds
-   * snapshotId to a create snapshot request to make sure that all the OM
-   * nodes (leader and followers) have the same snapshotId.
-   */
-  private OMRequest createValidationRequest(OMRequest clientRequest) {
-    if (clientRequest.getCmdType() == CreateSnapshot) {
-      OzoneManagerProtocolProtos.CreateSnapshotRequest requestWithSnapshotId =
-          clientRequest.getCreateSnapshotRequest().toBuilder()
-              .setSnapshotId(UUID.randomUUID().toString())
-              .build();
-      return clientRequest.toBuilder()
-          .setCreateSnapshotRequest(requestWithSnapshotId)
-          .build();
-    } else {
-      return clientRequest.toBuilder().build();
-    }
   }
 }

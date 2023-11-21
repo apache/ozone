@@ -26,6 +26,7 @@ ${BUCKET}                      generated
 ${KEY_NAME}                    key1
 ${OZONE_S3_TESTS_SET_UP}       ${FALSE}
 ${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
+${OZONE_S3_ADDRESS_STYLE}      path
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -33,6 +34,7 @@ Execute AWSS3APICli
     ${output} =       Execute                    aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
+# For possible AWS CLI return codes see: https://docs.aws.amazon.com/cli/latest/topic/return-codes.html
 Execute AWSS3APICli and checkrc
     [Arguments]       ${command}                 ${expected_error_code}
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}
@@ -46,6 +48,11 @@ Execute AWSS3APICli and ignore error
 Execute AWSS3Cli
     [Arguments]       ${command}
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
+    [return]          ${output}
+
+Execute AWSS3CliDebug
+    [Arguments]       ${command}
+    ${output} =       Execute                     aws --debug s3 --endpoint ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
 Install aws cli
@@ -72,7 +79,9 @@ Setup v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
 
 Setup secure v4 headers
-    ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
+    ${result} =         Execute and Ignore error             ozone s3 getsecret ${OM_HA_PARAM}
+    ${output} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
+    Return From Keyword if      ${output}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
     ${accessKey} =      Get Variable Value         ${accessKey}  testuser
@@ -83,6 +92,8 @@ Setup secure v4 headers
                         Execute                    aws configure set aws_access_key_id ${accessKey}
                         Execute                    aws configure set aws_secret_access_key ${secret}
                         Execute                    aws configure set region us-west-1
+                        Execute                    aws configure set default.s3.addressing_style ${OZONE_S3_ADDRESS_STYLE}
+
 
 Setup dummy credentials for S3
                         Execute                    aws configure set default.s3.signature_version s3v4
@@ -112,6 +123,17 @@ Create bucket with name
     ${result} =          Execute AWSS3APICli  create-bucket --bucket ${bucket}
                          Should contain              ${result}         Location
                          Should contain              ${result}         ${bucket}
+Create legacy bucket
+    ${postfix} =         Generate Ozone String
+    ${legacy_bucket} =   Set Variable               legacy-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l LEGACY s3v/${legacy_bucket}   0
+    [Return]             ${legacy_bucket}
+
+Create obs bucket
+    ${postfix} =         Generate Ozone String
+    ${bucket} =   Set Variable               obs-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l OBJECT_STORE s3v/${bucket}   0
+    [Return]             ${bucket}
 
 Setup s3 tests
     Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}

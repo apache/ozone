@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -49,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -124,7 +124,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     String volumeName = null;
     boolean decVolumeRefCount = true;
 
-    IOException exception = null;
+    Exception exception = null;
     OmVolumeArgs omVolumeArgs = null;
 
     try {
@@ -148,8 +148,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       decVolumeRefCount = volumeName.length() > 0;
 
       // Acquire the volume lock
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
       // Check if there are any accessIds in the tenant
       if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
@@ -164,7 +165,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          CacheValue.get(transactionLogIndex));
 
       // Decrement volume refCount
       if (decVolumeRefCount) {
@@ -183,7 +184,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(dbVolumeKey),
-            new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, omVolumeArgs));
 
         // TODO: Set response dbVolumeKey?
       }
@@ -207,7 +208,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           omResponse.setDeleteTenantResponse(deleteTenantResponse).build(),
           volumeName, omVolumeArgs, tenantId);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMTenantDeleteResponse(
           createErrorOMResponse(omResponse, exception));
@@ -215,10 +216,15 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
+                volumeName));
       }
       // Release authorizer write lock
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Perform audit logging

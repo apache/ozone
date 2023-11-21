@@ -86,7 +86,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVer
  */
 public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
   private final ConfigurationSource conf;
@@ -178,9 +178,7 @@ public class HeartbeatEndpointTask
       addPipelineActions(requestBuilder);
       addQueuedCommandCounts(requestBuilder);
       SCMHeartbeatRequestProto request = requestBuilder.build();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Sending heartbeat message :: {}", request.toString());
-      }
+      LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
       processResponse(response, datanodeDetailsProto);
@@ -450,9 +448,9 @@ public class HeartbeatEndpointTask
     if (rpcEndpoint.getState() == EndPointStates.HEARTBEAT) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Received SCM notification to register."
-            + " Interrupt HEARTBEAT and transit to REGISTER state.");
+            + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
-      rpcEndpoint.setState(EndPointStates.REGISTER);
+      rpcEndpoint.setState(EndPointStates.GETVERSION);
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Illegal state {} found, expecting {}.",

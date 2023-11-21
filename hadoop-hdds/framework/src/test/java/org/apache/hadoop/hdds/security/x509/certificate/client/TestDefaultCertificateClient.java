@@ -19,17 +19,16 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,20 +44,20 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.Calendar;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -66,18 +65,19 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -91,6 +91,7 @@ public class TestDefaultCertificateClient {
   private HDDSKeyGenerator keyGenerator;
   private Path dnMetaDirPath;
   private SecurityConfig dnSecurityConfig;
+  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
   private KeyCodec dnKeyCodec;
 
@@ -112,17 +113,23 @@ public class TestDefaultCertificateClient {
     Files.createDirectories(dnSecurityConfig.getKeyLocation(DN_COMPONENT));
     x509Certificate = generateX509Cert(null);
     certSerialId = x509Certificate.getSerialNumber().toString();
+    scmSecurityClient = mock(SCMSecurityProtocolClientSideTranslatorPB.class);
     getCertClient();
   }
 
-  private void getCertClient() {
-    dnCertClient = new DNCertificateClient(dnSecurityConfig,
+  private void getCertClient() throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
+
+    dnCertClient = new DNCertificateClient(dnSecurityConfig, scmSecurityClient,
         MockDatanodeDetails.randomDatanodeDetails(), certSerialId, null,
         () -> System.exit(1));
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
+    dnCertClient.close();
     dnCertClient = null;
     FileUtils.deleteQuietly(dnMetaDirPath.toFile());
   }
@@ -204,9 +211,10 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getPublicKeyFileName()).toFile());
 
     // Expect error when there is no private key to sign.
-    LambdaTestUtils.intercept(IOException.class, "Error while " +
-            "signing the stream",
+    IOException ioException = assertThrows(IOException.class,
         () -> dnCertClient.signData(data.getBytes(UTF_8)));
+    assertTrue(ioException.getMessage()
+        .contains("Error while signing the stream"));
 
     generateKeyPairFiles();
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
@@ -267,33 +275,55 @@ public class TestDefaultCertificateClient {
     X509Certificate cert1 = generateX509Cert(keyPair);
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
+    X509Certificate rootCa1 = generateX509Cert(keyPair);
+    X509Certificate rootCa2 = generateX509Cert(keyPair);
+    X509Certificate subCa1 = generateX509Cert(keyPair);
+    X509Certificate subCa2 = generateX509Cert(keyPair);
 
     Path certPath = dnSecurityConfig.getCertificateLocation(DN_COMPONENT);
     CertificateCodec codec = new CertificateCodec(dnSecurityConfig,
         DN_COMPONENT);
 
     // Certificate not found.
-    LambdaTestUtils.intercept(CertificateException.class, "Error while" +
-            " getting certificate",
-        () -> dnCertClient.getCertificate(cert1.getSerialNumber()
-            .toString()));
-    LambdaTestUtils.intercept(CertificateException.class, "Error while" +
-            " getting certificate",
-        () -> dnCertClient.getCertificate(cert2.getSerialNumber()
-            .toString()));
-    LambdaTestUtils.intercept(CertificateException.class, "Error while" +
-            " getting certificate",
+    CertificateException certException = assertThrows(
+        CertificateException.class,
+        () -> dnCertClient.getCertificate(cert1.getSerialNumber().toString()));
+    assertTrue(certException.getMessage()
+        .contains("Error while getting certificate"));
+    certException = assertThrows(CertificateException.class,
+        () -> dnCertClient.getCertificate(cert2.getSerialNumber().toString()));
+    assertTrue(certException.getMessage()
+        .contains("Error while getting certificate"));
+    certException = assertThrows(CertificateException.class,
         () -> dnCertClient.getCertificate(cert3.getSerialNumber()
             .toString()));
+    assertTrue(certException.getMessage()
+        .contains("Error while getting certificate"));
     codec.writeCertificate(certPath, "1.crt",
         getPEMEncodedString(cert1));
     codec.writeCertificate(certPath, "2.crt",
         getPEMEncodedString(cert2));
     codec.writeCertificate(certPath, "3.crt",
         getPEMEncodedString(cert3));
+    codec.writeCertificate(certPath,
+        CAType.ROOT.getFileNamePrefix() + "1.crt",
+        getPEMEncodedString(rootCa1));
+    codec.writeCertificate(certPath,
+        CAType.ROOT.getFileNamePrefix() + "2.crt",
+        getPEMEncodedString(rootCa2));
+    codec.writeCertificate(certPath,
+        CAType.SUBORDINATE.getFileNamePrefix() + "1.crt",
+        getPEMEncodedString(subCa1));
+    codec.writeCertificate(certPath,
+        CAType.SUBORDINATE.getFileNamePrefix() + "2.crt",
+        getPEMEncodedString(subCa2));
 
     // Re instantiate DN client which will load certificates from filesystem.
-    dnCertClient = new DNCertificateClient(dnSecurityConfig, null,
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    dnCertClient = new DNCertificateClient(dnSecurityConfig, null, dn,
         certSerialId, null, null);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
@@ -303,6 +333,12 @@ public class TestDefaultCertificateClient {
     assertNotNull(dnCertClient.getCertificate(cert3.getSerialNumber()
         .toString()));
 
+    assertEquals(2, dnCertClient.getAllCaCerts().size());
+    assertTrue(dnCertClient.getAllCaCerts().contains(subCa1));
+    assertTrue(dnCertClient.getAllCaCerts().contains(subCa2));
+    assertEquals(2, dnCertClient.getAllRootCaCerts().size());
+    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa1));
+    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa2));
   }
 
   @Test
@@ -321,6 +357,25 @@ public class TestDefaultCertificateClient {
     assertNotNull(dnCertClient.getCertificate(cert2.getSerialNumber()
         .toString()));
     assertNotNull(dnCertClient.getCertificate(cert3.getSerialNumber()
+        .toString()));
+  }
+
+  @Test
+  public void testStoreMultipleRootCACertificate() throws Exception {
+    KeyPair keyPair = keyGenerator.generateKey();
+    X509Certificate cert1 = generateX509Cert(keyPair);
+    X509Certificate cert2 = generateX509Cert(keyPair);
+    X509Certificate cert3 = generateX509Cert(keyPair);
+
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1), CAType.ROOT);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2), CAType.ROOT);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3), CAType.ROOT);
+
+    assertEquals(cert1, dnCertClient.getCertificate(cert1.getSerialNumber()
+        .toString()));
+    assertEquals(cert2, dnCertClient.getCertificate(cert2.getSerialNumber()
+        .toString()));
+    assertEquals(cert3, dnCertClient.getCertificate(cert3.getSerialNumber()
         .toString()));
   }
 
@@ -391,56 +446,6 @@ public class TestDefaultCertificateClient {
   }
 
   @Test
-  public void testCertificateExpirationHandlingInInit() throws Exception {
-    String certId = "1L";
-    String compName = "TEST";
-
-    Logger mockLogger = mock(Logger.class);
-
-    SecurityConfig config = mock(SecurityConfig.class);
-    Path nonexistent = Paths.get("nonexistent");
-    when(config.getCertificateLocation(anyString())).thenReturn(nonexistent);
-    when(config.getKeyLocation(anyString())).thenReturn(nonexistent);
-    when(config.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
-
-    Calendar cal = Calendar.getInstance();
-    cal.add(Calendar.DAY_OF_YEAR, 2);
-    Date expiration = cal.getTime();
-    X509Certificate mockCert = mock(X509Certificate.class);
-    when(mockCert.getNotAfter()).thenReturn(expiration);
-
-    DefaultCertificateClient client =
-        new DefaultCertificateClient(config, mockLogger, certId, compName,
-            null, null) {
-          @Override
-          public PrivateKey getPrivateKey() {
-            return mock(PrivateKey.class);
-          }
-
-          @Override
-          public PublicKey getPublicKey() {
-            return mock(PublicKey.class);
-          }
-
-          @Override
-          public X509Certificate getCertificate() {
-            return mockCert;
-          }
-
-          @Override
-          public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath)
-              throws CertificateException {
-            return null;
-          }
-        };
-
-    InitResponse resp = client.init();
-    verify(mockLogger, atLeastOnce()).info(anyString());
-    assertEquals(resp, REINIT);
-  }
-
-  @Test
   public void testTimeBeforeExpiryGracePeriod() throws Exception {
     KeyPair keyPair = keyGenerator.generateKey();
     Duration gracePeriod = dnSecurityConfig.getRenewalGracePeriod();
@@ -451,7 +456,7 @@ public class TestDefaultCertificateClient {
     dnCertClient.storeCertificate(
         getPEMEncodedString(cert), CAType.SUBORDINATE);
     Duration duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
-    Assert.assertTrue(duration.isZero());
+    assertTrue(duration.isZero());
 
     cert = KeyStoreTestUtil.generateCertificate("CN=Test",
         keyPair, (int) (gracePeriod.toDays() + 1),
@@ -459,7 +464,7 @@ public class TestDefaultCertificateClient {
     dnCertClient.storeCertificate(
         getPEMEncodedString(cert), CAType.SUBORDINATE);
     duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
-    Assert.assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
+    assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
         duration.toMillis() > Duration.ofHours(23).plusMinutes(59).toMillis());
   }
 
@@ -471,27 +476,25 @@ public class TestDefaultCertificateClient {
     certCodec.writeCertificate(
         new X509CertificateHolder(x509Certificate.getEncoded()));
 
-    SCMSecurityProtocolClientSideTranslatorPB scmClient =
-        mock(SCMSecurityProtocolClientSideTranslatorPB.class);
     X509Certificate newCert = generateX509Cert(null);
-    dnCertClient.setSecureScmClient(scmClient);
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
-    SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
-        SCMSecurityProtocolProtos.SCMGetCertResponseProto
-            .newBuilder().setResponseCode(SCMSecurityProtocolProtos
-                .SCMGetCertResponseProto.ResponseCode.success)
+    SCMGetCertResponseProto responseProto =
+        SCMGetCertResponseProto
+            .newBuilder().setResponseCode(
+                SCMGetCertResponseProto
+                    .ResponseCode.success)
             .setX509Certificate(pemCert)
             .setX509CACertificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmSecurityClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
     String certID = dnCertClient.getCertificate().getSerialNumber().toString();
     // a success renew
     String newCertId = dnCertClient.renewAndStoreKeyAndCertificate(true);
-    Assert.assertFalse(certID.equals(newCertId));
-    Assert.assertTrue(dnCertClient.getCertificate().getSerialNumber()
-        .toString().equals(certID));
+    assertNotEquals(certID, newCertId);
+    assertEquals(dnCertClient.getCertificate().getSerialNumber()
+        .toString(), certID);
 
     File newKeyDir = new File(dnSecurityConfig.getKeyLocation(
         dnCertClient.getComponentName()).toString() +
@@ -507,11 +510,11 @@ public class TestDefaultCertificateClient {
             HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX);
 
     // backup directories exist
-    Assert.assertTrue(backupKeyDir.exists());
-    Assert.assertTrue(backupCertDir.exists());
+    assertTrue(backupKeyDir.exists());
+    assertTrue(backupCertDir.exists());
     // new directories should not exist
-    Assert.assertFalse(newKeyDir.exists());
-    Assert.assertFalse(newCertDir.exists());
+    assertFalse(newKeyDir.exists());
+    assertFalse(newCertDir.exists());
 
     // cleanup backup key and cert dir
     dnCertClient.cleanBackupDir();
@@ -528,8 +531,84 @@ public class TestDefaultCertificateClient {
         newCertDir.toPath());
     dnCertClient.storeCertificate(getPEMEncodedString(cert),
         CAType.NONE,
-        certCodec, false);
+        certCodec, false, false);
     // a success renew after auto cleanup new key and cert dir
     dnCertClient.renewAndStoreKeyAndCertificate(true);
+  }
+
+  /**
+   * This test aims to test the side effects of having an executor in the
+   * background that renews the component certificate if needed.
+   * During close, we need to shut down this executor in order to ensure that
+   * there are no racing threads that are renewing the same set of certificates.
+   *
+   * The test checks if at instantiation the thread is created and there
+   * is only one thread that are being created, while it also checks that after
+   * close the thread is closed, and is not there anymore.
+   *
+   * @param metaDir the temporary folder for metadata persistence.
+   *
+   * @throws Exception in case an unexpected error happens.
+   */
+  @Test
+  public void testCloseCertificateClient(@TempDir File metaDir)
+      throws Exception {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration();
+    ozoneConf.set(HDDS_METADATA_DIR_NAME, metaDir.getPath());
+    SecurityConfig conf = new SecurityConfig(ozoneConf);
+    String compName = "test";
+
+    CertificateCodec certCodec = new CertificateCodec(conf, compName);
+    X509Certificate cert = generateX509Cert(null);
+    certCodec.writeCertificate(new X509CertificateHolder(cert.getEncoded()));
+
+    Logger logger = mock(Logger.class);
+    String certId = cert.getSerialNumber().toString();
+    DefaultCertificateClient client = new DefaultCertificateClient(
+        conf, null, logger, certId, compName, "", null, null
+    ) {
+
+      @Override
+      protected String signAndStoreCertificate(
+          PKCS10CertificationRequest request, Path certificatePath) {
+        return "";
+      }
+
+      @Override
+      protected SCMGetCertResponseProto getCertificateSignResponse(
+          PKCS10CertificationRequest request) {
+        return null;
+      }
+
+      @Override
+      protected String signAndStoreCertificate(
+          PKCS10CertificationRequest request, Path certificatePath,
+          boolean renew) {
+        return null;
+      }
+    };
+
+    Thread[] threads = new Thread[Thread.activeCount()];
+    Thread.enumerate(threads);
+    Predicate<Thread> monitorFilterPredicate =
+        t -> t != null
+            && t.getName().equals(compName + "-CertificateRenewerService");
+    long monitorThreadCount = Arrays.stream(threads)
+        .filter(monitorFilterPredicate)
+        .count();
+    assertThat(monitorThreadCount, is(1L));
+    Thread monitor = Arrays.stream(threads)
+        .filter(monitorFilterPredicate)
+        .findFirst()
+        .get(); // we should have one otherwise prev assertion fails.
+
+    client.close();
+    monitor.join();
+
+    threads = new Thread[Thread.activeCount()];
+    monitorThreadCount = Arrays.stream(threads)
+        .filter(monitorFilterPredicate)
+        .count();
+    assertThat(monitorThreadCount, is(0L));
   }
 }

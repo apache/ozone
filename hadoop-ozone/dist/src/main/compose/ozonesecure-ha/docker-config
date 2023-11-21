@@ -38,6 +38,7 @@ OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3.org
 OZONE-SITE.XML_ozone.scm.ratis.enable=true
+OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
 OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
 
@@ -53,10 +54,9 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.block.token.enabled=true
 OZONE-SITE.XML_hdds.container.token.enabled=true
 OZONE-SITE.XML_hdds.grpc.tls.enabled=true
-OZONE-SITE.XML_ozone.replication=3
+OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
-OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
@@ -68,8 +68,10 @@ OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
 OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
+OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
@@ -98,12 +100,14 @@ HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.
 
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
+OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
 OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.AuthenticationFilterInitializer
 
 OZONE-SITE.XML_ozone.om.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.scm.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.datanode.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.s3g.http.auth.type=kerberos
+OZONE-SITE.XML_ozone.s3g.secret.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.httpfs.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.recon.http.auth.type=kerberos
 
@@ -159,3 +163,11 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+
+OZONE-SITE.XML_hdds.secret.key.rotate.duration=5m
+OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=1m
+OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h

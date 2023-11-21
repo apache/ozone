@@ -20,15 +20,17 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * SCMHAManager provides HA service for SCM.
  */
-public interface SCMHAManager {
+public interface SCMHAManager extends AutoCloseable {
 
   /**
    * Starts HA service.
@@ -86,6 +88,12 @@ public interface SCMHAManager {
    *         corresponding termIndex. Otherwise, return null.
    */
   DBCheckpoint downloadCheckpointFromLeader(String leaderId);
+
+  /**
+   * Get secret keys from SCM leader.
+   */
+  List<ManagedSecretKey> getSecretKeysFromLeader(String leaderID)
+      throws IOException;
 
   /**
    * Verify the SCM DB checkpoint downloaded from leader.

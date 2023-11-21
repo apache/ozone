@@ -17,14 +17,15 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 
@@ -34,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -49,12 +49,26 @@ public class BucketManagerImpl implements BucketManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketManagerImpl.class);
 
+  private final OzoneManager ozoneManager;
+
   private final OMMetadataManager metadataManager;
 
-  public BucketManagerImpl(OMMetadataManager metadataManager) {
+  public BucketManagerImpl(OzoneManager ozoneManager,
+      OMMetadataManager metadataManager) {
+    this.ozoneManager = ozoneManager;
     this.metadataManager = metadataManager;
   }
 
+  /**
+   * Retrieve bucket info.
+   * This method does not follow the bucket link and returns only
+   * this bucket properties.
+   *
+   * @param volumeName - Name of the Volume.
+   * @param bucketName - Name of the Bucket.
+   * @return Bucket Information.
+   * @throws IOException
+   */
   @Override
   public OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException {
@@ -63,27 +77,8 @@ public class BucketManagerImpl implements BucketManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo value = metadataManager.getBucketTable().get(bucketKey);
-      if (value == null) {
-        LOG.debug("bucket: {} not found in volume: {}.", bucketName,
-            volumeName);
-        // Check parent volume existence
-        final String dbVolumeKey = metadataManager.getVolumeKey(volumeName);
-        if (metadataManager.getVolumeTable().get(dbVolumeKey) == null) {
-          // Parent volume doesn't exist, throw VOLUME_NOT_FOUND
-          throw new OMException("Volume not found when getting bucket info",
-              VOLUME_NOT_FOUND);
-        } else {
-          // Parent volume exists, throw BUCKET_NOT_FOUND
-          throw new OMException("Bucket not found", BUCKET_NOT_FOUND);
-        }
-      }
-
-      value = OzoneManagerUtils.resolveLinkBucketLayout(value, metadataManager,
-          new HashSet<>());
-
-      return value;
+      return OzoneManagerUtils.getBucketInfo(metadataManager,
+          volumeName, bucketName);
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Exception while getting bucket info for bucket: {}",
@@ -98,11 +93,14 @@ public class BucketManagerImpl implements BucketManager {
 
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
-      String startBucket, String bucketPrefix, int maxNumOfBuckets)
+                                        String startBucket,
+                                        String bucketPrefix,
+                                        int maxNumOfBuckets,
+                                        boolean hasSnapshot)
       throws IOException {
     Preconditions.checkNotNull(volumeName);
     return metadataManager.listBuckets(
-        volumeName, startBucket, bucketPrefix, maxNumOfBuckets);
+        volumeName, startBucket, bucketPrefix, maxNumOfBuckets, hasSnapshot);
 
   }
 
@@ -114,6 +112,8 @@ public class BucketManagerImpl implements BucketManager {
       throw new IllegalArgumentException("Unexpected argument passed to " +
           "BucketManager. OzoneObj type:" + obj.getResourceType());
     }
+    // bucket getAcl operation does not need resolveBucketLink in server side
+    // see: hadoop-hdds/docs/content/design/volume-management.md
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
@@ -146,6 +146,32 @@ public class BucketManagerImpl implements BucketManager {
 
     String volume = ozObject.getVolumeName();
     String bucket = ozObject.getBucketName();
+
+    boolean bucketNeedResolved =
+        ozObject.getResourceType() == OzoneObj.ResourceType.BUCKET
+        && (context.getAclRights() != ACLType.DELETE
+            && context.getAclRights() != ACLType.READ_ACL
+            && context.getAclRights() != ACLType.READ);
+
+    if (bucketNeedResolved ||
+        ozObject.getResourceType() == OzoneObj.ResourceType.KEY) {
+      try {
+        ResolvedBucket resolvedBucket =
+            ozoneManager.resolveBucketLink(
+            Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
+        volume = resolvedBucket.realVolume();
+        bucket = resolvedBucket.realBucket();
+      } catch (IOException e) {
+        if (e instanceof OMException &&
+            ((OMException) e).getResult() == BUCKET_NOT_FOUND) {
+          LOG.warn("checkAccess on non-exist source bucket " +
+                  "Volume:{} Bucket:{}.", volume, bucket);
+        } else {
+          throw new OMException(e.getMessage(), INTERNAL_ERROR);
+        }
+      }
+    }
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);

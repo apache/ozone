@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.function.Supplier;
 
 /**
  * Class used to pick messages from the ReplicationManager under replicated
@@ -27,22 +29,27 @@ import java.io.IOException;
 public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
         <ContainerHealthResult.UnderReplicatedHealthResult> {
 
-  public UnderReplicatedProcessor(ReplicationManager replicationManager,
-                                  long intervalInMillis) {
-    super(replicationManager, intervalInMillis);
+  UnderReplicatedProcessor(ReplicationManager replicationManager,
+      Supplier<Duration> interval) {
+    super(replicationManager, interval);
   }
 
   @Override
   protected ContainerHealthResult.UnderReplicatedHealthResult
-      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
-    return replicationManager.dequeueUnderReplicatedContainer();
+      dequeueHealthResultFromQueue(ReplicationQueue queue) {
+    return queue.dequeueUnderReplicatedContainer();
   }
 
   @Override
-  protected void requeueHealthResultFromQueue(
-          ReplicationManager replicationManager,
-          ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
-    replicationManager.requeueUnderReplicatedContainer(healthResult);
+  protected void requeueHealthResult(ReplicationQueue queue,
+      ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
+    queue.enqueue(healthResult);
+  }
+
+  @Override
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    return rm.getInflightReplicationCount() >= pendingOpLimit;
   }
 
   @Override

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 
 import java.time.Duration;
 
@@ -29,7 +30,7 @@ import java.time.Duration;
  * The configuration class for the SCM service.
  */
 @ConfigGroup(prefix = "hdds.scm")
-public class ScmConfig {
+public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
@@ -71,15 +72,31 @@ public class ScmConfig {
           "The full name of class which implements "
           + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used to find or "
-          + "allocate container. If not set, "
+          + "allocate Ratis containers. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
           + "RandomPipelineChoosePolicy will be used as default value."
   )
   private String pipelineChoosePolicyName;
 
+  @Config(key = "ec.pipeline.choose.policy.impl",
+      type = ConfigType.STRING,
+      defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms" +
+          ".RandomPipelineChoosePolicy",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "The full name of class which implements "
+              + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+              + "The class decides which pipeline will be used when "
+              + "selecting an EC Pipeline. If not set, "
+              + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
+              + "RandomPipelineChoosePolicy will be used as default value."
+  )
+  private String ecPipelineChoosePolicyName;
+
   @Config(key = "block.deletion.per-interval.max",
       type = ConfigType.INT,
       defaultValue = "100000",
+      reconfigurable = true,
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
           "Maximum number of blocks which SCM processes during an interval. "
@@ -100,7 +117,7 @@ public class ScmConfig {
               + "queued for deletion. Unit could be defined with "
               + "postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+  private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
   @Config(key = "init.default.layout.version",
       defaultValue = "-1",
@@ -114,11 +131,11 @@ public class ScmConfig {
   private int defaultLayoutVersionOnInit = -1;
 
   public Duration getBlockDeletionInterval() {
-    return Duration.ofMillis(blockDeletionInterval);
+    return blockDeletionInterval;
   }
 
   public void setBlockDeletionInterval(Duration duration) {
-    this.blockDeletionInterval = duration.toMillis();
+    blockDeletionInterval = duration;
   }
 
   public void setKerberosPrincipal(String kerberosPrincipal) {
@@ -136,6 +153,10 @@ public class ScmConfig {
 
   public void setPipelineChoosePolicyName(String pipelineChoosePolicyName) {
     this.pipelineChoosePolicyName = pipelineChoosePolicyName;
+  }
+
+  public void setECPipelineChoosePolicyName(String policyName) {
+    this.ecPipelineChoosePolicyName = policyName;
   }
 
   public void setBlockDeletionLimit(int blockDeletionLimit) {
@@ -156,6 +177,10 @@ public class ScmConfig {
 
   public String getPipelineChoosePolicyName() {
     return pipelineChoosePolicyName;
+  }
+
+  public String getECPipelineChoosePolicyName() {
+    return ecPipelineChoosePolicyName;
   }
 
   public int getBlockDeletionLimit() {

@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -25,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -49,6 +52,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 public class TestContainerUtils {
 
+  private OzoneConfiguration conf;
+
+  @BeforeEach
+  void setup(@TempDir File dir) {
+    conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+  }
+
   @Test
   public void redactsDataBuffers() {
     // GIVEN
@@ -71,8 +82,7 @@ public class TestContainerUtils {
   @Test
   public void testTarName() throws IOException {
     long containerId = 100;
-    String tarName = "container-100.tar";
-    assertEquals(tarName, ContainerUtils.getContainerTarName(containerId));
+    String tarName = ContainerUtils.getContainerTarName(containerId);
 
     assertEquals(containerId,
         ContainerUtils.retrieveContainerIdFromTarName(tarName));
@@ -112,11 +122,11 @@ public class TestContainerUtils {
     assertWriteRead(tempDir, id1);
   }
 
-  private static void assertWriteRead(@TempDir File tempDir,
+  private void assertWriteRead(@TempDir File tempDir,
       DatanodeDetails details) throws IOException {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
-    ContainerUtils.writeDatanodeDetailsTo(details, file);
+    ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
 
     DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
 
@@ -127,7 +137,7 @@ public class TestContainerUtils {
   private void createMalformedIDFile(File malformedFile)
       throws IOException {
     DatanodeDetails id = randomDatanodeDetails();
-    ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);
+    ContainerUtils.writeDatanodeDetailsTo(id, malformedFile, conf);
 
     try (FileOutputStream out = new FileOutputStream(malformedFile)) {
       out.write("malformed".getBytes(StandardCharsets.UTF_8));

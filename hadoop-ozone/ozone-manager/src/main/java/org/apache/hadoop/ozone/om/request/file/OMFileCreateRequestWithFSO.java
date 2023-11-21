@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -106,7 +107,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -124,8 +125,9 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -156,22 +158,23 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
         checkAllParentsExist(keyArgs, pathInfoFSO);
       }
 
+      // do open key
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(volumeName, bucketName));
       // add all missing parents to dir table
+
       missingParentInfos =
-              OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-                      ozoneManager, keyArgs, pathInfoFSO, trxnLogIndex);
+          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
+              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
 
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
               dbFileInfo, keyArgs.getDataSize(), locations,
@@ -229,7 +232,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumCreateFileFails();
@@ -240,8 +243,11 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

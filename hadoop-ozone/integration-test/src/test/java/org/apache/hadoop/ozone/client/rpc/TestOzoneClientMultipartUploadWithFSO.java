@@ -67,7 +67,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -103,7 +105,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(300000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300000));
   private String volumeName;
   private String bucketName;
   private String keyName;
@@ -332,7 +334,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     bucketArgs.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                1024)));
+                (int) OzoneConsts.MB)));
 
     volume.createBucket(myBucket, bucketArgs.build());
     return volume.getBucket(myBucket);
@@ -358,6 +360,36 @@ public class TestOzoneClientMultipartUploadWithFSO {
     // Complete multipart upload
     OzoneTestUtils.expectOmException(OMException.ResultCodes.ENTITY_TOO_SMALL,
         () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
+  }
+
+  @Test
+  public void testMultipartUploadWithDiscardedUnusedPartSize()
+      throws Exception {
+    // Initiate multipart upload
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS, ONE);
+    byte[] data = generateData(10000000, (byte) 97);
+
+    // Upload Parts
+    Map<Integer, String> partsMap = new TreeMap<>();
+
+    // Upload part 1 and add it to the partsMap for completing the upload.
+    String partName1 = uploadPart(bucket, keyName, uploadID, 1, data);
+    partsMap.put(1, partName1);
+
+    // Upload part 2 and add it to the partsMap for completing the upload.
+    String partName2 = uploadPart(bucket, keyName, uploadID, 2, data);
+    partsMap.put(2, partName2);
+
+    // Upload part 3 but do not add it to the partsMap.
+    uploadPart(bucket, keyName, uploadID, 3, data);
+
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
+
+    // Check the bucket size. Since part number 3 was not added to the partsMap,
+    // the unused part size should be discarded from the bucket size,
+    // 30000000 - 10000000 = 20000000
+    long bucketSize = volume.getBucket(bucketName).getUsedBytes();
+    Assert.assertEquals(bucketSize, data.length * 2);
   }
 
   @Test
@@ -407,6 +439,26 @@ public class TestOzoneClientMultipartUploadWithFSO {
   }
 
   @Test
+  public void testMultipartPartNumberExceedingAllowedRange() throws Exception {
+    String uploadID = initiateMultipartUpload(bucket, keyName,
+        RATIS, ONE);
+    byte[] data = "data".getBytes(UTF_8);
+
+    // Multipart part number must be an integer between 1 and 10000. So the
+    // part number 1, 5000, 10000 will succeed,
+    // the part number 0, 10001 will fail.
+    bucket.createMultipartKey(keyName, data.length, 1, uploadID);
+    bucket.createMultipartKey(keyName, data.length, 5000, uploadID);
+    bucket.createMultipartKey(keyName, data.length, 10000, uploadID);
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
+        () -> bucket.createMultipartKey(
+            keyName, data.length, 0, uploadID));
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
+        () -> bucket.createMultipartKey(
+            keyName, data.length, 10001, uploadID));
+  }
+
+  @Test
   public void testCommitPartAfterCompleteUpload() throws Exception {
     String parentDir = "a/b/c/d/";
     keyName = parentDir + UUID.randomUUID().toString();
@@ -440,8 +492,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     Assert.assertNotNull(omMultipartCommitUploadPartInfo);
 
     byte[] fileContent = new byte[data.length];
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    inputStream.read(fileContent);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      inputStream.read(fileContent);
+    }
     StringBuilder sb = new StringBuilder(data.length);
 
     // Combine all parts data, and check is it matching with get key data.
@@ -601,11 +654,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     Assert.assertNotNull(omMultipartKeyInfo);
 
-    TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
-        omMultipartKeyInfo.getPartKeyInfoMap();
-    for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
-        partKeyInfoMap.entrySet()) {
-      OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo = entry.getValue();
+    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
+        omMultipartKeyInfo.getPartKeyInfoMap()) {
       String partKeyName = partKeyInfo.getPartName();
 
       // reconstruct full part name with volume, bucket, partKeyName
@@ -844,11 +894,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
         omKeyInfo.getKeyName());
     Assert.assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
-    TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
-        omMultipartKeyInfo.getPartKeyInfoMap();
-    for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
-        partKeyInfoMap.entrySet()) {
-      OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo = entry.getValue();
+    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
+        omMultipartKeyInfo.getPartKeyInfoMap()) {
       OmKeyInfo currentKeyPartInfo =
           OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 

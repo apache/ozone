@@ -21,8 +21,6 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
 import picocli.CommandLine.Command;
 
-import java.util.function.Supplier;
-
 /**
  * Shell for multi-tenant related operations.
  */
@@ -40,8 +38,9 @@ public class TenantShell extends Shell {
   @Override
   public int execute(String[] argv) {
     TracingUtil.initTracing("tenant-shell", createOzoneConfiguration());
-    return TracingUtil.executeInNewSpan("tenant-shell",
-        (Supplier<Integer>) () -> super.execute(argv));
+    String spanName = "ozone tenant " + String.join(" ", argv);
+    return TracingUtil.executeInNewSpan(spanName,
+        () -> super.execute(argv));
   }
 
   /**

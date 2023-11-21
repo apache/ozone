@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -114,11 +114,14 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("ChunkReader-%d")
+            .setNameFormat(datanodeDetails.threadNamePrefix() +
+                "ChunkReader-%d")
             .build());
 
-    ThreadFactory factory = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("ChunkReader-ELG-%d")
+    ThreadFactory factory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(datanodeDetails.threadNamePrefix() +
+            "ChunkReader-ELG-%d")
         .build();
 
     if (Epoll.isAvailable()) {

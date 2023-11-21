@@ -20,23 +20,35 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.Slice;
 
+import javax.annotation.Nullable;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+
 /**
  * Managed Slice.
  */
 public class ManagedSlice extends Slice {
 
+  @Nullable
+  private final StackTraceElement[] elements;
+
   public ManagedSlice(byte[] var1) {
     super(var1);
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
+  }
+
+  @Override
+  public synchronized long getNativeHandle() {
+    return super.getNativeHandle();
   }
 
   @Override
   protected void finalize() throws Throwable {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (this.isOwningHandle()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      ManagedRocksObjectUtils.LOG.warn("{} is not closed properly",
-          this.getClass().getSimpleName());
+    if (isOwningHandle()) {
+      ManagedRocksObjectUtils.reportLeak(this, formatStackTrace(elements));
     }
     super.finalize();
   }
+
 }

@@ -22,15 +22,17 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Optional;
 
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
@@ -38,12 +40,10 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
-import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 /**
@@ -57,16 +57,15 @@ public class TestOMMultiTenantManagerImpl {
   private OzoneConfiguration conf;
   private OzoneManager ozoneManager;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+    conf.set(OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
     conf.set(OZONE_OM_TENANT_DEV_SKIP_RANGER, "true");
-    omMetadataManager = new OmMetadataManagerImpl(conf);
+    omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
 
     createTenantInDB(TENANT_ID);
     assignUserToTenantInDB(TENANT_ID, "seed-accessId1", "seed-user1", false,
@@ -136,14 +135,13 @@ public class TestOMMultiTenantManagerImpl {
       } else if (user.equals("seed-user1")) {
         assertEquals("seed-accessId1", userAccessId.getAccessId());
       } else {
-        Assert.fail();
+        Assertions.fail();
       }
     }
 
-    LambdaTestUtils.intercept(IOException.class,
-        "Tenant 'tenant2' not found", () -> {
-          tenantManager.listUsersInTenant("tenant2", null);
-        });
+    IOException ioException = assertThrows(IOException.class,
+        () -> tenantManager.listUsersInTenant("tenant2", null));
+    assertEquals("Tenant 'tenant2' not found!", ioException.getMessage());
 
     assertTrue(tenantManager.listUsersInTenant(TENANT_ID, "abc")
         .getUserAccessIds().isEmpty());
@@ -152,7 +150,7 @@ public class TestOMMultiTenantManagerImpl {
   @Test
   public void testRevokeUserAccessId() throws Exception {
 
-    LambdaTestUtils.intercept(OMException.class, () ->
+    assertThrows(OMException.class, () ->
         tenantManager.getCacheOp()
             .revokeUserAccessId("unknown-AccessId1", TENANT_ID));
     assertEquals(1, tenantManager.getTenantCache().size());

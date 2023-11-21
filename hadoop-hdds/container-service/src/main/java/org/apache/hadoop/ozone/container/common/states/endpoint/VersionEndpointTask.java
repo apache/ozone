@@ -22,12 +22,11 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -77,6 +76,10 @@ public class VersionEndpointTask implements
           // If end point is passive, datanode does not need to check volumes.
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
+          DatanodeLayoutStorage layoutStorage
+              = new DatanodeLayoutStorage(configuration);
+          layoutStorage.setClusterId(clusterId);
+          layoutStorage.persistCurrentState();
 
           Preconditions.checkNotNull(scmId,
               "Reply from SCM: scmId cannot be null");
@@ -124,20 +127,7 @@ public class VersionEndpointTask implements
         boolean result = StorageVolumeUtil.checkVolume(volume,
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
-
-        if (result) {
-          // Clean <HddsVolume>/tmp/container_delete_service dir.
-          if (volume instanceof HddsVolume) {
-            HddsVolume hddsVolume = (HddsVolume) volume;
-            try {
-              KeyValueContainerUtil.ContainerDeleteDirectory
-                  .cleanTmpDir(hddsVolume);
-            } catch (IOException ex) {
-              LOG.error("Error while cleaning tmp delete directory " +
-                  "under {}", hddsVolume.getWorkingDir(), ex);
-            }
-          }
-        } else {
+        if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }
       }

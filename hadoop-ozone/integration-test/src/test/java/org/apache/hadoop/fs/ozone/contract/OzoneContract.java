@@ -43,6 +43,8 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.Assert;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+
 /**
  * The contract of Ozone: only enabled if the test bucket is provided.
  */
@@ -120,6 +122,7 @@ class OzoneContract extends AbstractFSContract {
     BucketLayout bucketLayout = fsOptimizedServer
         ? BucketLayout.FILE_SYSTEM_OPTIMIZED : BucketLayout.LEGACY;
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
+    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
@@ -148,6 +151,7 @@ class OzoneContract extends AbstractFSContract {
     getConf().set("fs.defaultFS", uri);
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    copyClusterConfigs(OZONE_FS_HSYNC_ENABLED);
     return FileSystem.get(getConf());
   }
 

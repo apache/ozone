@@ -19,8 +19,18 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+import javax.annotation.Nonnull;
+
+import java.util.NoSuchElementException;
+
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
+import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
@@ -34,11 +44,11 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   private final Class<K> keyType;
   private final Class<V> valueType;
 
-  public RocksDbPersistentMap(ManagedRocksDB db,
-                              ColumnFamilyHandle columnFamilyHandle,
-                              CodecRegistry codecRegistry,
-                              Class<K> keyType,
-                              Class<V> valueType) {
+  public RocksDbPersistentMap(@Nonnull ManagedRocksDB db,
+                              @Nonnull ColumnFamilyHandle columnFamilyHandle,
+                              @Nonnull CodecRegistry codecRegistry,
+                              @Nonnull Class<K> keyType,
+                              @Nonnull Class<V> valueType) {
     this.db = db;
     this.columnFamilyHandle = columnFamilyHandle;
     this.codecRegistry = codecRegistry;
@@ -79,5 +89,95 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
+  }
+
+  @Override
+  public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
+                                                    Optional<K> upperBound) {
+    final ManagedReadOptions readOptions = new ManagedReadOptions();
+    ManagedRocksIterator iterator;
+    final ManagedSlice lowerBoundSlice;
+    final ManagedSlice upperBoundSlice;
+    try {
+      if (lowerBound.isPresent()) {
+        lowerBoundSlice = new ManagedSlice(
+            codecRegistry.asRawData(lowerBound.get()));
+        readOptions.setIterateLowerBound(lowerBoundSlice);
+      } else {
+        lowerBoundSlice = null;
+      }
+
+      if (upperBound.isPresent()) {
+        upperBoundSlice = new ManagedSlice(
+            codecRegistry.asRawData(upperBound.get()));
+        readOptions.setIterateUpperBound(upperBoundSlice);
+      } else {
+        upperBoundSlice = null;
+      }
+    } catch (IOException exception) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(exception);
+    }
+
+    iterator = ManagedRocksIterator.managed(
+        db.get().newIterator(columnFamilyHandle, readOptions));
+
+    iterator.get().seekToFirst();
+
+    return new ClosableIterator<Map.Entry<K, V>>() {
+      @Override
+      public boolean hasNext() {
+        return iterator.get().isValid();
+      }
+
+      @Override
+      public Map.Entry<K, V> next() {
+        if (!hasNext()) {
+          throw new NoSuchElementException("No more elements in the map.");
+        }
+        K key;
+        V value;
+
+        try {
+          key = codecRegistry.asObject(iterator.get().key(), keyType);
+          value = codecRegistry.asObject(iterator.get().value(), valueType);
+        } catch (IOException exception) {
+          // TODO: [SNAPSHOT] Fail gracefully.
+          throw new RuntimeException(exception);
+        }
+
+        // Move iterator to the next.
+        iterator.get().next();
+
+        return new Map.Entry<K, V>() {
+          @Override
+          public K getKey() {
+            return key;
+          }
+
+          @Override
+          public V getValue() {
+            return value;
+          }
+
+          @Override
+          public V setValue(V value) {
+            throw new IllegalStateException("setValue is not implemented.");
+          }
+        };
+      }
+
+      @Override
+      public void close() {
+        iterator.close();
+        readOptions.close();
+        if (upperBoundSlice != null) {
+          upperBoundSlice.close();
+        }
+        if (lowerBoundSlice != null) {
+          lowerBoundSlice.close();
+        }
+      }
+    };
   }
 }

@@ -29,11 +29,12 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -41,10 +42,12 @@ import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
@@ -157,6 +160,7 @@ public final class ReplicationTestUtil {
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
     builder.setOriginNodeId(originNodeId);
+    builder.setEmpty(keyCount == 0);
     return builder.build();
   }
 
@@ -186,34 +190,42 @@ public final class ReplicationTestUtil {
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(containerID);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(containerState);
-    return builder.build();
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .build();
+  }
+
+  public static ContainerInfo createContainerInfo(
+      ReplicationConfig replicationConfig, long containerID,
+      HddsProtos.LifeCycleState containerState, long sequenceID) {
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setSequenceId(sequenceID)
+        .build();
   }
 
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState, long keyCount, long bytesUsed) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(containerID);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(containerState);
-    builder.setNumberOfKeys(keyCount);
-    builder.setUsedBytes(bytesUsed);
-    return builder.build();
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setNumberOfKeys(keyCount)
+        .setUsedBytes(bytesUsed)
+        .build();
   }
 
   public static ContainerInfo createContainer(HddsProtos.LifeCycleState state,
       ReplicationConfig replicationConfig) {
-    return new ContainerInfo.Builder()
-        .setContainerID(1).setState(state)
-        .setReplicationConfig(replicationConfig).build();
+    return TestContainerInfo.newBuilderForTest()
+        .setState(state)
+        .setReplicationConfig(replicationConfig)
+        .build();
   }
 
   @SafeVarargs
@@ -281,13 +293,12 @@ public final class ReplicationTestUtil {
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
-        if (excludedNodes.contains(nodeToReturn)) {
+        if (excludedNodes.contains(nodeToReturn)
+            || usedNodes.contains(nodeToReturn)) {
           throw new SCMException("Insufficient Nodes available to choose",
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
         }
-        List<DatanodeDetails> dns = new ArrayList<>();
-        dns.add(nodeToReturn);
-        return dns;
+        return Collections.singletonList(nodeToReturn);
       }
 
       @Override
@@ -319,18 +330,55 @@ public final class ReplicationTestUtil {
   }
 
   /**
+   * Placement policy that throws an exception when the number of requested
+   * nodes is greater or equal to throwWhenThisOrMoreNodesRequested, otherwise
+   * returns a random node.
+   */
+  public static PlacementPolicy getInsufficientNodesTestPlacementPolicy(
+      final NodeManager nodeManager, final OzoneConfiguration conf,
+      int throwWhenThisOrMoreNodesRequested) {
+    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+      @Override
+      protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+        if (nodesRequiredToChoose >= throwWhenThisOrMoreNodesRequested) {
+          throw new SCMException("No nodes available",
+              FAILED_TO_FIND_SUITABLE_NODE);
+        }
+        return Collections
+            .singletonList(MockDatanodeDetails.randomDatanodeDetails());
+      }
+
+      @Override
+      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+        return null;
+      }
+    };
+  }
+
+  /**
    * Given a Mockito mock of ReplicationManager, this method will mock the
    * SendThrottledReplicationCommand method so that it adds the command created
    * to the commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
-   * @throws CommandTargetOverloadedException
+   * @param throwOverloaded If the atomic boolean is true, throw a
+   *                        CommandTargetOverloadedException and set the boolean
+   *                        to false, instead of creating the replicate command.
    */
   public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
+      AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
+      if (throwOverloaded.get()) {
+        throwOverloaded.set(false);
+        throw new CommandTargetOverloadedException("Overloaded");
+      }
       List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       ReplicateContainerCommand command = ReplicateContainerCommand
@@ -346,11 +394,37 @@ public final class ReplicationTestUtil {
 
   /**
    * Given a Mockito mock of ReplicationManager, this method will mock the
+   * SendThrottledReconstructionCommand method so that it adds the command
+   * created to the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @param throwOverloaded If the atomic boolean is true, throw a
+   *                        CommandTargetOverloadedException and set the boolean
+   *                        to false, instead of creating the replicate command.
+   */
+  public static void mockSendThrottledReconstructionCommand(
+      ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
+      AtomicBoolean throwOverloaded)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      if (throwOverloaded.get()) {
+        throwOverloaded.set(false);
+        throw new CommandTargetOverloadedException("Overloaded");
+      }
+      ReconstructECContainersCommand cmd = invocationOnMock.getArgument(1);
+      commandsSent.add(Pair.of(cmd.getTargetDatanodes().get(0), cmd));
+      return null;
+    }).when(mock).sendThrottledReconstructionCommand(
+        Mockito.any(ContainerInfo.class), Mockito.any());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
    * sendDatanodeCommand method so that it adds the command created to the
    * commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendDatanodeCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
@@ -369,7 +443,6 @@ public final class ReplicationTestUtil {
    * commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
@@ -393,7 +466,6 @@ public final class ReplicationTestUtil {
    * the commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)

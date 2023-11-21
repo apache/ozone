@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -234,7 +235,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
                   .getLegacyFactor(pipeline.getReplicationConfig())))
           .build();
     }
-    acquireClient();
+    try {
+      acquireClient();
+    } catch (IOException ioe) {
+      LOG.warn("Failed to acquire client for pipeline {}, block {}",
+          pipeline, blockID);
+      throw ioe;
+    }
     try {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Initializing BlockInputStream for get key to access {}",
@@ -259,11 +266,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private static final List<CheckedBiFunction> VALIDATORS
+  private static final List<Validator> VALIDATORS
       = ContainerProtocolCalls.toValidatorList(
           (request, response) -> validate(response));
 
-  static void validate(ContainerCommandResponseProto response)
+  private static void validate(ContainerCommandResponseProto response)
       throws IOException {
     if (!response.hasGetBlock()) {
       throw new IllegalArgumentException("Not GetBlock: response=" + response);

@@ -82,7 +82,9 @@ function get_changed_files() {
 }
 
 function set_outputs_run_everything_and_exit() {
-    BASIC_CHECKS="author bats checkstyle docs findbugs rat unit"
+    BASIC_CHECKS=$(grep -lr '^#checks:' hadoop-ozone/dev-support/checks \
+                       | sort -u | xargs -n1 basename \
+                       | cut -f1 -d'.')
     compile_needed=true
     compose_tests_needed=true
     dependency_check_needed=true
@@ -192,6 +194,7 @@ function check_if_tests_are_needed_at_all() {
 function run_all_tests_if_environment_files_changed() {
     start_end::group_start "Check if everything should be run"
     local pattern_array=(
+        "^.github/workflows/ci.yml"
         "^.github/workflows/post-commit.yml"
         "^dev-support/ci"
         "^hadoop-ozone/dev-support/checks/_lib.sh"
@@ -229,6 +232,8 @@ function get_count_compose_files() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/k8s"
+        "^hadoop-ozone/dist/src/main/license"
+        "\.md$"
     )
     filter_changed_files true
     COUNT_COMPOSE_CHANGED_FILES=${match_count}
@@ -284,6 +289,8 @@ function get_count_kubernetes_files() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/compose"
+        "^hadoop-ozone/dist/src/main/license"
+        "\.md$"
     )
     filter_changed_files true
     COUNT_KUBERNETES_CHANGED_FILES=${match_count}
@@ -306,6 +313,7 @@ function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/build.sh"
+        "^hadoop-ozone/dev-support/checks/native_check.sh"
         "src/main/java"
         "src/main/resources"
     )
@@ -430,6 +438,23 @@ function check_needs_findbugs() {
     start_end::group_end
 }
 
+function check_needs_native() {
+    start_end::group_start "Check if native is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/native.sh"
+        "^hadoop-hdds/rocks-native"
+        # include tests tagged as @Native in any module
+        $(grep -Flr 'org.apache.ozone.test.tag.Native' hadoop-*/*/src/test/java)
+    )
+    filter_changed_files true
+
+    if [[ ${match_count} != "0" ]]; then
+        add_basic_check native
+    fi
+
+    start_end::group_end
+}
+
 function check_needs_unit_test() {
     start_end::group_start "Check if unit test is needed"
     local pattern_array=(
@@ -467,6 +492,7 @@ function get_count_misc_files() {
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
+        "/NOTICE$"
     )
     local ignore_array=(
         "^.github/workflows/post-commit.yml"
@@ -525,9 +551,6 @@ function calculate_test_types_to_run() {
 function set_outputs() {
     # print results outside the group to increase visibility
 
-    if [[ -n "${BASIC_CHECKS}" ]]; then
-        initialization::ga_output needs-basic-checks "true"
-    fi
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"
 
@@ -565,8 +588,8 @@ fi
 
 
 get_changed_files
-run_all_tests_if_environment_files_changed
 check_if_tests_are_needed_at_all
+run_all_tests_if_environment_files_changed
 
 get_count_all_files
 get_count_compose_files
@@ -587,6 +610,7 @@ check_needs_checkstyle
 check_needs_dependency
 check_needs_docs
 check_needs_findbugs
+check_needs_native
 check_needs_unit_test
 calculate_test_types_to_run
 set_outputs

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -74,7 +75,8 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     // Verify resource name
-    OmUtils.validateVolumeName(volumeInfo.getVolume());
+    OmUtils.validateVolumeName(volumeInfo.getVolume(),
+        ozoneManager.isStrictS3());
 
     // Set creation time & set modification time
     long initialTime = Time.now();
@@ -114,7 +116,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     // Doing this here, so we can do protobuf conversion outside of lock.
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     OmVolumeArgs omVolumeArgs = null;
     Map<String, String> auditMap = null;
@@ -139,11 +141,13 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       }
 
       // acquire lock.
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
-      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
-          owner);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(USER_LOCK, owner));
+      acquiredUserLock = getOmLockDetails().isLockAcquired();
 
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
 
@@ -167,7 +171,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -178,10 +182,15 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
                 transactionLogIndex));
       }
       if (acquiredUserLock) {
-        omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

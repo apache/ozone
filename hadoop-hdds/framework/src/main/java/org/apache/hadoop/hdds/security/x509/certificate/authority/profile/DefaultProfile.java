@@ -42,11 +42,11 @@ import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.lang.Boolean.TRUE;
+import static org.apache.hadoop.hdds.function.Predicates.yesBi;
 import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_clientAuth;
 import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth;
 
@@ -57,17 +57,18 @@ import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth;
  * by SCM CA are constrained
  */
 public class DefaultProfile implements PKIProfile {
-  static final BiFunction<Extension, PKIProfile, Boolean>
+
+  private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_KEY_USAGE = DefaultProfile::validateKeyUsage;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_AUTHORITY_KEY_IDENTIFIER = (e, b) -> TRUE;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_LOGO_TYPE = (e, b) -> TRUE;
+  private static final BiPredicate<Extension, PKIProfile>
+      VALIDATE_AUTHORITY_KEY_IDENTIFIER = yesBi();
+  private static final BiPredicate<Extension, PKIProfile> VALIDATE_LOGO_TYPE =
+      yesBi();
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultProfile.class);
-  static final BiFunction<Extension, PKIProfile, Boolean>
+  private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_SAN = DefaultProfile::validateSubjectAlternativeName;
-  static final BiFunction<Extension, PKIProfile, Boolean>
+  private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_EXTENDED_KEY_USAGE = DefaultProfile::validateExtendedKeyUsage;
   // If we decide to add more General Names, we should add those here and
   // also update the logic in validateGeneralName function.
@@ -77,8 +78,8 @@ public class DefaultProfile implements PKIProfile {
       GeneralName.otherName,
   };
   // Map that handles all the Extensions lookup and validations.
-  protected static final Map<ASN1ObjectIdentifier, BiFunction<Extension,
-      PKIProfile, Boolean>> EXTENSIONS_MAP = Stream.of(
+  protected static final Map<ASN1ObjectIdentifier, BiPredicate<Extension,
+      PKIProfile>> EXTENSIONS_MAP = Stream.of(
           new SimpleEntry<>(Extension.keyUsage, VALIDATE_KEY_USAGE),
           new SimpleEntry<>(Extension.subjectAlternativeName, VALIDATE_SAN),
           new SimpleEntry<>(Extension.authorityKeyIdentifier,
@@ -103,7 +104,7 @@ public class DefaultProfile implements PKIProfile {
 
   };
   private final Set<KeyPurposeId> extendKeyPurposeSet;
-  private Set<Integer> generalNameSet;
+  private final Set<Integer> generalNameSet;
 
   /**
    * Construct DefaultProfile.
@@ -126,7 +127,7 @@ public class DefaultProfile implements PKIProfile {
    * @param profile - PKI Profile - In this case this profile.
    * @return True, if the request key usage is a subset, false otherwise.
    */
-  private static Boolean validateKeyUsage(Extension ext, PKIProfile profile) {
+  private static boolean validateKeyUsage(Extension ext, PKIProfile profile) {
     KeyUsage keyUsage = profile.getKeyUsage();
     KeyUsage requestedUsage = KeyUsage.getInstance(ext.getParsedValue());
     BitSet profileBitSet = BitSet.valueOf(keyUsage.getBytes());
@@ -145,7 +146,7 @@ public class DefaultProfile implements PKIProfile {
    * @return - True if the request contains only SANs, General names that we
    * support. False otherwise.
    */
-  private static Boolean validateSubjectAlternativeName(Extension ext,
+  private static boolean validateSubjectAlternativeName(Extension ext,
       PKIProfile profile) {
     if (ext.isCritical()) {
       // SAN extensions should not be marked as critical under ozone profile.
@@ -177,7 +178,7 @@ public class DefaultProfile implements PKIProfile {
    * @param profile - PKI Profile - In this case this profile.
    * @return True, if the request key usage is a subset, false otherwise.
    */
-  private static Boolean validateExtendedKeyUsage(Extension ext,
+  private static boolean validateExtendedKeyUsage(Extension ext,
       PKIProfile profile) {
     if (ext.isCritical()) {
       // https://tools.ietf.org/html/rfc5280#section-4.2.1.12
@@ -195,25 +196,16 @@ public class DefaultProfile implements PKIProfile {
     return true;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public int[] getGeneralNames() {
     return Arrays.copyOfRange(GENERAL_NAMES, 0, GENERAL_NAMES.length);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public boolean isSupportedGeneralName(int generalName) {
     return generalNameSet.contains(generalName);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public boolean validateGeneralName(int type, String value) {
     // TODO : We should add more validation for IP address, for example
@@ -231,7 +223,7 @@ public class DefaultProfile implements PKIProfile {
       // that before passing it on.
 
       // getByAddress call converts the IP address to hostname/ipAddress format.
-      // if the hostname cannot determined then it will be /ipAddress.
+      // if the hostname cannot be determined then it will be /ipAddress.
 
       // TODO: Fail? if we cannot resolve the Hostname?
       try {
@@ -247,7 +239,7 @@ public class DefaultProfile implements PKIProfile {
     case GeneralName.dNSName:
       return DomainValidator.getInstance().isValid(value);
     case GeneralName.otherName:
-      // for other name its a general string, nothing to validate
+      // for other name it's a general string, nothing to validate
       return true;
     default:
       // This should not happen, since it guarded via isSupportedGeneralName.
@@ -261,25 +253,16 @@ public class DefaultProfile implements PKIProfile {
     return extendKeyPurposeSet.contains(id);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public ASN1ObjectIdentifier[] getSupportedExtensions() {
     return getExtensionsMap().keySet().toArray(new ASN1ObjectIdentifier[0]);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public boolean isSupportedExtension(Extension extension) {
     return getExtensionsMap().containsKey(extension.getExtnId());
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public boolean validateExtension(Extension extension) {
     Preconditions.checkNotNull(extension, "Extension cannot be null");
@@ -290,44 +273,27 @@ public class DefaultProfile implements PKIProfile {
       return false;
     }
 
-    BiFunction<Extension, PKIProfile, Boolean> func =
-        EXTENSIONS_MAP.get(extension.getExtnId());
-
-    if (func != null) {
-      return func.apply(extension, this);
-    }
-    return false;
+    return EXTENSIONS_MAP.getOrDefault(extension.getExtnId(), (x, y) -> false)
+        .test(extension, this);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public KeyUsage getKeyUsage() {
     return new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment
         | KeyUsage.dataEncipherment | KeyUsage.keyAgreement);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public RDN[] getRDNs() {
     return new RDN[0];
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public boolean isValidRDN(RDN distinguishedName) {
     // TODO: Right now we just approve all strings.
     return true;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public boolean validateRDN(RDN name) {
     return true;
@@ -339,8 +305,9 @@ public class DefaultProfile implements PKIProfile {
   }
 
   @Override
-  public Map<ASN1ObjectIdentifier, BiFunction< Extension, PKIProfile,
-      Boolean>> getExtensionsMap() {
+  public Map<ASN1ObjectIdentifier, BiPredicate<Extension, PKIProfile>>
+      getExtensionsMap() {
     return EXTENSIONS_MAP;
   }
+
 }

@@ -17,75 +17,149 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.collect.Maps;
+import com.google.common.primitives.UnsignedLong;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Iterator to Parse output of RocksDBSSTDumpTool.
  */
-public class ManagedSSTDumpIterator implements
-        Iterator<ManagedSSTDumpIterator.KeyValue>, AutoCloseable {
-  private static final String SST_DUMP_TOOL_CLASS =
-          "org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool";
-  private static final String PATTERN_REGEX =
-          "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
+public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
-  public static final int PATTERN_KEY_GROUP_NUMBER = 1;
-  public static final int PATTERN_SEQ_GROUP_NUMBER = 2;
-  public static final int PATTERN_TYPE_GROUP_NUMBER = 3;
-  private static final Pattern PATTERN_MATCHER =
-          Pattern.compile(PATTERN_REGEX);
-  private BufferedReader processOutput;
-  private StringBuilder stdoutString;
-
-  private Matcher currentMatcher;
-  private int prevMatchEndIndex;
-  private KeyValue currentKey;
-  private char[] charBuffer;
-  private KeyValue nextKey;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ManagedSSTDumpIterator.class);
+  // Since we don't have any restriction on the key & value, we are prepending
+  // the length of the pattern in the sst dump tool output.
+  // The first token in the pattern is the key.
+  // The second tells the sequence number of the key.
+  // The third token gives the type of key in the sst file.
+  // The fourth token
+  private InputStream processOutput;
+  private Optional<KeyValue> currentKey;
+  private byte[] intBuffer;
+  private Optional<KeyValue> nextKey;
 
   private ManagedSSTDumpTool.SSTDumpToolTask sstDumpToolTask;
   private AtomicBoolean open;
-
+  private StackTraceElement[] stackTrace;
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
-                                String sstFilePath,
-                                ManagedOptions options) throws IOException,
-          NativeLibraryNotLoadedException {
+                                String sstFilePath, ManagedOptions options)
+      throws NativeLibraryNotLoadedException, IOException {
+    this(sstDumpTool, sstFilePath, options, null, null);
+  }
+
+  public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
+                                String sstFilePath, ManagedOptions options,
+                                ManagedSlice lowerKeyBound,
+                                ManagedSlice upperKeyBound)
+      throws IOException, NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
       throw new IOException(String.format("File in path : %s doesn't exist",
-              sstFile.getAbsolutePath()));
+          sstFile.getAbsolutePath()));
     }
     if (!sstFile.isFile()) {
       throw new IOException(String.format("Path given: %s is not a file",
-              sstFile.getAbsolutePath()));
+          sstFile.getAbsolutePath()));
     }
-    init(sstDumpTool, sstFile, options);
+    init(sstDumpTool, sstFile, options, lowerKeyBound, upperKeyBound);
+    this.stackTrace = Thread.currentThread().getStackTrace();
+  }
+
+  /**
+   * Parses next occuring number in the stream.
+   *
+   * @return Optional of the integer empty if no integer exists
+   */
+  private Optional<Integer> getNextNumberInStream() throws IOException {
+    int n = processOutput.read(intBuffer, 0, 4);
+    if (n == 4) {
+      return Optional.of(ByteBuffer.wrap(intBuffer).getInt());
+    } else if (n >= 0) {
+      throw new IllegalStateException(String.format("Integer expects " +
+          "4 bytes to be read from the stream, but read only %d bytes", n));
+    }
+    return Optional.empty();
+  }
+
+  private Optional<byte[]> getNextByteArray() throws IOException {
+    Optional<Integer> size = getNextNumberInStream();
+    if (size.isPresent()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Allocating byte array, size: {}", size.get());
+      }
+      byte[] b = new byte[size.get()];
+      int n = processOutput.read(b);
+      if (n >= 0 && n != size.get()) {
+        throw new IllegalStateException(String.format("Integer expects " +
+            "4 bytes to be read from the stream, but read only %d bytes", n));
+      }
+      return Optional.of(b);
+    }
+    return Optional.empty();
+  }
+
+  private Optional<UnsignedLong> getNextUnsignedLong() throws IOException {
+    long val = 0;
+    for (int i = 0; i < 8; i++) {
+      val = val << 8;
+      int nextByte = processOutput.read();
+      if (nextByte < 0) {
+        if (i == 0) {
+          return Optional.empty();
+        }
+        throw new IllegalStateException(String.format("Long expects " +
+            "8 bytes to be read from the stream, but read only %d bytes", i));
+      }
+      val += nextByte;
+    }
+    return Optional.of(UnsignedLong.fromLongBits(val));
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
-                    ManagedOptions options)
-          throws NativeLibraryNotLoadedException {
-    String[] args = {"--file=" + sstFile.getAbsolutePath(),
-                     "--command=scan"};
-    this.sstDumpToolTask = sstDumpTool.run(args, options);
-    processOutput = new BufferedReader(new InputStreamReader(
-            sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
-    stdoutString = new StringBuilder();
-    currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
-    charBuffer = new char[8192];
+                    ManagedOptions options, ManagedSlice lowerKeyBound,
+                    ManagedSlice upperKeyBound)
+      throws NativeLibraryNotLoadedException {
+    Map<String, String> argMap = Maps.newHashMap();
+    argMap.put("file", sstFile.getAbsolutePath());
+    argMap.put("silent", null);
+    argMap.put("command", "scan");
+    // strings containing '\0' do not have the same value when encode UTF-8 on
+    // java which is 0. But in jni the utf-8 encoded value for '\0'
+    // becomes -64 -128. Thus the value becomes different.
+    // In order to support this, changes have been made on the rocks-tools
+    // to pass the address of the ManagedSlice and the jni can use the object
+    // of slice directly from there.
+    if (Objects.nonNull(lowerKeyBound)) {
+      argMap.put("from", String.valueOf(lowerKeyBound.getNativeHandle()));
+    }
+    if (Objects.nonNull(upperKeyBound)) {
+      argMap.put("to", String.valueOf(upperKeyBound.getNativeHandle()));
+    }
+    this.sstDumpToolTask = sstDumpTool.run(argMap, options);
+    processOutput = sstDumpToolTask.getPipedOutput();
+    intBuffer = new byte[4];
     open = new AtomicBoolean(true);
+    currentKey = Optional.empty();
+    nextKey = Optional.empty();
     next();
   }
 
@@ -97,15 +171,16 @@ public class ManagedSSTDumpIterator implements
     if (!this.open.get()) {
       throw new RuntimeException("Iterator has been closed");
     }
-    if (sstDumpToolTask.getFuture().isDone()
-            && sstDumpToolTask.exitValue() != 0) {
+    if (sstDumpToolTask.getFuture().isDone() &&
+        sstDumpToolTask.exitValue() != 0) {
       throw new RuntimeException("Process Terminated with non zero " +
-              String.format("exit value %d", sstDumpToolTask.exitValue()));
+          String.format("exit value %d", sstDumpToolTask.exitValue()));
     }
   }
 
   /**
    * Checks the status of the process & sees if there is another record.
+   *
    * @return True if next exists & false otherwise
    * Throws Runtime Exception in case of SST File read failure
    */
@@ -113,94 +188,110 @@ public class ManagedSSTDumpIterator implements
   @Override
   public boolean hasNext() {
     checkSanityOfProcess();
-    return nextKey != null;
+    return nextKey.isPresent();
   }
 
   /**
+   * Transforms Key to a certain value.
+   *
+   * @param value
+   * @return transformed Value
+   */
+  protected abstract T getTransformedValue(Optional<KeyValue> value);
+
+  /**
    * Returns the next record from SSTDumpTool.
+   *
    * @return next Key
    * Throws Runtime Exception incase of failure.
    */
   @Override
-  public KeyValue next() {
+  public T next() {
     checkSanityOfProcess();
     currentKey = nextKey;
-    nextKey = null;
-    while (!currentMatcher.find()) {
-      try {
-        if (prevMatchEndIndex != 0) {
-          stdoutString = new StringBuilder(stdoutString.substring(
-                  prevMatchEndIndex, stdoutString.length()));
-          prevMatchEndIndex = 0;
-          currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
-        }
-        int numberOfCharsRead = processOutput.read(charBuffer);
-        if (numberOfCharsRead < 0) {
-          if (currentKey != null) {
-            currentKey.setValue(stdoutString.substring(0,
-                    Math.max(stdoutString.length() - 1, 0)));
-          }
-          return currentKey;
-        }
-        stdoutString.append(charBuffer, 0, numberOfCharsRead);
-        currentMatcher.reset();
-      } catch (IOException e) {
-        throw new RuntimeIOException(e);
+    nextKey = Optional.empty();
+    try {
+      Optional<byte[]> key = getNextByteArray();
+      if (!key.isPresent()) {
+        return getTransformedValue(currentKey);
       }
+      UnsignedLong sequenceNumber = getNextUnsignedLong()
+          .orElseThrow(() -> new IllegalStateException(
+              String.format("Error while trying to read sequence number" +
+                  " for key %s", StringUtils.bytes2String(key.get()))));
+
+      Integer type = getNextNumberInStream()
+          .orElseThrow(() -> new IllegalStateException(
+              String.format("Error while trying to read sequence number for " +
+                      "key %s with sequence number %s",
+                  StringUtils.bytes2String(key.get()),
+                  sequenceNumber.toString())));
+      byte[] val = getNextByteArray().orElseThrow(() ->
+          new IllegalStateException(
+              String.format("Error while trying to read sequence number for " +
+                      "key %s with sequence number %s of type %d",
+                  StringUtils.bytes2String(key.get()),
+                  sequenceNumber.toString(), type)));
+      nextKey = Optional.of(new KeyValue(key.get(), sequenceNumber, type, val));
+    } catch (IOException e) {
+      // TODO [SNAPSHOT] Throw custom snapshot exception
+      throw new RuntimeIOException(e);
     }
-    if (currentKey != null) {
-      currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
-              currentMatcher.start() - 1));
-    }
-    prevMatchEndIndex = currentMatcher.end();
-    nextKey = new KeyValue(
-            currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
-            currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
-            currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
-    return currentKey;
+    return getTransformedValue(currentKey);
   }
 
   @Override
-  public synchronized void close() throws Exception {
+  public synchronized void close() throws UncheckedIOException {
     if (this.sstDumpToolTask != null) {
       if (!this.sstDumpToolTask.getFuture().isDone()) {
         this.sstDumpToolTask.getFuture().cancel(true);
       }
-      this.processOutput.close();
+      try {
+        this.processOutput.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
     open.compareAndSet(true, false);
   }
 
   @Override
   protected void finalize() throws Throwable {
+    if (open.get()) {
+      LOG.warn("{}  is not closed properly." +
+              " StackTrace for unclosed instance: {}",
+          this.getClass().getName(),
+          Arrays.stream(stackTrace)
+              .map(StackTraceElement::toString).collect(
+                  Collectors.joining("\n")));
+    }
     this.close();
+    super.finalize();
   }
 
   /**
    * Class containing Parsed KeyValue Record from Sst Dumptool output.
    */
   public static final class KeyValue {
-    private String key;
-    private Integer sequence;
-    private Integer type;
 
-    private String value;
+    private final byte[] key;
+    private final UnsignedLong sequence;
+    private final Integer type;
+    private final byte[] value;
 
-    private KeyValue(String key, String sequence, String type) {
+    private KeyValue(byte[] key, UnsignedLong sequence, Integer type,
+                     byte[] value) {
       this.key = key;
-      this.sequence = Integer.valueOf(sequence);
-      this.type = Integer.valueOf(type);
-    }
-
-    private void setValue(String value) {
+      this.sequence = sequence;
+      this.type = type;
       this.value = value;
     }
 
-    public String getKey() {
+    public byte[] getKey() {
       return key;
     }
 
-    public Integer getSequence() {
+    public UnsignedLong getSequence() {
       return sequence;
     }
 
@@ -208,18 +299,18 @@ public class ManagedSSTDumpIterator implements
       return type;
     }
 
-    public String getValue() {
+    public byte[] getValue() {
       return value;
     }
 
     @Override
     public String toString() {
       return "KeyValue{" +
-              "key='" + key + '\'' +
-              ", sequence=" + sequence +
-              ", type=" + type +
-              ", value='" + value + '\'' +
-              '}';
+          "key=" + StringUtils.bytes2String(key) +
+          ", sequence=" + sequence +
+          ", type=" + type +
+          ", value=" + StringUtils.bytes2String(value) +
+          '}';
     }
   }
 }

@@ -25,7 +25,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 
@@ -41,9 +40,12 @@ import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.mockito.Mockito.doReturn;
 
@@ -70,7 +72,6 @@ public class TestObjectGet {
   private HttpHeaders headers;
   private ObjectEndpoint rest;
   private OzoneClient client;
-  private ByteArrayInputStream body;
   private ContainerRequestContext context;
 
   @Before
@@ -89,7 +90,6 @@ public class TestObjectGet {
     rest.setOzoneConfiguration(new OzoneConfiguration());
     headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     context = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
@@ -101,7 +101,7 @@ public class TestObjectGet {
   @Test
   public void get() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get("b1", "key1", null, 0, null, body);
+    Response response = rest.get("b1", "key1", 0, null, 0, null);
 
     //THEN
     OzoneInputStream ozoneInputStream =
@@ -123,7 +123,7 @@ public class TestObjectGet {
   public void inheritRequestHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    Response response = rest.get("b1", "key1", null, 0, null, body);
+    Response response = rest.get("b1", "key1", 0, null, 0, null);
 
     Assert.assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
@@ -156,8 +156,7 @@ public class TestObjectGet {
 
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryParameter);
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    Response response = rest.get("b1", "key1", null, 0, null, body);
+    Response response = rest.get("b1", "key1", 0, null, 0, null);
 
     Assert.assertEquals(CONTENT_TYPE2,
         response.getHeaderString("Content-Type"));
@@ -177,15 +176,14 @@ public class TestObjectGet {
   public void getRangeHeader() throws IOException, OS3Exception {
     Response response;
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", 0, null, 0, null);
     Assert.assertEquals("1", response.getHeaderString("Content-Length"));
     Assert.assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", 0, null, 0, null);
     Assert.assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
     Assert.assertEquals(
@@ -196,8 +194,7 @@ public class TestObjectGet {
   @Test
   public void getStatusCode() throws IOException, OS3Exception {
     Response response;
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", 0, null, 0, null);
     Assert.assertEquals(response.getStatus(),
         Response.Status.OK.getStatusCode());
 
@@ -205,7 +202,7 @@ public class TestObjectGet {
     // The 206 (Partial Content) status code indicates that the server is
     //   successfully fulfilling a range request for the target resource
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", 0, null, 0, null);
     Assert.assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
   }
@@ -223,5 +220,27 @@ public class TestObjectGet {
         .when(headers).getHeaderString("Content-Disposition");
     doReturn(CONTENT_ENCODING1)
         .when(headers).getHeaderString("Content-Encoding");
+  }
+
+  @Test
+  public void testGetWhenKeyIsDirectoryAndDoesNotEndWithASlash()
+      throws IOException {
+    // GIVEN
+    final String bucketName = "b1";
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    rest.setOzoneConfiguration(config);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(bucketName);
+    bucket.createDirectory(keyPath);
+
+    // WHEN
+    final OS3Exception ex =
+        Assertions.assertThrows(OS3Exception.class,
+            () -> rest.get(bucketName, keyPath, 0, null, 0, null));
+
+    // THEN
+    Assertions.assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
+    bucket.deleteKey(keyPath);
   }
 }

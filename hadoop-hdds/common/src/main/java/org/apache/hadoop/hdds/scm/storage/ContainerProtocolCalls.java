@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.container.common.helpers.BlockNotCommittedException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -72,6 +73,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Implementation of all container protocol calls performed by Container
@@ -164,7 +167,7 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
-      List<CheckedBiFunction> validators,
+      List<Validator> validators,
       DatanodeBlockID datanodeBlockID,
       Token<? extends TokenIdentifier> token) throws IOException {
     GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
@@ -196,7 +199,7 @@ public final class ContainerProtocolCalls  {
   }
 
   private static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
-      List<CheckedBiFunction> validators,
+      List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
       DatanodeDetails datanode) throws IOException {
     final ContainerCommandRequestProto request = builder
@@ -279,8 +282,6 @@ public final class ContainerProtocolCalls  {
    * @param token a token for this block (may be null)
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
-   * @throws InterruptedException
-   * @throws ExecutionException
    */
   public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
       BlockData containerBlockData, boolean eof,
@@ -323,7 +324,7 @@ public final class ContainerProtocolCalls  {
    */
   public static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      List<CheckedBiFunction> validators,
+      List<Validator> validators,
       Token<? extends TokenIdentifier> token) throws IOException {
     ReadChunkRequestProto.Builder readChunkRequest =
         ReadChunkRequestProto.newBuilder()
@@ -346,7 +347,7 @@ public final class ContainerProtocolCalls  {
 
   private static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      List<CheckedBiFunction> validators,
+      List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
       DatanodeDetails d) throws IOException {
     final ContainerCommandRequestProto request = builder
@@ -377,39 +378,6 @@ public final class ContainerProtocolCalls  {
     } else {
       return -1;
     }
-  }
-
-  /**
-   * Calls the container protocol to write a chunk.
-   *
-   * @param xceiverClient client to perform call
-   * @param chunk information about chunk to write
-   * @param blockID ID of the block
-   * @param data the data of the chunk to write
-   * @param token a token for this block (may be null)
-   * @throws IOException if there is an error while performing the call
-   */
-  public static void writeChunk(XceiverClientSpi xceiverClient, ChunkInfo chunk,
-      BlockID blockID, ByteString data,
-      Token<OzoneBlockTokenIdentifier> token)
-      throws IOException {
-    WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto
-        .newBuilder()
-        .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-        .setChunkData(chunk)
-        .setData(data);
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
-        .newBuilder()
-        .setCmdType(Type.WriteChunk)
-        .setContainerID(blockID.getContainerID())
-        .setDatanodeUuid(id)
-        .setWriteChunk(writeChunkRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    ContainerCommandRequestProto request = builder.build();
-    xceiverClient.sendCommand(request, getValidatorList());
   }
 
   /**
@@ -463,7 +431,6 @@ public final class ContainerProtocolCalls  {
    * @param data - Data to be written into the container.
    * @param token a token for this block (may be null)
    * @return container protocol writeSmallFile response
-   * @throws IOException
    */
   public static PutSmallFileResponseProto writeSmallFile(
       XceiverClientSpi client, BlockID blockID, byte[] data,
@@ -521,7 +488,6 @@ public final class ContainerProtocolCalls  {
    * @param containerID - ID of container
    * @param encodedToken - encodedToken if security is enabled
    * @param replicaIndex - index position of the container replica
-   * @throws IOException
    */
   @InterfaceStability.Evolving
   public static void createRecoveringContainer(XceiverClientSpi client,
@@ -536,7 +502,6 @@ public final class ContainerProtocolCalls  {
    * @param client  - client
    * @param containerID - ID of container
    * @param encodedToken - encodedToken if security is enabled
-   * @throws IOException
    */
   public static void createContainer(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException {
@@ -549,7 +514,6 @@ public final class ContainerProtocolCalls  {
    * @param encodedToken - encodedToken if security is enabled
    * @param state - state of the container
    * @param replicaIndex - index position of the container replica
-   * @throws IOException
    */
   public static void createContainer(XceiverClientSpi client,
       long containerID, String encodedToken,
@@ -582,10 +546,8 @@ public final class ContainerProtocolCalls  {
   /**
    * Deletes a container from a pipeline.
    *
-   * @param client
    * @param force whether or not to forcibly delete the container.
    * @param encodedToken - encodedToken if security is enabled
-   * @throws IOException
    */
   public static void deleteContainer(XceiverClientSpi client, long containerID,
       boolean force, String encodedToken) throws IOException {
@@ -609,10 +571,7 @@ public final class ContainerProtocolCalls  {
   /**
    * Close a container.
    *
-   * @param client
-   * @param containerID
    * @param encodedToken - encodedToken if security is enabled
-   * @throws IOException
    */
   public static void closeContainer(XceiverClientSpi client,
       long containerID, String encodedToken)
@@ -636,7 +595,6 @@ public final class ContainerProtocolCalls  {
    *
    * @param client       - client
    * @param encodedToken - encodedToken if security is enabled
-   * @throws IOException
    */
   public static ReadContainerResponseProto readContainer(
       XceiverClientSpi client, long containerID, String encodedToken)
@@ -661,11 +619,9 @@ public final class ContainerProtocolCalls  {
   /**
    * Reads the data given the blockID.
    *
-   * @param client
    * @param blockID - ID of the block
    * @param token a token for this block (may be null)
    * @return GetSmallFileResponseProto
-   * @throws IOException
    */
   public static GetSmallFileResponseProto readSmallFile(XceiverClientSpi client,
       BlockID blockID,
@@ -718,25 +674,20 @@ public final class ContainerProtocolCalls  {
         response.getMessage(), response.getResult());
   }
 
-  public static List<CheckedBiFunction> getValidatorList() {
+  public static List<Validator> getValidatorList() {
     return VALIDATORS;
   }
 
-  private static final List<CheckedBiFunction> VALIDATORS = createValidators();
+  private static final List<Validator> VALIDATORS = createValidators();
 
-  private static List<CheckedBiFunction> createValidators() {
-    CheckedBiFunction<ContainerProtos.ContainerCommandRequestProto,
-        ContainerProtos.ContainerCommandResponseProto, IOException>
-        validator = (request, response) -> validateContainerResponse(response);
-    return Collections.singletonList(validator);
+  private static List<Validator> createValidators() {
+    return singletonList(
+        (request, response) -> validateContainerResponse(response));
   }
 
-  public static List<CheckedBiFunction> toValidatorList(
-      CheckedBiFunction<ContainerCommandRequestProto,
-          ContainerCommandResponseProto, IOException> validator) {
-    final List<CheckedBiFunction> defaults
-        = ContainerProtocolCalls.getValidatorList();
-    final List<CheckedBiFunction> validators
+  public static List<Validator> toValidatorList(Validator validator) {
+    final List<Validator> defaults = getValidatorList();
+    final List<Validator> validators
         = new ArrayList<>(defaults.size() + 1);
     validators.addAll(defaults);
     validators.add(validator);
@@ -773,4 +724,30 @@ public final class ContainerProtocolCalls  {
     }
     return datanodeToResponseMap;
   }
+
+  public static HashMap<DatanodeDetails, ReadContainerResponseProto>
+      readContainerFromAllNodes(XceiverClientSpi client, long containerID,
+      String encodedToken) throws IOException, InterruptedException {
+    String id = client.getPipeline().getFirstNode().getUuidString();
+    HashMap<DatanodeDetails, ReadContainerResponseProto> datanodeToResponseMap
+        = new HashMap<>();
+    ContainerCommandRequestProto.Builder request =
+        ContainerCommandRequestProto.newBuilder();
+    request.setCmdType(Type.ReadContainer);
+    request.setContainerID(containerID);
+    request.setReadContainer(ReadContainerRequestProto.getDefaultInstance());
+    request.setDatanodeUuid(id);
+    if (encodedToken != null) {
+      request.setEncodedToken(encodedToken);
+    }
+    Map<DatanodeDetails, ContainerCommandResponseProto> responses =
+        client.sendCommandOnAllNodes(request.build());
+    for (Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry :
+        responses.entrySet()) {
+      datanodeToResponseMap.put(entry.getKey(),
+          entry.getValue().getReadContainer());
+    }
+    return datanodeToResponseMap;
+  }
+
 }

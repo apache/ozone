@@ -38,7 +38,7 @@ public class Scheduler {
 
   private volatile boolean isClosed;
 
-  private String threadName;
+  private final String threadName;
 
   /**
    * Creates a ScheduledExecutorService based on input arguments.
@@ -63,7 +63,7 @@ public class Scheduler {
     scheduledExecutorService.schedule(runnable, delay, timeUnit);
   }
 
-  public void schedule(CheckedRunnable runnable, long delay,
+  public void schedule(CheckedRunnable<?> runnable, long delay,
       TimeUnit timeUnit, Logger logger, String errMsg) {
     scheduledExecutorService.schedule(() -> {
       try {

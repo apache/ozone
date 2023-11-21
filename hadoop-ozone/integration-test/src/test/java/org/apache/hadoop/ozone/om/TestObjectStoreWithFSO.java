@@ -54,7 +54,9 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.net.URI;
@@ -70,6 +72,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -80,7 +83,8 @@ import static org.junit.Assert.fail;
  * Tests to verify Object store with prefix enabled cases.
  */
 public class TestObjectStoreWithFSO {
-
+  private static final Path ROOT =
+      new Path(OZONE_URI_DELIMITER);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static String clusterId;
@@ -92,7 +96,7 @@ public class TestObjectStoreWithFSO {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -138,21 +142,24 @@ public class TestObjectStoreWithFSO {
    *
    * @throws IOException DB failure
    */
-  private void deleteRootDir() throws IOException {
-    Path root = new Path("/");
-    FileStatus[] fileStatuses = fs.listStatus(root);
+  protected void deleteRootDir() throws IOException {
+    FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
       return;
     }
+    deleteRootRecursively(fileStatuses);
+    fileStatuses = fs.listStatus(ROOT);
+    if (fileStatuses != null) {
+      Assert.assertEquals(
+          "Delete root failed!", 0, fileStatuses.length);
+    }
+  }
 
+  private static void deleteRootRecursively(FileStatus[] fileStatuses)
+      throws IOException {
     for (FileStatus fStatus : fileStatuses) {
       fs.delete(fStatus.getPath(), true);
-    }
-
-    fileStatuses = fs.listStatus(root);
-    if (fileStatuses != null) {
-      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
     }
   }
 
@@ -375,7 +382,7 @@ public class TestObjectStoreWithFSO {
    *                    |
    *                    a
    *                    |
-   *      -----------------------------------
+   *      --------------------------------------
    *     |              |                       |
    *     b1             b2                      b3
    *    -----           --------               ----------
@@ -454,11 +461,16 @@ public class TestObjectStoreWithFSO {
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Intermediate level keyPrefix - 3rd level
+    // Without trailing slash
     ozoneKeyIterator =
         ozoneBucket.listKeys("a/b2/d1", null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d1/");
     expectedKeys.add("a/b2/d1/d11.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+    // With trailing slash
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b2/d1/", null);
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Boundary of a level
@@ -472,6 +484,21 @@ public class TestObjectStoreWithFSO {
     ozoneKeyIterator =
         ozoneBucket.listKeys("a/b3/e3", "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Key level, prefix=key case
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b1/c1/c1.tx");
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/b1/c1/c1.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Key directly under bucket
+    createTestKey(ozoneBucket, "key1.tx", "key1");
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("key1.tx");
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("key1.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
   }
 
@@ -623,15 +650,12 @@ public class TestObjectStoreWithFSO {
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, fromKeyName, value);
 
-    // Rename to empty string should fail.
+    // Rename to an empty string means that we are moving the key to the bucket
+    // level and the toKeyName will be the source key name
     String toKeyName = "";
-    try {
-      bucket.renameKey(fromKeyName, toKeyName);
-      fail("Rename to empty string should fail!");
-    } catch (OMException ome) {
-      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-              ome.getResult());
-    }
+    bucket.renameKey(fromKeyName, toKeyName);
+    OzoneKey emptyKeyRename = bucket.getKey(fromKeyName);
+    Assert.assertEquals(fromKeyName, emptyKeyRename.getName());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);

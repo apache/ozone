@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.conf.TimeDurationUtil.getDuration;
+import static org.apache.hadoop.hdds.conf.TimeDurationUtil.getTimeDurationHelper;
+
 /**
  * Possible type of injected configuration.
  * <p>
@@ -24,13 +30,149 @@ package org.apache.hadoop.hdds.conf;
  * the configuration field.
  */
 public enum ConfigType {
-  AUTO,
-  STRING,
-  BOOLEAN,
-  INT,
-  LONG,
-  TIME,
-  SIZE,
-  CLASS,
-  DOUBLE
+  AUTO {
+    @Override
+    Object parse(String value, Config config, Class<?> type, String key) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      throw new UnsupportedOperationException();
+    }
+  },
+  STRING {
+    @Override
+    String parse(String value, Config config, Class<?> type, String key) {
+      return value;
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.set(key, String.valueOf(value));
+    }
+  },
+  BOOLEAN {
+    @Override
+    Boolean parse(String value, Config config, Class<?> type, String key) {
+      return Boolean.parseBoolean(value);
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setBoolean(key, (boolean) value);
+    }
+  },
+  INT {
+    @Override
+    Integer parse(String value, Config config, Class<?> type, String key) {
+      return Integer.parseInt(value);
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setInt(key, (int) value);
+    }
+  },
+  LONG {
+    @Override
+    Long parse(String value, Config config, Class<?> type, String key) {
+      return Long.parseLong(value);
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setLong(key, (long) value);
+    }
+  },
+  TIME {
+    @Override
+    Object parse(String value, Config config, Class<?> type, String key) {
+      if (type == Duration.class) {
+        return getDuration(key, value, config.timeUnit());
+      }
+      return getTimeDurationHelper(key, value, config.timeUnit());
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      if (value instanceof Duration) {
+        final Duration duration = (Duration) value;
+        if (duration.getNano() % 1_000_000 > 0) {
+          target.setTimeDuration(key, duration.toNanos(), TimeUnit.NANOSECONDS);
+        } else {
+          final long millis = duration.toMillis();
+          target.setTimeDuration(key, millis, TimeUnit.MILLISECONDS);
+        }
+      } else {
+        target.setTimeDuration(key, (long) value, config.timeUnit());
+      }
+    }
+  },
+  SIZE {
+    @Override
+    Object parse(String value, Config config, Class<?> type, String key) {
+      StorageSize measure = StorageSize.parse(value);
+      long val = Math.round(measure.getUnit().toBytes(measure.getValue()));
+      if (type == int.class) {
+        return (int) val;
+      }
+      return val;
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      if (value instanceof Long) {
+        target.setStorageSize(key, (long) value, StorageUnit.BYTES);
+      } else if (value instanceof Integer) {
+        target.setStorageSize(key, (int) value, StorageUnit.BYTES);
+      } else {
+        throw new ConfigurationException("Unsupported type " + value.getClass()
+            + " for " + key);
+      }
+    }
+  },
+  CLASS {
+    @Override
+    Class<?> parse(String value, Config config, Class<?> type, String key)
+        throws ClassNotFoundException {
+      return Class.forName(value);
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      if (value instanceof Class<?>) {
+        target.set(key, ((Class<?>) value).getName());
+      } else {
+        throw new ConfigurationException("Unsupported type " + value.getClass()
+            + " for " + key);
+      }
+    }
+  },
+  DOUBLE {
+    @Override
+    Double parse(String value, Config config, Class<?> type, String key) {
+      return Double.parseDouble(value);
+    }
+
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setDouble(key, (double) value);
+    }
+  };
+
+  abstract Object parse(String value, Config config, Class<?> type, String key)
+      throws Exception;
+
+  abstract void set(ConfigurationTarget target, String key, Object value,
+      Config config);
 }

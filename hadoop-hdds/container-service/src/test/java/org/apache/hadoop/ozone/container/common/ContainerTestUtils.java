@@ -19,11 +19,14 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
@@ -31,15 +34,22 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -47,14 +57,18 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.mockito.Mockito;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -70,6 +84,20 @@ public final class ContainerTestUtils {
 
   private ContainerTestUtils() {
   }
+
+  public static final DispatcherContext WRITE_STAGE = DispatcherContext
+      .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
+      .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
+      .build();
+
+  public static final DispatcherContext COMMIT_STAGE = DispatcherContext
+      .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
+      .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+      .setContainer2BCSIDMap(Collections.emptyMap())
+      .build();
+
+  public static final DispatcherContext COMBINED_STAGE
+      = DispatcherContext.getHandleWriteChunk();
 
   /**
    * Creates an Endpoint class for testing purpose.
@@ -96,18 +124,26 @@ public final class ContainerTestUtils {
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
     return new EndpointStateMachine(address, rpcClient,
-        new LegacyHadoopConfigurationSource(conf));
+        new LegacyHadoopConfigurationSource(conf), "");
   }
 
   public static OzoneContainer getOzoneContainer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
-    DatanodeStateMachine stateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
+    StateContext context = getMockContext(datanodeDetails, conf);
+    return new OzoneContainer(datanodeDetails, conf, context);
+  }
+
+  public static StateContext getMockContext(DatanodeDetails datanodeDetails,
+      OzoneConfiguration conf) {
+    DatanodeStateMachine stateMachine = Mockito.mock(
+        DatanodeStateMachine.class);
+    Mockito.lenient().when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
-    return new OzoneContainer(datanodeDetails, conf, context, null);
+    return context;
   }
 
   public static DatanodeDetails createDatanodeDetails() {
@@ -134,7 +170,7 @@ public final class ContainerTestUtils {
 
   public static KeyValueContainer getContainer(long containerId,
       ContainerLayoutVersion layout,
-      ContainerProtos.ContainerDataProto.State state) {
+      ContainerDataProto.State state) {
     KeyValueContainerData kvData =
         new KeyValueContainerData(containerId,
             layout,
@@ -173,30 +209,65 @@ public final class ContainerTestUtils {
 
   public static void setupMockContainer(
       Container<ContainerData> c, boolean shouldScanData,
-      boolean scanMetaDataSuccess, boolean scanDataSuccess,
-      AtomicLong containerIdSeq) {
-    setupMockContainer(c, shouldScanData, scanDataSuccess, containerIdSeq);
-    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
-  }
-
-  public static void setupMockContainer(
-      Container<ContainerData> c, boolean shouldScanData,
-      boolean scanDataSuccess, AtomicLong containerIdSeq) {
+      ScanResult metadataScanResult, ScanResult dataScanResult,
+      AtomicLong containerIdSeq, HddsVolume vol) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
+    when(c.shouldScanMetadata()).thenReturn(true);
+    when(c.getContainerData().getVolume()).thenReturn(vol);
+
+    try {
+      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+          .thenReturn(dataScanResult);
+      Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
+    } catch (InterruptedException ex) {
+      // Mockito.when invocations will not throw this exception. It is just
+      // required for compilation.
+    }
   }
 
-  public static KeyValueContainer setUpTestContainerUnderTmpDir(
+  /**
+   * Construct an unhealthy scan result to use for testing purposes.
+   */
+  public static ScanResult getUnhealthyScanResult() {
+    return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CHUNK,
+        new File(""),
+        new IOException("Fake corruption failure for testing"));
+  }
+
+  public static KeyValueContainer addContainerToDeletedDir(
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
+    KeyValueContainer container = addContainerToVolumeDir(volume, clusterId,
+        conf, schemaVersion);
+
+    // For testing, we are moving the container
+    // under the tmp directory, in order to delete
+    // it from there, during datanode startup or shutdown
+    KeyValueContainerUtil
+        .moveToDeletedContainerDir(container.getContainerData(), volume);
+
+    return container;
+  }
+
+  public static KeyValueContainer addContainerToVolumeDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion)
+      throws IOException {
+    long containerId = ContainerTestHelper.getTestContainerID();
+    return addContainerToVolumeDir(volume, clusterId, conf, schemaVersion,
+        containerId);
+  }
+
+  public static KeyValueContainer addContainerToVolumeDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion, long containerId)
+      throws IOException {
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
-    long containerId = HddsUtils.getTime();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
@@ -212,12 +283,64 @@ public final class ContainerTestUtils {
 
     container.close();
 
-    // For testing, we are moving the container
-    // under the tmp directory, in order to delete
-    // it from there, during datanode startup or shutdown
-    KeyValueContainerUtil.ContainerDeleteDirectory
-        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
-
     return container;
+  }
+
+  private static class NoopContainerDispatcher implements ContainerDispatcher {
+    @Override
+    public ContainerCommandResponseProto dispatch(
+        ContainerCommandRequestProto msg, DispatcherContext context) {
+      return ContainerTestHelper.getCreateContainerResponse(msg);
+    }
+
+    @Override
+    public void validateContainerCommand(ContainerCommandRequestProto msg) {
+    }
+
+    @Override
+    public void init() {
+    }
+
+    @Override
+    public void buildMissingContainerSetAndValidate(
+        Map<Long, Long> container2BCSIDMap) {
+    }
+
+    @Override
+    public void shutdown() {
+    }
+
+    @Override
+    public Handler getHandler(ContainerType containerType) {
+      return null;
+    }
+
+    @Override
+    public void setClusterId(String clusterId) {
+    }
+  }
+
+  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER
+      = new NoopContainerDispatcher();
+
+  public static ContainerDispatcher getNoopContainerDispatcher() {
+    return NOOP_CONTAINER_DISPATCHER;
+  }
+
+  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
+      = new ContainerController(new ContainerSet(1000), Collections.emptyMap());
+
+  public static ContainerController getEmptyContainerController() {
+    return EMPTY_CONTAINER_CONTROLLER;
+  }
+
+  public static XceiverServerRatis newXceiverServerRatis(
+      DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
+    conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+
+    return XceiverServerRatis.newXceiverServerRatis(dn, conf,
+        getNoopContainerDispatcher(), getEmptyContainerController(),
+        null, null);
   }
 }

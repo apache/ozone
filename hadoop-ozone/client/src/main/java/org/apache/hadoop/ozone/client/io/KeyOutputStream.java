@@ -23,6 +23,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -64,7 +65,8 @@ import org.slf4j.LoggerFactory;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyOutputStream extends OutputStream implements Syncable {
+public class KeyOutputStream extends OutputStream
+    implements Syncable, KeyMetadataAware {
 
   private OzoneClientConfig config;
   private final ReplicationConfig replication;
@@ -93,7 +95,13 @@ public class KeyOutputStream extends OutputStream implements Syncable {
 
   private long clientID;
 
-  private OzoneManagerProtocol omClient;
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
       ContainerClientMetrics clientMetrics) {
@@ -138,11 +146,12 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       OzoneClientConfig config,
       OpenKeySession handler,
       XceiverClientFactory xceiverClientManager,
-      OzoneManagerProtocol omClient, int chunkSize,
+      OzoneManagerProtocol omClient,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics,
+      boolean atomicKeyCreation
   ) {
     this.config = config;
     this.replication = replicationConfig;
@@ -163,7 +172,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
-    this.omClient = omClient;
+    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -179,13 +188,13 @@ public class KeyOutputStream extends OutputStream implements Syncable {
    * @param openVersion the version corresponding to the pre-allocation.
    * @throws IOException
    */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
+  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version,
       long openVersion) throws IOException {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   @Override
-  public void write(int b) throws IOException {
+  public synchronized void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -204,7 +213,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
    * @throws IOException
    */
   @Override
-  public void write(byte[] b, int off, int len)
+  public synchronized void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -444,7 +453,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   }
 
   @Override
-  public void flush() throws IOException {
+  public synchronized void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -455,7 +464,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   }
 
   @Override
-  public void hsync() throws IOException {
+  public synchronized void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -546,7 +555,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
    * @throws IOException
    */
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     if (closed) {
       return;
     }
@@ -556,19 +565,31 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
+      if (atomicKeyCreation) {
+        long expectedSize = blockOutputStreamEntryPool.getDataSize();
+        Preconditions.checkState(expectedSize == offset,
+            String.format("Expected: %d and actual %d write sizes do not match",
+                expectedSize, offset));
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }
   }
 
-  public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
+  public synchronized OmMultipartCommitUploadPartInfo
+      getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
 
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockOutputStreamEntryPool.getExcludeList();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockOutputStreamEntryPool.getMetadata();
   }
 
   /**
@@ -578,8 +599,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     private OpenKeySession openHandler;
     private XceiverClientFactory xceiverManager;
     private OzoneManagerProtocol omClient;
-    private int chunkSize;
-    private String requestID;
+    private final String requestID = UUID.randomUUID().toString();
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
@@ -587,6 +607,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
     private ContainerClientMetrics clientMetrics;
+    private boolean atomicKeyCreation = false;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -633,22 +654,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       return this;
     }
 
-    public int getChunkSize() {
-      return chunkSize;
-    }
-
-    public Builder setChunkSize(int size) {
-      this.chunkSize = size;
-      return this;
-    }
-
     public String getRequestID() {
       return requestID;
-    }
-
-    public Builder setRequestID(String id) {
-      this.requestID = id;
-      return this;
     }
 
     public boolean isMultipartKey() {
@@ -687,6 +694,11 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       return this;
     }
 
+    public Builder setAtomicKeyCreation(boolean atomicKey) {
+      this.atomicKeyCreation = atomicKey;
+      return this;
+    }
+
     public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
       this.clientMetrics = clientMetrics;
       return this;
@@ -696,20 +708,24 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       return clientMetrics;
     }
 
+    public boolean getAtomicKeyCreation() {
+      return atomicKeyCreation;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(
           clientConfig,
           openHandler,
           xceiverManager,
           omClient,
-          chunkSize,
           requestID,
           replicationConfig,
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion,
-          clientMetrics);
+          clientMetrics,
+          atomicKeyCreation);
     }
 
   }

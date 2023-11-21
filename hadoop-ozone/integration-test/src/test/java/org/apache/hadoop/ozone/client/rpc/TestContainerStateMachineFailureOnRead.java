@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -68,7 +67,6 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Test to verify pipeline is closed on readStateMachine failure.
  */
-@Flaky("see HDDS-3294")
 public class TestContainerStateMachineFailureOnRead {
   private MiniOzoneCluster cluster;
   private ObjectStore objectStore;
@@ -164,10 +162,11 @@ public class TestContainerStateMachineFailureOnRead {
     Assert.assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
     // Verify healthy pipeline before creating key
-    XceiverClientRatis xceiverClientRatis =
-        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
-    xceiverClientRatis.connect();
-    TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    try (XceiverClientRatis xceiverClientRatis =
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
+      xceiverClientRatis.connect();
+      TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    }
 
     OmKeyLocationInfo omKeyLocationInfo;
     OzoneOutputStream key = objectStore.getVolume(volumeName)

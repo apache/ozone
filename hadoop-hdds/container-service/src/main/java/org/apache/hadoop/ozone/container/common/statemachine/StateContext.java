@@ -152,6 +152,11 @@ public class StateContext {
   private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
 
   private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
+
+  private final int maxCommandQueueLimit;
+
+  private final String threadNamePrefix;
+
   /**
    * Constructs a StateContext.
    *
@@ -161,8 +166,11 @@ public class StateContext {
    */
   public StateContext(ConfigurationSource conf,
       DatanodeStateMachine.DatanodeStates
-          state, DatanodeStateMachine parent) {
+          state, DatanodeStateMachine parent, String threadNamePrefix) {
     this.conf = conf;
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    maxCommandQueueLimit = dnConf.getCommandQueueLimit();
     this.state = state;
     this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
@@ -182,6 +190,7 @@ public class StateContext {
     isFullReportReadyToBeSent = new HashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
+    this.threadNamePrefix = threadNamePrefix;
     initReportTypeCollection();
   }
 
@@ -795,6 +804,11 @@ public class StateContext {
   public void addCommand(SCMCommand command) {
     lock.lock();
     try {
+      if (commandQueue.size() >= maxCommandQueueLimit) {
+        LOG.warn("Ignore command as command queue crosses max limit {}.",
+            maxCommandQueueLimit);
+        return;
+      }
       updateTermOfLeaderSCM(command);
       commandQueue.add(command);
     } finally {
@@ -957,5 +971,9 @@ public class StateContext {
 
   public DatanodeQueueMetrics getQueueMetrics() {
     return parentDatanodeStateMachine.getQueueMetrics();
+  }
+
+  public String getThreadNamePrefix() {
+    return threadNamePrefix;
   }
 }

@@ -309,6 +309,10 @@ public class MockNodeManager implements NodeManager {
       return deadNodes;
     }
 
+    if (nodestate == null) {
+      return new ArrayList<>(nodeMetricMap.keySet());
+    }
+
     return null;
   }
 
@@ -633,6 +637,12 @@ public class MockNodeManager implements NodeManager {
     return 0;
   }
 
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
+  }
+
   /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
@@ -809,7 +819,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 
@@ -896,6 +906,11 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
+  public int totalHealthyVolumeCount() {
+    return healthyNodes.size() * numHealthyDisksPerDatanode;
+  }
+
+  @Override
   public int pipelineLimit(DatanodeDetails dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numPipelinePerDatanode;
@@ -905,6 +920,11 @@ public class MockNodeManager implements NodeManager {
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numPipelinePerDatanode;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 
   public void setNumPipelinePerDatanode(int value) {

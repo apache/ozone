@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,6 +100,7 @@ public class TestContainerBalancerTask {
   private MockNodeManager mockNodeManager;
   private StorageContainerManager scm;
   private OzoneConfiguration conf;
+  private ReplicationManagerConfiguration rmConf;
   private PlacementPolicy placementPolicy;
   private PlacementPolicy ecPlacementPolicy;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
@@ -124,6 +127,7 @@ public class TestContainerBalancerTask {
   public void setup() throws IOException, NodeNotFoundException,
       TimeoutException {
     conf = new OzoneConfiguration();
+    rmConf = new ReplicationManagerConfiguration();
     scm = Mockito.mock(StorageContainerManager.class);
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -135,6 +139,12 @@ public class TestContainerBalancerTask {
         .thenReturn(CompletableFuture.completedFuture(
             MoveManager.MoveResult.COMPLETED));
 
+    /*
+    Disable LegacyReplicationManager. This means balancer should select RATIS
+     as well as EC containers for balancing. Also, MoveManager will be used.
+     */
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    rmConf.setEnableLegacy(false);
     // these configs will usually be specified in each test
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
@@ -225,7 +235,7 @@ public class TestContainerBalancerTask {
         .register(Mockito.any(SCMService.class));
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), balancerConfiguration);
+        sb.getMetrics(), balancerConfiguration, false);
   }
 
   @Test
@@ -261,7 +271,7 @@ public class TestContainerBalancerTask {
 
       balancerConfiguration.setThreshold(randomThreshold);
       containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-          sb.getMetrics(), balancerConfiguration);
+          sb.getMetrics(), balancerConfiguration, false);
       containerBalancerTask.run();
 
       unBalancedNodesAccordingToBalancer =
@@ -284,11 +294,7 @@ public class TestContainerBalancerTask {
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException,
       NodeNotFoundException {
-    ReplicationManagerConfiguration rmConf =
-        conf.getObject(ReplicationManagerConfiguration.class);
     rmConf.setEnableLegacy(false);
-    conf.setFromObject(rmConf);
-
     startBalancer(balancerConfiguration);
     Mockito.verify(moveManager, atLeastOnce())
         .move(Mockito.any(ContainerID.class),
@@ -387,6 +393,47 @@ public class TestContainerBalancerTask {
     }
   }
 
+  /**
+   * Container Balancer should not select a non-CLOSED replica for moving.
+   */
+  @Test
+  public void balancerShouldNotSelectNonClosedContainerReplicas()
+      throws IOException, IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException, TimeoutException {
+
+    // let's mock such that all replicas have CLOSING state
+    when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
+        .thenAnswer(invocationOnMock -> {
+          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
+          Set<ContainerReplica> replicas = cidToReplicasMap.get(cid);
+          Set<ContainerReplica> replicasToReturn =
+              new HashSet<>(replicas.size());
+          for (ContainerReplica replica : replicas) {
+            ContainerReplica newReplica =
+                replica.toBuilder().setContainerState(
+                    ContainerReplicaProto.State.CLOSING).build();
+            replicasToReturn.add(newReplica);
+          }
+
+          return replicasToReturn;
+        });
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+
+    startBalancer(balancerConfiguration);
+    stopBalancer();
+
+    // balancer should have identified unbalanced nodes
+    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+        .isEmpty());
+    // no container should have moved because all replicas are CLOSING
+    Assertions.assertTrue(
+        containerBalancerTask.getContainerToSourceMap().isEmpty());
+  }
+
   @Test
   public void containerBalancerShouldObeyMaxSizeToMoveLimit()
       throws IllegalContainerBalancerStateException, IOException,
@@ -462,9 +509,16 @@ public class TestContainerBalancerTask {
       replicas.add(containerToTargetMap.get(container));
 
       ContainerInfo containerInfo = cidToInfoMap.get(container);
-      ContainerPlacementStatus placementStatus =
-          placementPolicy.validateContainerPlacement(replicas,
-              containerInfo.getReplicationConfig().getRequiredNodes());
+      ContainerPlacementStatus placementStatus;
+      if (containerInfo.getReplicationType() ==
+          HddsProtos.ReplicationType.RATIS) {
+        placementStatus = placementPolicy.validateContainerPlacement(replicas,
+            containerInfo.getReplicationConfig().getRequiredNodes());
+      } else {
+        placementStatus =
+            ecPlacementPolicy.validateContainerPlacement(replicas,
+                containerInfo.getReplicationConfig().getRequiredNodes());
+      }
       Assertions.assertTrue(placementStatus.isPolicySatisfied());
     }
   }
@@ -500,6 +554,8 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     balancerConfiguration.setIterations(1);
+    rmConf.setEnableLegacy(true);
+
     startBalancer(balancerConfiguration);
 
     stopBalancer();
@@ -522,7 +578,7 @@ public class TestContainerBalancerTask {
      Try the same test by disabling LegacyReplicationManager so that
      MoveManager is used.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     stopBalancer();
     numContainers = containerBalancerTask.getContainerToTargetMap().size();
@@ -580,7 +636,7 @@ public class TestContainerBalancerTask {
     cbc.setBalancingInterval(1);
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc);
+        sb.getMetrics(), cbc, false);
     containerBalancerTask.run();
 
     stopBalancer();
@@ -619,7 +675,7 @@ public class TestContainerBalancerTask {
     cbc.setBalancingInterval(1);
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc);
+        sb.getMetrics(), cbc, false);
     containerBalancerTask.run();
 
     stopBalancer();
@@ -635,7 +691,8 @@ public class TestContainerBalancerTask {
   @Test
   public void testMetrics()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
+      InvalidContainerBalancerConfigurationException, TimeoutException,
+      NodeNotFoundException {
     conf.set("hdds.datanode.du.refresh.period", "1ms");
     balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
     balancerConfiguration.setThreshold(10);
@@ -644,6 +701,11 @@ public class TestContainerBalancerTask {
     // deliberately set max size per iteration to a low value, 6 GB
     balancerConfiguration.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    Mockito.when(moveManager.move(any(), any(), any()))
+           .thenReturn(CompletableFuture.completedFuture(
+               MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
+           .thenReturn(CompletableFuture.completedFuture(
+               MoveManager.MoveResult.COMPLETED));
 
     startBalancer(balancerConfiguration);
     stopBalancer();
@@ -653,7 +715,18 @@ public class TestContainerBalancerTask {
             balancerConfiguration.getThreshold()).size(),
         metrics.getNumDatanodesUnbalanced());
     Assertions.assertTrue(metrics.getDataSizeMovedGBInLatestIteration() <= 6);
+    Assertions.assertTrue(metrics.getDataSizeMovedGB() > 0);
     Assertions.assertEquals(1, metrics.getNumIterations());
+    Assertions.assertTrue(
+        metrics.getNumContainerMovesScheduledInLatestIteration() > 0);
+    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+        metrics.getNumContainerMovesScheduledInLatestIteration());
+    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+        metrics.getNumContainerMovesCompleted() +
+            metrics.getNumContainerMovesFailed() +
+            metrics.getNumContainerMovesTimeout());
+    Assertions.assertEquals(0, metrics.getNumContainerMovesTimeout());
+    Assertions.assertEquals(1, metrics.getNumContainerMovesFailed());
   }
 
   /**
@@ -762,6 +835,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    rmConf.setEnableLegacy(true);
 
     startBalancer(balancerConfiguration);
 
@@ -795,7 +869,7 @@ public class TestContainerBalancerTask {
     /*
     Try the same but use MoveManager for container move instead of legacy RM.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     Assertions.assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
@@ -814,10 +888,12 @@ public class TestContainerBalancerTask {
       InvalidContainerBalancerConfigurationException,
       TimeoutException {
 
+    CompletableFuture<MoveManager.MoveResult> completedFuture =
+        CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenReturn(genCompletableFuture(10))
+        .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(2000));
 
     balancerConfiguration.setThreshold(10);
@@ -826,7 +902,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-
+    rmConf.setEnableLegacy(true);
     startBalancer(balancerConfiguration);
 
     /*
@@ -848,11 +924,11 @@ public class TestContainerBalancerTask {
     The first move being 10ms falls within the timeout duration of 500ms. It
     should be successful. The rest should fail.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenReturn(genCompletableFuture(10))
+        .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(2000));
 
     startBalancer(balancerConfiguration);
@@ -889,7 +965,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-
+    rmConf.setEnableLegacy(true);
     startBalancer(balancerConfiguration);
 
     Assertions.assertTrue(containerBalancerTask.getMetrics()
@@ -906,6 +982,7 @@ public class TestContainerBalancerTask {
             Mockito.any(DatanodeDetails.class)))
         .thenReturn(future).thenAnswer(invocation -> future2);
 
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     Assertions.assertTrue(containerBalancerTask.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration() > 0);
@@ -943,6 +1020,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
+    rmConf.setEnableLegacy(true);
 
     startBalancer(balancerConfiguration);
 
@@ -970,6 +1048,7 @@ public class TestContainerBalancerTask {
         .thenThrow(new ContainerNotFoundException("Test Container not found"))
         .thenReturn(future);
 
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     Assertions.assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
@@ -978,6 +1057,76 @@ public class TestContainerBalancerTask {
         containerBalancerTask.getMetrics()
             .getNumContainerMovesFailed() >= 3);
     stopBalancer();
+  }
+
+  @Unhealthy("HDDS-8941")
+  @Test
+  public void testDelayedStart() throws InterruptedException, TimeoutException {
+    conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit", 10,
+        TimeUnit.SECONDS);
+    ContainerBalancer balancer = new ContainerBalancer(scm);
+    containerBalancerTask = new ContainerBalancerTask(scm, 2, balancer,
+        balancer.getMetrics(), balancerConfiguration, true);
+    Thread balancingThread = new Thread(containerBalancerTask);
+    // start the thread and assert that balancer is RUNNING
+    balancingThread.start();
+    Assertions.assertEquals(ContainerBalancerTask.Status.RUNNING,
+        containerBalancerTask.getBalancerStatus());
+
+    /*
+     Wait for the thread to start sleeping and assert that it's sleeping.
+     This is the delay before it starts balancing.
+     */
+    GenericTestUtils.waitFor(
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
+    Assertions.assertEquals(Thread.State.TIMED_WAITING,
+        balancingThread.getState());
+
+    // interrupt the thread from its sleep, wait and assert that balancer has
+    // STOPPED
+    balancingThread.interrupt();
+    GenericTestUtils.waitFor(() -> containerBalancerTask.getBalancerStatus() ==
+        ContainerBalancerTask.Status.STOPPED, 1, 20);
+    Assertions.assertEquals(ContainerBalancerTask.Status.STOPPED,
+        containerBalancerTask.getBalancerStatus());
+
+    // ensure the thread dies
+    GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
+    Assertions.assertFalse(balancingThread.isAlive());
+  }
+
+  /**
+   * The expectation is that only RATIS containers should be selected for
+   * balancing when LegacyReplicationManager is enabled. This is because
+   * LegacyReplicationManager does not support moving EC containers.
+   */
+  @Test
+  public void balancerShouldExcludeECContainersWhenLegacyRmIsEnabled()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException {
+    // Enable LegacyReplicationManager
+    rmConf.setEnableLegacy(true);
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setIterations(1);
+    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+
+    startBalancer(balancerConfiguration);
+
+    /*
+     Get all containers that were selected by balancer and assert none of
+     them is an EC container.
+     */
+    Map<ContainerID, DatanodeDetails> containerToSource =
+        containerBalancerTask.getContainerToSourceMap();
+    Assertions.assertFalse(containerToSource.isEmpty());
+    for (Map.Entry<ContainerID, DatanodeDetails> entry :
+        containerToSource.entrySet()) {
+      ContainerInfo containerInfo = cidToInfoMap.get(entry.getKey());
+      Assertions.assertNotSame(HddsProtos.ReplicationType.EC,
+          containerInfo.getReplicationType());
+    }
   }
 
   /**
@@ -1104,14 +1253,23 @@ public class TestContainerBalancerTask {
   }
 
   private ContainerInfo createContainer(long id, int multiple) {
-    return new ContainerInfo.Builder()
+    ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setContainerID(id)
-        .setReplicationConfig(RatisReplicationConfig
-                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.CLOSED)
         .setOwner("TestContainerBalancer")
-        .setUsedBytes(STORAGE_UNIT * multiple)
-        .build();
+        .setUsedBytes(STORAGE_UNIT * multiple);
+
+    /*
+    Make it a RATIS container if id is even, else make it an EC container
+     */
+    if (id % 2 == 0) {
+      builder.setReplicationConfig(RatisReplicationConfig
+          .getInstance(HddsProtos.ReplicationFactor.THREE));
+    } else {
+      builder.setReplicationConfig(new ECReplicationConfig(3, 2));
+    }
+
+    return builder.build();
   }
 
   /**
@@ -1128,7 +1286,8 @@ public class TestContainerBalancerTask {
 
         // randomly pick a datanode for this replica
         int datanodeIndex = RANDOM.nextInt(0, numberOfNodes);
-        if (nodeUtilizations.get(i) != 0.0d) {
+        // don't put replicas in DNs that are supposed to have 0 utilization
+        if (Math.abs(nodeUtilizations.get(datanodeIndex) - 0.0d) > 0.00001) {
           DatanodeDetails node =
               nodesInCluster.get(datanodeIndex).getDatanodeDetails();
           Set<ContainerReplica> replicas =
@@ -1136,6 +1295,8 @@ public class TestContainerBalancerTask {
           replicas.add(createReplica(container.containerID(), node,
               container.getUsedBytes()));
           cidToReplicasMap.put(container.containerID(), replicas);
+          datanodeToContainersMap.get(nodesInCluster.get(datanodeIndex))
+              .add(container.containerID());
         }
       }
     }

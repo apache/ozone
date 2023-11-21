@@ -19,16 +19,17 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -72,7 +73,8 @@ public class S3GetSecretRequest extends OMClientRequest {
     // protolock check.
     final String accessId = s3GetSecretRequest.getKerberosID();
 
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    final UserGroupInformation ugi =
+        S3SecretRequestHelper.getOrCreateUgi(accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);
@@ -131,7 +133,7 @@ public class S3GetSecretRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
 
     final GetS3SecretRequest getS3SecretRequest =
             getOmRequest().getGetS3SecretRequest();
@@ -162,13 +164,23 @@ public class S3GetSecretRequest extends OMClientRequest {
                     new S3SecretValue(accessId, awsSecret.get());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId,
-                    assignS3SecretValue,
-                    transactionLogIndex);
+                    assignS3SecretValue);
               } else {
                 assignS3SecretValue = null;
               }
             } else {
-              // Found in S3SecretTable.
+              final OMMultiTenantManager multiTenantManager =
+                  ozoneManager.getMultiTenantManager();
+              if (multiTenantManager == null ||
+                  !multiTenantManager.getTenantForAccessID(accessId)
+                      .isPresent()) {
+                // Access Id is not assigned to any tenant and
+                // Secret is found in S3SecretTable. No secret is returned.
+                throw new OMException("Secret for '" + accessId +
+                    "' already exists", OMException.ResultCodes.
+                    S3_SECRET_ALREADY_EXISTS);
+              }
+              // For tenant getsecret, secret is always returned
               awsSecret.set(s3SecretValue.getAwsSecret());
               assignS3SecretValue = null;
             }
@@ -196,11 +208,11 @@ public class S3GetSecretRequest extends OMClientRequest {
           });
 
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new S3GetSecretResponse(null,
           ozoneManager.getS3SecretManager(),
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

@@ -42,25 +42,26 @@ import org.slf4j.LoggerFactory;
 /**
  * Cache implementation for the table. Full Table cache, where the DB state
  * and cache state will be same for these tables.
+ * @param <KEY>
+ * @param <VALUE>
  */
 @Private
 @Evolving
-public class FullTableCache<CACHEKEY extends CacheKey,
-    CACHEVALUE extends CacheValue> implements TableCache<CACHEKEY, CACHEVALUE> {
+public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(FullTableCache.class);
 
-  private final Map<CACHEKEY, CACHEVALUE> cache;
-  private final NavigableMap<Long, Set<CACHEKEY>> epochEntries;
-  private ExecutorService executorService;
+  private final Map<CacheKey<KEY>, CacheValue<VALUE>> cache;
+  private final NavigableMap<Long, Set<CacheKey<KEY>>> epochEntries;
+  private final ExecutorService executorService;
 
   private final ReadWriteLock lock;
 
   private final CacheStatsRecorder statsRecorder;
 
 
-  public FullTableCache() {
+  public FullTableCache(String threadNamePrefix) {
     // As for full table cache only we need elements to be inserted in sorted
     // manner, so that list will be easy. But look ups have log(N) time
     // complexity.
@@ -77,18 +78,20 @@ public class FullTableCache<CACHEKEY extends CacheKey,
 
     // Created a singleThreadExecutor, so one cleanup will be running at a
     // time.
-    ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("FullTableCache Cleanup Thread - %d").build();
-    executorService = Executors.newSingleThreadExecutor(build);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "FullTableCache-Cleanup-%d")
+        .build();
+    executorService = Executors.newSingleThreadExecutor(threadFactory);
 
     statsRecorder = new CacheStatsRecorder();
   }
 
   @Override
-  public CACHEVALUE get(CACHEKEY cachekey) {
+  public CacheValue<VALUE> get(CacheKey<KEY> cachekey) {
     try {
       lock.readLock().lock();
-      CACHEVALUE cachevalue = cache.get(cachekey);
+      CacheValue<VALUE> cachevalue = cache.get(cachekey);
       statsRecorder.recordValue(cachevalue);
       return cachevalue;
     } finally {
@@ -97,16 +100,16 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   }
 
   @Override
-  public void loadInitial(CACHEKEY cacheKey, CACHEVALUE cacheValue) {
+  public void loadInitial(CacheKey<KEY> key, CacheValue<VALUE> value) {
     // No need to add entry to epochEntries. Adding to cache is required during
     // normal put operation.
     // No need of acquiring lock, this is performed only during startup. No
     // operations happening at that time.
-    cache.put(cacheKey, cacheValue);
+    cache.put(key, value);
   }
 
   @Override
-  public void put(CACHEKEY cacheKey, CACHEVALUE value) {
+  public void put(CacheKey<KEY> cacheKey, CacheValue<VALUE> value) {
     try {
       lock.writeLock().lock();
       cache.put(cacheKey, value);
@@ -128,7 +131,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   }
 
   @Override
-  public Iterator<Map.Entry<CACHEKEY, CACHEVALUE>> iterator() {
+  public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> iterator() {
     statsRecorder.recordIteration();
     return cache.entrySet().iterator();
   }
@@ -136,8 +139,8 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   @VisibleForTesting
   @Override
   public void evictCache(List<Long> epochs) {
-    Set<CACHEKEY> currentCacheKeys;
-    CACHEKEY cachekey;
+    Set<CacheKey<KEY>> currentCacheKeys;
+    CacheKey<KEY> cachekey;
     long lastEpoch = epochs.get(epochs.size() - 1);
     for (long currentEpoch : epochEntries.keySet()) {
       currentCacheKeys = epochEntries.get(currentEpoch);
@@ -153,7 +156,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
       try {
         lock.writeLock().lock();
         if (epochs.contains(currentEpoch)) {
-          for (Iterator<CACHEKEY> iterator = currentCacheKeys.iterator();
+          for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
                iterator.hasNext();) {
             cachekey = iterator.next();
             cache.computeIfPresent(cachekey, ((k, v) -> {
@@ -179,9 +182,9 @@ public class FullTableCache<CACHEKEY extends CacheKey,
   }
 
   @Override
-  public CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey) {
+  public CacheResult<VALUE> lookup(CacheKey<KEY> cachekey) {
 
-    CACHEVALUE cachevalue = cache.get(cachekey);
+    CacheValue<VALUE> cachevalue = cache.get(cachekey);
     statsRecorder.recordValue(cachevalue);
     if (cachevalue == null) {
       return new CacheResult<>(CacheResult.CacheStatus.NOT_EXIST, null);
@@ -199,7 +202,7 @@ public class FullTableCache<CACHEKEY extends CacheKey,
 
   @VisibleForTesting
   @Override
-  public NavigableMap<Long, Set<CACHEKEY>> getEpochEntries() {
+  public NavigableMap<Long, Set<CacheKey<KEY>>> getEpochEntries() {
     return epochEntries;
   }
 

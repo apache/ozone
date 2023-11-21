@@ -24,7 +24,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,14 +56,15 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -167,13 +167,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
-    chunkExecutors = createChunkExecutors(conf);
+    String threadNamePrefix = datanodeDetails.threadNamePrefix();
+    chunkExecutors = createChunkExecutors(conf, threadNamePrefix);
     nodeFailureTimeoutMs =
-            conf.getObject(DatanodeRatisServerConfig.class)
-                    .getFollowerSlownessTimeout();
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getFollowerSlownessTimeout();
     shouldDeleteRatisLogDirectory =
-            conf.getObject(DatanodeRatisServerConfig.class)
-                    .shouldDeleteRatisLogDirectory();
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .shouldDeleteRatisLogDirectory();
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -215,7 +216,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutors, this, conf);
+        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
   private void setUpRatisStream(RaftProperties properties) {
@@ -245,7 +246,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @SuppressWarnings("checkstyle:methodlength")
-  private RaftProperties newRaftProperties() {
+  public RaftProperties newRaftProperties() {
     final RaftProperties properties = new RaftProperties();
 
     // Set rpc type
@@ -711,10 +712,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setClosePipeline(closePipelineInfo)
         .setAction(PipelineAction.Action.CLOSE)
         .build();
-    context.addPipelineActionIfAbsent(action);
-    // wait for the next HB timeout or right away?
-    if (triggerHB) {
-      context.getParent().triggerHeartbeat();
+    if (context != null) {
+      context.addPipelineActionIfAbsent(action);
+      // wait for the next HB timeout or right away?
+      if (triggerHB) {
+        context.getParent().triggerHeartbeat();
+      }
     }
     LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
             action.getAction(), pipelineID,
@@ -729,10 +732,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
     long bytesWritten = 0;
-    Iterator<org.apache.hadoop.ozone.container.common.interfaces.Container<?>>
-        containerIt = containerController.getContainers();
-    while (containerIt.hasNext()) {
-      ContainerData containerData = containerIt.next().getContainerData();
+    for (Container<?> container : containerController.getContainers()) {
+      ContainerData containerData = container.getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {
         bytesWritten += containerData.getWriteBytes();
@@ -922,7 +923,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
-      ConfigurationSource conf) {
+      ConfigurationSource conf, String threadNamePrefix) {
     // TODO create single pool with N threads if using non-incremental chunks
     final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys
@@ -938,7 +939,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
-          .setNameFormat("ChunkWriter-" + i + "-%d")
+          .setNameFormat(threadNamePrefix + "ChunkWriter-" + i + "-%d")
           .build();
       BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,

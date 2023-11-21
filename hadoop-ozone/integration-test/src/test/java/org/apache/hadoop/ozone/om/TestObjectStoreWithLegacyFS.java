@@ -49,7 +49,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +67,7 @@ import java.util.UUID;
 public class TestObjectStoreWithLegacyFS {
 
   @Rule
-  public Timeout timeout = Timeout.seconds(200);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(200));
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
@@ -151,9 +153,8 @@ public class TestObjectStoreWithLegacyFS {
       String dbKey, int expectedCnt, String keyName) {
     int countKeys = 0;
     int matchingKeys = 0;
-    try {
-      TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          itr = keyTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+          itr = keyTable.iterator()) {
       itr.seek(dbKey);
       while (itr.hasNext()) {
 

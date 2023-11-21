@@ -27,24 +27,69 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.Arrays;
+import java.util.Collection;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.mockito.Mockito.when;
 /**
  * Tests OMCreateKeyRequestWithFSO class.
  */
 public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
-  public TestOMKeyCreateRequestWithFSO(boolean setKeyPathLock,
-                                       boolean setFileSystemPaths) {
-    super(setKeyPathLock, setFileSystemPaths);
+  public static Collection<Object[]> data() {
+    return Arrays.asList(
+        new Object[]{true, true},
+        new Object[]{true, false},
+        new Object[]{false, true},
+        new Object[]{false, false});
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithKeyContainsSnapshotReservedWord(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    String[] validKeyNames = {
+        keyName,
+        OM_SNAPSHOT_INDICATOR + "a/" + keyName,
+        "a/" + OM_SNAPSHOT_INDICATOR + "/b/c/" + keyName
+    };
+    for (String validKeyName : validKeyNames) {
+      keyName = validKeyName;
+      OMRequest omRequest = createKeyRequest(false, 0);
+
+      OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+          omMetadataManager, getBucketLayout());
+      OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+
+      OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
+      omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+      OMClientResponse omKeyCreateResponse =
+          omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+              ozoneManagerDoubleBufferHelper);
+      Assertions.assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
+      Assertions.assertEquals(keyName,
+          omKeyCreateResponse.getOMResponse()
+                .getCreateKeyResponse().getKeyInfo().getKeyName(),
+          "Incorrect keyName");
+    }
   }
 
   @Override
@@ -61,12 +106,10 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     Path keyPath = Paths.get(keyName);
     long parentId = checkIntermediatePaths(keyPath);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, fileName, HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE,  parentId + 1, parentId, 100,
+        Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
   }
@@ -82,18 +125,18 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
 
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
+        bucketName);
 
     // Check open key entry
     Path keyPathFileName = keyPath.getFileName();
-    Assert.assertNotNull("Failed to find fileName", keyPathFileName);
+    Assertions.assertNotNull(keyPathFileName, "Failed to find fileName");
     String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
-            parentID, fileName, omRequest.getCreateKeyRequest().getClientID());
+        parentID, fileName, omRequest.getCreateKeyRequest().getClientID());
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
-    Assert.assertNotNull(omKeyInfo);
+    Assertions.assertNotNull(omKeyInfo);
   }
 
   @Override
@@ -102,8 +145,8 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     keyPath = keyPath.getParent(); // skip the file name
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    Assert.assertNotNull("Bucket not found!", omBucketInfo);
+        omMetadataManager.getBucketTable().get(bucketKey);
+    Assertions.assertNotNull(omBucketInfo, "Bucket not found!");
     long lastKnownParentId = omBucketInfo.getObjectID();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
 
@@ -114,12 +157,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
       fullKeyPath.append(fileName);
       String dbNodeName = omMetadataManager.getOzonePathKey(volumeId,
-              omBucketInfo.getObjectID(), lastKnownParentId, fileName);
+          omBucketInfo.getObjectID(), lastKnownParentId, fileName);
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
-              get(dbNodeName);
+          get(dbNodeName);
 
-      Assert.assertNotNull("Parent key path:" + fullKeyPath +
-              " doesn't exist", omDirInfo);
+      Assertions.assertNotNull(omDirInfo, "Parent key path:" + fullKeyPath +
+          " doesn't exist");
       lastKnownParentId = omDirInfo.getObjectID();
     }
 
@@ -130,14 +173,14 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   protected String getOpenKey(long id) throws IOException {
 
     OmVolumeArgs volumeInfo = omMetadataManager.getVolumeTable()
-            .get(omMetadataManager.getVolumeKey(volumeName));
+        .get(omMetadataManager.getVolumeKey(volumeName));
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
-            .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
     return omMetadataManager.getOpenFileName(
-            volumeInfo == null ? 100 : volumeInfo.getObjectID(),
-            omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
-            omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
-            keyName, id);
+        volumeInfo == null ? 100 : volumeInfo.getObjectID(),
+        omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
+        omBucketInfo == null ? 1000 : omBucketInfo.getObjectID(),
+        keyName, id);
 
   }
 
@@ -149,12 +192,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
         omMetadataManager.getBucketTable().get(bucketKey);
     if (omBucketInfo != null) {
       final long bucketId = omMetadataManager.getBucketId(volumeName,
-              bucketName);
+          bucketName);
       return omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              omBucketInfo.getObjectID(), keyName);
+          omBucketInfo.getObjectID(), keyName);
     } else {
       return omMetadataManager.getOzonePathKey(volumeId, 1000,
-              1000, keyName);
+          1000, keyName);
     }
   }
 

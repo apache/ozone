@@ -23,11 +23,15 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests the server side replication config preference logic.
@@ -44,16 +48,25 @@ public class TestOzoneConfigUtil {
       new DefaultReplicationConfig(
           new ECReplicationConfig(clientECReplicationConfig));
 
+  private OzoneManager ozoneManager;
+
+  @BeforeEach
+  public void setup() {
+    ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(ratis3ReplicationConfig);
+  }
+
   /**
    * Tests EC bucket defaults.
    */
   @Test
-  public void testResolveClientSideRepConfigWhenBucketHasEC() {
+  public void testResolveClientSideRepConfigWhenBucketHasEC() throws Exception {
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(noneType, zeroFactor,
-            clientECReplicationConfig, bucketECConfig, ratis3ReplicationConfig);
+            clientECReplicationConfig, bucketECConfig, ozoneManager);
     // Client has no preference, so we should bucket defaults as we passed.
-    Assert.assertEquals(bucketECConfig.getReplicationConfig(),
+    Assertions.assertEquals(bucketECConfig.getReplicationConfig(),
         replicationConfig);
   }
 
@@ -61,27 +74,29 @@ public class TestOzoneConfigUtil {
    * Tests server defaults.
    */
   @Test
-  public void testResolveClientSideRepConfigWithNoClientAndBucketDefaults() {
+  public void testResolveClientSideRepConfigWithNoClientAndBucketDefaults()
+      throws Exception {
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(noneType, zeroFactor,
-            clientECReplicationConfig, null, ratis3ReplicationConfig);
+            clientECReplicationConfig, null, ozoneManager);
     // Client has no preference, no bucket defaults, so it should return server
     // defaults.
-    Assert.assertEquals(ratis3ReplicationConfig, replicationConfig);
+    Assertions.assertEquals(ratis3ReplicationConfig, replicationConfig);
   }
 
   /**
    * Tests client preference of EC.
    */
   @Test
-  public void testResolveClientSideRepConfigWhenClientPassEC() {
+  public void testResolveClientSideRepConfigWhenClientPassEC()
+      throws Exception {
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(HddsProtos.ReplicationType.EC,
             zeroFactor, clientECReplicationConfig, null,
-            ratis3ReplicationConfig);
+            ozoneManager);
     // Client has preference of type EC, no bucket defaults, so it should return
     // client preference.
-    Assert.assertEquals(new ECReplicationConfig("rs-3-2-1024K"),
+    Assertions.assertEquals(new ECReplicationConfig("rs-3-2-1024K"),
         replicationConfig);
   }
 
@@ -89,7 +104,8 @@ public class TestOzoneConfigUtil {
    * Tests bucket ratis defaults.
    */
   @Test
-  public void testResolveClientSideRepConfigWhenBucketHasEC3() {
+  public void testResolveClientSideRepConfigWhenBucketHasEC3()
+      throws Exception {
     ReplicationConfig ratisReplicationConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
     DefaultReplicationConfig ratisBucketDefaults =
@@ -97,10 +113,10 @@ public class TestOzoneConfigUtil {
     ReplicationConfig replicationConfig = OzoneConfigUtil
         .resolveReplicationConfigPreference(noneType, zeroFactor,
             clientECReplicationConfig, ratisBucketDefaults,
-            ratis3ReplicationConfig);
+            ozoneManager);
     // Client has no preference of type and bucket has ratis defaults, so it
     // should return ratis.
-    Assert.assertEquals(ratisReplicationConfig, replicationConfig);
+    Assertions.assertEquals(ratisReplicationConfig, replicationConfig);
   }
 
   @Test
@@ -108,7 +124,7 @@ public class TestOzoneConfigUtil {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice,bob");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
+    Assertions.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
         .containsAll(Arrays.asList("alice", "bob")));
   }
 
@@ -117,7 +133,7 @@ public class TestOzoneConfigUtil {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice,bob");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
+    Assertions.assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
         .containsAll(Arrays.asList("alice", "bob")));
   }
 
@@ -127,8 +143,8 @@ public class TestOzoneConfigUtil {
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS,
         "test1, test2");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration)
-        .containsAll(Arrays.asList("test1", "test2")));
+    Assertions.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(
+        configuration).containsAll(Arrays.asList("test1", "test2")));
   }
 
   @Test
@@ -137,7 +153,7 @@ public class TestOzoneConfigUtil {
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
         "test1, test2");
 
-    Assert.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration)
-        .containsAll(Arrays.asList("test1", "test2")));
+    Assertions.assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(
+        configuration).containsAll(Arrays.asList("test1", "test2")));
   }
 }

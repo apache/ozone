@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Handles Stale node event.
@@ -62,7 +61,7 @@ public class StaleNodeHandler implements EventHandler<DatanodeDetails> {
       try {
         Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
         pipelineManager.closePipeline(pipeline, true);
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
         LOG.info("Could not finalize pipeline={} for dn={}", pipelineID,
             datanodeDetails);
       }

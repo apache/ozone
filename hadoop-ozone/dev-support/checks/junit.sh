@@ -20,8 +20,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 : ${CHECK:="unit"}
+: ${FAIL_FAST:="false"}
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
+: ${OZONE_REPO_CACHED:="false"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -29,20 +31,22 @@ if [[ ${ITERATIONS} -le 0 ]]; then
 fi
 
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx --no-transfer-progress'
+MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
 
-if [[ "${FAIL_FAST:-}" == "true" ]]; then
+if [[ "${FAIL_FAST}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
 else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
 fi
 
 if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
-  mvn ${MAVEN_OPTIONS} -DskipTests clean install
+  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+    mvn ${MAVEN_OPTIONS} -DskipTests clean install
+  fi
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
@@ -73,6 +77,10 @@ for i in $(seq 1 ${ITERATIONS}); do
 
   if [[ ${rc} == 0 ]]; then
     rc=${irc}
+  fi
+
+  if [[ ${rc} != 0 ]] && [[ "${FAIL_FAST}" == "true" ]]; then
+    break
   fi
 done
 

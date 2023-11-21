@@ -28,6 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone Manager Server</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
+
   <dependencies>
 
     <dependency>
@@ -103,11 +107,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
@@ -157,6 +156,33 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jersey-client</artifactId>
     </dependency>
 
+    <!-- Overrider ranger-intg jackson version -->
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-core-asl</artifactId>
+      <version>${jackson1.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-mapper-asl</artifactId>
+      <version>${jackson1.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-jaxrs</artifactId>
+      <version>${jackson-jaxr.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-core-asl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-mapper-asl</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-intg</artifactId>
@@ -183,10 +209,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </exclusion>
         <exclusion>
           <groupId>org.apache.lucene</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
@@ -230,6 +252,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
+    </dependency>
+      <dependency>
+          <groupId>org.apache.ozone</groupId>
+          <artifactId>hdds-rocks-native</artifactId>
+      </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
     </dependency>
   </dependencies>
   <build>

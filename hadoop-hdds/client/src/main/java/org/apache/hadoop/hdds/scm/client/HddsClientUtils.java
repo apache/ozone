@@ -127,17 +127,30 @@ public final class HddsClientUtils {
     }
   }
 
-  private static boolean isSupportedCharacter(char c) {
-    return (c == '.' || c == '-' ||
-        Character.isLowerCase(c) || Character.isDigit(c));
+  private static boolean isSupportedCharacter(char c, boolean isStrictS3) {
+    // When isStrictS3 is set as false,
+    // ozone allows namespace to follow other volume/bucket naming convention,
+    // for example, here supports '_',
+    // which is a valid character in POSIX-compliant system, like HDFS.
+    if (c >= '0' && c <= '9') {
+      return true;
+    } else if (c >= 'a' && c <= 'z') {
+      return true;
+    } else if (c == '-' || c == '.') {
+      return true;
+    } else if (c == '_' && !isStrictS3) {
+      return true;
+    }
+    return false;
   }
 
-  private static void doCharacterChecks(char currChar, char prev) {
+  private static void doCharacterChecks(char currChar, char prev,
+      boolean isStrictS3) {
     if (Character.isUpperCase(currChar)) {
       throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
     }
-    if (!isSupportedCharacter(currChar)) {
+    if (!isSupportedCharacter(currChar, isStrictS3)) {
       throw new IllegalArgumentException("Bucket or Volume name has an " +
           "unsupported character : " + currChar);
     }
@@ -163,6 +176,17 @@ public final class HddsClientUtils {
    * @throws IllegalArgumentException
    */
   public static void verifyResourceName(String resName) {
+    verifyResourceName(resName, true);
+  }
+
+  /**
+   * verifies that bucket name / volume name is a valid DNS name.
+   *
+   * @param resName Bucket or volume Name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyResourceName(String resName, boolean isStrictS3) {
 
     doNameChecks(resName);
 
@@ -174,7 +198,7 @@ public final class HddsClientUtils {
       if (currChar != '.') {
         isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
       }
-      doCharacterChecks(currChar, prev);
+      doCharacterChecks(currChar, prev, isStrictS3);
       prev = currChar;
     }
 

@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -49,6 +50,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -95,6 +97,8 @@ public class TestInfoSubCommand {
       throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(includeIndex));
+    Mockito.when(scmClient.getPipeline(any()))
+        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
@@ -135,6 +139,8 @@ public class TestInfoSubCommand {
   public void testReplicasNotOutputIfError() throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenThrow(new IOException("Error getting Replicas"));
+    Mockito.when(scmClient.getPipeline(any()))
+        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");

@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import org.apache.commons.io.FileUtils;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
@@ -29,27 +32,31 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
-import org.apache.hadoop.hdds.security.x509.certificate.client
-    .CertificateClient;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -59,17 +66,14 @@ import static org.mockito.Mockito.when;
  */
 class TestSCMHAManagerImpl {
 
-  private String storageBaseDir;
+  @TempDir
+  private Path storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
-  private final int waitForClusterToBeReadyTimeout = 10000;
 
   @BeforeEach
-  public void setup() throws IOException, InterruptedException,
+  void setup() throws IOException, InterruptedException,
       TimeoutException {
-    storageBaseDir = GenericTestUtils.getTempPath(
-        TestSCMHAManagerImpl.class.getSimpleName() + "-" +
-            UUID.randomUUID());
     clusterID = UUID.randomUUID().toString();
     OzoneConfiguration conf = getConfig("scm1", 9894);
     final StorageContainerManager scm = getMockStorageContainerManager(conf);
@@ -85,10 +89,10 @@ class TestSCMHAManagerImpl {
 
   private OzoneConfiguration getConfig(String scmId, int ratisPort) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, storageBaseDir
-        + File.separator + scmId + File.separator + "ratis");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageBaseDir
-        + File.separator + scmId + File.separator + "metadata");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
+        storageBaseDir.resolve(scmId).resolve("ratis").toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        storageBaseDir.resolve(scmId).resolve("metadata").toString());
     conf.set(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, String.valueOf(ratisPort));
     return conf;
   }
@@ -97,13 +101,12 @@ class TestSCMHAManagerImpl {
       throws TimeoutException,
       InterruptedException {
     GenericTestUtils.waitFor(ratisDivision::isLeaderReady,
-          1000, waitForClusterToBeReadyTimeout);
+          1000, 10000);
   }
 
   @AfterEach
   public void cleanup() throws IOException {
     primarySCMHAManager.stop();
-    FileUtils.deleteDirectory(new File(storageBaseDir));
   }
 
   @Test
@@ -128,6 +131,35 @@ class TestSCMHAManagerImpl {
     }
   }
 
+  @Test
+  public void testHARingRemovalErrors() throws IOException,
+      AuthenticationException {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, "scm1");
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageBaseDir.toString());
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setSCMHAManager(primarySCMHAManager);
+    final StorageContainerManager scm2 = HddsTestUtils
+        .getScm(config, configurator);
+
+    try {
+      // try removing scmid from ratis group not amongst peer list
+      String randomScmId = UUID.randomUUID().toString();
+      IOException ex;
+      ex = assertThrows(IOException.class, () ->
+          scm2.removePeerFromHARing(randomScmId));
+      assertTrue(ex.getMessage().contains("Peer"));
+
+      // try removing leader scm from ratis ring
+      ex = assertThrows(IOException.class, () ->
+          scm2.removePeerFromHARing(scm2.getScmId()));
+      assertTrue(ex.getMessage().contains("leader"));
+    } finally {
+      scm2.getScmHAManager().getRatisServer().stop();
+    }
+  }
   @Test
   public void testRemoveSCM() throws IOException, InterruptedException {
     Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()
@@ -205,8 +237,10 @@ class TestSCMHAManagerImpl {
     when(dbStore.initBatchOperation()).thenReturn(batchOperation);
     when(nodeDetails.getRatisHostPortStr()).thenReturn("localhost:" +
         conf.get(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY));
+    when(scm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
 
-    final SCMHAManager manager = new SCMHAManagerImpl(conf, scm);
+    final SCMHAManager manager = new SCMHAManagerImpl(conf,
+        new SecurityConfig(conf), scm);
     when(scm.getScmHAManager()).thenReturn(manager);
     return scm;
   }

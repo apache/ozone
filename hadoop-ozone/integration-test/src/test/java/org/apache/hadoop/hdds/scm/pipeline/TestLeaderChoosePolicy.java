@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -25,9 +24,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -46,7 +45,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Tests for LeaderChoosePolicy.
  */
-@Disabled("This test was never enabled")
+@Unhealthy("This test was never enabled")
 public class TestLeaderChoosePolicy {
 
   private MiniOzoneCluster cluster;
@@ -55,8 +54,6 @@ public class TestLeaderChoosePolicy {
 
   public void init(int numDatanodes, int datanodePipelineLimit)
       throws Exception {
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, datanodePipelineLimit);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

@@ -20,16 +20,19 @@ package org.apache.hadoop.ozone.container.common;
 
 import com.google.common.collect.Lists;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -49,7 +52,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -61,32 +63,37 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingTask;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -100,9 +107,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -113,11 +123,13 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestBlockDeletingService {
 
+  @Rule
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
+
   private File testRoot;
   private String scmId;
-  private String clusterID;
   private String datanodeUuid;
-  private OzoneConfiguration conf;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   private final ContainerLayoutVersion layout;
   private final String schemaVersion;
@@ -127,7 +139,6 @@ public class TestBlockDeletingService {
   public TestBlockDeletingService(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
@@ -138,13 +149,14 @@ public class TestBlockDeletingService {
 
   @Before
   public void init() throws IOException {
+    CodecBuffer.enableLeakDetection();
+
     testRoot = GenericTestUtils
         .getTestDir(TestBlockDeletingService.class.getSimpleName());
     if (testRoot.exists()) {
       FileUtils.cleanDirectory(testRoot);
     }
     scmId = UUID.randomUUID().toString();
-    clusterID = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
@@ -157,15 +169,8 @@ public class TestBlockDeletingService {
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
+    CodecBuffer.assertNoLeaks();
   }
-
-  private static final DispatcherContext WRITE_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
-
-  private static final DispatcherContext COMMIT_STAGE =
-      new DispatcherContext.Builder()
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
   /**
    * A helper method to create some blocks and put them under deletion
@@ -206,11 +211,11 @@ public class TestBlockDeletingService {
     data = (KeyValueContainerData) containerSet.getContainer(
         containerID).getContainerData();
     data.setSchemaVersion(schemaVersion);
-    if (schemaVersion.equals(SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
           containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-    } else if (schemaVersion.equals(SCHEMA_V2)
-        || schemaVersion.equals(SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, SCHEMA_V2)
+        || isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
       createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
           containerID, numOfChunksPerBlock, buffer, chunkManager,
           container, data);
@@ -295,7 +300,7 @@ public class TestBlockDeletingService {
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
 
-        if (schemaVersion.equals(SCHEMA_V3)) {
+        if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
           DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
               (DatanodeStoreSchemaThreeImpl) ds;
           dnStoreThreeImpl.getDeleteTransactionTable()
@@ -381,12 +386,12 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(DBHandle meta,
       KeyValueContainerData data) throws IOException {
-    if (data.getSchemaVersion().equals(SCHEMA_V1)) {
+    if (data.hasSchema(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
           .getRangeKVs(null, 100, data.containerPrefix(),
               data.getDeletingBlockKeyFilter())
           .size();
-    } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
+    } else if (data.hasSchema(SCHEMA_V2)) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
@@ -402,7 +407,7 @@ public class TestBlockDeletingService {
         }
       }
       return pendingBlocks;
-    } else if (data.getSchemaVersion().equals(SCHEMA_V3)) {
+    } else if (data.hasSchema(SCHEMA_V3)) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
@@ -435,7 +440,7 @@ public class TestBlockDeletingService {
   @Test
   public void testPendingDeleteBlockReset() throws Exception {
     // This test is not relevant for schema V1.
-    if (schemaVersion.equals(SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       return;
     }
 
@@ -569,7 +574,7 @@ public class TestBlockDeletingService {
     containerSet.listContainer(0L, 1, containerData);
     Assert.assertEquals(1, containerData.size());
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
-    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
 
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
@@ -587,6 +592,10 @@ public class TestBlockDeletingService {
 
       long deleteSuccessCount =
           deletingServiceMetrics.getSuccessCount();
+      long totalBlockChosenCount =
+          deletingServiceMetrics.getTotalBlockChosenCount();
+      long totalContainerChosenCount =
+          deletingServiceMetrics.getTotalContainerChosenCount();
       Assert.assertEquals(0, transactionId);
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
@@ -611,6 +620,17 @@ public class TestBlockDeletingService {
       Assert.assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getTotalBlockChosenCount()
+              - totalBlockChosenCount);
+      Assert.assertEquals(1,
+          deletingServiceMetrics.getTotalContainerChosenCount()
+              - totalContainerChosenCount);
+      // The value of the getTotalPendingBlockCount Metrics is obtained
+      // before the deletion is processing
+      // So the Pending Block count will be 3
+      Assert.assertEquals(3,
+          deletingServiceMetrics.getTotalPendingBlockCount());
 
       deleteAndWait(svc, 2);
 
@@ -629,11 +649,21 @@ public class TestBlockDeletingService {
       Assert.assertEquals(3,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      Assert.assertEquals(3,
+          deletingServiceMetrics.getTotalBlockChosenCount()
+              - totalBlockChosenCount);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getTotalContainerChosenCount()
+              - totalContainerChosenCount);
 
       // check if blockData get deleted
       assertBlockDataTableRecordCount(0, meta, filter, data.getContainerID());
+      // The value of the getTotalPendingBlockCount Metrics is obtained
+      // before the deletion is processing
+      // So the Pending Block count will be 1
+      Assert.assertEquals(1,
+          deletingServiceMetrics.getTotalPendingBlockCount());
     }
-
     svc.shutdown();
   }
 
@@ -641,7 +671,7 @@ public class TestBlockDeletingService {
   public void testWithUnrecordedBlocks() throws Exception {
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
     // from received TNXs will be deleted, not in BlockDeletingService
-    Assume.assumeFalse(Objects.equals(schemaVersion, SCHEMA_V1));
+    Assume.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
 
     int numOfContainers = 2;
     int numOfChunksPerBlock = 1;
@@ -671,7 +701,7 @@ public class TestBlockDeletingService {
     Assert.assertEquals(2, containerData.size());
     KeyValueContainerData ctr1 = (KeyValueContainerData) containerData.get(0);
     KeyValueContainerData ctr2 = (KeyValueContainerData) containerData.get(1);
-    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         ctr1.getDeletingBlockKeyFilter() : ctr1.getUnprefixedKeyFilter();
 
     // Have two unrecorded blocks onDisk and another two not to simulate the
@@ -823,12 +853,12 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf);
+        10, conf, "", mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data
     KeyValueContainer container =
-        (KeyValueContainer) containerSet.getContainerIterator().next();
+        (KeyValueContainer) containerSet.iterator().next();
     KeyValueContainerData data = container.getContainerData();
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
@@ -868,7 +898,7 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @Test(timeout = 30000)
+  @Test
   @org.junit.Ignore
   public void testContainerThrottle() throws Exception {
     // Properties :
@@ -934,6 +964,55 @@ public class TestBlockDeletingService {
     }
   }
 
+  @Test
+  public void testContainerMaxLockHoldingTime() throws Exception {
+    GenericTestUtils.LogCapturer log =
+        GenericTestUtils.LogCapturer.captureLogs(
+            LoggerFactory.getLogger(BlockDeletingTask.class));
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+
+    // Ensure that the lock holding timeout occurs every time a deletion
+    // transaction is executed by setting BlockDeletingMaxLockHoldingTime to -1.
+    dnConf.setBlockDeletingMaxLockHoldingTime(Duration.ofMillis(-1));
+    dnConf.setBlockDeletionLimit(3);
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = new ContainerSet(1000);
+
+    int containerCount = 1;
+    int chunksPerBlock = 10;
+    int blocksPerContainer = 3;
+    createToDeleteBlocks(containerSet, containerCount, blocksPerContainer,
+        chunksPerBlock);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            ContainerMetrics.create(conf), c -> {
+        });
+    BlockDeletingServiceTestImpl service =
+        getBlockDeletingService(containerSet, conf, keyValueHandler);
+    service.start();
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, containerCount, containerData);
+    try {
+      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+      deleteAndWait(service, 1);
+      GenericTestUtils.waitFor(() ->
+              (containerData.get(0).getBytesUsed() == 0),
+          100, 3000);
+      if (schemaVersion != null && (
+          schemaVersion.equals(SCHEMA_V2) || schemaVersion.equals(SCHEMA_V3))) {
+
+        // Since MaxLockHoldingTime is -1, every "deletion transaction" triggers
+        // a timeout except the last one, where a "deletion transaction"
+        // will be created for each Block, so it will start
+        // blocksPerContainer - 1 timeout.
+        Assert.assertEquals(blocksPerContainer - 1,
+            StringUtils.countMatches(log.getOutput(), "Max lock hold time"));
+      }
+    } finally {
+      service.shutdown();
+    }
+  }
+
   public long currentBlockSpace(List<ContainerData> containerData,
       int totalContainers) {
     long totalSpaceUsed = 0;
@@ -943,7 +1022,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testBlockThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 5
@@ -1048,12 +1127,13 @@ public class TestBlockDeletingService {
       DBHandle handle, KeyPrefixFilter filter, long containerID)
       throws IOException {
     long count = 0L;
-    BlockIterator<BlockData> iterator = handle.getStore().
-        getBlockIterator(containerID, filter);
-    iterator.seekToFirst();
-    while (iterator.hasNext()) {
-      iterator.nextBlock();
-      count += 1;
+    try (BlockIterator<BlockData> iterator = handle.getStore().
+        getBlockIterator(containerID, filter)) {
+      iterator.seekToFirst();
+      while (iterator.hasNext()) {
+        iterator.nextBlock();
+        count += 1;
+      }
     }
     Assert.assertEquals("Excepted: " + expectedCount
         + ", but actual: " + count + " in the blockData table of container: "

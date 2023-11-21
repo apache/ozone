@@ -87,6 +87,8 @@ public class TestXceiverClientGrpc {
   @Timeout(5)
   public void testRandomFirstNodeIsCommandTarget() throws IOException {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    conf.setBoolean(
+            OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
     // Using a new Xceiver Client, call it repeatedly until all DNs in the
     // pipeline have been the target of the command, indicating it is shuffling
     // the DNs on each call with a new client. This test will timeout if this

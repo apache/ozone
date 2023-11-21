@@ -19,9 +19,12 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -51,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * entries that represent a writing channel towards DataNodes are the main
  * responsibility of this class.
  */
-public class BlockOutputStreamEntryPool {
+public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
@@ -117,7 +120,8 @@ public class BlockOutputStreamEntryPool {
   }
 
   ExcludeList createExcludeList() {
-    return new ExcludeList();
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
   }
 
   BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
@@ -137,7 +141,7 @@ public class BlockOutputStreamEntryPool {
 
     currentStreamIndex = 0;
     openID = -1;
-    excludeList = new ExcludeList();
+    excludeList = createExcludeList();
     this.clientMetrics = clientMetrics;
   }
 
@@ -427,5 +431,17 @@ public class BlockOutputStreamEntryPool {
 
   boolean isEmpty() {
     return streamEntries.isEmpty();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    if (keyArgs != null) {
+      return this.keyArgs.getMetadata();
+    }
+    return null;
+  }
+
+  long getDataSize() {
+    return keyArgs.getDataSize();
   }
 }

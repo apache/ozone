@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,7 +94,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result;
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
@@ -106,8 +107,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
               IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       final long volumeId = omMetadataManager.getVolumeTable()
@@ -142,22 +144,23 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             + " as there is already file in the given path", NOT_A_FILE);
       }
 
+      // do open key
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(volumeName, bucketName));
+
       // add all missing parents to dir table
       missingParentInfos =
-              OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-                      ozoneManager, keyArgs, pathInfoFSO, trxnLogIndex);
+          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
+              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
 
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(volumeName, bucketName));
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
               dbFileInfo, keyArgs.getDataSize(), locations,
@@ -216,7 +219,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumKeyAllocateFails();
@@ -227,8 +230,11 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquireLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

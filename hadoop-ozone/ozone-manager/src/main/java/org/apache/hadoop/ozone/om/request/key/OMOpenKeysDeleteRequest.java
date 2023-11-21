@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -37,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -83,7 +83,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
@@ -100,7 +100,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
@@ -109,6 +109,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     processResults(omMetrics, numSubmittedOpenKeys, deletedOpenKeys.size(),
@@ -147,8 +150,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     try {
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       for (OpenKey key: keysPerBucket.getKeysList()) {
         String fullKeyName = key.getName();
@@ -174,7 +178,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
               new CacheKey<>(fullKeyName),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
           ozoneManager.getMetrics().incNumOpenKeysDeleted();
           LOG.debug("Open key {} deleted.", fullKeyName);
@@ -189,8 +193,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
     } finally {
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
     }
   }

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -119,7 +120,7 @@ public class TestDatanodeStateMachine {
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("Test Data Node State Machine Thread - %d").build());
+            .setNameFormat("TestDataNodeStateMachineThread-%d").build());
   }
 
   @AfterEach
@@ -157,8 +158,7 @@ public class TestDatanodeStateMachine {
   public void testStartStopDatanodeStateMachine() throws IOException,
       InterruptedException, TimeoutException {
     try (DatanodeStateMachine stateMachine =
-        new DatanodeStateMachine(getNewDatanodeDetails(), conf, null, null,
-            null)) {
+        new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
       stateMachine.startDaemon();
       SCMConnectionManager connectionManager =
           stateMachine.getConnectionManager();
@@ -218,10 +218,9 @@ public class TestDatanodeStateMachine {
         DatanodeDetails.Port.Name.STANDALONE,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
-    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
+    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
-             new DatanodeStateMachine(datanodeDetails, conf, null, null,
-                 null)) {
+             new DatanodeStateMachine(datanodeDetails, conf)) {
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -252,6 +251,11 @@ public class TestDatanodeStateMachine {
       stateMachine.getContext().setState(newState);
       task = stateMachine.getContext().getTask();
       Assertions.assertEquals(RunningDatanodeState.class, task.getClass());
+
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+          UUID.randomUUID().toString(),
+          HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+      layoutStorage.initialize();
 
       // This execute will invoke getVersion calls against all SCM endpoints
       // that we know of.
@@ -343,8 +347,7 @@ public class TestDatanodeStateMachine {
     datanodeDetails.setPort(port);
 
     try (DatanodeStateMachine stateMachine =
-             new DatanodeStateMachine(datanodeDetails, conf, null, null,
-                 null)) {
+             new DatanodeStateMachine(datanodeDetails, conf)) {
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -402,7 +405,7 @@ public class TestDatanodeStateMachine {
       perTestConf.setStrings(entry.getKey(), entry.getValue());
       LOG.info("Test with {} = {}", entry.getKey(), entry.getValue());
       try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(
-          getNewDatanodeDetails(), perTestConf, null, null, null)) {
+          getNewDatanodeDetails(), perTestConf)) {
         DatanodeStateMachine.DatanodeStates currentState =
             stateMachine.getContext().getState();
         Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.INIT,

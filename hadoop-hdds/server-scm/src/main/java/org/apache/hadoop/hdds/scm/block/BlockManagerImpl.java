@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -48,7 +47,6 @@ import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,11 +104,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         scm.getSequenceIdGen(),
         metrics);
 
+
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
             scm.getSCMServiceManager(), conf,
-            metrics, scm.getSystemClock());
+            metrics, scm.getSystemClock(), scm.getReconfigurationHandler());
   }
 
   /**
@@ -149,7 +148,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public AllocatedBlock allocateBlock(final long size,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , replicationConfig: {}", size, replicationConfig);
     }
@@ -184,7 +183,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @return AllocatedBlock
    */
   private AllocatedBlock newBlock(ContainerInfo containerInfo)
-      throws NotLeaderException, TimeoutException {
+      throws SCMException {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
@@ -245,7 +244,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
     try {
       deletedBlockLog.addTransactions(containerBlocks);
-    } catch (IOException | TimeoutException e) {
+    } catch (IOException e) {
       throw new IOException("Skip writing the deleted blocks info to"
           + " the delLog because addTransaction fails. " + keyBlocksInfoList
           .size() + "Keys skipped", e);
@@ -279,16 +278,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       MBeans.unregister(mxBean);
       mxBean = null;
     }
-  }
-
-  @Override
-  public int getOpenContainersNo() {
-    return 0;
-    // TODO : FIX ME : The open container being a single number does not make
-    // sense.
-    // We have to get open containers by Replication Type and Replication
-    // factor. Hence returning 0 for now.
-    // containers.get(HddsProtos.LifeCycleState.OPEN).size();
   }
 
   @Override

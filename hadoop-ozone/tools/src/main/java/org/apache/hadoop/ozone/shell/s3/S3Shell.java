@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import java.util.function.Supplier;
-
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
 
@@ -39,8 +37,9 @@ public class S3Shell extends Shell {
   @Override
   public int execute(String[] argv) {
     TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    return TracingUtil.executeInNewSpan("s3shell",
-        (Supplier<Integer>) () -> super.execute(argv));
+    String spanName = "ozone s3 " + String.join(" ", argv);
+    return TracingUtil.executeInNewSpan(spanName,
+        () -> super.execute(argv));
   }
 
   /**

@@ -167,9 +167,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             .addMetadata(keyValue);
     this.xceiverClient =
         (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
+    this.token = token;
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
-    this.token = token;
     this.bufferList = bufferList;
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
@@ -204,6 +204,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             .setCmdType(ContainerProtos.Type.StreamInit)
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
 
     ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
@@ -372,8 +376,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
-          commitWatcher.streamWatchOnFirstIndex() :
-          commitWatcher.streamWatchOnLastIndex();
+          commitWatcher.watchOnFirstIndex() :
+          commitWatcher.watchOnLastIndex();
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -450,7 +454,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Adding index " + asyncReply.getLogIndex() +
                     " commitMap size "
-                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                    + commitWatcher.getCommitIndexMap().size() + " flushLength "
                     + flushPos + " blockID " + blockID);
               }
               // for standalone protocol, logIndex will always be 0.

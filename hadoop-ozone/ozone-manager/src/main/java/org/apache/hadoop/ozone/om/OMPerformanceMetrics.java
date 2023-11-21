@@ -74,6 +74,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check in getKeyInfo")
   private MutableRate getKeyInfoAclCheckLatencyNs;
 
+  @Metric(about = "Sort datanodes latency in getKeyInfo")
+  private MutableRate getKeyInfoSortDatanodesLatencyNs;
+
   @Metric(about = "resolveBucketLink latency in getKeyInfo")
   private MutableRate getKeyInfoResolveBucketLatencyNs;
 
@@ -82,6 +85,33 @@ public class OMPerformanceMetrics {
 
   @Metric(about = "Client requests forcing container info cache refresh")
   private MutableRate forceContainerCacheRefresh;
+
+  @Metric(about = "checkAccess latency in nanoseconds")
+  private MutableRate checkAccessLatencyNs;
+
+  @Metric(about = "listKeys latency in nanoseconds")
+  private MutableRate listKeysLatencyNs;
+
+  @Metric(about = "Validate request latency in nano seconds")
+  private MutableRate validateRequestLatencyNs;
+
+  @Metric(about = "Validate response latency in nano seconds")
+  private MutableRate validateResponseLatencyNs;
+
+  @Metric(about = "PreExecute latency in nano seconds")
+  private MutableRate preExecuteLatencyNs;
+
+  @Metric(about = "Ratis latency in nano seconds")
+  private MutableRate submitToRatisLatencyNs;
+
+  @Metric(about = "Convert om request to ratis request nano seconds")
+  private MutableRate createRatisRequestLatencyNs;
+
+  @Metric(about = "Convert ratis response to om response nano seconds")
+  private MutableRate createOmResoonseLatencyNs;
+
+  @Metric(about = "Ratis local command execution latency in nano seconds")
+  private MutableRate validateAndUpdateCacneLatencyNs;
 
 
   public void addLookupLatency(long latencyInNs) {
@@ -137,7 +167,47 @@ public class OMPerformanceMetrics {
     return getKeyInfoResolveBucketLatencyNs;
   }
 
+  public MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
+    return getKeyInfoSortDatanodesLatencyNs;
+  }
+
   public void setForceContainerCacheRefresh(boolean value) {
     forceContainerCacheRefresh.add(value ? 1L : 0L);
+  }
+
+  public void setCheckAccessLatencyNs(long latencyInNs) {
+    checkAccessLatencyNs.add(latencyInNs);
+  }
+
+  public void addListKeysLatencyNs(long latencyInNs) {
+    listKeysLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getValidateRequestLatencyNs() {
+    return validateRequestLatencyNs;
+  }
+
+  public MutableRate getValidateResponseLatencyNs() {
+    return validateResponseLatencyNs;
+  }
+
+  public MutableRate getPreExecuteLatencyNs() {
+    return preExecuteLatencyNs;
+  }
+
+  public MutableRate getSubmitToRatisLatencyNs() {
+    return submitToRatisLatencyNs;
+  }
+
+  public MutableRate getCreateRatisRequestLatencyNs() {
+    return createRatisRequestLatencyNs;
+  }
+
+  public MutableRate getCreateOmResponseLatencyNs() {
+    return createOmResoonseLatencyNs;
+  }
+
+  public MutableRate getValidateAndUpdateCacneLatencyNs() {
+    return validateAndUpdateCacneLatencyNs;
   }
 }

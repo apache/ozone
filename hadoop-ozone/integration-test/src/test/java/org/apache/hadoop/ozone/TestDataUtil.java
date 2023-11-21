@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Scanner;
 
@@ -70,22 +71,28 @@ public final class TestDataUtil {
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      String volumeName, String bucketName,
-      BucketArgs omBucketArgs) throws IOException {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs volumeArgs =
-        VolumeArgs.newBuilder().setAdmin(adminName).setOwner(userName).build();
-
-    ObjectStore objectStore = client.getObjectStore();
-
-    objectStore.createVolume(volumeName, volumeArgs);
-
-    OzoneVolume volume = objectStore.getVolume(volumeName);
-
+                                                  String volumeName,
+                                                  String bucketName,
+                                                  BucketArgs omBucketArgs)
+      throws IOException {
+    OzoneVolume volume = createVolume(client, volumeName);
     volume.createBucket(bucketName, omBucketArgs);
     return volume.getBucket(bucketName);
+
+  }
+
+  public static OzoneVolume createVolume(OzoneClient client,
+                                         String volumeName) throws IOException {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setAdmin(adminName)
+        .setOwner(userName)
+        .build();
+
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(volumeName, volumeArgs);
+    return objectStore.getVolume(volumeName);
 
   }
 
@@ -110,6 +117,18 @@ public final class TestDataUtil {
         .createKey(keyName, content.length(), repConfig,
             new HashMap<>())) {
       stream.write(content.getBytes(UTF_8));
+    }
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+      ReplicationFactor repFactor, ReplicationType repType,
+      ByteBuffer data) throws IOException {
+    ReplicationConfig repConfig = ReplicationConfig
+        .fromTypeAndFactor(repType, repFactor);
+    try (OutputStream stream = bucket
+        .createKey(keyName, data.capacity(), repConfig,
+            new HashMap<>())) {
+      stream.write(data.array());
     }
   }
 
