@@ -433,6 +433,23 @@ public class TestStateContext {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
+    OzoneContainer container = mock(OzoneContainer.class);
+    HddsProtos.PipelineID pipelineIDProto = PipelineID.randomId().getProtobuf();
+
+    // Mock DN PipelineReport
+    PipelineReportsProto.Builder
+        pipelineReportsProtoBuilder = PipelineReportsProto.newBuilder();
+    pipelineReportsProtoBuilder.addAllPipelineReport(Collections.singletonList(
+        PipelineReport.newBuilder()
+            .setPipelineID(pipelineIDProto)
+            .setIsLeader(false)
+            .build()));
+    PipelineReportsProto pipelineReportsProto =
+        pipelineReportsProtoBuilder.build();
+
+    when(container.getPipelineReport()).thenReturn(pipelineReportsProto);
+    when(datanodeStateMachineMock.getContainer()).thenReturn(container);
+
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
@@ -454,7 +471,7 @@ public class TestStateContext {
     stateContext.addEndpoint(scm2);
 
     final ClosePipelineInfo closePipelineInfo = ClosePipelineInfo.newBuilder()
-        .setPipelineID(PipelineID.randomId().getProtobuf())
+        .setPipelineID(pipelineIDProto)
         .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED)
         .setDetailedReason("Test").build();
     final PipelineAction pipelineAction = PipelineAction.newBuilder()
@@ -467,7 +484,8 @@ public class TestStateContext {
 
     pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
-    // The pipeline action is dequeued from scm2 now, but still in scm1
+    // The pipeline action will not be dequeued from scm2
+    // until it is removed from the DN.
 
     // The same pipeline action will not be added if it already exists
     stateContext.addPipelineActionIfAbsent(pipelineAction);
