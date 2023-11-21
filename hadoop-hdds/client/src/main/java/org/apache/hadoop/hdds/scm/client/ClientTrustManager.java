@@ -34,7 +34,41 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * tbd.
+ * A {@link javax.net.ssl.TrustManager} implementation for gRPC and Ratis
+ * clients.
+ *
+ * This TrustManager instance is holding a reference to an externally supplied
+ * TrustManager instance, and forwards all requests to that one.
+ * This class is designed within the context of XceiverClientManager, where
+ * we have the TrustManager initialized based on a ServiceInfo object, and
+ * later on if the root of trust expires we need to refresh the rootCA
+ * certificate for long-running clients to deal with a rootCA rotation if
+ * necessary.
+ *
+ * The broader context where this class is usable is generally any place, where
+ * clients are created based on a factory, and that factory can cache the
+ * initial root of trust in this TrustManager, and a refresh mechanism as
+ * necessary if the root of trust is expected to change for the certificate
+ * of the server side.
+ *
+ * Note that in-memory provider is used to get the initial list of CA
+ * certificates, that will be used to verify server side certificates.
+ * In case of a certificate verification failure, the remote provider is used
+ * to fetch a new list of CA certificates that will be used to verify server
+ * side certificate from then on until the next failure.
+ * Failures expected to happen only after a CA certificate that issued
+ * the certificate of the servers is expired, or when the servers in preparation
+ * for this expiration event renewed their certificates with a new CA.
+ *
+ * Important to note that this logic without additional efforts is weak against
+ * a sophisticated attack, and should only be used with extra protection within
+ * the remote provider. In Ozone's case the supplied remote provider is
+ * an OzoneManager client, that verifies the identity of the server side
+ * via Kerberos and expects the other side to be identified as an Ozone Manager.
+ *
+ * The checkClientTrusted methods throw Unsupported operation exceptions,
+ * as this TrustManager instance is designed to be used only with client side
+ * SSL channels.
  */
 public class ClientTrustManager extends X509ExtendedTrustManager {
 
@@ -45,13 +79,36 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private X509ExtendedTrustManager trustManager;
 
   /**
-   * tbd.
+   * An interface that defines a trust anchor provider API this class relies on.
    */
   @FunctionalInterface
   public interface CACertificateProvider {
     List<X509Certificate> provideCACerts() throws IOException;
   }
 
+  /**
+   * Creates a ClientTrustManager instance based on an in-memory and a remote
+   * trust anchor provider.
+   *
+   * The TrustManager first loads itself utilizing the in-memory provider to
+   * provide a trust anchor (CA certificate) to be present in the trust store.
+   *
+   * Once the trust can not be established it uses the remote trust anchor
+   * provider to refresh the locally known list of certificates.
+   *
+   * Both provider is allowed to be null, if any of them is null, then it
+   * will not be used to get the certificate list to be trusted.
+   * If both the remote and in memory provider is null, any call to verify
+   * a server certificate will fail with an underlying SSL error. The trust
+   * check does not fall back to a system provided trust store, as in Ozone
+   * we are not currently rely on that.
+   *
+   * @param remoteProvider the provider to call once the root of trust has to
+   *                       be renewed potentially as certificate verification
+   *                       failed.
+   * @param inMemoryProvider the initial provider of the trusted certificates.
+   * @throws IOException in case an IO operation fails.
+   */
   public ClientTrustManager(CACertificateProvider remoteProvider,
       CACertificateProvider inMemoryProvider)
       throws IOException {
