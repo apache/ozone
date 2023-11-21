@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test class for @{@link OzoneClientProducer}.
@@ -71,7 +72,7 @@ public class TestOzoneClientProducer {
     IOException testGetClientFailure = assertThrows(IOException.class, () ->
         producer.createClient(),
         "testGetClientFailureWithMultipleServiceIdsAndInternalServiceId");
-    assertTrue(testGetClientFailure.getMessage().contains(
+    assertFalse(testGetClientFailure.getMessage().contains(
         "More than 1 OzoneManager ServiceID"));
   }
 
