@@ -39,7 +39,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import picocli.CommandLine;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +54,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -64,6 +70,15 @@ public class TestInfoSubCommand {
   private Logger logger;
   private TestAppender appender;
 
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private ByteArrayInputStream inContent;
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+  private final InputStream originalIn = System.in;
+
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+
   @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
@@ -75,11 +90,17 @@ public class TestInfoSubCommand {
     logger = Logger.getLogger(
         org.apache.hadoop.hdds.scm.cli.container.InfoSubcommand.class);
     logger.addAppender(appender);
+
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
   @AfterEach
   public void after() {
     logger.removeAppender(appender);
+    System.setOut(originalOut);
+    System.setErr(originalErr);
+    System.setIn(originalIn);
   }
 
   @Test
@@ -93,6 +114,16 @@ public class TestInfoSubCommand {
   }
 
   @Test
+  public void testErrorWhenNoContainerIDParam() throws Exception {
+    cmd = new InfoSubcommand();
+    assertThrows(CommandLine.MissingParameterException.class, () -> {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs();
+      cmd.execute(scmClient);
+    });
+  }
+
+  @Test
   public void testMultipleContainersCanBePassed() throws Exception {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(true));
@@ -100,7 +131,23 @@ public class TestInfoSubCommand {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1", "123", "456", "invalid", "789");
     cmd.execute(scmClient);
+    validateMultiOutput();
+  }
 
+  @Test
+  public void testContainersCanBeReadFromStdin() throws IOException {
+    String input = "1\n123\n456\ninvalid\n789\n";
+    inContent = new ByteArrayInputStream(input.getBytes());
+    System.setIn(inContent);
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-");
+    cmd.execute(scmClient);
+
+    validateMultiOutput();
+  }
+
+  private void validateMultiOutput() {
     // Ensure we have a log line for each containerID
     List<LoggingEvent> logs = appender.getLog();
     List<LoggingEvent> replica = logs.stream()
@@ -117,6 +164,21 @@ public class TestInfoSubCommand {
   }
 
   @Test
+  public void testContainersCanBeReadFromStdinJson()
+      throws IOException {
+    String input = "1\n123\n456\ninvalid\n789\n";
+    inContent = new ByteArrayInputStream(input.getBytes());
+    System.setIn(inContent);
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-", "--json");
+    cmd.execute(scmClient);
+
+    validateJsonMultiOutput();
+  }
+
+
+  @Test
   public void testMultipleContainersCanBePassedJson() throws Exception {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(true));
@@ -125,6 +187,10 @@ public class TestInfoSubCommand {
     c.parseArgs("1", "123", "456", "invalid", "789", "--json");
     cmd.execute(scmClient);
 
+    validateJsonMultiOutput();
+  }
+
+  private void validateJsonMultiOutput() {
     // Ensure we have a log line for each containerID
     List<LoggingEvent> logs = appender.getLog();
     List<LoggingEvent> replica = logs.stream()

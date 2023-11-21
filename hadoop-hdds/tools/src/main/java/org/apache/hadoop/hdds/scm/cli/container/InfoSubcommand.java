@@ -74,7 +74,11 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @Parameters(description = "One or more container IDs separated by spaces.")
+  @Parameters(description = "One or more container IDs separated by spaces. " +
+      "To read from stdin, specify '-' and supply the container IDs " +
+      "separated by newlines.",
+      arity = "1..*",
+      paramLabel = "<container ID>")
   private String[] containerList;
 
   private boolean multiContainer = false;
@@ -82,13 +86,16 @@ public class InfoSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean first = true;
-    if (containerList == null || containerList.length > 1) {
+    boolean stdin = false;
+    if (containerList.length > 1) {
       multiContainer = true;
+    } else if (containerList[0].equals("-")) {
+      stdin = true;
     }
+
     printHeader();
-    if (containerList == null) {
+    if (stdin) {
       Scanner scanner = new Scanner(System.in, "UTF-8");
-      System.in.
       while (scanner.hasNextLine()) {
         String id = scanner.nextLine().trim();
         printOutput(scmClient, id, first);
