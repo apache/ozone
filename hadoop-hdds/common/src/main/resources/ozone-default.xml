@@ -841,6 +841,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.chunk.list.incremental</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT, DATANODE, PERFORMANCE</tag>
+    <description>
+      By default, a writer client sends full chunk list of a block when it
+      sends PutBlock requests. Changing this configuration to true will send
+      only incremental chunk list which reduces metadata overhead and improves
+      hsync performance.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.layout</name>
     <value>FILE_PER_BLOCK</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>

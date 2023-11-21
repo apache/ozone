@@ -103,6 +103,12 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
+  public DBColumnFamilyDefinition<String, BlockData>
+      getLastChunkInfoColumnFamily() {
+    return null;
+  }
+
+  @Override
   public List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(String name) {
     return COLUMN_FAMILIES.get(name);
   }

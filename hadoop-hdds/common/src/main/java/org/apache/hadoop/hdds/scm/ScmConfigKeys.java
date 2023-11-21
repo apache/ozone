@@ -143,6 +143,10 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
       "64KB";
 
+  public static final String OZONE_CHUNK_LIST_INCREMENTAL =
+      "ozone.chunk.list.incremental";
+  public static final boolean OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT = false;
+
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
 

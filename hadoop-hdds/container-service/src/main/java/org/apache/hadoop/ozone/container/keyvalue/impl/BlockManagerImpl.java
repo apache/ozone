@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -36,11 +37,15 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.base.Preconditions;
+
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,8 +61,8 @@ public class BlockManagerImpl implements BlockManager {
   private ConfigurationSource config;
 
   private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
-  private static final String NO_SUCH_BLOCK_ERR_MSG =
-      "Unable to find the block.";
+  public static final String INCREMENTAL_CHUNK_LIST = "incremental";
+  public static final String FULL_CHUNK = "full";
 
   // Default Read Buffer capacity when Checksum is not present
   private final int defaultReadBufferCapacity;
@@ -103,6 +108,15 @@ public class BlockManagerImpl implements BlockManager {
   public static long persistPutBlock(KeyValueContainer container,
       BlockData data, ConfigurationSource config, boolean endOfBlock)
       throws IOException {
+    boolean incrementalEnabled =
+            config.getBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
+                    OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT);
+    if (incrementalEnabled && !VersionedDatanodeFeatures.isFinalized(
+            HDDSLayoutFeature.LAST_CHUNK_TABLE)) {
+      throw new StorageContainerException("DataNode has not finalized " +
+        "upgrading to a version that supports incremental chunk list.",
+        UNSUPPORTED_REQUEST);
+    }
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
@@ -145,7 +159,6 @@ public class BlockManagerImpl implements BlockManager {
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
-
         // If the block does not exist in the pendingPutBlockCache of the
         // container, then check the DB to ascertain if it exists or not.
         // If block exists in cache, blockCount should not be incremented.
@@ -158,8 +171,8 @@ public class BlockManagerImpl implements BlockManager {
           }
         }
 
-        db.getStore().getBlockDataTable().putWithBatch(
-            batch, containerData.getBlockKey(localID), data);
+        db.getStore().putBlockByID(batch, incrementalEnabled, localID, data,
+            containerData, endOfBlock);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
               batch, containerData.getBcsIdKey(), bcsId);
@@ -354,14 +367,6 @@ public class BlockManagerImpl implements BlockManager {
 
   private BlockData getBlockByID(DBHandle db, BlockID blockID,
       KeyValueContainerData containerData) throws IOException {
-    String blockKey = containerData.getBlockKey(blockID.getLocalID());
-
-    BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
-    if (blockData == null) {
-      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG +
-              " BlockID : " + blockID, NO_SUCH_BLOCK);
-    }
-
-    return blockData;
+    return db.getStore().getBlockByID(blockID, containerData);
   }
 }
