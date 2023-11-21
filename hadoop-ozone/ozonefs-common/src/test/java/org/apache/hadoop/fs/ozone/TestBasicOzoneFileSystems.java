@@ -48,7 +48,7 @@ public class TestBasicOzoneFileSystems {
     );
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(autoCloseArguments = false)
   @MethodSource("data")
   public void defaultBlockSize(FileSystem subject) {
     Configuration conf = new OzoneConfiguration();
@@ -58,7 +58,7 @@ public class TestBasicOzoneFileSystems {
     assertDefaultBlockSize(expected, subject);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(autoCloseArguments = false)
   @MethodSource("data")
   public void defaultBlockSizeCustomized(FileSystem subject) {
     String customValue = "128MB";
@@ -70,7 +70,7 @@ public class TestBasicOzoneFileSystems {
   }
 
   // test for filesystem pseduo-posix symlink support
-  @ParameterizedTest
+  @ParameterizedTest(autoCloseArguments = false)
   @MethodSource("data")
   public void testFileSystemPosixSymlinkSupport(FileSystem subject) {
     if (subject instanceof BasicRootedOzoneFileSystem) {
@@ -83,7 +83,7 @@ public class TestBasicOzoneFileSystems {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(autoCloseArguments = false)
   @MethodSource("data")
   public void testCreateSnapshotReturnPath(
       FileSystem subject) throws IOException {
