@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -186,15 +187,21 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     }
   }
 
+  public void checkIfAllDNInExcludeList(Set<DatanodeDetails> dnDetails)
+      throws SCMException {
+    if (dnDetails.containsAll(scm.getScmNodeManager().getAllNodes())) {
+      throw new SCMException("All Datanodes have been added in exclude list. Client should retry all Datanodes again.",
+          SCMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST);
+    }
+  }
+
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request, int clientVersion)
       throws IOException {
     ExcludeList excludeList = ExcludeList.getFromProtoBuf(request.getExcludeList());
-    if (excludeList.getDatanodes().size() ==
-        scm.getScmNodeManager().getNodeCount(NodeStatus.inServiceHealthy())) {
-      throw new SCMException("All Datanodes have been added into exclude list. Client should retry all Datanodes again.",
-          SCMException.ResultCodes.RETRY_ALL_DN_IN_EXCLUDE_LIST);
-    }
+    // scm should let client know it should retry all DN again
+    // if all DN are already in exclude list.
+    checkIfAllDNInExcludeList(excludeList.getDatanodes());
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(),
