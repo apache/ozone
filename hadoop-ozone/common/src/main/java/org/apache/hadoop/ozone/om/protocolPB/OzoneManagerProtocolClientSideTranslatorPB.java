@@ -223,8 +223,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.util.ProtobufUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -250,8 +248,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 @InterfaceAudience.Private
 public final class OzoneManagerProtocolClientSideTranslatorPB
     implements OzoneManagerClientProtocol {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneManagerProtocolClientSideTranslatorPB.class);
+
   private final String clientID;
   private OmTransport transport;
   private ThreadLocal<S3Auth> threadLocalS3Auth
