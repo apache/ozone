@@ -514,12 +514,12 @@ public class TestOmContainerLocationCache {
   }
 
   /**
-   * Verify that in situation that SCM return empty pipelines (that prevents
-   * clients from reading data), the empty pipeline is not cached and
+   * Verify that in situation that SCM returns empty pipelines (that prevents
+   * clients from reading data), the empty pipelines are not cached and
    * subsequent key reads re-fetch container data from SCM.
    */
   @Test
-  public void containerRefreshedEmptyPipelines() throws Exception {
+  public void containerRefreshedOnEmptyPipelines() throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
     mockScmAllocationOnDn1(testContainerId, 1L);
