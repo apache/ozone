@@ -102,7 +102,9 @@ import java.util.stream.Stream;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -196,6 +198,11 @@ public class TestOmContainerLocationCache {
     mockDn1Protocol = spy(new XceiverClientGrpc(createPipeline(DN1), conf));
     mockDn2Protocol = spy(new XceiverClientGrpc(createPipeline(DN2), conf));
     XceiverClientManager manager = mock(XceiverClientManager.class);
+    when(manager.acquireClient(argThat(matchEmptyPipeline())))
+        .thenCallRealMethod();
+    when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
+        .thenCallRealMethod();
+
     when(manager.acquireClient(argThat(matchPipeline(DN1))))
         .thenReturn(mockDn1Protocol);
     when(manager.acquireClientForReadData(argThat(matchPipeline(DN1))))
@@ -208,8 +215,14 @@ public class TestOmContainerLocationCache {
     return manager;
   }
 
-  private static ArgumentMatcher<Pipeline> matchPipeline(DatanodeDetails dn) {
+  private static ArgumentMatcher<Pipeline> matchEmptyPipeline() {
     return argument -> argument != null
+        && argument.getNodes().isEmpty();
+  }
+
+
+  private static ArgumentMatcher<Pipeline> matchPipeline(DatanodeDetails dn) {
+    return argument -> argument != null && !argument.getNodes().isEmpty()
         && argument.getNodes().get(0).getUuid().equals(dn.getUuid());
   }
 
@@ -500,6 +513,60 @@ public class TestOmContainerLocationCache {
         .getContainerWithPipelineBatch(newHashSet(testContainerId));
   }
 
+  /**
+   * Verify that in situation that SCM return empty pipelines (that prevents
+   * clients from reading data), the empty pipeline is not cached and
+   * subsequent key reads re-fetch container data from SCM.
+   */
+  @Test
+  public void containerRefreshedEmptyPipelines() throws Exception {
+    byte[] data = "Test content".getBytes(UTF_8);
+
+    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockWriteChunkResponse(mockDn1Protocol);
+    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+
+    OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
+        .getBucket(BUCKET_NAME);
+
+    String keyName = "key";
+    try (OzoneOutputStream os = bucket.createKey(keyName, data.length)) {
+      IOUtils.write(data, os);
+    }
+
+    // All datanodes go down and scm returns empty pipeline for the container.
+    mockScmGetContainerPipelineEmpty(testContainerId);
+
+    OzoneKeyDetails key1 = bucket.getKey(keyName);
+
+    verify(mockScmContainerClient, times(1))
+        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+
+    // verify that the effort to read will result in a NO_REPLICA_FOUND error.
+    Exception ex =
+        assertThrows(IllegalArgumentException.class, () -> {
+          try (InputStream is = key1.getContent()) {
+            IOUtils.read(is, new byte[(int) key1.getDataSize()]);
+          }
+        });
+    assertEquals(NO_REPLICA_FOUND.toString(), ex.getMessage());
+
+    // but the empty pipeline is not cached, and when some data node is back.
+    mockScmGetContainerPipeline(testContainerId, DN1);
+    mockGetBlock(mockDn1Protocol, testContainerId, 1L, data, null, null);
+    mockReadChunk(mockDn1Protocol, testContainerId, 1L, data, null, null);
+    // the subsequent effort to read the key is success.
+    OzoneKeyDetails updatedKey1 = bucket.getKey(keyName);
+    try (InputStream is = updatedKey1.getContent()) {
+      byte[] read = new byte[(int) key1.getDataSize()];
+      IOUtils.read(is, read);
+      Assertions.assertArrayEquals(data, read);
+    }
+    // verify SCM is called one more time to refetch the container pipeline..
+    verify(mockScmContainerClient, times(2))
+        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+  }
+
   private void mockPutBlockResponse(XceiverClientSpi mockDnProtocol,
                                     long containerId, long localId,
                                     byte[] data)
@@ -567,6 +634,20 @@ public class TestOmContainerLocationCache {
                                            DatanodeDetails dn)
       throws IOException {
     Pipeline pipeline = createPipeline(dn);
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setPipelineID(pipeline.getId()).build();
+    List<ContainerWithPipeline> containerWithPipelines =
+        Collections.singletonList(
+            new ContainerWithPipeline(containerInfo, pipeline));
+
+    when(mockScmContainerClient.getContainerWithPipelineBatch(
+        newHashSet(containerId))).thenReturn(containerWithPipelines);
+  }
+
+  private void mockScmGetContainerPipelineEmpty(long containerId)
+      throws IOException {
+    Pipeline pipeline = createPipeline(Collections.emptyList());
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
         .setPipelineID(pipeline.getId()).build();
@@ -664,12 +745,16 @@ public class TestOmContainerLocationCache {
   }
 
   private static Pipeline createPipeline(DatanodeDetails dn) {
+    return createPipeline(Collections.singletonList(dn));
+  }
+
+  private static Pipeline createPipeline(List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
-        .setNodes(Collections.singletonList(dn))
+        .setNodes(nodes)
         .build();
   }
 }
