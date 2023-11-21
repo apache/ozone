@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -82,6 +83,7 @@ public class TestPermissionCheck {
     Mockito.when(client.getConfiguration()).thenReturn(conf);
     headers = Mockito.mock(HttpHeaders.class);
     clientProtocol = Mockito.mock(ClientProtocol.class);
+    S3GatewayMetrics.create(conf);
     Mockito.when(client.getProxy()).thenReturn(clientProtocol);
   }
 
