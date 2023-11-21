@@ -20,17 +20,23 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.WriteOptions;
 
+import javax.annotation.Nullable;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+
 /**
- * Managed WriteBatch.
+ * Managed {@link WriteOptions}.
  */
 public class ManagedWriteOptions extends WriteOptions {
-  public ManagedWriteOptions() {
-    super();
-  }
+
+  @Nullable
+  private final StackTraceElement[] elements = getStackTrace();
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    assertClosed(this, formatStackTrace(elements));
     super.finalize();
   }
 }

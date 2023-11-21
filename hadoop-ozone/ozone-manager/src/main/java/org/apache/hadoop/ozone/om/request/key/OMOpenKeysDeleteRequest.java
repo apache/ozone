@@ -109,6 +109,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     processResults(omMetrics, numSubmittedOpenKeys, deletedOpenKeys.size(),
@@ -147,8 +150,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     try {
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       for (OpenKey key: keysPerBucket.getKeysList()) {
         String fullKeyName = key.getName();
@@ -189,8 +193,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
     } finally {
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
     }
   }
