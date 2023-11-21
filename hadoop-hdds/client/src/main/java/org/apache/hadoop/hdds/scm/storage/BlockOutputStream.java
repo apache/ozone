@@ -83,6 +83,8 @@ public class BlockOutputStream extends OutputStream {
       "Unexpected Storage Container Exception: ";
   public static final String INCREMENTAL_CHUNK_LIST = "incremental";
   public static final String FULL_CHUNK = "full";
+  public static final KeyValue FULL_CHUNK_KV =
+      KeyValue.newBuilder().setKey(FULL_CHUNK).build();
 
   private AtomicReference<BlockID> blockID;
   private final AtomicReference<ChunkInfo> previousChunkInfo
@@ -840,15 +842,19 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Updates lastChunkOffset to {}", lastChunkOffset);
     }
     // create chunk info for lastChunkBuffer, which is partial
-    ChunkInfo lastChunkInfo2 = createChunkInfo(lastChunkOffset);
-    LOG.debug("lastChunkInfo2 = {}", lastChunkInfo2);
-    long lastChunkSize = lastChunkInfo2.getLen();
-    if (lastChunkSize > 0) {
-      addToBlockData(lastChunkInfo2);
-    }
+    if (lastChunkBuffer.remaining() > 0) {
+      ChunkInfo lastChunkInfo2 = createChunkInfo(lastChunkOffset);
+      LOG.debug("lastChunkInfo2 = {}", lastChunkInfo2);
+      long lastChunkSize = lastChunkInfo2.getLen();
+      if (lastChunkSize > 0) {
+        addToBlockData(lastChunkInfo2);
+      }
 
-    lastChunkBuffer.clear();
-    lastChunkBuffer.position((int) lastChunkSize);
+      lastChunkBuffer.clear();
+      lastChunkBuffer.position((int) lastChunkSize);
+    } else {
+      lastChunkBuffer.clear();
+    }
   }
 
   private void appendLastChunkBuffer(ChunkBuffer chunkBuffer, int offset,
@@ -915,9 +921,7 @@ public class BlockOutputStream extends OutputStream {
         .setChecksumData(revisedChecksumData.getProtoBufMessage());
     // if full chunk
     if (revisedChunkSize == config.getStreamBufferSize()) {
-      KeyValue keyValue =
-          KeyValue.newBuilder().setKey(FULL_CHUNK).build();
-      revisedChunkInfo.addMetadata(keyValue);
+      revisedChunkInfo.addMetadata(FULL_CHUNK_KV);
     }
     return revisedChunkInfo.build();
   }

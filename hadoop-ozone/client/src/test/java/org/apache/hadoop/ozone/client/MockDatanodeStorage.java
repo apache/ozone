@@ -35,6 +35,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.storage.BlockOutputStream.FULL_CHUNK_KV;
 import static org.apache.hadoop.hdds.scm.storage.BlockOutputStream.INCREMENTAL_CHUNK_LIST;
 
 /**
@@ -83,13 +84,8 @@ public class MockDatanodeStorage {
     }
   }
 
-  private static final ContainerProtos.KeyValue FULL_CHUNK =
-      ContainerProtos.KeyValue.newBuilder()
-          .setKey(BlockOutputStream.FULL_CHUNK)
-          .build();
-
   private boolean isFullChunk(ChunkInfo chunkInfo) {
-    return (chunkInfo.getMetadataList().contains(FULL_CHUNK));
+    return (chunkInfo.getMetadataList().contains(FULL_CHUNK_KV));
   }
 
   public void putBlockIncremental(
