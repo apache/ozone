@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadResponse;
 import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -101,6 +102,7 @@ public class TestMultipartObjectGet {
     REST.setClient(client);
     REST.setOzoneConfiguration(conf);
     REST.setContext(context);
+    S3GatewayMetrics.create(conf);
   }
 
   private static void startCluster()
