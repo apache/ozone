@@ -42,7 +42,6 @@ public enum S3GAction implements AuditAction {
   COPY_OBJECT_STREAMING,
   CREATE_KEY,
   CREATE_KEY_STREAMING,
-  CREATE_KEY,
   LIST_PARTS,
   GET_KEY,
   HEAD_KEY,
