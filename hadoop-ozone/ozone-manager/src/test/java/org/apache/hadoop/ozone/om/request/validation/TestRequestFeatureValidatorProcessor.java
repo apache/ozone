@@ -20,7 +20,7 @@ import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.annotations.RequestFeatureValidatorProcessor;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -38,8 +38,8 @@ import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERRO
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_BE_STATIC;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMREQUEST;
 import static org.apache.ozone.annotations.RequestFeatureValidatorProcessor.ERROR_VALIDATOR_METHOD_HAS_TO_RETURN_OMRESPONSE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Compile tests against the annotation processor for the

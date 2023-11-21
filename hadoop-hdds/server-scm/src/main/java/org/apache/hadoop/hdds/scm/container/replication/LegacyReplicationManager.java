@@ -99,6 +99,8 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.MOVE;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
 /**
  * Legacy Replication Manager (RM) is a legacy , which is used to process
@@ -496,6 +498,22 @@ public class LegacyReplicationManager {
            *  If container is empty, schedule task to delete the container.
            */
           deleteContainerReplicas(container, replicas);
+          return;
+        }
+
+        // If the container is empty and has no replicas, it is possible it was
+        // a container which stuck in the closing state which never got any
+        // replicas created on the datanodes. In this case, we don't have enough
+        // information to delete the container, so we just log it as EMPTY,
+        // leaving it as CLOSED and return true, otherwise, it will end up
+        // marked as missing by the under replication handling.
+        if (replicas.isEmpty()
+            && container.getState() == LifeCycleState.CLOSED
+            && container.getNumberOfKeys() == 0) {
+          LOG.debug("Container {} appears empty and is closed, but cannot be " +
+              "deleted because it has no replicas. Marking as EMPTY.",
+              container);
+          report.incrementAndSample(HealthState.EMPTY, container.containerID());
           return;
         }
 
@@ -1324,21 +1342,50 @@ public class LegacyReplicationManager {
       ReplicationManagerReport report) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
-    int excessReplicas = replicas.size() -
-        container.getReplicationConfig().getRequiredNodes();
-    int missingReplicas = excessReplicas * -1;
 
-    if (missingReplicas > 0) {
+    RatisContainerReplicaCount unhealthyReplicaSet =
+        new RatisContainerReplicaCount(container,
+            new HashSet<>(replicaSet.getReplicas()),
+            getPendingOps(container.containerID()),
+            minHealthyForMaintenance,
+            true);
+
+    if (unhealthyReplicaSet.isUnderReplicated()) {
       handleUnderReplicatedAllUnhealthy(container, replicas,
-          placementStatus, missingReplicas, report);
-    } else if (excessReplicas > 0) {
+          placementStatus, unhealthyReplicaSet.additionalReplicaNeeded(),
+          report);
+    } else if (unhealthyReplicaSet.isOverReplicated()) {
       handleOverReplicatedAllUnhealthy(container, replicas,
-          excessReplicas, report);
+          unhealthyReplicaSet.getExcessRedundancy(true), report);
     } else {
       // We have the correct number of unhealthy replicas. See if any of them
       // can be closed.
       closeReplicasIfPossible(container, replicas);
     }
+  }
+
+  /**
+   * Transform the Legacy inflight operation in the pendingOps format.
+   * @param containerID The contaiuner to get the pending ops for.
+   * @return A list of pendingOp, or an empty list if none exist.
+   */
+  private List<ContainerReplicaOp> getPendingOps(ContainerID containerID) {
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    List<InflightAction> inflightActions = inflightReplication.get(containerID);
+    if (inflightActions != null) {
+      for (InflightAction a : inflightActions) {
+        pendingOps.add(new ContainerReplicaOp(
+            ADD, a.getDatanode(), 0, Long.MAX_VALUE));
+      }
+    }
+    inflightActions = inflightDeletion.get(containerID);
+    if (inflightActions != null) {
+      for (InflightAction a : inflightActions) {
+        pendingOps.add(new ContainerReplicaOp(
+            DELETE, a.getDatanode(), 0, Long.MAX_VALUE));
+      }
+    }
+    return pendingOps;
   }
 
   /**

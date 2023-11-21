@@ -79,6 +79,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -511,6 +512,19 @@ public class TestLegacyReplicationManager {
 
       assertDeleteScheduled(expectedDelete);
       return null;
+    }
+
+    @Test
+    public void testEmptyContainerWithNoReplicas() throws Exception {
+      final ContainerInfo container = createContainer(
+          LifeCycleState.CLOSED, 0, 0);
+      // No replicas
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1,
+          report.getStat(ReplicationManagerReport.HealthState.EMPTY));
+      Assertions.assertEquals(LifeCycleState.CLOSED, container.getState());
     }
 
     @Test
@@ -1567,6 +1581,43 @@ public class TestLegacyReplicationManager {
           numReplicas;
       assertReplicaScheduled(numReplicasNeeded);
       assertUnderReplicatedCount(1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = LifeCycleState.class,
+        names = {"CLOSED", "QUASI_CLOSED"})
+    public void testUnderReplicatedWithOnlyUnhealthyReplicasDecommission(
+        LifeCycleState state)
+        throws Exception {
+      final ContainerInfo container = createContainer(state);
+      for (int i = 0; i < 2; i++) {
+        addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+      }
+      addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY),
+          UNHEALTHY);
+      assertReplicaScheduled(1);
+      assertUnderReplicatedCount(1);
+      // Run again, and there should be a pending add scheduled, so nothing
+      // else should get scheduled.
+      assertReplicaScheduled(0);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = LifeCycleState.class,
+        names = {"CLOSED", "QUASI_CLOSED"})
+    public void testOverReplicatedWithOnlyUnhealthyReplicas(
+        LifeCycleState state) throws Exception {
+      final ContainerInfo container = createContainer(state);
+      for (int i = 0; i < 4; i++) {
+        addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+      }
+      assertDeleteScheduled(1);
+      assertUnderReplicatedCount(0);
+      assertOverReplicatedCount(1);
+
+      // Run again, and there should be a pending delete scheduled, so nothing
+      // else should get scheduled.
+      assertDeleteScheduled(0);
     }
 
     /**

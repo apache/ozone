@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests OzoneManagerLock.Resource.KEY_PATH_LOCK.
@@ -104,14 +104,14 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
 
     // For example, threadCount = 10, iterations = 100. The expected counter
     // value is 10 * 100
-    Assert.assertEquals(((long) threadCount) * iterations,
+    Assertions.assertEquals(((long) threadCount) * iterations,
         counter.getCount());
-    Assert.assertEquals(threadCount, listTokens.size());
+    Assertions.assertEquals(threadCount, listTokens.size());
 
     // Thread-1 -> 1 * 100,
     // Thread-2 -> 2 * 100 and so on.
     for (int i = 1; i <= listTokens.size(); i++) {
-      Assert.assertEquals(Integer.valueOf(i * iterations),
+      Assertions.assertEquals(Integer.valueOf(i * iterations),
           listTokens.get(i - 1));
     }
   }
@@ -134,7 +134,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     }
 
     // Now all threads have been instantiated.
-    Assert.assertEquals(0, countDownLatch.getCount());
+    Assertions.assertEquals(0, countDownLatch.getCount());
 
     lock.acquireWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
@@ -201,7 +201,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
       return true; // all threads have finished counting down.
     }, 3000, 120000); // 2 minutes
 
-    Assert.assertEquals(0, countDown.getCount());
+    Assertions.assertEquals(0, countDown.getCount());
 
     for (Thread t : threads) {
       t.join();
@@ -221,7 +221,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     // Waiting for all the threads to be instantiated/to reach
     // acquireWriteLock.
     countDown.countDown();
-    Assert.assertEquals(1, lock.getCurrentLocks().size());
+    Assertions.assertEquals(1, lock.getCurrentLocks().size());
 
     lock.releaseWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Released by " + Thread.currentThread().getName());
@@ -248,7 +248,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
+      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
   }
 
@@ -273,7 +273,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
+      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
   }
 
@@ -298,7 +298,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
+      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
   }
 
@@ -323,7 +323,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
+      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
   }
 }

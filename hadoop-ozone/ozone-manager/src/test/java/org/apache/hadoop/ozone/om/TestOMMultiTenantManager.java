@@ -27,8 +27,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.util.StringUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -60,7 +60,7 @@ public class TestOMMultiTenantManager {
 
     // Case 1: ozone.om.multitenancy.enabled = false
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, false);
-    Assert.assertFalse(
+    Assertions.assertFalse(
         OMMultiTenantManager.checkAndEnableMultiTenancy(ozoneManager, conf));
 
     // Case 2: ozone.om.multitenancy.enabled = true
@@ -94,7 +94,7 @@ public class TestOMMultiTenantManager {
     confKerbAuth.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@REALM");
     expectConfigCheckToFail(ozoneManager, confKerbAuth);
     confKerbAuth.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, "/path/to/om.keytab");
-    Assert.assertTrue(OMMultiTenantManager.checkAndEnableMultiTenancy(
+    Assertions.assertTrue(OMMultiTenantManager.checkAndEnableMultiTenancy(
         ozoneManager, confKerbAuth));
 
     // Try basic auth
@@ -103,7 +103,7 @@ public class TestOMMultiTenantManager {
     expectConfigCheckToFail(ozoneManager, confBasicAuth);
     confBasicAuth.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "Password1");
     // At this point the config check should pass. Method returns true
-    Assert.assertTrue(OMMultiTenantManager.checkAndEnableMultiTenancy(
+    Assertions.assertTrue(OMMultiTenantManager.checkAndEnableMultiTenancy(
         ozoneManager, confBasicAuth));
   }
 
@@ -114,9 +114,9 @@ public class TestOMMultiTenantManager {
       OzoneConfiguration conf) {
     try {
       OMMultiTenantManager.checkAndEnableMultiTenancy(ozoneManager, conf);
-      Assert.fail("Should have thrown RuntimeException");
+      Assertions.fail("Should have thrown RuntimeException");
     } catch (RuntimeException e) {
-      Assert.assertTrue(e.getMessage().contains("Failed to meet"));
+      Assertions.assertTrue(e.getMessage().contains("Failed to meet"));
     }
   }
 
@@ -174,9 +174,9 @@ public class TestOMMultiTenantManager {
       throws IOException {
     try {
       OzoneManagerRatisUtils.createClientRequest(omRequest, om);
-      Assert.fail("Should have thrown OMException");
+      Assertions.fail("Should have thrown OMException");
     } catch (OMException e) {
-      Assert.assertEquals(FEATURE_NOT_ENABLED, e.getResult());
+      Assertions.assertEquals(FEATURE_NOT_ENABLED, e.getResult());
     }
   }
 
@@ -188,9 +188,9 @@ public class TestOMMultiTenantManager {
 
     // handleReadRequest does not throw
     OMResponse omResponse = handler.handleReadRequest(omRequest);
-    Assert.assertFalse(omResponse.getSuccess());
-    Assert.assertEquals(Status.FEATURE_NOT_ENABLED, omResponse.getStatus());
-    Assert.assertTrue(omResponse.getMessage()
+    Assertions.assertFalse(omResponse.getSuccess());
+    Assertions.assertEquals(Status.FEATURE_NOT_ENABLED, omResponse.getStatus());
+    Assertions.assertTrue(omResponse.getMessage()
         .startsWith("S3 multi-tenancy feature is not enabled"));
   }
 

@@ -76,6 +76,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.HddsUtils.isReadOnly;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -317,11 +318,11 @@ public class TestSecureContainerServer {
       ContainerCommandResponseProto response = client.sendCommand(request);
       assertNotEquals(response.getResult(), ContainerProtos.Result.SUCCESS);
       String msg = response.getMessage();
-      assertTrue(msg, msg.contains("token verification failed"));
+      assertTrue(msg, msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()));
     } else {
-      assertRootCauseMessage("token verification failed",
-          Assert.assertThrows(IOException.class, () ->
-              client.sendCommand(request)));
+      final Throwable t = Assert.assertThrows(Throwable.class,
+          () -> client.sendCommand(request));
+      assertRootCauseMessage(BLOCK_TOKEN_VERIFICATION_FAILED.name(), t);
     }
   }
 

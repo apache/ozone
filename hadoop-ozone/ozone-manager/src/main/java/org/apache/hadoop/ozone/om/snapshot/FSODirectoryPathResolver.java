@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -26,7 +25,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -36,7 +34,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
 
 /**
  * Class to resolve absolute paths for FSO DirectoryInfo Objects.
@@ -66,12 +64,14 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
    * Assuming all dirObjIds belong to a bucket this function resolves absolute
    * path for a given FSO bucket.
    * @param dirObjIds Object Ids corresponding to which absolute path is needed.
+   * @param skipUnresolvedObjs boolean value to skipUnresolved objects when
+   *                           false exception will be thrown.
    * @return Map of Path corresponding to provided directory object IDs
    */
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Override
   public Map<Long, Path> getAbsolutePathForObjectIDs(
-      Optional<Set<Long>> dirObjIds) throws IOException {
+      Optional<Set<Long>> dirObjIds, boolean skipUnresolvedObjs)
+      throws IOException {
     // Root of a bucket would always have the
     // key as /volumeId/bucketId/bucketId/
     if (!dirObjIds.isPresent() || dirObjIds.get().isEmpty()) {
@@ -80,7 +80,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
     Set<Long> objIds = Sets.newHashSet(dirObjIds.get());
     Map<Long, Path> objectIdPathMap = new HashMap<>();
     Queue<Pair<Long, Path>> objectIdPathVals = new LinkedList<>();
-    Pair<Long, Path> root = Pair.of(bucketId, Paths.get(OZONE_URI_DELIMITER));
+    Pair<Long, Path> root = Pair.of(bucketId, ROOT_PATH);
     objectIdPathVals.add(root);
     addToPathMap(root, objIds, objectIdPathMap);
 
@@ -100,7 +100,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
       }
     }
     // Invalid directory objectId which does not exist in the given bucket.
-    if (objIds.size() > 0) {
+    if (objIds.size() > 0 && !skipUnresolvedObjs) {
       throw new IllegalArgumentException(
           "Dir object Ids required but not found in bucket: " + objIds);
     }

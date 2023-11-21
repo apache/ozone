@@ -18,26 +18,23 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.util.FakeTimer;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestName;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
@@ -47,39 +44,28 @@ import static org.apache.hadoop.ozone.container.common.volume.TestStorageVolumeC
 /**
  * Test periodic volume checker in StorageVolumeChecker.
  */
+@Timeout(150)
 public class TestPeriodicVolumeChecker {
 
   public static final Logger LOG = LoggerFactory.getLogger(
       TestPeriodicVolumeChecker.class);
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public TestName testName = new TestName();
-
-  @Rule
-  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(150));
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
-        .getAbsolutePath());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
-        folder.newFolder().getAbsolutePath());
-  }
-
-  @After
-  public void cleanup() throws IOException {
-    FileUtils.deleteDirectory(folder.getRoot());
+        Files.createDirectory(folder.resolve("VolumeCheckerDir")).toString());
   }
 
   @Test
-  public void testPeriodicVolumeChecker() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  public void testPeriodicVolumeChecker(TestInfo testInfo) throws Exception {
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
@@ -100,33 +86,33 @@ public class TestPeriodicVolumeChecker {
       volumeChecker.setDelegateChecker(
           new TestStorageVolumeChecker.DummyChecker());
 
-      Assert.assertEquals(0, volumeChecker.getNumAllVolumeChecks());
-      Assert.assertEquals(0, volumeChecker.getNumAllVolumeSetsChecks());
+      Assertions.assertEquals(0, volumeChecker.getNumAllVolumeChecks());
+      Assertions.assertEquals(0, volumeChecker.getNumAllVolumeSetsChecks());
 
       // first round
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
-      Assert.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
-      Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
-      Assert.assertEquals(0, volumeChecker.getNumSkippedChecks());
+      Assertions.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
+      Assertions.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
+      Assertions.assertEquals(0, volumeChecker.getNumSkippedChecks());
 
       // periodic disk checker next round within gap
       timer.advance(gap.toMillis() / 3);
       volumeChecker.checkAllVolumeSets();
 
       // skipped next round
-      Assert.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
-      Assert.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
-      Assert.assertEquals(1, volumeChecker.getNumSkippedChecks());
+      Assertions.assertEquals(2, volumeChecker.getNumAllVolumeChecks());
+      Assertions.assertEquals(1, volumeChecker.getNumAllVolumeSetsChecks());
+      Assertions.assertEquals(1, volumeChecker.getNumSkippedChecks());
 
       // periodic disk checker next round
       timer.advance(interval.toMillis());
       volumeChecker.checkAllVolumeSets();
 
-      Assert.assertEquals(4, volumeChecker.getNumAllVolumeChecks());
-      Assert.assertEquals(2, volumeChecker.getNumAllVolumeSetsChecks());
-      Assert.assertEquals(1, volumeChecker.getNumSkippedChecks());
+      Assertions.assertEquals(4, volumeChecker.getNumAllVolumeChecks());
+      Assertions.assertEquals(2, volumeChecker.getNumAllVolumeSetsChecks());
+      Assertions.assertEquals(1, volumeChecker.getNumSkippedChecks());
     } finally {
       volumeChecker.shutdownAndWait(1, TimeUnit.SECONDS);
     }

@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -59,14 +59,14 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
     String openKey = getOpenKeyName();
 
-    Assert.assertFalse(
+    Assertions.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     omKeyCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertTrue(
+    Assertions.assertTrue(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
   }
 
@@ -87,7 +87,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
     // Before calling addToDBBatch
     String openKey = getOpenKeyName();
-    Assert.assertFalse(
+    Assertions.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     omKeyCreateResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
@@ -96,7 +96,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse is error it is a no-op.
-    Assert.assertFalse(
+    Assertions.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
   }
