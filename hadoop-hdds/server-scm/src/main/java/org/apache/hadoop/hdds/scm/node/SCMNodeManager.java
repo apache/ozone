@@ -82,6 +82,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -379,15 +380,10 @@ public class SCMNodeManager implements NodeManager {
       datanodeDetails.setIpAddress(dnAddress.getHostAddress());
     }
 
-    String networkLocation;
-    String ipAddress = datanodeDetails.getIpAddress();
-    String hostName = datanodeDetails.getHostName();
+    final String ipAddress = datanodeDetails.getIpAddress();
+    final String hostName = datanodeDetails.getHostName();
     datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-    if (useHostname) {
-      networkLocation = nodeResolve(hostName);
-    } else {
-      networkLocation = nodeResolve(ipAddress);
-    }
+    String networkLocation = nodeResolve(useHostname ? hostName : ipAddress);
     if (networkLocation != null) {
       datanodeDetails.setNetworkLocation(networkLocation);
     }
@@ -420,17 +416,16 @@ public class SCMNodeManager implements NodeManager {
       try {
         final DatanodeInfo datanodeInfo =
                 nodeStateManager.getNode(datanodeDetails);
-        if (!datanodeInfo.getIpAddress().equals(datanodeDetails.getIpAddress())
-                || !datanodeInfo.getHostName()
-                .equals(datanodeDetails.getHostName())) {
+        final String oldIpAddress = datanodeInfo.getIpAddress();
+        final String oldHostName = datanodeInfo.getHostName();
+        if (!Objects.equals(oldIpAddress, ipAddress)
+            || !Objects.equals(oldHostName, hostName)) {
           LOG.info("Updating data node {} from {} to {}",
                   datanodeDetails.getUuidString(),
                   datanodeInfo,
                   datanodeDetails);
           clusterMap.update(datanodeInfo, datanodeDetails);
 
-          String oldIpAddress = datanodeInfo.getIpAddress();
-          String oldHostName = datanodeInfo.getHostName();
           updateDnsToUuidMap(oldIpAddress, ipAddress, uuid);
           updateDnsToUuidMap(oldHostName, hostName, uuid);
 
