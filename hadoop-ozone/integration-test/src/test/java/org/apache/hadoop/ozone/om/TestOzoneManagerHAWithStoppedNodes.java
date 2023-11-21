@@ -282,7 +282,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
       }
       return false;
     }, 1000, 100000);
-
+    
+    ozoneManager.awaitDoubleBufferFlush();
     // The current lastAppliedLogIndex on the state machine should be greater
     // than or equal to the saved snapshot index.
     long smLastAppliedIndex =
