@@ -1839,12 +1839,15 @@ public class TestSCMNodeManager {
     }
   }
 
-  @Test
-  public void testScmRegisterNodeWithNetworkTopology()
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testScmRegisterNodeWithNetworkTopology(boolean useHostname)
       throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
+    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        useHostname);
 
     // create table mapping file
     String[] hostNames = {"host1", "host2", "host3", "host4"};
