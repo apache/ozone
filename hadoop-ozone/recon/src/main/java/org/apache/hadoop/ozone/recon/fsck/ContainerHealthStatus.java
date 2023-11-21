@@ -48,8 +48,12 @@ public class ContainerHealthStatus {
     int repFactor = container.getReplicationConfig().getRequiredNodes();
     this.healthyReplicas = healthyReplicas
         .stream()
-        .filter(r -> !r.getState()
-            .equals((ContainerReplicaProto.State.UNHEALTHY)))
+        // Filter unhealthy replicas and
+        // replicas belonging to out-of-service nodes.
+        .filter(r ->
+            (!r.getDatanodeDetails().isDecommissioned() &&
+             !r.getDatanodeDetails().isMaintenance() &&
+             !r.getState().equals((ContainerReplicaProto.State.UNHEALTHY))))
         .collect(Collectors.toSet());
     this.replicaDelta = repFactor - this.healthyReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);

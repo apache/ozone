@@ -28,9 +28,13 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,6 +50,15 @@ public class TestContainerHealthStatus {
 
   private PlacementPolicy placementPolicy;
   private ContainerInfo container;
+
+  private static Stream<Arguments> outOfServiceNodeStates() {
+    return Stream.of(
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING),
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED),
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE),
+        Arguments.of(HddsProtos.NodeOperationalState.IN_MAINTENANCE)
+    );
+  }
 
   @BeforeEach
   public void setup() {
@@ -146,6 +159,79 @@ public class TestContainerHealthStatus {
     assertEquals(-1, status.replicaDelta());
     assertEquals(false, status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
+  }
+
+  /**
+   * Starting with a ContainerHealthStatus of 1 over-replicated container
+   * replica and then updating a datanode to one of the out-of-service states.
+   * Container should then be considered healthy.
+   */
+  @ParameterizedTest
+  @MethodSource("outOfServiceNodeStates")
+  public void testOverReplicatedWithOutOfServiceNodes(
+      HddsProtos.NodeOperationalState state) {
+    Set<ContainerReplica> replicas = generateReplicas(container,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+    ContainerHealthStatus status =
+        new ContainerHealthStatus(container, replicas, placementPolicy);
+    assertFalse(status.isHealthy());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isMisReplicated());
+    assertTrue(status.isOverReplicated());
+
+    for (ContainerReplica replica : replicas) {
+      replicas.remove(replica);
+      replica.getDatanodeDetails().setPersistedOpState(state);
+      replicas.add(replica);
+      break;
+    }
+
+    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    assertTrue(status.isHealthy());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isOverReplicated());
+  }
+
+  /**
+   * Starting with a healthy ContainerHealthStatus and then updating
+   * a datanode to one of the out-of-service states.
+   * Container should then be considered under-replicated.
+   */
+  @ParameterizedTest
+  @MethodSource("outOfServiceNodeStates")
+  public void testUnderReplicatedWithOutOfServiceNodes(
+      HddsProtos.NodeOperationalState state) {
+    Set<ContainerReplica> replicas = generateReplicas(container,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+    ContainerHealthStatus status =
+        new ContainerHealthStatus(container, replicas, placementPolicy);
+    assertTrue(status.isHealthy());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isOverReplicated());
+
+    for (ContainerReplica replica : replicas) {
+      replicas.remove(replica);
+      replica.getDatanodeDetails().setPersistedOpState(state);
+      replicas.add(replica);
+      break;
+    }
+
+    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    assertFalse(status.isHealthy());
+    assertFalse(status.isMissing());
+    assertTrue(status.isUnderReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isOverReplicated());
   }
 
   @Test
