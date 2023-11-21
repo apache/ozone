@@ -205,7 +205,7 @@ public final class OzoneManagerDoubleBuffer {
       boolean isRatisEnabled, boolean isTracingEnabled,
       Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
       FlushNotifier flushNotifier, S3SecretManager s3SecretManager,
-                                   String threadPrefix) {
+      String threadPrefix) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;

@@ -358,6 +358,17 @@ class TestOzoneManagerDoubleBuffer {
     Assertions.assertTrue(cache.get(userPrincipalId3) == null);
     Assertions.assertTrue(cache.get(userPrincipalId2) == null);
     Assertions.assertTrue(cache.get(userPrincipalId1) == null);
+
+    // cleanup metrics
+    doubleBuffer.stopDaemon();
+    OzoneManagerDoubleBufferMetrics metrics =
+        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+    metrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
+    metrics.setAvgFlushTransactionsInOneIteration(0);
+    metrics.incrTotalSizeOfFlushedTransactions(
+        -metrics.getTotalNumOfFlushedTransactions());
+    metrics.incrTotalNumOfFlushOperations(
+        -metrics.getTotalNumOfFlushOperations());
   }
 
   private void processSuccessSecretRequest(
