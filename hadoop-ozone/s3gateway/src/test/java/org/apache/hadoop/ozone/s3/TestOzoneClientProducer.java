@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class for @{@link OzoneClientProducer}.
@@ -55,8 +56,8 @@ public class TestOzoneClientProducer {
     producer.setOzoneConfiguration(configuration);
     IOException testGetClientFailure = assertThrows(IOException.class, () ->
         producer.createClient(), "testGetClientFailureWithMultipleServiceIds");
-    testGetClientFailure.getMessage().contains(
-        "More than 1 OzoneManager ServiceID");
+    assertTrue(testGetClientFailure.getMessage().contains(
+        "More than 1 OzoneManager ServiceID"));
   }
 
   @Test
@@ -70,8 +71,8 @@ public class TestOzoneClientProducer {
     IOException testGetClientFailure = assertThrows(IOException.class, () ->
         producer.createClient(),
         "testGetClientFailureWithMultipleServiceIdsAndInternalServiceId");
-    testGetClientFailure.getMessage().contains(
-        "More than 1 OzoneManager ServiceID");
+    assertTrue(testGetClientFailure.getMessage().contains(
+        "More than 1 OzoneManager ServiceID"));
   }
 
 }
