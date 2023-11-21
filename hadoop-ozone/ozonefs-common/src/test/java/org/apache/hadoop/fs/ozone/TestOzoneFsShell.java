@@ -28,8 +28,8 @@ import java.util.Arrays;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 
 /**
@@ -55,12 +55,12 @@ public class TestOzoneFsShell {
     } finally {
       // test command bindings for "rm" command handled by OzoneDelete class
       CommandFactory factory = shell.getCommandFactory();
-      Assert.assertEquals(1, Arrays.stream(factory.getNames())
+      Assertions.assertEquals(1, Arrays.stream(factory.getNames())
           .filter(c -> c.equals(rmCmd)).count());
       Command instance = factory.getInstance(rmCmd);
-      Assert.assertNotNull(instance);
-      Assert.assertEquals(OzoneFsDelete.Rm.class, instance.getClass());
-      Assert.assertEquals(rmCmdName, instance.getCommandName());
+      Assertions.assertNotNull(instance);
+      Assertions.assertEquals(OzoneFsDelete.Rm.class, instance.getClass());
+      Assertions.assertEquals(rmCmdName, instance.getCommandName());
       shell.close();
       System.setErr(oldErr);
     }

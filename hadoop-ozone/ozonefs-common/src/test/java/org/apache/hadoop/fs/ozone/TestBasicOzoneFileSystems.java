@@ -22,10 +22,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -35,18 +34,13 @@ import java.util.Collection;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Matchers.any;
 
 /**
  * Unit test for Basic*OzoneFileSystem.
  */
-@RunWith(Parameterized.class)
 public class TestBasicOzoneFileSystems {
-
-  private final FileSystem subject;
-
-  @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
         new Object[]{new BasicOzoneFileSystem()},
@@ -54,44 +48,45 @@ public class TestBasicOzoneFileSystems {
     );
   }
 
-  public TestBasicOzoneFileSystems(FileSystem subject) {
-    this.subject = subject;
-  }
-
-  @Test
-  public void defaultBlockSize() {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void defaultBlockSize(FileSystem subject) {
     Configuration conf = new OzoneConfiguration();
     subject.setConf(conf);
 
     long expected = toBytes(OZONE_SCM_BLOCK_SIZE_DEFAULT);
-    assertDefaultBlockSize(expected);
+    assertDefaultBlockSize(expected, subject);
   }
 
-  @Test
-  public void defaultBlockSizeCustomized() {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void defaultBlockSizeCustomized(FileSystem subject) {
     String customValue = "128MB";
     Configuration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_BLOCK_SIZE, customValue);
     subject.setConf(conf);
 
-    assertDefaultBlockSize(toBytes(customValue));
+    assertDefaultBlockSize(toBytes(customValue), subject);
   }
 
   // test for filesystem pseduo-posix symlink support
-  @Test
-  public void testFileSystemPosixSymlinkSupport() {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testFileSystemPosixSymlinkSupport(FileSystem subject) {
     if (subject instanceof BasicRootedOzoneFileSystem) {
-      Assert.assertTrue(subject.supportsSymlinks());
+      Assertions.assertTrue(subject.supportsSymlinks());
     } else if (subject instanceof BasicOzoneFileSystem) {
-      Assert.assertFalse(subject.supportsSymlinks());
+      Assertions.assertFalse(subject.supportsSymlinks());
     } else {
-      Assert.fail("Test case not implemented for FileSystem: " +
+      Assertions.fail("Test case not implemented for FileSystem: " +
           subject.getClass().getSimpleName());
     }
   }
 
-  @Test
-  public void testCreateSnapshotReturnPath() throws IOException {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateSnapshotReturnPath(
+      FileSystem subject) throws IOException {
     final String snapshotName = "snap1";
 
     if (subject instanceof BasicRootedOzoneFileSystem) {
@@ -112,7 +107,7 @@ public class TestBasicOzoneFileSystems {
 
       // Return value path should be "ofs://om/vol1/buck1/.snapshot/snap1"
       // without the subdirectory "dir1" in the Path.
-      Assert.assertEquals(expectedSnapshotPath, res);
+      Assertions.assertEquals(expectedSnapshotPath, res);
     } else if (subject instanceof BasicOzoneFileSystem) {
       BasicOzoneClientAdapterImpl adapter =
           Mockito.mock(BasicOzoneClientAdapterImpl.class);
@@ -131,14 +126,14 @@ public class TestBasicOzoneFileSystems {
 
       // Return value path should be "o3fs://buck1.vol1.om/.snapshot/snap1"
       // without the subdirectory "dir1" in the Path.
-      Assert.assertEquals(expectedSnapshotPath, res);
+      Assertions.assertEquals(expectedSnapshotPath, res);
     } else {
-      Assert.fail("Test case not implemented for FileSystem: " +
+      Assertions.fail("Test case not implemented for FileSystem: " +
           subject.getClass().getSimpleName());
     }
   }
 
-  private void assertDefaultBlockSize(long expected) {
+  private void assertDefaultBlockSize(long expected, FileSystem subject) {
     assertEquals(expected, subject.getDefaultBlockSize());
 
     Path anyPath = new Path("/");
