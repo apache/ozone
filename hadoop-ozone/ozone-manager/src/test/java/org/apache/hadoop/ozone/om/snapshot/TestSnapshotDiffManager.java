@@ -21,7 +21,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -632,8 +631,6 @@ public class TestSnapshotDiffManager {
    * In the case of reading tombstones old Snapshot Persistent map should have
    * object Ids in the range 50-100 & should be empty otherwise
    */
-  @SuppressFBWarnings({"DLS_DEAD_LOCAL_STORE",
-      "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"})
   @ParameterizedTest
   @CsvSource({"false," + OmMetadataManagerImpl.DIRECTORY_TABLE,
       "true," + OmMetadataManagerImpl.DIRECTORY_TABLE,

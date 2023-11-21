@@ -121,6 +121,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                         int partNumber)
+      throws IOException {
+    return objectStoreStub.getS3Volume().getBucket(bucketName).getKey(keyName);
+  }
+
+  @Override
   public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return null;
   }
@@ -578,6 +585,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setIsS3Request(boolean isS3Request) {
+
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }
@@ -641,6 +653,12 @@ public class ClientProtocolStub implements ClientProtocol {
       String bucketName, String snapshotName)
       throws IOException {
 
+  }
+
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName,
+                                       String snapshotName) throws IOException {
+    return null;
   }
 
   public String printCompactionLogDag(String fileNamePrefix,

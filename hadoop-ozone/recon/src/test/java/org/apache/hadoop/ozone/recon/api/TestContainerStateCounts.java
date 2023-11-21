@@ -41,9 +41,12 @@ import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -55,7 +58,8 @@ import static org.mockito.Mockito.mock;
  * Unit test for ClusterStateEndpoint ContainerStateCounts.
  */
 public class TestContainerStateCounts extends AbstractReconSqlDBTest {
-
+  @TempDir
+  private Path temporaryFolder;
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ClusterStateEndpoint clusterStateEndpoint;
@@ -74,10 +78,11 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   @BeforeEach
   public void setUp() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))

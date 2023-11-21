@@ -851,16 +851,7 @@ public final class OzoneManagerRatisServer {
   }
 
   @VisibleForTesting
-  public RaftPeerId getRaftLeaderId() {
-    return this.getLeader() == null ? null : this.getLeader().getId();
-  }
-
-  @VisibleForTesting
-  public String getRaftLeaderAddress() {
-    RaftPeer leaderPeer = getLeader();
-    if (leaderPeer == null) {
-      return null;
-    }
+  public String getRaftLeaderAddress(RaftPeer leaderPeer) {
     InetAddress leaderInetAddress = null;
     try {
       Optional<String> hostname =

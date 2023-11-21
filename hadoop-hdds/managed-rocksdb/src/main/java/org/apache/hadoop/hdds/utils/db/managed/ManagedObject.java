@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.RocksObject;
 
+import javax.annotation.Nullable;
+
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 
 /**
@@ -29,6 +31,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.fo
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
 
+  @Nullable
   private final StackTraceElement[] elements;
 
   ManagedObject(T original) {

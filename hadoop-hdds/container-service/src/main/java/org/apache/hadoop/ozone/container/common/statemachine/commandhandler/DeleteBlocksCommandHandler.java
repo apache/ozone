@@ -121,7 +121,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
-    handlerThread = new Daemon(new DeleteCmdWorker());
+    long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
+    handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
   }
 
@@ -221,6 +222,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   public final class DeleteCmdWorker implements Runnable {
 
+    private long intervalInMs;
+
+    public DeleteCmdWorker(long interval) {
+      this.intervalInMs = interval;
+    }
+
+    @VisibleForTesting
+    public long getInterval() {
+      return this.intervalInMs;
+    }
+
     @Override
     public void run() {
       while (true) {
@@ -234,7 +246,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
 
         try {
-          Thread.sleep(2000);
+          Thread.sleep(this.intervalInMs);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;

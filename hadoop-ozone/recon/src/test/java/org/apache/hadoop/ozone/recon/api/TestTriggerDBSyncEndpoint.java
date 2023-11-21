@@ -39,11 +39,10 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
 import java.io.File;
@@ -51,6 +50,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -69,18 +70,20 @@ import static org.mockito.Mockito.when;
  */
 public class TestTriggerDBSyncEndpoint {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
   private ReconTestInjector reconTestInjector;
   private CommonUtils commonUtils;
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException, AuthenticationException {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
-        temporaryFolder.newFolder().getAbsolutePath());
+        Files.createDirectory(temporaryFolder.resolve("OmSnapshotDB"))
+            .toFile().getAbsolutePath());
     configuration.set(OZONE_RECON_DB_DIR,
-        temporaryFolder.newFolder().getAbsolutePath());
+        Files.createDirectory(temporaryFolder.resolve("ReconDb"))
+            .toFile().getAbsolutePath());
     configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
     commonUtils = new CommonUtils();
     OzoneManagerProtocol ozoneManagerProtocol
@@ -89,10 +92,12 @@ public class TestTriggerDBSyncEndpoint {
         .DBUpdatesRequest.class))).thenReturn(new DBUpdates());
 
     OMMetadataManager omMetadataManager =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("OnMetadata")).toFile());
     ReconOMMetadataManager reconOMMetadataManager
         = getTestReconOmMetadataManager(omMetadataManager,
-        temporaryFolder.newFolder());
+        Files.createDirectory(
+            temporaryFolder.resolve("OmMetadataTest")).toFile());
 
 
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
@@ -120,7 +125,7 @@ public class TestTriggerDBSyncEndpoint {
     ozoneManagerServiceProvider.start();
 
     reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(ozoneManagerServiceProvider)

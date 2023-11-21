@@ -21,11 +21,10 @@ package org.apache.hadoop.ozone.container.replication;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,8 +44,8 @@ import static org.mockito.Mockito.verify;
  */
 public class TestSimpleContainerDownloader {
 
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void testGetContainerDataFromReplicasHappyPath() throws Exception {
@@ -58,7 +57,7 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     Path result = downloader.getContainerDataFromReplicas(1L, datanodes,
-        tempDir.newFolder().toPath(), NO_COMPRESSION);
+        tempDir, NO_COMPRESSION);
 
     //THEN
     Assertions.assertEquals(datanodes.get(0).getUuidString(),
@@ -79,7 +78,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir.newFolder().toPath(), NO_COMPRESSION);
+            tempDir, NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
@@ -100,7 +99,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir.newFolder().toPath(), NO_COMPRESSION);
+            tempDir, NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
@@ -126,7 +125,7 @@ public class TestSimpleContainerDownloader {
     //returned.
     for (int i = 0; i < 10000; i++) {
       Path path = downloader.getContainerDataFromReplicas(1L, datanodes,
-          tempDir.newFolder().toPath(), NO_COMPRESSION);
+          tempDir, NO_COMPRESSION);
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }

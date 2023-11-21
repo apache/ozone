@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.apache.hadoop.util.Time;
 
 import java.util.Collections;
@@ -47,7 +47,7 @@ public class TestOmBucketInfo {
         .setStorageType(StorageType.ARCHIVE)
         .build();
 
-    Assert.assertEquals(bucket,
+    Assertions.assertEquals(bucket,
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
   }
 
@@ -60,7 +60,7 @@ public class TestOmBucketInfo {
         .setSourceBucket("someBucket")
         .build();
 
-    Assert.assertEquals(bucket,
+    Assertions.assertEquals(bucket,
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
   }
 
@@ -82,10 +82,10 @@ public class TestOmBucketInfo {
 
     /* Clone an omBucketInfo. */
     OmBucketInfo cloneBucketInfo = omBucketInfo.copyObject();
-    Assert.assertNotSame(omBucketInfo, cloneBucketInfo);
-    Assert.assertEquals("Expected " + omBucketInfo + " and " + cloneBucketInfo
-            + " to be equal",
-        omBucketInfo, cloneBucketInfo);
+    Assertions.assertNotSame(omBucketInfo, cloneBucketInfo);
+    Assertions.assertEquals(omBucketInfo, cloneBucketInfo,
+        "Expected " + omBucketInfo + " and " + cloneBucketInfo
+            + " to be equal");
 
     /* Reset acl & check not equal. */
     omBucketInfo.setAcls(Collections.singletonList(new OzoneAcl(
@@ -94,14 +94,14 @@ public class TestOmBucketInfo {
         IAccessAuthorizer.ACLType.WRITE_ACL,
         OzoneAcl.AclScope.ACCESS
     )));
-    Assert.assertNotEquals(
+    Assertions.assertNotEquals(
         omBucketInfo.getAcls().get(0),
         cloneBucketInfo.getAcls().get(0));
 
     /* Clone acl & check equal. */
     cloneBucketInfo = omBucketInfo.copyObject();
-    Assert.assertEquals(omBucketInfo, cloneBucketInfo);
-    Assert.assertEquals(
+    Assertions.assertEquals(omBucketInfo, cloneBucketInfo);
+    Assertions.assertEquals(
         omBucketInfo.getAcls().get(0),
         cloneBucketInfo.getAcls().get(0));
 
@@ -112,8 +112,8 @@ public class TestOmBucketInfo {
         IAccessAuthorizer.ACLType.WRITE_ACL,
         OzoneAcl.AclScope.ACCESS
     ));
-    Assert.assertEquals((int) 0, omBucketInfo.getAcls().size());
-    Assert.assertEquals((int) 1, cloneBucketInfo.getAcls().size());
+    Assertions.assertEquals(0, omBucketInfo.getAcls().size());
+    Assertions.assertEquals(1, cloneBucketInfo.getAcls().size());
 
   }
 
@@ -123,16 +123,17 @@ public class TestOmBucketInfo {
         OmBucketInfo.newBuilder().setBucketName("bucket").setVolumeName("vol1")
             .setCreationTime(Time.now()).setIsVersionEnabled(false)
             .setStorageType(StorageType.ARCHIVE).setAcls(Collections
-            .singletonList(new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-                "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
-                OzoneAcl.AclScope.ACCESS))).build();
+                .singletonList(new OzoneAcl(
+                    IAccessAuthorizer.ACLIdentityType.USER,
+                    "defaultUser", IAccessAuthorizer.ACLType.WRITE_ACL,
+                    OzoneAcl.AclScope.ACCESS))).build();
     OzoneManagerProtocolProtos.BucketInfo protobuf = omBucketInfo.getProtobuf();
     // No EC Config
-    Assert.assertFalse(protobuf.hasDefaultReplicationConfig());
+    Assertions.assertFalse(protobuf.hasDefaultReplicationConfig());
 
     // Reconstruct object from Proto
     OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(protobuf);
-    Assert.assertNull(recovered.getDefaultReplicationConfig());
+    Assertions.assertNull(recovered.getDefaultReplicationConfig());
 
     // EC Config
     omBucketInfo = OmBucketInfo.newBuilder()
@@ -150,20 +151,20 @@ public class TestOmBucketInfo {
                 new ECReplicationConfig(3, 2))).build();
     protobuf = omBucketInfo.getProtobuf();
 
-    Assert.assertTrue(protobuf.hasDefaultReplicationConfig());
-    Assert.assertEquals(3,
+    Assertions.assertTrue(protobuf.hasDefaultReplicationConfig());
+    Assertions.assertEquals(3,
         protobuf.getDefaultReplicationConfig().getEcReplicationConfig()
             .getData());
-    Assert.assertEquals(2,
+    Assertions.assertEquals(2,
         protobuf.getDefaultReplicationConfig().getEcReplicationConfig()
             .getParity());
 
     // Reconstruct object from Proto
     recovered = OmBucketInfo.getFromProtobuf(protobuf);
-    Assert.assertEquals(ReplicationType.EC,
+    Assertions.assertEquals(ReplicationType.EC,
         recovered.getDefaultReplicationConfig().getType());
     ReplicationConfig config =
         recovered.getDefaultReplicationConfig().getReplicationConfig();
-    Assert.assertEquals(new ECReplicationConfig(3, 2), config);
+    Assertions.assertEquals(new ECReplicationConfig(3, 2), config);
   }
 }

@@ -25,9 +25,9 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ranger.RangerClient;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
@@ -53,7 +53,7 @@ public class TestMultiTenantAccessController {
   private MultiTenantAccessController controller;
   private List<String> users;
 
-  @Before
+  @BeforeEach
   public void setupUsers() {
     // If testing against a real cluster, users must already be added to Ranger.
     users = new ArrayList<>();
@@ -64,7 +64,7 @@ public class TestMultiTenantAccessController {
   /**
    * Use this setup to test against a simulated Ranger instance.
    */
-  @Before
+  @BeforeEach
   public void setupUnitTest() {
     controller = new InMemoryMultiTenantAccessController();
   }
@@ -72,7 +72,7 @@ public class TestMultiTenantAccessController {
   /**
    * Use this setup to test against a live Ranger instance.
    */
-//  @Before
+//  @BeforeEach
   public void setupClusterTest() throws Exception {
 
     // Set up truststore
@@ -148,23 +148,23 @@ public class TestMultiTenantAccessController {
     // get to check it's there with all attributes.
     MultiTenantAccessController.Policy retrievedPolicy =
         controller.getPolicy(policyName);
-    Assert.assertEquals(originalPolicy, retrievedPolicy);
+    Assertions.assertEquals(originalPolicy, retrievedPolicy);
 
     // Service policy version should have been bumped by 1 at this point
     long currPolicyVersion = controller.getRangerServicePolicyVersion();
-    Assert.assertEquals(prevPolicyVersion + 1L, currPolicyVersion);
+    Assertions.assertEquals(prevPolicyVersion + 1L, currPolicyVersion);
 
     // delete policy.
     controller.deletePolicy(policyName);
 
     // Service policy version should have been bumped again
     currPolicyVersion = controller.getRangerServicePolicyVersion();
-    Assert.assertEquals(prevPolicyVersion + 2L, currPolicyVersion);
+    Assertions.assertEquals(prevPolicyVersion + 2L, currPolicyVersion);
 
     // get to check it is deleted.
     try {
       controller.getPolicy(policyName);
-      Assert.fail("Expected exception for missing policy.");
+      Assertions.fail("Expected exception for missing policy.");
     } catch (Exception ex) {
        // Expected since policy is not there.
     }
@@ -181,7 +181,7 @@ public class TestMultiTenantAccessController {
             .build();
     // create in ranger.
     controller.createPolicy(originalPolicy);
-    Assert.assertEquals(originalPolicy, controller.getPolicy(policyName));
+    Assertions.assertEquals(originalPolicy, controller.getPolicy(policyName));
 
     // Create a policy with the same name but different resource.
     // Check for error.
@@ -192,7 +192,7 @@ public class TestMultiTenantAccessController {
             .build();
     try {
       controller.createPolicy(sameNamePolicy);
-      Assert.fail("Expected exception for duplicate policy.");
+      Assertions.fail("Expected exception for duplicate policy.");
     } catch (Exception ex) {
       // Expected since a policy with the same name should not be allowed.
     }
@@ -206,7 +206,7 @@ public class TestMultiTenantAccessController {
             .build();
     try {
       controller.createPolicy(sameResourcePolicy);
-      Assert.fail("Expected exception for duplicate policy.");
+      Assertions.fail("Expected exception for duplicate policy.");
     } catch (Exception ex) {
       // Expected since a policy with the same resource should not be allowed.
     }
@@ -245,16 +245,17 @@ public class TestMultiTenantAccessController {
     // Get should only return policies with the specified label.
     List<Policy> retrievedLabeledPolicies =
         controller.getLabeledPolicies(label);
-    Assert.assertEquals(labeledPolicies.size(),
+    Assertions.assertEquals(labeledPolicies.size(),
         retrievedLabeledPolicies.size());
-    Assert.assertTrue(retrievedLabeledPolicies.containsAll(labeledPolicies));
+    Assertions.assertTrue(retrievedLabeledPolicies.containsAll(
+        labeledPolicies));
 
     // Get of a specific policy should also succeed.
     Policy retrievedPolicy = controller.getPolicy(unlabeledPolicy.getName());
-    Assert.assertEquals(unlabeledPolicy, retrievedPolicy);
+    Assertions.assertEquals(unlabeledPolicy, retrievedPolicy);
 
     // Get of policies with nonexistent label should give an empty list.
-    Assert.assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
+    Assertions.assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
 
     // Cleanup
     for (Policy policy: labeledPolicies) {
@@ -276,7 +277,7 @@ public class TestMultiTenantAccessController {
             Collections.singletonList(Acl.allow(ACLType.READ_ACL)))
         .build();
     controller.createPolicy(originalPolicy);
-    Assert.assertEquals(originalPolicy,
+    Assertions.assertEquals(originalPolicy,
         controller.getPolicy(policyName));
 
     Policy updatedPolicy = new Policy.Builder()
@@ -289,7 +290,7 @@ public class TestMultiTenantAccessController {
             Collections.singletonList(Acl.allow(ACLType.READ_ACL)))
         .build();
     controller.updatePolicy(updatedPolicy);
-    Assert.assertEquals(updatedPolicy,
+    Assertions.assertEquals(updatedPolicy,
         controller.getPolicy(policyName));
 
     // Cleanup
@@ -313,17 +314,17 @@ public class TestMultiTenantAccessController {
     Policy retrievedPolicy = controller.getPolicy(policy.getName());
     Map<String, Collection<Acl>> retrievedRoleAcls =
         retrievedPolicy.getRoleAcls();
-    Assert.assertEquals(1, retrievedRoleAcls.size());
+    Assertions.assertEquals(1, retrievedRoleAcls.size());
     List<Acl> roleAcls = new ArrayList<>(retrievedRoleAcls.get(roleName));
-    Assert.assertEquals(1, roleAcls.size());
-    Assert.assertEquals(ACLType.ALL, roleAcls.get(0).getAclType());
-    Assert.assertTrue(roleAcls.get(0).isAllowed());
+    Assertions.assertEquals(1, roleAcls.size());
+    Assertions.assertEquals(ACLType.ALL, roleAcls.get(0).getAclType());
+    Assertions.assertTrue(roleAcls.get(0).isAllowed());
 
     // get one of the roles to check it is there but empty.
     Role retrievedRole = controller.getRole(roleName);
-    Assert.assertFalse(retrievedRole.getDescription().isPresent());
-    Assert.assertTrue(retrievedRole.getUsersMap().isEmpty());
-    Assert.assertTrue(retrievedRole.getId().isPresent());
+    Assertions.assertFalse(retrievedRole.getDescription().isPresent());
+    Assertions.assertTrue(retrievedRole.getUsersMap().isEmpty());
+    Assertions.assertTrue(retrievedRole.getId().isPresent());
 
     // Add a user to the role.
     retrievedRole.getUsersMap().put(users.get(0), false);
@@ -338,7 +339,7 @@ public class TestMultiTenantAccessController {
             Collections.singletonList(Acl.allow(ACLType.READ)))
         .build();
     controller.createPolicy(policy2);
-    Assert.assertEquals(controller.getRole(roleName), retrievedRole);
+    Assertions.assertEquals(controller.getRole(roleName), retrievedRole);
 
     controller.deletePolicy("policy1");
     controller.deletePolicy("policy2");
@@ -362,15 +363,15 @@ public class TestMultiTenantAccessController {
     // get to check it's there with all attributes.
     Role retrievedRole = controller.getRole(roleName);
     // Role ID should have been added by Ranger.
-    Assert.assertTrue(retrievedRole.getId().isPresent());
-    Assert.assertEquals(originalRole, retrievedRole);
+    Assertions.assertTrue(retrievedRole.getId().isPresent());
+    Assertions.assertEquals(originalRole, retrievedRole);
 
     // delete role.
     controller.deleteRole(roleName);
     // get to check it is deleted.
     try {
       controller.getRole(roleName);
-      Assert.fail("Expected exception for missing role.");
+      Assertions.fail("Expected exception for missing role.");
     } catch (Exception ex) {
       // Expected since policy is not there.
     }
@@ -385,7 +386,7 @@ public class TestMultiTenantAccessController {
             .build();
     // create in Ranger.
     controller.createRole(originalRole);
-    Assert.assertEquals(originalRole, controller.getRole(roleName));
+    Assertions.assertEquals(originalRole, controller.getRole(roleName));
 
     // Create a role with the same name and check for error.
     Role sameNameRole = new Role.Builder()
@@ -394,7 +395,7 @@ public class TestMultiTenantAccessController {
             .build();
     try {
       controller.createRole(sameNameRole);
-      Assert.fail("Expected exception for duplicate role.");
+      Assertions.fail("Expected exception for duplicate role.");
     } catch (Exception ex) {
       // Expected since a policy with the same name should not be allowed.
     }
@@ -415,18 +416,18 @@ public class TestMultiTenantAccessController {
     controller.createRole(originalRole);
 
     Role retrievedRole = controller.getRole(roleName);
-    Assert.assertEquals(originalRole, retrievedRole);
-    Assert.assertTrue(retrievedRole.getId().isPresent());
+    Assertions.assertEquals(originalRole, retrievedRole);
+    Assertions.assertTrue(retrievedRole.getId().isPresent());
     long roleId = retrievedRole.getId().get();
 
     // Remove a user from the role and update it.
     retrievedRole.getUsersMap().remove(users.get(0));
-    Assert.assertEquals(originalRole.getUsersMap().size() - 1,
+    Assertions.assertEquals(originalRole.getUsersMap().size() - 1,
         retrievedRole.getUsersMap().size());
     controller.updateRole(roleId, retrievedRole);
     Role retrievedUpdatedRole = controller.getRole(roleName);
-    Assert.assertEquals(retrievedRole, retrievedUpdatedRole);
-    Assert.assertEquals(originalRole.getUsersMap().size() - 1,
+    Assertions.assertEquals(retrievedRole, retrievedUpdatedRole);
+    Assertions.assertEquals(originalRole.getUsersMap().size() - 1,
         retrievedUpdatedRole.getUsersMap().size());
 
     // Cleanup.

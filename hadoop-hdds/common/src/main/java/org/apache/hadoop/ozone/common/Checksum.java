@@ -231,6 +231,11 @@ public class Checksum {
     return verifyChecksum(ByteBuffer.wrap(data), checksumData, 0);
   }
 
+  private static boolean verifyChecksum(ByteBuffer data,
+      ChecksumData checksumData, int startIndex) throws OzoneChecksumException {
+    return verifyChecksum(ChunkBuffer.wrap(data), checksumData, startIndex);
+  }
+
   /**
    * Computes the ChecksumData for the input data and verifies that it
    * matches with that of the input checksumData.
@@ -240,7 +245,7 @@ public class Checksum {
    *                   data's computed checksum.
    * @throws OzoneChecksumException is thrown if checksums do not match
    */
-  private static boolean verifyChecksum(ByteBuffer data,
+  public static boolean verifyChecksum(ChunkBuffer data,
       ChecksumData checksumData,
       int startIndex) throws OzoneChecksumException {
     ChecksumType checksumType = checksumData.getChecksumType();

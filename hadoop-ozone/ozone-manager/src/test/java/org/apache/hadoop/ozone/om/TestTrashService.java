@@ -33,15 +33,15 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -56,8 +56,8 @@ import java.util.Collections;
  */
 public class TestTrashService {
 
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
+  @TempDir
+  private Path tempFolder;
 
   private KeyManager keyManager;
   private OzoneManagerProtocol writeClient;
@@ -65,14 +65,14 @@ public class TestTrashService {
   private String volumeName;
   private String bucketName;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException, AuthenticationException {
     ExitUtils.disableSystemExit();
     OzoneConfiguration configuration = new OzoneConfiguration();
 
-    File folder = tempFolder.newFolder();
+    File folder = tempFolder.toFile();
     if (!folder.exists()) {
-      Assert.assertTrue(folder.mkdirs());
+      Assertions.assertTrue(folder.mkdirs());
     }
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
@@ -86,7 +86,7 @@ public class TestTrashService {
     bucketName = "bucket";
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     om.stop();
   }
@@ -99,7 +99,7 @@ public class TestTrashService {
 
     boolean recoverOperation = keyManager.getMetadataManager()
         .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
-    Assert.assertTrue(recoverOperation);
+    Assertions.assertTrue(recoverOperation);
   }
 
   private void createAndDeleteKey(String keyName) throws IOException {
