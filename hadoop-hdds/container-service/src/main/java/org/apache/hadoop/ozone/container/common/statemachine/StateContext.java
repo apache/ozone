@@ -515,8 +515,6 @@ public class StateContext {
         int size = actions.size();
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
-          // we need to remove the action from the containerAction queue
-          // as well
           ContainerAction action = actions.poll();
           Preconditions.checkNotNull(action);
           containerActionList.add(action);
@@ -580,6 +578,7 @@ public class StateContext {
       InetSocketAddress endpoint,
       int maxLimit) {
     List<PipelineAction> pipelineActionList = new ArrayList<>();
+    List<PipelineAction> persistPipelineAction = new ArrayList<>();
     synchronized (pipelineActions) {
       if (!pipelineActions.isEmpty() &&
           CollectionUtils.isNotEmpty(pipelineActions.get(endpoint))) {
@@ -588,8 +587,21 @@ public class StateContext {
         int size = actionsForEndpoint.size();
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
-          pipelineActionList.add(actionsForEndpoint.poll());
+          // Add closePipeline back to the pipelineAction queue until
+          // pipeline is closed and removed from the DN.
+          PipelineAction action = actionsForEndpoint.poll();
+          if (action.hasClosePipeline()) {
+            if (parentDatanodeStateMachine.getContainer().getPipelineReport()
+                .getPipelineReportList().stream().noneMatch(
+                    report -> action.getClosePipeline().getPipelineID()
+                        .equals(report.getPipelineID()))) {
+              continue;
+            }
+            persistPipelineAction.add(action);
+          }
+          pipelineActionList.add(action);
         }
+        actionsForEndpoint.addAll(persistPipelineAction);
       }
       return pipelineActionList;
     }

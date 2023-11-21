@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -50,6 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -357,6 +360,72 @@ public class TestStateContext {
     // Put back reports.
     stateContext.putBackReports(allAvailableReports, scm1);
     assertFalse(stateContext.getAllAvailableReports(scm1).isEmpty());
+  }
+
+  @Test
+  public void testClosePipelineActions() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+    OzoneContainer container = mock(OzoneContainer.class);
+    HddsProtos.PipelineID pipelineIDProto = PipelineID.randomId().getProtobuf();
+
+    // Mock DN PipelineReport
+    // Report pipelineId the first two time.
+    // Return empty pipeline report the third time to mock the pipeline being
+    // closed and removed from the DN.
+    PipelineReportsProto.Builder
+        pipelineReportsProtoBuilder = PipelineReportsProto.newBuilder();
+    pipelineReportsProtoBuilder.addAllPipelineReport(Collections.singletonList(
+        PipelineReport.newBuilder()
+            .setPipelineID(pipelineIDProto)
+            .setIsLeader(false)
+            .build()));
+    PipelineReportsProto pipelineReportsProto =
+        pipelineReportsProtoBuilder.build();
+
+    StorageContainerDatanodeProtocolProtos.PipelineReportsProto.Builder
+        emptyPipelineReportsBuilder = PipelineReportsProto.newBuilder();
+    emptyPipelineReportsBuilder.addAllPipelineReport(Collections.emptyList());
+
+    when(container.getPipelineReport()).thenReturn(pipelineReportsProto,
+        pipelineReportsProto, emptyPipelineReportsBuilder.build());
+    when(datanodeStateMachineMock.getContainer()).thenReturn(container);
+
+    StateContext stateContext = new StateContext(conf,
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
+
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+
+    // Add SCM endpoint.
+    stateContext.addEndpoint(scm1);
+
+    final ClosePipelineInfo closePipelineInfo = ClosePipelineInfo.newBuilder()
+        .setPipelineID(pipelineIDProto)
+        .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED)
+        .setDetailedReason("Test").build();
+    final PipelineAction pipelineAction = PipelineAction.newBuilder()
+        .setClosePipeline(closePipelineInfo)
+        .setAction(PipelineAction.Action.CLOSE)
+        .build();
+
+    // Add PipelineAction. Should be added to all endpoints.
+    stateContext.addPipelineActionIfAbsent(pipelineAction);
+
+    // Get pipeline actions for scm1.
+    List<PipelineAction> pipelineActions =
+        stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+
+    // Ensure that the close pipeline action is not dequeued from scm1 since
+    // DN reports the pipelineID.
+    pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+
+    // Ensure that the pipeline action is dequeued from scm1 when
+    // the DN closes and removes the pipeline
+    pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(0, pipelineActions.size());
   }
 
   @Test
