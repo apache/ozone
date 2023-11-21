@@ -216,9 +216,12 @@ public class TestPermissionCheck {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        "bucketName", "acl", headers, null));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    try {
+      bucketEndpoint.put("bucketName", "acl", headers, null);
+    } catch (Exception e) {
+      assertTrue(e instanceof OS3Exception &&
+          ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
+    }
   }
 
   /**

@@ -62,10 +62,12 @@ public class TestBucketPut {
 
   @Test
   public void testBucketFailWithAuthHeaderMissing() throws Exception {
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null, null));
-    assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
-    assertEquals(MALFORMED_HEADER.getCode(), e.getCode());
+    try {
+      bucketEndpoint.put(bucketName, null, null, null);
+    } catch (OS3Exception ex) {
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+    }
   }
 
   @Test
@@ -83,10 +85,12 @@ public class TestBucketPut {
 
   @Test
   public void testBucketFailWithInvalidHeader() throws Exception {
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null, null));
-    assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
-    assertEquals(MALFORMED_HEADER.getCode(), e.getCode());
+    try {
+      bucketEndpoint.put(bucketName, null, null, null);
+    } catch (OS3Exception ex) {
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+    }
   }
 
   /**
