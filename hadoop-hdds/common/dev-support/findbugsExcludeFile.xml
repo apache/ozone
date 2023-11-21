@@ -31,9 +31,6 @@
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
   </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.utils.db.CodecBuffer"></Class>
-  </Match>
 
   <!-- Test -->
   <Match>
