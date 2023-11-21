@@ -32,6 +32,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -92,7 +93,7 @@ public class TestSnapshotChain {
         .build();
   }
 
-  private void deleteSnapshot(UUID snapshotID) {
+  private void deleteSnapshot(UUID snapshotID) throws IOException {
     SnapshotInfo sinfo = null;
     final String snapshotPath = "vol1/bucket1";
     // reset the next snapshotInfo.globalPreviousSnapshotID
@@ -352,13 +353,12 @@ public class TestSnapshotChain {
         UUID.randomUUID(),
         UUID.randomUUID(),
         System.currentTimeMillis());
-    IllegalStateException createException =
-        assertThrows(IllegalStateException.class,
+    IOException createException = assertThrows(IOException.class,
             () -> chainManager.addSnapshot(snapInfo));
     assertEquals("Snapshot chain is corrupted.", createException.getMessage());
     if (!snapshotIDs.isEmpty()) {
-      IllegalStateException deleteException =
-          assertThrows(IllegalStateException.class,
+      IOException deleteException =
+          assertThrows(IOException.class,
               () -> chainManager.deleteSnapshot(
                   snapshotInfo.get(snapshotIDs.get(0).toString())));
       assertEquals("Snapshot chain is corrupted.",
@@ -386,13 +386,12 @@ public class TestSnapshotChain {
         UUID.randomUUID(),
         UUID.randomUUID(),
         System.currentTimeMillis());
-    IllegalStateException createException =
-        assertThrows(IllegalStateException.class,
+    IOException createException = assertThrows(IOException.class,
             () -> chainManager.addSnapshot(snapInfo));
     assertEquals("Snapshot chain is corrupted.", createException.getMessage());
     if (!snapshotIDs.isEmpty()) {
-      IllegalStateException deleteException =
-          assertThrows(IllegalStateException.class,
+      IOException deleteException =
+          assertThrows(IOException.class,
               () -> chainManager.deleteSnapshot(
                   snapshotInfo.get(snapshotIDs.get(0).toString())));
       assertEquals("Snapshot chain is corrupted.",
