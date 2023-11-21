@@ -392,6 +392,7 @@ public class SCMNodeManager implements NodeManager {
       datanodeDetails.setNetworkLocation(networkLocation);
     }
 
+    final UUID uuid = datanodeDetails.getUuid();
     if (!isNodeRegistered(datanodeDetails)) {
       try {
         clusterMap.add(datanodeDetails);
@@ -399,8 +400,8 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addToDnsToUuidMap(ipAddress, datanodeDetails.getUuid());
-        addToDnsToUuidMap(hostName, datanodeDetails.getUuid());
+        addToDnsToUuidMap(ipAddress, uuid);
+        addToDnsToUuidMap(hostName, uuid);
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
         LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
@@ -430,8 +431,8 @@ public class SCMNodeManager implements NodeManager {
 
           String oldIpAddress = datanodeInfo.getIpAddress();
           String oldHostName = datanodeInfo.getHostName();
-          updateDnsToUuidMap(oldIpAddress, ipAddress, datanodeDetails.getUuid());
-          updateDnsToUuidMap(oldHostName, hostName, datanodeDetails.getUuid());
+          updateDnsToUuidMap(oldIpAddress, ipAddress, uuid);
+          updateDnsToUuidMap(oldHostName, hostName, uuid);
 
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
