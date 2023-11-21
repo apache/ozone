@@ -36,7 +36,7 @@ public final class MetricUtil {
 
   private static final ExecutorService EXECUTOR =
       new ThreadPoolExecutor(1, 10, 100, TimeUnit.MILLISECONDS,
-          new LinkedBlockingQueue<>(),
+          new LinkedBlockingQueue<>(500_000),
           new ThreadFactoryBuilder()
               .setDaemon(true)
               .setNameFormat("metric-mutable-rate-handler-%d")
