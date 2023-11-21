@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -118,7 +120,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   }
 
   ExcludeList createExcludeList() {
-    return new ExcludeList();
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
   }
 
   BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
@@ -138,7 +141,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
     currentStreamIndex = 0;
     openID = -1;
-    excludeList = new ExcludeList();
+    excludeList = createExcludeList();
     this.clientMetrics = clientMetrics;
   }
 
