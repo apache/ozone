@@ -400,11 +400,11 @@ public class SCMNodeManager implements NodeManager {
         addToDnsToUuidMap(hostName, uuid);
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
-        LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
+        LOG.info("Registered datanode: {}", datanodeDetails.toDebugString());
         scmNodeEventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
       } catch (NodeAlreadyExistsException e) {
         if (LOG.isTraceEnabled()) {
-          LOG.trace("Datanode is already registered. Datanode: {}",
+          LOG.trace("Datanode is already registered: {}",
               datanodeDetails);
         }
       } catch (NodeNotFoundException e) {
@@ -420,7 +420,7 @@ public class SCMNodeManager implements NodeManager {
         final String oldHostName = datanodeInfo.getHostName();
         if (!Objects.equals(oldIpAddress, ipAddress)
             || !Objects.equals(oldHostName, hostName)) {
-          LOG.info("Updating data node {} from {} to {}",
+          LOG.info("Updating datanode {} from {} to {}",
                   datanodeDetails.getUuidString(),
                   datanodeInfo,
                   datanodeDetails);
@@ -433,7 +433,7 @@ public class SCMNodeManager implements NodeManager {
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
           Preconditions.checkState(dn.getParent() != null);
           processNodeReport(datanodeDetails, nodeReport);
-          LOG.info("Updated Datanode to: {}", dn);
+          LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher
                   .fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
         }
