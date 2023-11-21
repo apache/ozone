@@ -25,7 +25,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
@@ -40,7 +43,7 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
 
   private final NodeManager nodeManager;
 
-  private PipelineChoosePolicy healthPolicy;
+  private final PipelineChoosePolicy healthPolicy;
 
   public CapacityPipelineChoosePolicy(NodeManager nodeManager) {
     this.nodeManager = nodeManager;
@@ -53,37 +56,15 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
     Pipeline targetPipeline;
     Pipeline pipeline1 = healthPolicy.choosePipeline(pipelineList, pri);
     Pipeline pipeline2 = healthPolicy.choosePipeline(pipelineList, pri);
-    if (pipeline1.getId().equals(pipeline2.getId())) {
-      targetPipeline = pipeline1;
-      LOG.debug("Chosen pipeline = {}", targetPipeline);
-    } else {
-      SCMNodeMetric metric1 = getMaxUsageNodeFromPipeline(pipeline1);
-      SCMNodeMetric metric2 = getMaxUsageNodeFromPipeline(pipeline2);
-      if (metric1 == null || metric2 == null) {
-        LOG.warn("Can't get SCMNodeStat from pipeline: {} or {}.",
-            pipeline1, pipeline2);
-        targetPipeline = pipeline1;
-      } else {
-        targetPipeline =
-            !metric1.isGreater(metric2.get()) ? pipeline1 : pipeline2;
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Compare the max datanode storage in the two pipelines, " +
-                  "first : {}, second : {}, and chosen the {} pipeline = {}",
-              metric1.get(), metric2.get(),
-              targetPipeline == pipeline1 ? "first" : "second", targetPipeline);
-        }
-      }
-    }
-    return targetPipeline;
-  }
 
-  private SCMNodeMetric getMaxUsageNodeFromPipeline(Pipeline pipeline) {
-    return pipeline.getNodes().stream()
-        .map(nodeManager::getNodeStat)
-        .filter(Objects::nonNull)
-        .reduce((metric1, metric2) ->
-            metric2.isGreater(metric1.get()) ? metric2 : metric1)
-        .orElse(null);
+    int result = new CapacityPipelineComparator(this)
+        .compare(pipeline1, pipeline2);
+    targetPipeline = result <= 0 ? pipeline1 : pipeline2;
+
+    LOG.debug("Chosen the {} pipeline by compared scmUsed",
+        targetPipeline == pipeline1 ? "first" : "second");
+
+    return targetPipeline;
   }
 
   @Override
@@ -93,4 +74,54 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
     Pipeline pipeline = choosePipeline(mutableList, pri);
     return pipelineList.indexOf(pipeline);
   }
+
+  /**
+   * Return a list of SCMNodeMetrics corresponding to the DataNodes in the
+   * pipeline, sorted in descending order based on scm used storage.
+   * @param pipeline pipeline
+   * @return sorted SCMNodeMetrics corresponding the pipeline
+   */
+  private Deque<SCMNodeMetric> getSortedNodeFromPipeline(Pipeline pipeline) {
+    Deque<SCMNodeMetric> sortedNodeStack = new ArrayDeque<>();
+    pipeline.getNodes().stream()
+        .map(nodeManager::getNodeStat)
+        .filter(Objects::nonNull)
+        .sorted()
+        .forEach(sortedNodeStack::push);
+    return sortedNodeStack;
+  }
+
+  static class CapacityPipelineComparator implements Comparator<Pipeline> {
+    private final CapacityPipelineChoosePolicy policy;
+
+    CapacityPipelineComparator(CapacityPipelineChoosePolicy policy) {
+      this.policy = policy;
+    }
+    @Override
+    public int compare(Pipeline p1, Pipeline p2) {
+      if (p1.getId().equals(p2.getId())) {
+        LOG.debug("Compare the same pipeline {}", p1);
+        return 0;
+      }
+      Deque<SCMNodeMetric> sortedNodes1 = policy.getSortedNodeFromPipeline(p1);
+      Deque<SCMNodeMetric> sortedNodes2 = policy.getSortedNodeFromPipeline(p2);
+
+      if (sortedNodes1.isEmpty() || sortedNodes2.isEmpty()) {
+        LOG.warn("Cannot obtain SCMNodeMetric in pipeline {} or {}", p1, p2);
+        return 0;
+      }
+      LOG.debug("Compare scmUsed in pipelines, first : {}, second : {}",
+          sortedNodes1, sortedNodes2);
+      // Compare the scmUsed of the first node in the two sorted node stacks
+      int result = sortedNodes1.pop().compareTo(sortedNodes2.pop());
+
+      if (result == 0 && !sortedNodes1.isEmpty() && !sortedNodes2.isEmpty()) {
+        // Compare the scmUsed of the second node in the two sorted node stacks
+        LOG.debug("Secondary compare because the first round is the same");
+        result = sortedNodes1.pop().compareTo(sortedNodes2.pop());
+      }
+      return result;
+    }
+  }
+
 }
