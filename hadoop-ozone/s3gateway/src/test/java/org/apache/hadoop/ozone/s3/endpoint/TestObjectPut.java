@@ -252,56 +252,39 @@ public class TestObjectPut {
     assertEquals(CONTENT, keyContent);
 
     // source and dest same
-    try {
-      objectEndpoint.put(bucketName, keyName, CONTENT.length(), 1, null, body);
-      fail("test copy object failed");
-    } catch (OS3Exception ex) {
-      assertTrue(ex.getErrorMessage().contains("This copy request is " +
-          "illegal"));
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+        bucketName, keyName, CONTENT.length(), 1, null, body),
+        "test copy object failed");
+    assertTrue(e.getErrorMessage().contains("This copy request is illegal"));
 
     // source bucket not found
-    try {
-      when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          nonexist + "/"  + urlEncode(keyName));
-      objectEndpoint.put(destBucket, destkey, CONTENT.length(), 1, null,
-          body);
-      fail("test copy object failed");
-    } catch (OS3Exception ex) {
-      assertTrue(ex.getCode().contains("NoSuchBucket"));
-    }
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        nonexist + "/"  + urlEncode(keyName));
+    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(destBucket,
+        destkey, CONTENT.length(), 1, null, body), "test copy object failed");
+    assertTrue(e.getCode().contains("NoSuchBucket"));
 
     // dest bucket not found
-    try {
-      when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          bucketName + "/" + urlEncode(keyName));
-      objectEndpoint.put(nonexist, destkey, CONTENT.length(), 1, null, body);
-      fail("test copy object failed");
-    } catch (OS3Exception ex) {
-      assertTrue(ex.getCode().contains("NoSuchBucket"));
-    }
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        bucketName + "/" + urlEncode(keyName));
+    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(nonexist,
+        destkey, CONTENT.length(), 1, null, body), "test copy object failed");
+    assertTrue(e.getCode().contains("NoSuchBucket"));
 
     //Both source and dest bucket not found
-    try {
-      when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          nonexist + "/" + urlEncode(keyName));
-      objectEndpoint.put(nonexist, destkey, CONTENT.length(), 1, null, body);
-      fail("test copy object failed");
-    } catch (OS3Exception ex) {
-      assertTrue(ex.getCode().contains("NoSuchBucket"));
-    }
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        nonexist + "/" + urlEncode(keyName));
+    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(nonexist,
+        destkey, CONTENT.length(), 1, null, body), "test copy object failed");
+    assertTrue(e.getCode().contains("NoSuchBucket"));
 
     // source key not found
-    try {
-      when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-          bucketName + "/" + urlEncode(nonexist));
-      objectEndpoint.put("nonexistent", keyName, CONTENT.length(), 1,
-          null, body);
-      fail("test copy object failed");
-    } catch (OS3Exception ex) {
-      assertTrue(ex.getCode().contains("NoSuchBucket"));
-    }
-
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        bucketName + "/" + urlEncode(nonexist));
+    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+        "nonexistent", keyName, CONTENT.length(), 1, null, body),
+        "test copy object failed");
+    assertTrue(e.getCode().contains("NoSuchBucket"));
   }
 
   @Test
@@ -313,15 +296,11 @@ public class TestObjectPut {
     keyName = "sourceKey";
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("random");
 
-    try {
-      objectEndpoint.put(bucketName, keyName,
-          CONTENT.length(), 1, null, body);
-      fail("testInvalidStorageType");
-    } catch (OS3Exception ex) {
-      assertEquals(S3ErrorTable.INVALID_ARGUMENT.getErrorMessage(),
-          ex.getErrorMessage());
-      assertEquals("random", ex.getResource());
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+        bucketName, keyName, CONTENT.length(), 1, null, body));
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getErrorMessage(),
+        e.getErrorMessage());
+    assertEquals("random", e.getResource());
   }
 
   @Test

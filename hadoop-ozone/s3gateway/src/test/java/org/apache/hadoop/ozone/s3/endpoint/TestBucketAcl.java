@@ -45,7 +45,6 @@ import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /**
@@ -98,12 +97,9 @@ public class TestBucketAcl {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.GROUP.getHeaderType() + "=root");
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    try {
-      bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, headers, null);
-    } catch (Exception e) {
-      assertTrue(e instanceof OS3Exception &&
-          ((OS3Exception) e).getHttpCode() == HTTP_NOT_IMPLEMENTED);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, headers, null));
+    assertEquals(e.getHttpCode(), HTTP_NOT_IMPLEMENTED);
   }
 
   @Test
@@ -259,11 +255,8 @@ public class TestBucketAcl {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    try {
-      bucketEndpoint.getAcl("bucket-not-exist");
-    } catch (Exception e) {
-      assertTrue(e instanceof OS3Exception &&
-          ((OS3Exception)e).getHttpCode() == HTTP_NOT_FOUND);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.getAcl("bucket-not-exist"));
+    assertEquals(e.getHttpCode(), HTTP_NOT_FOUND);
   }
 }

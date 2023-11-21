@@ -33,8 +33,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,13 +60,10 @@ public class TestBucketPut {
 
   @Test
   public void testBucketFailWithAuthHeaderMissing() throws Exception {
-
-    try {
-      bucketEndpoint.put(bucketName, null, null, null);
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
+        bucketName, null, null, null));
+    assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
+    assertEquals(MALFORMED_HEADER.getCode(), e.getCode());
   }
 
   @Test
@@ -75,23 +71,20 @@ public class TestBucketPut {
     Response response = bucketEndpoint.put(bucketName, null, null, null);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getLocation());
-    try {
-      // Create-bucket on an existing bucket fails
-      bucketEndpoint.put(bucketName, null, null, null);
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_CONFLICT, ex.getHttpCode());
-      assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
-    }
+
+    // Create-bucket on an existing bucket fails
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
+        bucketName, null, null, null));
+    assertEquals(HTTP_CONFLICT, e.getHttpCode());
+    assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
   }
 
   @Test
   public void testBucketFailWithInvalidHeader() throws Exception {
-    try {
-      bucketEndpoint.put(bucketName, null, null, null);
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
+        bucketName, null, null, null));
+    assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
+    assertEquals(MALFORMED_HEADER.getCode(), e.getCode());
   }
 
   /**

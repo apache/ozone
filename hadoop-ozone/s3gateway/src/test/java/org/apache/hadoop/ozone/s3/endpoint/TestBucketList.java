@@ -31,12 +31,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Testing basic object list browsing.
@@ -352,15 +347,11 @@ public class TestBucketList {
 
     getBucket.setClient(ozoneClient);
 
-    try {
-      getBucket.get("b1", "/", null, null, 2, "dir", "random", null,
-          null, null, null).getEntity();
-      fail("listWithContinuationTokenFail");
-    } catch (OS3Exception ex) {
-      assertEquals("random", ex.getResource());
-      assertEquals("Invalid Argument", ex.getErrorMessage());
-    }
-
+    OS3Exception e = assertThrows(OS3Exception.class, () -> getBucket.get("b1",
+        "/", null, null, 2, "dir", "random", null, null, null, null)
+        .getEntity(), "listWithContinuationTokenFail");
+    assertEquals("random", e.getResource());
+    assertEquals("Invalid Argument", e.getErrorMessage());
   }
 
 
@@ -475,22 +466,16 @@ public class TestBucketList {
   }
 
   @Test
-  public void testEncodingTypeException() throws IOException, OS3Exception {
+  public void testEncodingTypeException() throws IOException {
     BucketEndpoint getBucket = new BucketEndpoint();
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");
     getBucket.setClient(client);
-    try {
-      ListObjectResponse response = (ListObjectResponse) getBucket.get(
-          "b1", null, "unSupportType", null, 1000, null,
-          null, null, null, null, null).getEntity();
-      fail();
-    } catch (Exception e) {
-      assertTrue(e instanceof OS3Exception);
-      assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(),
-          ((OS3Exception) e).getCode());
-    }
 
+    OS3Exception e = assertThrows(OS3Exception.class, () -> getBucket.get(
+        "b1", null, "unSupportType", null, 1000, null,
+        null, null, null, null, null).getEntity());
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
   }
 
   private void assertEncodingTypeObject(
