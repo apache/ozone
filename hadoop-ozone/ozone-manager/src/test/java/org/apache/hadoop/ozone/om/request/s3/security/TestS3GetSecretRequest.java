@@ -60,9 +60,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantA
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.junit.Assert;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -241,13 +240,13 @@ public class TestS3GetSecretRequest {
 
     // Verify that the transaction index is added to the cache for "alice".
     S3SecretCache cache = ozoneManager.getS3SecretManager().cache();
-    Assert.assertNotNull(cache.get(userPrincipalIdAlice));
-    Assert.assertEquals(1,
+    Assertions.assertNotNull(cache.get(userPrincipalIdAlice));
+    Assertions.assertEquals(1,
         cache.get(userPrincipalIdAlice).getTransactionLogIndex());
 
     // Verify that the transaction index is added to the cache for "bob".
-    Assert.assertNotNull(cache.get(userPrincipalIdBob));
-    Assert.assertEquals(2,
+    Assertions.assertNotNull(cache.get(userPrincipalIdBob));
+    Assertions.assertEquals(2,
         cache.get(userPrincipalIdBob).getTransactionLogIndex());
   }
 
@@ -284,10 +283,10 @@ public class TestS3GetSecretRequest {
         ozoneManager, 2, ozoneManagerDoubleBufferHelper);
 
     // Verify that the revoke operation was successful.
-    Assert.assertTrue(omRevokeResponse instanceof S3RevokeSecretResponse);
+    Assertions.assertTrue(omRevokeResponse instanceof S3RevokeSecretResponse);
     S3RevokeSecretResponse s3RevokeSecretResponse =
         (S3RevokeSecretResponse) omRevokeResponse;
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK.getNumber(),
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK.getNumber(),
         s3RevokeSecretResponse.getOMResponse().getStatus().getNumber());
 
     // Fetch the revoked secret and verify its value is null.
@@ -296,7 +295,7 @@ public class TestS3GetSecretRequest {
             ozoneManager)
     );
     S3SecretValue s3SecretValue = omMetadataManager.getSecret(kerberosID);
-    Assert.assertNull(s3SecretValue);
+    Assertions.assertNull(s3SecretValue);
 
     // Verify that the secret for revoked user will be set to a new one upon
     // calling getSecret request.
@@ -304,13 +303,13 @@ public class TestS3GetSecretRequest {
         s3GetSecretRequest.validateAndUpdateCache(
             ozoneManager, 3, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    Assertions.assertTrue(omClientResponse instanceof S3GetSecretResponse);
     S3GetSecretResponse s3GetSecretResponse =
         (S3GetSecretResponse) omClientResponse;
 
     // Compare the old secret value and new secret value after revoking;
     // they should not be the same.
-    Assert.assertNotEquals(originalS3Secret,
+    Assertions.assertNotEquals(originalS3Secret,
         s3GetSecretResponse.getS3SecretValue().getAwsSecret());
   }
 

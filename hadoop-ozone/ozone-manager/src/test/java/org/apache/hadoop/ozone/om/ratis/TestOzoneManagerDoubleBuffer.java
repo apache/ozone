@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -337,7 +337,7 @@ class TestOzoneManagerDoubleBuffer {
     ugiAlice = UserGroupInformation.createRemoteUser(userPrincipalId1);
     UserGroupInformation.createRemoteUser(userPrincipalId2);
     UserGroupInformation.createRemoteUser(userPrincipalId3);
-    Assert.assertEquals("alice", ugiAlice.getShortUserName());
+    Assertions.assertEquals("alice", ugiAlice.getShortUserName());
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
     // Create 3 secrets and store them in the cache and double buffer.
@@ -347,17 +347,17 @@ class TestOzoneManagerDoubleBuffer {
 
     S3SecretCache cache = secretManager.cache();
     // Check if all the three secrets are cached.
-    Assert.assertTrue(cache.get(userPrincipalId1) != null);
-    Assert.assertTrue(cache.get(userPrincipalId2) != null);
-    Assert.assertTrue(cache.get(userPrincipalId3) != null);
+    Assertions.assertTrue(cache.get(userPrincipalId1) != null);
+    Assertions.assertTrue(cache.get(userPrincipalId2) != null);
+    Assertions.assertTrue(cache.get(userPrincipalId3) != null);
 
     // Flush the current buffer.
     doubleBuffer.flushCurrentBuffer();
 
     // Check if all the three secrets are cleared from the cache.
-    Assert.assertTrue(cache.get(userPrincipalId3) == null);
-    Assert.assertTrue(cache.get(userPrincipalId2) == null);
-    Assert.assertTrue(cache.get(userPrincipalId1) == null);
+    Assertions.assertTrue(cache.get(userPrincipalId3) == null);
+    Assertions.assertTrue(cache.get(userPrincipalId2) == null);
+    Assertions.assertTrue(cache.get(userPrincipalId1) == null);
   }
 
   private void processSuccessSecretRequest(
