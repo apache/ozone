@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -1246,7 +1245,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   private String resolveBucketRelativePath(boolean isFSOBucket,
       final Optional<Map<Long, Path>> parentIdMap, byte[] keyVal,
       boolean skipUnresolvedObjIds)
@@ -1268,7 +1266,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       return parentIdMap.map(m -> m.get(parentId).resolve(splitKey[1]))
           .get().toString().substring(1);
     }
-    return Paths.get(OzoneConsts.OZONE_URI_DELIMITER).resolve(key).toString()
+    return OzoneConsts.ROOT_PATH.resolve(key).toString()
         .substring(1);
   }
 

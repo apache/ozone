@@ -115,6 +115,12 @@ Test Multipart Upload Complete
                                 Execute                    cat /tmp/part1 /tmp/part2 > /tmp/${PREFIX}-multipartKey1
     Compare files               /tmp/${PREFIX}-multipartKey1         /tmp/${PREFIX}-multipartKey1.result
 
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 /tmp/${PREFIX}-multipartKey1-part1.result
+    Compare files               /tmp/part1        /tmp/${PREFIX}-multipartKey1-part1.result
+
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
+    Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
+
 Test Multipart Upload Complete Entity too small
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
@@ -182,6 +188,12 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 /tmp/${PREFIX}-multipartKey3.result
                         Execute                    cat /tmp/part1 /tmp/part3 > /tmp/${PREFIX}-multipartKey3
     Compare files       /tmp/${PREFIX}-multipartKey3         /tmp/${PREFIX}-multipartKey3.result
+
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 1 /tmp/${PREFIX}-multipartKey3-part1.result
+    Compare files       /tmp/part1         /tmp/${PREFIX}-multipartKey3-part1.result
+
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part3.result
+    Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
 
 Test abort Multipart upload
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --storage-class REDUCED_REDUNDANCY

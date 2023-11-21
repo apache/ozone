@@ -33,6 +33,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
@@ -57,12 +58,27 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final int maxLevel;
   /** Schema manager. */
   private final NodeSchemaManager schemaManager;
+  /** The algorithm to randomize nodes with equal distances. */
+  private final Consumer<List<? extends Node>> shuffleOperation;
   /** Lock to coordinate cluster tree access. */
   private ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
   public NetworkTopologyImpl(ConfigurationSource conf) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
+    shuffleOperation = Collections::shuffle;
+    maxLevel = schemaManager.getMaxLevel();
+    factory = InnerNodeImpl.FACTORY;
+    clusterTree = factory.newInnerNode(ROOT, null, null,
+        NetConstants.ROOT_LEVEL,
+        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+  }
+
+  @VisibleForTesting
+  public NetworkTopologyImpl(NodeSchemaManager manager,
+                             Consumer<List<? extends Node>> shuffleOperation) {
+    schemaManager = manager;
+    this.shuffleOperation = shuffleOperation;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -72,12 +88,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager) {
-    schemaManager = manager;
-    maxLevel = schemaManager.getMaxLevel();
-    factory = InnerNodeImpl.FACTORY;
-    clusterTree = factory.newInnerNode(ROOT, null, null,
-        NetConstants.ROOT_LEVEL,
-        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+    this(manager, Collections::shuffle);
   }
 
   /**
@@ -754,14 +765,22 @@ public class NetworkTopologyImpl implements NetworkTopology {
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
    * @param activeLen Number of active nodes at the front of the array
+   *
+   * @return list of sorted nodes if reader is not null,
+   * or shuffled input nodes otherwise. The size of returned list is limited
+   * by activeLen parameter.
    */
   @Override
   public List<? extends Node> sortByDistanceCost(Node reader,
       List<? extends Node> nodes, int activeLen) {
-    /** Sort weights for the nodes array */
+    // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      return nodes;
+      List<? extends Node> shuffledNodes =
+          new ArrayList<>(nodes.subList(0, activeLen));
+      shuffleOperation.accept(shuffledNodes);
+      return shuffledNodes;
     }
+    // Sort weights for the nodes array
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
       costs[i] = getDistanceCost(reader, nodes.get(i));
@@ -782,7 +801,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     List<Node> ret = new ArrayList<>();
     for (List<Node> list: tree.values()) {
       if (list != null) {
-        Collections.shuffle(list);
+        shuffleOperation.accept(list);
         for (Node n: list) {
           ret.add(n);
         }

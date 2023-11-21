@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -97,6 +96,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Sets.newHashSet;
@@ -149,7 +149,7 @@ public class TestOmContainerLocationCache {
       MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
   private static final DatanodeDetails DN2 =
       MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
-  private static long testContainerId = 1L;
+  private static final AtomicLong CONTAINER_ID = new AtomicLong(1);
 
 
   @BeforeAll
@@ -248,9 +248,8 @@ public class TestOmContainerLocationCache {
   }
 
   @BeforeEach
-  @SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
   public void beforeEach() {
-    testContainerId++;
+    CONTAINER_ID.getAndIncrement();
     Mockito.reset(mockScmBlockLocationProtocol, mockScmContainerClient,
         mockDn1Protocol, mockDn2Protocol);
     when(mockDn1Protocol.getPipeline()).thenReturn(createPipeline(DN1));
@@ -265,9 +264,9 @@ public class TestOmContainerLocationCache {
   public void containerCachedInHappyCase() throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
-    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockScmAllocationOnDn1(CONTAINER_ID.get(), 1L);
     mockWriteChunkResponse(mockDn1Protocol);
-    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+    mockPutBlockResponse(mockDn1Protocol, CONTAINER_ID.get(), 1L, data);
 
     OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
         .getBucket(BUCKET_NAME);
@@ -278,15 +277,15 @@ public class TestOmContainerLocationCache {
       IOUtils.write(data, os);
     }
 
-    mockScmGetContainerPipeline(testContainerId, DN1);
+    mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
 
     // Read keyName1.
     OzoneKeyDetails key1 = bucket.getKey(keyName1);
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
-    mockGetBlock(mockDn1Protocol, testContainerId, 1L, data, null, null);
-    mockReadChunk(mockDn1Protocol, testContainerId, 1L, data, null, null);
+    mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+    mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
     try (InputStream is = key1.getContent()) {
       byte[] read = new byte[(int) key1.getDataSize()];
       IOUtils.read(is, read);
@@ -307,7 +306,7 @@ public class TestOmContainerLocationCache {
     }
     // Ensure SCM is not called once again.
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
   private static Stream<Arguments> errorsTriggerRefresh() {
@@ -339,9 +338,9 @@ public class TestOmContainerLocationCache {
       Exception dnException, Result dnResponseCode) throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
-    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockScmAllocationOnDn1(CONTAINER_ID.get(), 1L);
     mockWriteChunkResponse(mockDn1Protocol);
-    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+    mockPutBlockResponse(mockDn1Protocol, CONTAINER_ID.get(), 1L, data);
 
     OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
         .getBucket(BUCKET_NAME);
@@ -351,20 +350,20 @@ public class TestOmContainerLocationCache {
       IOUtils.write(data, os);
     }
 
-    mockScmGetContainerPipeline(testContainerId, DN1);
+    mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
 
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
     try (InputStream is = key1.getContent()) {
       // Simulate dn1 got errors, and the container's moved to dn2.
-      mockGetBlock(mockDn1Protocol, testContainerId, 1L, null,
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
           dnException, dnResponseCode);
-      mockScmGetContainerPipeline(testContainerId, DN2);
-      mockGetBlock(mockDn2Protocol, testContainerId, 1L, data, null, null);
-      mockReadChunk(mockDn2Protocol, testContainerId, 1L, data, null, null);
+      mockScmGetContainerPipeline(CONTAINER_ID.get(), DN2);
+      mockGetBlock(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
 
       byte[] read = new byte[(int) key1.getDataSize()];
       IOUtils.read(is, read);
@@ -373,7 +372,7 @@ public class TestOmContainerLocationCache {
 
     // verify SCM is called one more time to refresh.
     verify(mockScmContainerClient, times(2))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
   /**
@@ -387,9 +386,9 @@ public class TestOmContainerLocationCache {
       Exception dnException, Result dnResponseCode) throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
-    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockScmAllocationOnDn1(CONTAINER_ID.get(), 1L);
     mockWriteChunkResponse(mockDn1Protocol);
-    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+    mockPutBlockResponse(mockDn1Protocol, CONTAINER_ID.get(), 1L, data);
 
     OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
         .getBucket(BUCKET_NAME);
@@ -399,21 +398,21 @@ public class TestOmContainerLocationCache {
       IOUtils.write(data, os);
     }
 
-    mockScmGetContainerPipeline(testContainerId, DN1);
+    mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
 
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
     try (InputStream is = key1.getContent()) {
       // simulate dn1 goes down, the container's to dn2.
-      mockGetBlock(mockDn1Protocol, testContainerId, 1L, data, null, null);
-      mockReadChunk(mockDn1Protocol, testContainerId, 1L, null,
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
           dnException, dnResponseCode);
-      mockScmGetContainerPipeline(testContainerId, DN2);
-      mockGetBlock(mockDn2Protocol, testContainerId, 1L, data, null, null);
-      mockReadChunk(mockDn2Protocol, testContainerId, 1L, data, null, null);
+      mockScmGetContainerPipeline(CONTAINER_ID.get(), DN2);
+      mockGetBlock(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn2Protocol, CONTAINER_ID.get(), 1L, data, null, null);
 
       byte[] read = new byte[(int) key1.getDataSize()];
       IOUtils.read(is, read);
@@ -422,7 +421,7 @@ public class TestOmContainerLocationCache {
 
     // verify SCM is called one more time to refresh.
     verify(mockScmContainerClient, times(2))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
   /**
@@ -436,9 +435,9 @@ public class TestOmContainerLocationCache {
       throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
-    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockScmAllocationOnDn1(CONTAINER_ID.get(), 1L);
     mockWriteChunkResponse(mockDn1Protocol);
-    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+    mockPutBlockResponse(mockDn1Protocol, CONTAINER_ID.get(), 1L, data);
 
     OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
         .getBucket(BUCKET_NAME);
@@ -448,16 +447,17 @@ public class TestOmContainerLocationCache {
       IOUtils.write(data, os);
     }
 
-    mockScmGetContainerPipeline(testContainerId, DN1);
+    mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
 
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
     try (InputStream is = key1.getContent()) {
       // simulate dn1 got errors, and the container's moved to dn2.
-      mockGetBlock(mockDn1Protocol, testContainerId, 1L, null, ex, errorCode);
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, null, ex,
+          errorCode);
 
       assertThrows(expectedEx,
           () -> IOUtils.read(is, new byte[(int) key1.getDataSize()]));
@@ -465,7 +465,7 @@ public class TestOmContainerLocationCache {
 
     // verify SCM is called one more time to refresh.
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
   /**
@@ -479,9 +479,9 @@ public class TestOmContainerLocationCache {
       Class<? extends Exception> expectedEx) throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
-    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockScmAllocationOnDn1(CONTAINER_ID.get(), 1L);
     mockWriteChunkResponse(mockDn1Protocol);
-    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+    mockPutBlockResponse(mockDn1Protocol, CONTAINER_ID.get(), 1L, data);
 
     OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
         .getBucket(BUCKET_NAME);
@@ -491,17 +491,17 @@ public class TestOmContainerLocationCache {
       IOUtils.write(data, os);
     }
 
-    mockScmGetContainerPipeline(testContainerId, DN1);
+    mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
 
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
     try (InputStream is = key1.getContent()) {
       // simulate dn1 got errors, and the container's moved to dn2.
-      mockGetBlock(mockDn1Protocol, testContainerId, 1L, data, null, null);
-      mockReadChunk(mockDn1Protocol, testContainerId, 1L, null,
+      mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+      mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, null,
           dnException, dnResponseCode);
 
       assertThrows(expectedEx,
@@ -510,7 +510,7 @@ public class TestOmContainerLocationCache {
 
     // verify SCM is called one more time to refresh.
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
   /**
@@ -522,9 +522,9 @@ public class TestOmContainerLocationCache {
   public void containerRefreshedOnEmptyPipelines() throws Exception {
     byte[] data = "Test content".getBytes(UTF_8);
 
-    mockScmAllocationOnDn1(testContainerId, 1L);
+    mockScmAllocationOnDn1(CONTAINER_ID.get(), 1L);
     mockWriteChunkResponse(mockDn1Protocol);
-    mockPutBlockResponse(mockDn1Protocol, testContainerId, 1L, data);
+    mockPutBlockResponse(mockDn1Protocol, CONTAINER_ID.get(), 1L, data);
 
     OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME)
         .getBucket(BUCKET_NAME);
@@ -535,12 +535,12 @@ public class TestOmContainerLocationCache {
     }
 
     // All datanodes go down and scm returns empty pipeline for the container.
-    mockScmGetContainerPipelineEmpty(testContainerId);
+    mockScmGetContainerPipelineEmpty(CONTAINER_ID.get());
 
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     verify(mockScmContainerClient, times(1))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
 
     // verify that the effort to read will result in a NO_REPLICA_FOUND error.
     Exception ex =
@@ -552,9 +552,9 @@ public class TestOmContainerLocationCache {
     assertEquals(NO_REPLICA_FOUND.toString(), ex.getMessage());
 
     // but the empty pipeline is not cached, and when some data node is back.
-    mockScmGetContainerPipeline(testContainerId, DN1);
-    mockGetBlock(mockDn1Protocol, testContainerId, 1L, data, null, null);
-    mockReadChunk(mockDn1Protocol, testContainerId, 1L, data, null, null);
+    mockScmGetContainerPipeline(CONTAINER_ID.get(), DN1);
+    mockGetBlock(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
+    mockReadChunk(mockDn1Protocol, CONTAINER_ID.get(), 1L, data, null, null);
     // the subsequent effort to read the key is success.
     OzoneKeyDetails updatedKey1 = bucket.getKey(keyName);
     try (InputStream is = updatedKey1.getContent()) {
@@ -564,7 +564,7 @@ public class TestOmContainerLocationCache {
     }
     // verify SCM is called one more time to refetch the container pipeline..
     verify(mockScmContainerClient, times(2))
-        .getContainerWithPipelineBatch(newHashSet(testContainerId));
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
   private void mockPutBlockResponse(XceiverClientSpi mockDnProtocol,
