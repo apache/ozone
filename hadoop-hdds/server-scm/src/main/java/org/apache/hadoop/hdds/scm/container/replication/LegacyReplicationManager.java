@@ -87,7 +87,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1267,6 +1266,8 @@ public class LegacyReplicationManager {
               try {
                 return nodeManager.getNodeStatus(dnd);
               } catch (NodeNotFoundException e) {
+                LOG.warn("Exception while finding an unhealthy replica to " +
+                    "delete for container {}.", container, e);
                 return null;
               }
             });
@@ -2354,38 +2355,20 @@ public class LegacyReplicationManager {
     // by an existing replica.
     // TODO topology handling must be improved to make an optimal
     //  choice as to which replica to keep.
-
-    // Gather the origin node IDs of replicas which are not candidates for
-    // deletion.
-    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
-        .filter(r -> !deleteCandidates.contains(r))
-        .filter(
-            r -> {
+    Set<ContainerReplica> allReplicasSet = new HashSet<>(allReplicas);
+    List<ContainerReplica> nonUniqueDeleteCandidates =
+        ReplicationManagerUtil.findNonUniqueDeleteCandidates(allReplicasSet,
+            deleteCandidates, (dnd) -> {
               try {
-                return nodeManager.getNodeStatus(r.getDatanodeDetails())
-                    .isHealthy();
+                return nodeManager.getNodeStatus(dnd);
               } catch (NodeNotFoundException e) {
-                LOG.warn("Exception when checking replica {} for container {}" +
-                    " while deleting excess UNHEALTHY.", r, container, e);
-                return false;
+                LOG.warn(
+                    "Exception while finding excess unhealthy replicas to " +
+                        "delete for container {} with replicas {}.", container,
+                    allReplicas, e);
+                return null;
               }
-            })
-        .filter(r -> r.getDatanodeDetails().getPersistedOpState()
-            .equals(IN_SERVICE))
-        .map(ContainerReplica::getOriginDatanodeId)
-        .collect(Collectors.toSet());
-
-    List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
-    for (ContainerReplica replica: deleteCandidates) {
-      if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
-        nonUniqueDeleteCandidates.add(replica);
-      } else {
-        // Spare this replica with this new origin node ID from deletion.
-        // delete candidates seen later in the loop with this same origin
-        // node ID can be deleted.
-        existingOriginNodeIDs.add(replica.getOriginDatanodeId());
-      }
-    }
+            });
 
     if (LOG.isDebugEnabled() && nonUniqueDeleteCandidates.size() < excess) {
       LOG.debug("Unable to delete {} excess replicas of container {}. Only {}" +

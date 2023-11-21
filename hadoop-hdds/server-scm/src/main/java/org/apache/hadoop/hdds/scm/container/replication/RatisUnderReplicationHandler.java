@@ -154,6 +154,9 @@ public class RatisUnderReplicationHandler
   private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
       throws NotLeaderException {
+    LOG.info("Finding an unhealthy replica to delete for container {} with " +
+        "replicas {} to unblock under replication handling.", containerInfo,
+        replicas);
     int pendingDeletes = 0;
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
@@ -167,6 +170,9 @@ public class RatisUnderReplicationHandler
               try {
                 return replicationManager.getNodeStatus(dnd);
               } catch (NodeNotFoundException e) {
+                LOG.warn("Exception while finding an unhealthy replica to " +
+                    "delete for container {} with replicas {}.", containerInfo,
+                    replicas, e);
                 return null;
               }
             });
