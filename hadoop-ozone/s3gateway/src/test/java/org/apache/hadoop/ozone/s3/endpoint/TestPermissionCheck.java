@@ -129,7 +129,8 @@ public class TestPermissionCheck {
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.delete("bucketName"));
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.delete("bucketName"));
     assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
   }
   @Test
