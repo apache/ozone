@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -44,6 +43,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +55,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -147,7 +148,7 @@ public class TestInfoSubCommand {
     validateMultiOutput();
   }
 
-  private void validateMultiOutput() {
+  private void validateMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
     List<LoggingEvent> logs = appender.getLog();
     List<LoggingEvent> replica = logs.stream()
@@ -156,11 +157,10 @@ public class TestInfoSubCommand {
         .collect(Collectors.toList());
     Assertions.assertEquals(4, replica.size());
 
-    replica = logs.stream()
-        .filter(m -> m.getRenderedMessage()
-            .matches("(?s)^Invalid container ID: invalid.*"))
-        .collect(Collectors.toList());
-    Assertions.assertEquals(1, replica.size());
+    Pattern p = Pattern.compile(
+        "^Invalid\\scontainer\\sID:\\sinvalid.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
   }
 
   @Test
@@ -190,7 +190,7 @@ public class TestInfoSubCommand {
     validateJsonMultiOutput();
   }
 
-  private void validateJsonMultiOutput() {
+  private void validateJsonMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
     List<LoggingEvent> logs = appender.getLog();
     List<LoggingEvent> replica = logs.stream()
@@ -199,11 +199,10 @@ public class TestInfoSubCommand {
         .collect(Collectors.toList());
     Assertions.assertEquals(4, replica.size());
 
-    replica = logs.stream()
-        .filter(m -> m.getRenderedMessage()
-            .matches("(?s)^.*\"error\": \"Invalid container ID: invalid.*"))
-        .collect(Collectors.toList());
-    Assertions.assertEquals(1, replica.size());
+    Pattern p = Pattern.compile(
+        "^Invalid\\scontainer\\sID:\\sinvalid.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
   }
 
   private void testReplicaIncludedInOutput(boolean includeIndex)
@@ -266,13 +265,10 @@ public class TestInfoSubCommand {
         .collect(Collectors.toList());
     Assertions.assertEquals(0, replica.size());
 
-    // Ensure we have an error logged:
-    List<LoggingEvent> error = logs.stream()
-        .filter(m -> m.getLevel() == Level.ERROR)
-        .collect(Collectors.toList());
-    Assertions.assertEquals(1, error.size());
-    Assertions.assertTrue(error.get(0).getRenderedMessage()
-        .matches("(?s)^Unable to retrieve the replica details.*"));
+    Pattern p = Pattern.compile(
+        "^Unable to retrieve the replica details.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
   }
 
   @Test

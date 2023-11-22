@@ -91,6 +91,8 @@ public class InfoSubcommand extends ScmSubcommand {
       multiContainer = true;
     } else if (containerList[0].equals("-")) {
       stdin = true;
+      // Assume multiple containers if reading from stdin
+      multiContainer = true;
     }
 
     printHeader();
@@ -112,9 +114,6 @@ public class InfoSubcommand extends ScmSubcommand {
 
   private void printOutput(ScmClient scmClient, String id, boolean first)
       throws IOException {
-    if (!first) {
-      printBreak();
-    }
     long containerID;
     try {
       containerID = Long.parseLong(id);
@@ -122,7 +121,7 @@ public class InfoSubcommand extends ScmSubcommand {
       printError("Invalid container ID: " + id);
       return;
     }
-    printDetails(scmClient, containerID);
+    printDetails(scmClient, containerID, first);
   }
 
   private void printHeader() {
@@ -138,11 +137,7 @@ public class InfoSubcommand extends ScmSubcommand {
   }
 
   private void printError(String error) {
-    if (json) {
-      LOG.info("{ \"error\": \"" + error + "\" }");
-    } else {
-      LOG.info(error);
-    }
+    System.err.println(error);
   }
 
   private void printBreak() {
@@ -153,8 +148,8 @@ public class InfoSubcommand extends ScmSubcommand {
     }
   }
 
-  private void printDetails(ScmClient scmClient, long containerID)
-      throws IOException {
+  private void printDetails(ScmClient scmClient, long containerID,
+      boolean first) throws IOException {
     final ContainerWithPipeline container;
     try {
       container = scmClient.getContainerWithPipeline(containerID);
@@ -168,11 +163,12 @@ public class InfoSubcommand extends ScmSubcommand {
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      if (!json) {
-        LOG.error("Unable to retrieve the replica details", e);
-      }
+      printError("Unable to retrieve the replica details: " + e.getMessage());
     }
 
+    if (!first) {
+      printBreak();
+    }
     if (json) {
       if (container.getPipeline().size() != 0) {
         ContainerWithPipelineAndReplicas wrapper =
