@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,11 +63,8 @@ public class TestBucketHead {
 
   @Test
   public void testHeadFail() throws Exception {
-    try {
-      bucketEndpoint.head("unknownbucket");
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals("NoSuchBucket", ex.getCode());
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.head("unknownbucket"));
+    assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
+    assertEquals("NoSuchBucket", e.getCode());
   }
 }

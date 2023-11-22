@@ -96,7 +96,7 @@ public class TestPermissionCheck {
     RootEndpoint rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(client);
     OS3Exception e = assertThrows(OS3Exception.class, () -> rootEndpoint.get());
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   /**
@@ -109,7 +109,7 @@ public class TestPermissionCheck {
     bucketEndpoint.setClient(client);
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.head("bucketName"));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -120,7 +120,7 @@ public class TestPermissionCheck {
     bucketEndpoint.setClient(client);
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.put("bucketName", null, null, null));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -131,7 +131,7 @@ public class TestPermissionCheck {
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.delete("bucketName"));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
   @Test
   public void testListMultiUpload() throws IOException {
@@ -142,7 +142,7 @@ public class TestPermissionCheck {
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.listMultipartUploads("bucketName", "prefix"));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -157,7 +157,7 @@ public class TestPermissionCheck {
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "bucketName", null, null, null, 1000,
         null, null, null, null, null, null));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -175,7 +175,7 @@ public class TestPermissionCheck {
 
     MultiDeleteResponse response =
         bucketEndpoint.multiDelete("BucketName", "keyName", request);
-    assertTrue(response.getErrors().size() == 1);
+    assertEquals(1, response.getErrors().size());
     assertTrue(
         response.getErrors().get(0).getCode().equals("PermissionDenied"));
   }
@@ -198,7 +198,7 @@ public class TestPermissionCheck {
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "bucketName", null, null, null, 1000, null, null, null, null, "acl",
         null), "Expected OS3Exception with FORBIDDEN http code.");
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -239,7 +239,7 @@ public class TestPermissionCheck {
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.get(
         "bucketName", "keyPath", 0, null, 1000, "marker"));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -256,7 +256,7 @@ public class TestPermissionCheck {
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         "bucketName", "keyPath", 1024, 0, null,
         new ByteArrayInputStream(new byte[]{})));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -271,7 +271,7 @@ public class TestPermissionCheck {
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         objectEndpoint.delete("bucketName", "keyPath", null));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -285,6 +285,6 @@ public class TestPermissionCheck {
 
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         objectEndpoint.initializeMultipartUpload("bucketName", "keyPath"));
-    assertEquals(e.getHttpCode(), HTTP_FORBIDDEN);
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 }
