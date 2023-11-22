@@ -70,6 +70,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
     description = "Parse a list of container IDs"
 )
 @MetaInfServices(SubcommandWithParent.class)
+// TODO use dirinfotable field as FSOdirpathresolver
 public class ContainerKeyScanner implements Callable<Void>,
     SubcommandWithParent {
 
@@ -137,11 +138,13 @@ public class ContainerKeyScanner implements Callable<Void>,
 
     while (!objectIdPathVals.isEmpty() && !objIds.isEmpty()) {
       Pair<Long, Path> parentPair = objectIdPathVals.poll();
-      // read directoryTable
+
+      // Get all tables from RocksDB
       List<ColumnFamilyDescriptor> columnFamilyDescriptors =
           RocksDBUtils.getColumnFamilyDescriptors(dbPath);
       final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
+      // Get all table handles
       try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath,
           columnFamilyDescriptors, columnFamilyHandles)) {
         dbPath = removeTrailingSlashIfNeeded(dbPath);
@@ -151,6 +154,7 @@ public class ContainerKeyScanner implements Callable<Void>,
           throw new IllegalStateException("Incorrect DB Path");
         }
 
+        // Get directory table
         DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
             dbDefinition.getColumnFamily(DIRECTORY_TABLE);
         if (columnFamilyDefinition == null) {
@@ -158,6 +162,7 @@ public class ContainerKeyScanner implements Callable<Void>,
               "Table with name" + DIRECTORY_TABLE + " not found");
         }
 
+        // Get directory table handle
         ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
             columnFamilyDefinition.getName().getBytes(UTF_8),
             columnFamilyHandles);
@@ -165,12 +170,15 @@ public class ContainerKeyScanner implements Callable<Void>,
           throw new IllegalStateException("columnFamilyHandle is null");
         }
 
+        // Get iterator for directory table
         try (ManagedRocksIterator iterator = new ManagedRocksIterator(
             db.get().newIterator(columnFamilyHandle))) {
           iterator.get().seekToFirst();
           while (!objIds.isEmpty() && iterator.get().isValid()) {
             String subDir = prefix + parentPair.getKey() + OM_KEY_PREFIX;
             String key = new String(iterator.get().key(), UTF_8);
+
+            // Skip key if it does not contain subDir
             if (!key.contains(subDir)) {
               iterator.get().next();
               continue;
@@ -285,7 +293,8 @@ public class ContainerKeyScanner implements Callable<Void>,
                 // Generate asbolute key path for FSO keys
                 StringBuilder keyName = new StringBuilder();
                 if (tableName.equals(FILE_TABLE)) {
-                  handleFileTable(dbPath, volumeId, bucketId, value, keyName);
+                  keyName.append(
+                      getFsoKeyPrefix(dbPath, volumeId, bucketId, value));
                 }
                 keyName.append(value.getKeyName());
                 containerKeyInfos.add(
@@ -312,8 +321,8 @@ public class ContainerKeyScanner implements Callable<Void>,
     return path;
   }
 
-  private void handleFileTable(String dbPath, long volumeId, long bucketId,
-                         OmKeyInfo value, StringBuilder keyName)
+  private String getFsoKeyPrefix(String dbPath, long volumeId, long bucketId,
+                                 OmKeyInfo value)
       throws IOException, RocksDBException {
     String prefix =
         OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId +
@@ -331,7 +340,7 @@ public class ContainerKeyScanner implements Callable<Void>,
       keyPath = path + OM_KEY_PREFIX;
     }
 
-    keyName.append(removeBeginningSlash(keyPath));
+    return removeBeginningSlash(keyPath);
   }
 
 
