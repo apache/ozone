@@ -33,10 +33,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test methods of the EndpointBase.
@@ -97,13 +94,11 @@ public class TestEndpointBase {
       public void init() { }
     };
 
-    try {
-      endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
-      fail("getCustomMetadataFromHeaders should fail. " +
-          "Expected OS3Exception not thrown");
-    } catch (OS3Exception ex) {
-      assertTrue(ex.getCode().contains("MetadataTooLarge"));
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> endpointBase
+        .getCustomMetadataFromHeaders(s3requestHeaders),
+        "getCustomMetadataFromHeaders should fail." +
+            " Expected OS3Exception not thrown");
+    assertTrue(e.getCode().contains("MetadataTooLarge"));
   }
 
 }
