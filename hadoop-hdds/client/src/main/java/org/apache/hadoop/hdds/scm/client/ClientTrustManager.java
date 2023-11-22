@@ -75,7 +75,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ClientTrustManager.class);
 
-  private final CACertificateProvider client;
+  private final CACertificateProvider remoteProvider;
   private X509ExtendedTrustManager trustManager;
 
   /**
@@ -112,7 +112,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   public ClientTrustManager(CACertificateProvider remoteProvider,
       CACertificateProvider inMemoryProvider)
       throws IOException {
-    this.client = remoteProvider;
+    this.remoteProvider = remoteProvider;
     try {
       initialize(loadCerts(inMemoryProvider));
     } catch (CertificateException e) {
@@ -152,7 +152,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     try {
       LOG.info("Loading certificates for client.");
       if (caCertsProvider == null) {
-        return client.provideCACerts();
+        return remoteProvider.provideCACerts();
       }
       return caCertsProvider.provideCACerts();
     } catch (IOException e) {
@@ -168,7 +168,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     } catch (CertificateException e) {
       LOG.info("CheckServerTrusted call failed, trying to re-fetch " +
           "rootCA certificate", e);
-      initialize(loadCerts(null));
+      initialize(loadCerts(remoteProvider));
       trustManager.checkServerTrusted(chain, authType, socket);
     }
   }
@@ -181,7 +181,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     } catch (CertificateException e) {
       LOG.info("CheckServerTrusted call failed, trying to re-fetch " +
           "rootCA certificate", e);
-      initialize(loadCerts(null));
+      initialize(loadCerts(remoteProvider));
       trustManager.checkServerTrusted(chain, authType, engine);
     }
   }
@@ -194,7 +194,7 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
     } catch (CertificateException e) {
       LOG.info("CheckServerTrusted call failed, trying to re-fetch " +
           "rootCA certificate", e);
-      initialize(loadCerts(null));
+      initialize(loadCerts(remoteProvider));
       trustManager.checkServerTrusted(chain, authType);
     }
   }

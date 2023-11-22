@@ -69,7 +69,12 @@ public class ServiceInfoEx implements CACertificateProvider {
                 " not be null when caCertPems is empty or null"
         ));
       }
-      caCertPems = Collections.singletonList(caCertPem);
+      // In OM, if caCertPem is null, then it becomes empty string on the
+      // client side, in this case we do not want to add it to the caCertPems
+      // list. This happens during testing.
+      if (!caCertPem.isEmpty()) {
+        caCertPems = Collections.singletonList(caCertPem);
+      }
     }
     return OzoneSecurityUtil.convertToX509(caCertPems);
   }
