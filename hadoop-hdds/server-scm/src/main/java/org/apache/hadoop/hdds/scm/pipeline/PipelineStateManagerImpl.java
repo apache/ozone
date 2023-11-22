@@ -119,7 +119,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void addContainerToPipelineUnchecked(
+  public void addContainerToPipelineForce(
           PipelineID pipelineId, ContainerID containerID)
           throws IOException {
     lock.writeLock().lock();

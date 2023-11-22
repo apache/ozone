@@ -207,7 +207,7 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void addContainerToPipelineSCMStart(
           PipelineID pipelineID, ContainerID containerID) throws IOException {
-    stateManager.addContainerToPipelineUnchecked(pipelineID, containerID);
+    stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override

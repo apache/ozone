@@ -75,7 +75,7 @@ public interface PipelineStateManager {
    * @param containerID
    * @throws IOException
    */
-  void addContainerToPipelineUnchecked(
+  void addContainerToPipelineForce(
       PipelineID pipelineID,
       ContainerID containerID
   ) throws IOException;
