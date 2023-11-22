@@ -59,9 +59,9 @@ import static org.junit.Assert.assertEquals;
 
 import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
@@ -107,7 +107,7 @@ public class TestKeyValueHandler {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
     handler = Mockito.mock(KeyValueHandler.class);

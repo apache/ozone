@@ -44,11 +44,11 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -111,7 +111,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     tempFolder = new TemporaryFolder();
     tempFolder.create();
@@ -123,7 +123,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         tempFolder.getRoot().getAbsolutePath());
   }
 
-  @After
+  @AfterEach
   public void teardown() throws Exception {
     if (scmRpcServer != null) {
       scmRpcServer.stop();

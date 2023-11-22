@@ -57,12 +57,12 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
 import org.assertj.core.api.Fail;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 
@@ -143,7 +143,7 @@ public class TestKeyValueContainer {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     CodecBuffer.enableLeakDetection();
 
@@ -183,7 +183,7 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
   }
 
-  @After
+  @AfterEach
   public void after() {
     CodecBuffer.assertNoLeaks();
   }

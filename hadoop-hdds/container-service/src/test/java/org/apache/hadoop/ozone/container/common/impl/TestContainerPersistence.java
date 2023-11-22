@@ -82,8 +82,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getData;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
-import org.junit.After;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
@@ -91,10 +91,10 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
-import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -146,7 +146,7 @@ public class TestContainerPersistence {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     conf = new OzoneConfiguration();
     hddsPath = GenericTestUtils
@@ -156,12 +156,12 @@ public class TestContainerPersistence {
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     FileUtils.deleteDirectory(new File(hddsPath));
   }
 
-  @Before
+  @BeforeEach
   public void setupPaths() throws IOException {
     containerSet = new ContainerSet(1000);
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
@@ -183,7 +183,7 @@ public class TestContainerPersistence {
     }
   }
 
-  @After
+  @AfterEach
   public void cleanupDir() throws IOException {
     // Cleanup cache
     BlockUtils.shutdownCache(conf);

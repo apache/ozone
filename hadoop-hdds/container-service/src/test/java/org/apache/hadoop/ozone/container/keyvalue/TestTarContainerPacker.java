@@ -46,10 +46,10 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.SpyInputStream;
 import org.apache.ozone.test.SpyOutputStream;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -115,14 +115,14 @@ public class TestTarContainerPacker {
     return parameterList;
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws IOException {
     initDir(SOURCE_CONTAINER_ROOT);
     initDir(DEST_CONTAINER_ROOT);
     initDir(TEMP_DIR);
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(SOURCE_CONTAINER_ROOT.toFile());
     FileUtils.deleteDirectory(DEST_CONTAINER_ROOT.toFile());

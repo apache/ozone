@@ -45,11 +45,11 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -105,7 +105,7 @@ public class TestOzoneContainer {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
         .getAbsolutePath());
@@ -118,7 +118,7 @@ public class TestOzoneContainer {
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
-  @After
+  @AfterEach
   public void cleanUp() {
     BlockUtils.shutdownCache(conf);
 

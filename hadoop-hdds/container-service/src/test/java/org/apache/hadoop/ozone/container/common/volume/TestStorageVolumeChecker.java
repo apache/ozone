@@ -40,11 +40,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
 import org.junit.Rule;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.rules.TemporaryFolder;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TestName;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -114,7 +114,7 @@ public class TestStorageVolumeChecker {
     this.layout = layout;
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
@@ -123,7 +123,7 @@ public class TestStorageVolumeChecker {
         folder.newFolder().getAbsolutePath());
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     FileUtils.deleteDirectory(folder.getRoot());
   }

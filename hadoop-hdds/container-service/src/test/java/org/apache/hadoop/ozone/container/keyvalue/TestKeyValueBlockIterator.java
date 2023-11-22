@@ -51,14 +51,14 @@ import org.apache.ozone.test.GenericTestUtils;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -108,7 +108,7 @@ public class TestKeyValueBlockIterator {
     return listB;
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
@@ -129,7 +129,7 @@ public class TestKeyValueBlockIterator {
   }
 
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     db.close();
     db.cleanup();

@@ -71,12 +71,13 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
@@ -147,7 +148,7 @@ public class TestBlockDeletingService {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     CodecBuffer.enableLeakDetection();
 
@@ -165,7 +166,7 @@ public class TestBlockDeletingService {
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
@@ -899,7 +900,7 @@ public class TestBlockDeletingService {
   }
 
   @Test
-  @org.junit.Ignore
+  @Disabled
   public void testContainerThrottle() throws Exception {
     // Properties :
     //  - Number of containers : 2

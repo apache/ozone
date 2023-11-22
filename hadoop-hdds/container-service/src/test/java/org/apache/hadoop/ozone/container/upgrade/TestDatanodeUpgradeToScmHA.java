@@ -43,11 +43,11 @@ import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -106,7 +106,7 @@ public class TestDatanodeUpgradeToScmHA {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAAlreadyEnabled);
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     tempFolder = new TemporaryFolder();
     tempFolder.create();
@@ -116,7 +116,7 @@ public class TestDatanodeUpgradeToScmHA {
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
   }
 
-  @After
+  @AfterEach
   public void teardown() throws Exception {
     if (scmRpcServer != null) {
       scmRpcServer.stop();

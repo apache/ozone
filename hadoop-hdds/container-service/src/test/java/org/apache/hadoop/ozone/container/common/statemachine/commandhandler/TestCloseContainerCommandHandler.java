@@ -35,8 +35,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -83,7 +83,7 @@ public class TestCloseContainerCommandHandler {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void before() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     context = ContainerTestUtils.getMockContext(randomDatanodeDetails(), conf);

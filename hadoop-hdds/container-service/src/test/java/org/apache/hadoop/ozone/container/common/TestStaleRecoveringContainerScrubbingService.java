@@ -35,11 +35,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.ozone.test.TestClock;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -99,7 +99,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     File volumeDir = tempDir.newFolder();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir.getAbsolutePath());
@@ -117,7 +117,7 @@ public class TestStaleRecoveringContainerScrubbingService {
         .thenReturn(hddsVolume);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
   }

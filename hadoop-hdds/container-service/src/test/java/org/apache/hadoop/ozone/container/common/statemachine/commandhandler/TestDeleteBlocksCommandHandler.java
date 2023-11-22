@@ -30,11 +30,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.SchemaHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
@@ -101,7 +101,7 @@ public class TestDeleteBlocksCommandHandler {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -138,7 +138,7 @@ public class TestDeleteBlocksCommandHandler {
     handler.getSchemaHandlers().put(SCHEMA_V3, testSchemaHandler3);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     handler.stop();
     BlockDeletingServiceMetrics.unRegister();

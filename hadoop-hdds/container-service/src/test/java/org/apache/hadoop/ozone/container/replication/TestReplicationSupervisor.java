@@ -63,10 +63,10 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -123,7 +123,7 @@ public class TestReplicationSupervisor {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
@@ -138,7 +138,7 @@ public class TestReplicationSupervisor {
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     replicatorRef.set(null);
   }

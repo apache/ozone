@@ -48,9 +48,9 @@ import org.apache.hadoop.ozone.container.metadata.SchemaOneDeletedBlocksTable;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -114,7 +114,7 @@ public class TestSchemaOneBackwardsCompatibility {
     });
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     TestDB testDB = new TestDB();
 

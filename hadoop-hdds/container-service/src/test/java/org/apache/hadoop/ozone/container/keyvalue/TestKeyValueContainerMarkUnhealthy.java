@@ -27,10 +27,10 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
@@ -91,7 +91,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
@@ -120,7 +120,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         keyValueContainerData, conf);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     volumeSet = null;
     keyValueContainer = null;

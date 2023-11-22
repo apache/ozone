@@ -42,8 +42,8 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.Contai
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -73,7 +73,7 @@ public class TestContainerDeletionChoosingPolicy {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void init() throws Throwable {
     conf = new OzoneConfiguration();
     path = GenericTestUtils
