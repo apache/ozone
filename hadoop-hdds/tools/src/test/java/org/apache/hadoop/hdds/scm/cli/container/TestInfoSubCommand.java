@@ -86,6 +86,8 @@ public class TestInfoSubCommand {
     datanodes = createDatanodeDetails(3);
     Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
         .then(i -> getContainerWithPipeline(i.getArgument(0)));
+    Mockito.when(scmClient.getPipeline(any()))
+        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
 
     appender = new TestAppender();
     logger = Logger.getLogger(
@@ -138,7 +140,7 @@ public class TestInfoSubCommand {
   @Test
   public void testContainersCanBeReadFromStdin() throws IOException {
     String input = "1\n123\n456\ninvalid\n789\n";
-    inContent = new ByteArrayInputStream(input.getBytes());
+    inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -167,7 +169,7 @@ public class TestInfoSubCommand {
   public void testContainersCanBeReadFromStdinJson()
       throws IOException {
     String input = "1\n123\n456\ninvalid\n789\n";
-    inContent = new ByteArrayInputStream(input.getBytes());
+    inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -209,8 +211,6 @@ public class TestInfoSubCommand {
       throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(includeIndex));
-    Mockito.when(scmClient.getPipeline(any()))
-        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");
@@ -251,8 +251,6 @@ public class TestInfoSubCommand {
   public void testReplicasNotOutputIfError() throws IOException {
     Mockito.when(scmClient.getContainerReplicas(anyLong()))
         .thenThrow(new IOException("Error getting Replicas"));
-    Mockito.when(scmClient.getPipeline(any()))
-        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("1");

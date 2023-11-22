@@ -206,7 +206,7 @@ public class InfoSubcommand extends ScmSubcommand {
             ioe) instanceof PipelineNotFoundException) {
           LOG.info("Write Pipeline State: CLOSED");
         } else {
-          LOG.error("Failed to retrieve pipeline info");
+          printError("Failed to retrieve pipeline info");
         }
       }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
