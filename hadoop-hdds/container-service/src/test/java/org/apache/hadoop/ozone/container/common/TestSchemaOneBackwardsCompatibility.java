@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.SchemaOneDeletedBlocksTable;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
@@ -68,10 +68,10 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -157,7 +157,7 @@ public class TestSchemaOneBackwardsCompatibility {
   private void assertTableIteratorUnsupported(Table<?, ?> table) {
     try {
       table.iterator();
-      Assert.fail("Table iterator should have thrown " +
+      Assertions.fail("Table iterator should have thrown " +
               "UnsupportedOperationException.");
     } catch (IOException | UnsupportedOperationException ex) {
       // Exception thrown as expected.
@@ -355,14 +355,14 @@ public class TestSchemaOneBackwardsCompatibility {
         preUpgradeBlocks.add(chunkListKV.getKey());
         try {
           chunkListKV.getValue();
-          Assert.fail("No exception thrown when trying to retrieve old " +
+          Assertions.fail("No exception thrown when trying to retrieve old " +
                   "deleted blocks values as chunk lists.");
         } catch (IOException ex) {
           // Exception thrown as expected.
         }
       }
 
-      Assert.assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
+      Assertions.assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
 
       long initialTotalSpace = newKvData().getBytesUsed();
       long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
@@ -386,7 +386,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
       // The blocks that were originally marked for deletion should now be
       // deleted.
-      Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
+      Assertions.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
               numberOfBlocksDeleted);
     }
   }
@@ -402,7 +402,7 @@ public class TestSchemaOneBackwardsCompatibility {
       for (String blockID: TestDB.BLOCK_IDS) {
         String blockKey = cData.getBlockKey(Long.parseLong(blockID));
         BlockData blockData = blockDataTable.get(blockKey);
-        Assert.assertEquals(Long.toString(blockData.getLocalID()), blockID);
+        Assertions.assertEquals(Long.toString(blockData.getLocalID()), blockID);
       }
 
       // Test decoding keys from the database.
@@ -417,7 +417,7 @@ public class TestSchemaOneBackwardsCompatibility {
         decodedKeys.add(blockDataKV.getKey());
       }
 
-      Assert.assertEquals(TestDB.BLOCK_IDS, decodedKeys);
+      Assertions.assertEquals(TestDB.BLOCK_IDS, decodedKeys);
 
       // Test reading blocks with block iterator.
       try (BlockIterator<BlockData> iter =
@@ -430,7 +430,7 @@ public class TestSchemaOneBackwardsCompatibility {
           iteratorBlockIDs.add(Long.toString(localID));
         }
 
-        Assert.assertEquals(TestDB.BLOCK_IDS, iteratorBlockIDs);
+        Assertions.assertEquals(TestDB.BLOCK_IDS, iteratorBlockIDs);
       }
     }
   }
@@ -446,7 +446,7 @@ public class TestSchemaOneBackwardsCompatibility {
         String blockKey = cData.getDeletingBlockKey(
             Long.parseLong(blockID));
         BlockData blockData = blockDataTable.get(blockKey);
-        Assert.assertEquals(Long.toString(blockData.getLocalID()), blockID);
+        Assertions.assertEquals(Long.toString(blockData.getLocalID()), blockID);
       }
 
       // Test decoding keys from the database.
@@ -467,7 +467,7 @@ public class TestSchemaOneBackwardsCompatibility {
           .map(key -> cData.getDeletingBlockKey(Long.parseLong(key)))
           .collect(Collectors.toList());
 
-      Assert.assertEquals(expectedKeys, decodedKeys);
+      Assertions.assertEquals(expectedKeys, decodedKeys);
 
       // Test reading deleting blocks with block iterator.
       KeyPrefixFilter filter = cData.getDeletingBlockKeyFilter();
@@ -483,7 +483,7 @@ public class TestSchemaOneBackwardsCompatibility {
           iteratorBlockIDs.add(Long.toString(localID));
         }
 
-        Assert.assertEquals(TestDB.DELETING_BLOCK_IDS, iteratorBlockIDs);
+        Assertions.assertEquals(TestDB.DELETING_BLOCK_IDS, iteratorBlockIDs);
       }
     }
   }
@@ -495,11 +495,11 @@ public class TestSchemaOneBackwardsCompatibility {
       Table<String, Long> metadataTable =
           refCountedDB.getStore().getMetadataTable();
 
-      Assert.assertEquals(TestDB.KEY_COUNT,
+      Assertions.assertEquals(TestDB.KEY_COUNT,
           metadataTable.get(cData.getBlockCountKey()).longValue());
-      Assert.assertEquals(TestDB.BYTES_USED,
+      Assertions.assertEquals(TestDB.BYTES_USED,
           metadataTable.get(cData.getBytesUsedKey()).longValue());
-      Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
+      Assertions.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
           metadataTable.get(cData.getPendingDeleteBlockCountKey())
               .longValue());
     }
@@ -515,7 +515,7 @@ public class TestSchemaOneBackwardsCompatibility {
       for (String blockID: TestDB.DELETED_BLOCK_IDS) {
         // Since chunk info for deleted blocks was not stored in schema
         // version 1, there is no value to retrieve here.
-        Assert.assertTrue(deletedBlocksTable.isExist(blockID));
+        Assertions.assertTrue(deletedBlocksTable.isExist(blockID));
       }
 
       // Test decoding keys from the database.
@@ -530,7 +530,7 @@ public class TestSchemaOneBackwardsCompatibility {
         decodedKeys.add(kv.getKey());
       }
 
-      Assert.assertEquals(TestDB.DELETED_BLOCK_IDS, decodedKeys);
+      Assertions.assertEquals(TestDB.DELETED_BLOCK_IDS, decodedKeys);
     }
   }
 

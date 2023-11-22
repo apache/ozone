@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.SpyInputStream;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
@@ -57,7 +57,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test the tar/untar for a given container.
@@ -201,13 +201,13 @@ public class TestTarContainerPacker {
       Map<String, TarArchiveEntry> entries = new HashMap<>();
       while ((entry = tarStream.getNextTarEntry()) != null) {
         if (first) {
-          Assert.assertEquals(CONTAINER_FILE_NAME, entry.getName());
+          Assertions.assertEquals(CONTAINER_FILE_NAME, entry.getName());
           first = false;
         }
         entries.put(entry.getName(), entry);
       }
 
-      Assert.assertTrue(entries.containsKey(CONTAINER_FILE_NAME));
+      Assertions.assertTrue(entries.containsKey(CONTAINER_FILE_NAME));
     } finally {
       if (tarStream != null) {
         tarStream.close();
@@ -221,7 +221,7 @@ public class TestTarContainerPacker {
     String containerYaml = new String(
         packer.unpackContainerDescriptor(inputForUnpackDescriptor),
         UTF_8);
-    Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
+    Assertions.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
     inputForUnpackDescriptor.assertClosedExactlyOnce();
 
     KeyValueContainerData destinationContainerData =
@@ -245,11 +245,11 @@ public class TestTarContainerPacker {
     assertExampleChunkFileIsGood(
         Paths.get(destinationContainerData.getChunksPath()),
         TEST_CHUNK_FILE_NAME);
-    Assert.assertFalse(
+    Assertions.assertFalse(
         "Descriptor file should not have been extracted by the "
             + "unpackContainerData Call",
         destinationContainer.getContainerFile().exists());
-    Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
+    Assertions.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
     inputForUnpackData.assertClosedExactlyOnce();
   }
 
@@ -403,7 +403,7 @@ public class TestTarContainerPacker {
 
     Path exampleFile = parentPath.resolve(filename);
 
-    Assert.assertTrue(
+    Assertions.assertTrue(
         "example file is missing after pack/unpackContainerData: "
             + exampleFile,
         Files.exists(exampleFile));
@@ -411,8 +411,8 @@ public class TestTarContainerPacker {
     try (FileInputStream testFile =
              new FileInputStream(exampleFile.toFile())) {
       List<String> strings = IOUtils.readLines(testFile, UTF_8);
-      Assert.assertEquals(1, strings.size());
-      Assert.assertEquals(content, strings.get(0));
+      Assertions.assertEquals(1, strings.size());
+      Assertions.assertEquals(content, strings.get(0));
     }
   }
 

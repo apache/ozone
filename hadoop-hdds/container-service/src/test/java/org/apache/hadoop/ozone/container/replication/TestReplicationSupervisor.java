@@ -64,7 +64,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
@@ -157,16 +157,16 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(2L));
       supervisor.addTask(createTask(5L));
 
-      Assert.assertEquals(3, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(3, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(3, set.containerCount());
+      Assertions.assertEquals(3, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(3, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(3, set.containerCount());
 
       MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
       metrics.getMetrics(metricsCollector, true);
-      Assert.assertEquals(1, metricsCollector.getRecords().size());
+      Assertions.assertEquals(1, metricsCollector.getRecords().size());
     } finally {
       metrics.unRegister();
       supervisor.stop();
@@ -187,13 +187,13 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(6L));
 
       //THEN
-      Assert.assertEquals(4, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(3, supervisor.getReplicationSkippedCount());
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(1, set.containerCount());
+      Assertions.assertEquals(4, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(1, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(3, supervisor.getReplicationSkippedCount());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(1, set.containerCount());
     } finally {
       supervisor.stop();
     }
@@ -211,13 +211,13 @@ public class TestReplicationSupervisor {
       supervisor.addTask(task);
 
       //THEN
-      Assert.assertEquals(1, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(1, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(0, set.containerCount());
-      Assert.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
+      Assertions.assertEquals(1, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(1, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(0, set.containerCount());
+      Assertions.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
     } finally {
       supervisor.stop();
     }
@@ -238,16 +238,16 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createECTask(5L));
 
       //THEN
-      Assert.assertEquals(0, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(5, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(3, supervisor.getInFlightReplications(
+      Assertions.assertEquals(0, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(5, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(3, supervisor.getInFlightReplications(
           ReplicationTask.class));
-      Assert.assertEquals(2, supervisor.getInFlightReplications(
+      Assertions.assertEquals(2, supervisor.getInFlightReplications(
           ECReconstructionCoordinatorTask.class));
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(0, set.containerCount());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(0, set.containerCount());
     } finally {
       supervisor.stop();
     }
@@ -267,15 +267,15 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(3L));
 
       //THEN
-      Assert.assertEquals(3, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(2, supervisor.getQueueSize());
+      Assertions.assertEquals(3, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(2, supervisor.getQueueSize());
       // Sleep 4s, wait all tasks processed
       try {
         Thread.sleep(4000);
       } catch (InterruptedException e) {
       }
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
     } finally {
       supervisor.stop();
     }
@@ -320,9 +320,9 @@ public class TestReplicationSupervisor {
         .captureLogs(DownloadAndImportReplicator.LOG);
 
     supervisor.addTask(createTask(1L));
-    Assert.assertEquals(1, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
-    Assert.assertTrue(logCapturer.getOutput()
+    Assertions.assertEquals(1, supervisor.getReplicationFailureCount());
+    Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
+    Assertions.assertTrue(logCapturer.getOutput()
         .contains("Container 1 replication was unsuccessful."));
   }
 
@@ -348,13 +348,13 @@ public class TestReplicationSupervisor {
     supervisor.addTask(task2);
     supervisor.addTask(task3);
 
-    Assert.assertEquals(3, supervisor.getReplicationRequestCount());
-    Assert.assertEquals(2, supervisor.getReplicationSuccessCount());
-    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-    Assert.assertEquals(0, supervisor.getQueueSize());
-    Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
-    Assert.assertEquals(2, set.containerCount());
+    Assertions.assertEquals(3, supervisor.getReplicationRequestCount());
+    Assertions.assertEquals(2, supervisor.getReplicationSuccessCount());
+    Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+    Assertions.assertEquals(0, supervisor.getQueueSize());
+    Assertions.assertEquals(1, supervisor.getReplicationTimeoutCount());
+    Assertions.assertEquals(2, set.containerCount());
 
   }
 
@@ -373,13 +373,13 @@ public class TestReplicationSupervisor {
     supervisor.addTask(new ReplicationTask(pushCmd, replicatorRef.get()));
     supervisor.addTask(new ReplicationTask(pullCmd, replicatorRef.get()));
 
-    Assert.assertEquals(2, supervisor.getReplicationRequestCount());
-    Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
-    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-    Assert.assertEquals(0, supervisor.getQueueSize());
-    Assert.assertEquals(0, supervisor.getReplicationTimeoutCount());
-    Assert.assertEquals(1, set.containerCount());
+    Assertions.assertEquals(2, supervisor.getReplicationRequestCount());
+    Assertions.assertEquals(1, supervisor.getReplicationSuccessCount());
+    Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+    Assertions.assertEquals(0, supervisor.getQueueSize());
+    Assertions.assertEquals(0, supervisor.getReplicationTimeoutCount());
+    Assertions.assertEquals(1, set.containerCount());
   }
 
   @Test
@@ -391,8 +391,8 @@ public class TestReplicationSupervisor {
     context.setTermOfLeaderSCM(newTerm);
     supervisor.addTask(createTask(1L));
 
-    Assert.assertEquals(1, supervisor.getReplicationRequestCount());
-    Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
+    Assertions.assertEquals(1, supervisor.getReplicationRequestCount());
+    Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
   }
 
   @Test
@@ -447,19 +447,19 @@ public class TestReplicationSupervisor {
     // Before unblocking the queue, check the queue count for the OrderedTask.
     // We loaded 3 High / normal priority and 2 low. The counter should not
     // include the low counts.
-    Assert.assertEquals(3,
+    Assertions.assertEquals(3,
         supervisor.getInFlightReplications(OrderedTask.class));
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         supervisor.getInFlightReplications(BlockingTask.class));
 
     // Unblock the queue
     completeRunning.countDown();
     // Wait for all tasks to complete
     tasksCompleteLatch.await();
-    Assert.assertEquals(expectedOrder, completionOrder);
-    Assert.assertEquals(0,
+    Assertions.assertEquals(expectedOrder, completionOrder);
+    Assertions.assertEquals(0,
         supervisor.getInFlightReplications(OrderedTask.class));
-    Assert.assertEquals(0,
+    Assertions.assertEquals(0,
         supervisor.getInFlightReplications(BlockingTask.class));
   }
 
@@ -599,7 +599,7 @@ public class TestReplicationSupervisor {
       }
 
       // assumes same-thread execution
-      Assert.assertEquals(1, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(1, supervisor.getTotalInFlightReplications());
 
       KeyValueContainerData kvcd =
           new KeyValueContainerData(task.getContainerId(),
@@ -612,7 +612,7 @@ public class TestReplicationSupervisor {
         set.addContainer(kvc);
         task.setStatus(DONE);
       } catch (Exception e) {
-        Assert.fail("Unexpected error: " + e.getMessage());
+        Assertions.fail("Unexpected error: " + e.getMessage());
       }
     }
   }
@@ -710,21 +710,21 @@ public class TestReplicationSupervisor {
 
     // in progress task will be limited by max. queue size,
     // since all tasks are discarded by the executor, none of them complete
-    Assert.assertEquals(maxQueueSize, rs.getTotalInFlightReplications());
+    Assertions.assertEquals(maxQueueSize, rs.getTotalInFlightReplications());
 
     // queue size is doubled
     rs.nodeStateUpdated(HddsProtos.NodeOperationalState.DECOMMISSIONING);
-    Assert.assertEquals(2 * maxQueueSize, rs.getMaxQueueSize());
-    Assert.assertEquals(2 * replicationMaxStreams, threadPoolSize.get());
+    Assertions.assertEquals(2 * maxQueueSize, rs.getMaxQueueSize());
+    Assertions.assertEquals(2 * replicationMaxStreams, threadPoolSize.get());
 
     // can schedule more tasks
     scheduleTasks(datanodes, rs);
-    Assert.assertEquals(2 * maxQueueSize, rs.getTotalInFlightReplications());
+    Assertions.assertEquals(2 * maxQueueSize, rs.getTotalInFlightReplications());
 
     // queue size is restored
     rs.nodeStateUpdated(IN_SERVICE);
-    Assert.assertEquals(maxQueueSize, rs.getMaxQueueSize());
-    Assert.assertEquals(replicationMaxStreams, threadPoolSize.get());
+    Assertions.assertEquals(maxQueueSize, rs.getMaxQueueSize());
+    Assertions.assertEquals(replicationMaxStreams, threadPoolSize.get());
   }
 
   //schedule 10 container replication

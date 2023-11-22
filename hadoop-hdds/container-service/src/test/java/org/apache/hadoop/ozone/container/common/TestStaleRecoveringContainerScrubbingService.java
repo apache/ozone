@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
@@ -169,7 +169,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //closed container should not be scrubbed
-    Assert.assertTrue(containerSet.containerCount() == 5);
+    Assertions.assertTrue(containerSet.containerCount() == 5);
 
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()
@@ -177,9 +177,9 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should be scrubbed since recovering timeout
-    Assert.assertEquals(10, containerSet.containerCount());
+    Assertions.assertEquals(10, containerSet.containerCount());
     for (Container<?> entry : containerSet) {
-      Assert.assertEquals(entry.getContainerState(),
+      Assertions.assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
 
@@ -191,9 +191,9 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should not be scrubbed
-    Assert.assertEquals(15, containerSet.containerCount());
+    Assertions.assertEquals(15, containerSet.containerCount());
     for (Container<?> entry : containerSet) {
-      Assert.assertEquals(entry.getContainerState(),
+      Assertions.assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
   }

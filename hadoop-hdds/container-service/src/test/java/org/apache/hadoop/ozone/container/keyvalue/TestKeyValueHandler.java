@@ -55,10 +55,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
@@ -389,12 +389,12 @@ public class TestKeyValueHandler {
           createContainerRequest(datanodeId, containerID);
 
       kvHandler.handleCreateContainer(createContainer, null);
-      Assert.assertEquals(1, icrReceived.get());
-      Assert.assertNotNull(containerSet.getContainer(containerID));
+      Assertions.assertEquals(1, icrReceived.get());
+      Assertions.assertNotNull(containerSet.getContainer(containerID));
 
       kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
-      Assert.assertEquals(2, icrReceived.get());
-      Assert.assertNull(containerSet.getContainer(containerID));
+      Assertions.assertEquals(2, icrReceived.get());
+      Assertions.assertNull(containerSet.getContainer(containerID));
 
       File[] deletedContainers =
           hddsVolume.getDeletedContainerDir().listFiles();
@@ -411,9 +411,9 @@ public class TestKeyValueHandler {
 
       kvHandler.handleCreateContainer(createContainer2, null);
 
-      Assert.assertEquals(3, icrReceived.get());
+      Assertions.assertEquals(3, icrReceived.get());
       Container<?> container = containerSet.getContainer(container2ID);
-      Assert.assertNotNull(container);
+      Assertions.assertNotNull(container);
       File deletedContainerDir = hddsVolume.getDeletedContainerDir();
       // to simulate failed move
       File dummyDir = new File(DUMMY_PATH);
@@ -421,7 +421,7 @@ public class TestKeyValueHandler {
       try {
         kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
-        Assert.assertTrue(
+        Assertions.assertTrue(
             sce.getMessage().contains("Failed to move container"));
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
@@ -438,7 +438,7 @@ public class TestKeyValueHandler {
       String expectedLog =
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";
-      Assert.assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
+      Assertions.assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
@@ -86,7 +86,7 @@ public class TestContainerDeletionChoosingPolicy {
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));
     }
-    Assert.assertTrue(containerDir.mkdirs());
+    Assertions.assertTrue(containerDir.mkdirs());
 
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -105,7 +105,7 @@ public class TestContainerDeletionChoosingPolicy {
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
-      Assert.assertTrue(
+      Assertions.assertTrue(
           containerSet.getContainerMapCopy()
               .containsKey(data.getContainerID()));
     }
@@ -121,7 +121,7 @@ public class TestContainerDeletionChoosingPolicy {
     for (ContainerBlockInfo pr : result0) {
       totPendingBlocks += pr.getNumBlocksToDelete();
     }
-    Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    Assertions.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
     // test random choosing. We choose 100 times the 3 datanodes twice.
     //We expect different order at least once.
@@ -138,7 +138,7 @@ public class TestContainerDeletionChoosingPolicy {
         }
       }
     }
-    Assert.fail("Chosen container results were same 100 times");
+    Assertions.fail("Chosen container results were same 100 times");
 
   }
 
@@ -148,7 +148,7 @@ public class TestContainerDeletionChoosingPolicy {
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));
     }
-    Assert.assertTrue(containerDir.mkdirs());
+    Assertions.assertTrue(containerDir.mkdirs());
 
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -179,7 +179,7 @@ public class TestContainerDeletionChoosingPolicy {
       KeyValueContainer container = new KeyValueContainer(data, conf);
       data.closeContainer();
       containerSet.addContainer(container);
-      Assert.assertTrue(
+      Assertions.assertTrue(
           containerSet.getContainerMapCopy().containsKey(containerId));
     }
     numberOfBlocks.sort(Collections.reverseOrder());
@@ -193,7 +193,7 @@ public class TestContainerDeletionChoosingPolicy {
     for (ContainerBlockInfo pr : result0) {
       totPendingBlocks += pr.getNumBlocksToDelete();
     }
-    Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    Assertions.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
 
     List<ContainerBlockInfo> result1 = blockDeletingService
@@ -208,7 +208,7 @@ public class TestContainerDeletionChoosingPolicy {
         break;
       }
     }
-    Assert.assertEquals(containerCount, result1.size());
+    Assertions.assertEquals(containerCount, result1.size());
 
     // verify the order of return list
     int initialName2CountSize = name2Count.size();
@@ -217,11 +217,11 @@ public class TestContainerDeletionChoosingPolicy {
       int currentCount =
           name2Count.remove(data.getContainerData().getContainerID());
       // previous count should not smaller than next one
-      Assert.assertTrue(currentCount > 0 && currentCount <= lastCount);
+      Assertions.assertTrue(currentCount > 0 && currentCount <= lastCount);
       lastCount = currentCount;
     }
     // ensure all the container data are compared
-    Assert.assertEquals(result1.size(),
+    Assertions.assertEquals(result1.size(),
         initialName2CountSize - name2Count.size());
   }
 

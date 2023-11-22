@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Assertions;
@@ -242,9 +242,9 @@ public class TestContainerReader {
     thread.join();
 
     //recovering container should be marked unhealthy, so the count should be 3
-    Assert.assertEquals(UNHEALTHY, containerSet.getContainer(
+    Assertions.assertEquals(UNHEALTHY, containerSet.getContainer(
         recoveringContainerData.getContainerID()).getContainerState());
-    Assert.assertEquals(3, containerSet.containerCount());
+    Assertions.assertEquals(3, containerSet.containerCount());
 
     for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);
@@ -253,13 +253,13 @@ public class TestContainerReader {
           keyValueContainer.getContainerData();
 
       // Verify block related metadata.
-      Assert.assertEquals(blockCount,
+      Assertions.assertEquals(blockCount,
           keyValueContainerData.getBlockCount());
 
-      Assert.assertEquals(blockCount * blockLen,
+      Assertions.assertEquals(blockCount * blockLen,
           keyValueContainerData.getBytesUsed());
 
-      Assert.assertEquals(i,
+      Assertions.assertEquals(i,
           keyValueContainerData.getNumPendingDeletionBlocks());
     }
   }
@@ -299,7 +299,7 @@ public class TestContainerReader {
             keyValueContainer.getContainerData().getContainerPath();
         File containerPath = new File(containerPathStr);
         String renamePath = containerPathStr + "-aa";
-        Assert.assertTrue(containerPath.renameTo(new File(renamePath)));
+        Assertions.assertTrue(containerPath.renameTo(new File(renamePath)));
       }
     }
     ContainerCache.getInstance(conf).shutdownCache();
@@ -307,7 +307,7 @@ public class TestContainerReader {
     ContainerReader containerReader = new ContainerReader(volumeSet1,
         hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
-    Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
+    Assertions.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
 
   @Test
@@ -379,11 +379,11 @@ public class TestContainerReader {
     }
     System.out.println("Open " + volumeNum + " Volume with " + containerCount +
         " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
-    Assert.assertEquals(containerCount,
+    Assertions.assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
-    Assert.assertEquals(0, cache.size());
+    Assertions.assertEquals(0, cache.size());
   }
 
   @Test

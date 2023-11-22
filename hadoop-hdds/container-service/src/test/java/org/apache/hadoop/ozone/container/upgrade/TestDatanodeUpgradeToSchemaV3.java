@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
@@ -148,22 +148,22 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertNull(dataVolume.getDbVolume());
-    Assert.assertFalse(dataVolume.isDbLoaded());
+    Assertions.assertNull(dataVolume.getDbVolume());
+    Assertions.assertFalse(dataVolume.isDbLoaded());
 
     dsm.finalizeUpgrade();
     // RocksDB is created during upgrade
     File dbFile = new File(dataVolume.getStorageDir().getAbsolutePath() + "/" +
         dataVolume.getClusterID() + "/" + dataVolume.getStorageID());
-    Assert.assertTrue(dbFile.exists());
+    Assertions.assertTrue(dbFile.exists());
 
     // RocksDB loaded when SchemaV3 is enabled
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-      Assert.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
+      Assertions.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
           .startsWith(dataVolume.getStorageDir().toString()));
     } else {
       // RocksDB is not loaded when SchemaV3 is disabled.
-      Assert.assertFalse(dataVolume.isDbLoaded());
+      Assertions.assertFalse(dataVolume.isDbLoaded());
     }
   }
 
@@ -182,26 +182,26 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertNull(dataVolume.getDbParentDir());
+    Assertions.assertNull(dataVolume.getDbParentDir());
 
     dsm.finalizeUpgrade();
     // RocksDB is created during upgrade
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertEquals(dbVolume, dataVolume.getDbVolume());
-    Assert.assertTrue(
+    Assertions.assertEquals(dbVolume, dataVolume.getDbVolume());
+    Assertions.assertTrue(
         dbVolume.getHddsVolumeIDs().contains(dataVolume.getStorageID()));
     File dbFile = new File(dbVolume.getStorageDir().getAbsolutePath() + "/" +
         dbVolume.getClusterID() + "/" + dataVolume.getStorageID());
-    Assert.assertTrue(dbFile.exists());
+    Assertions.assertTrue(dbFile.exists());
 
     // RocksDB loaded when SchemaV3 is enabled
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-      Assert.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
+      Assertions.assertTrue(dataVolume.getDbParentDir().getAbsolutePath()
           .startsWith(dbVolume.getStorageDir().toString()));
     } else {
       // RocksDB is not loaded when SchemaV3 is disabled.
-      Assert.assertFalse(dataVolume.isDbLoaded());
+      Assertions.assertFalse(dataVolume.isDbLoaded());
     }
   }
 
@@ -229,10 +229,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dataVolume.format(CLUSTER_ID);
     File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
     if (!idDir.mkdir()) {
-      Assert.fail("Failed to create id directory");
+      Assertions.fail("Failed to create id directory");
     }
 
-    Assert.assertNull(dataVolume.getDbParentDir());
+    Assertions.assertNull(dataVolume.getDbParentDir());
 
     // Restart DN and finalize upgrade
     restartDatanode(
@@ -242,11 +242,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // RocksDB is created by upgrade action
     dataVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0));
-    Assert.assertNotNull(dataVolume.getDbParentDir());
+    Assertions.assertNotNull(dataVolume.getDbParentDir());
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-      Assert.assertTrue(dataVolume.isDbLoaded());
+      Assertions.assertTrue(dataVolume.isDbLoaded());
     } else {
-      Assert.assertFalse(dataVolume.isDbLoaded());
+      Assertions.assertFalse(dataVolume.isDbLoaded());
     }
   }
 
@@ -267,11 +267,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     DbVolume dbVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0)).getDbVolume();
-    Assert.assertNotNull(dbVolume);
+    Assertions.assertNotNull(dbVolume);
 
     dsm.finalizeUpgrade();
     // DB Dir should be the same.
-    Assert.assertEquals(dbVolume, ((HddsVolume) dsm.getContainer()
+    Assertions.assertEquals(dbVolume, ((HddsVolume) dsm.getContainer()
         .getVolumeSet().getVolumesList().get(0)).getDbVolume());
   }
 
@@ -295,11 +295,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
         dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
       if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-        Assert.assertTrue(hddsVolume.isDbLoaded());
-        Assert.assertTrue(hddsVolume.getDbParentDir().getAbsolutePath()
+        Assertions.assertTrue(hddsVolume.isDbLoaded());
+        Assertions.assertTrue(hddsVolume.getDbParentDir().getAbsolutePath()
             .startsWith(hddsVolume.getStorageDir().getAbsolutePath()));
       } else {
-        Assert.assertFalse(hddsVolume.isDbLoaded());
+        Assertions.assertFalse(hddsVolume.isDbLoaded());
       }
     }
   }
@@ -315,11 +315,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
     startPreFinalizedDatanode();
     HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertNull(hddsVolume.getDbParentDir());
+    Assertions.assertNull(hddsVolume.getDbParentDir());
     dsm.finalizeUpgrade();
     // DB is created during upgrade
     File dbDir = hddsVolume.getDbParentDir();
-    Assert.assertTrue(dbDir.getAbsolutePath().startsWith(
+    Assertions.assertTrue(dbDir.getAbsolutePath().startsWith(
         hddsVolume.getStorageDir().getAbsolutePath()));
 
     // Add a new DbVolume
@@ -330,13 +330,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // HddsVolume should still use the rocksDB under it's volume
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
-    Assert.assertEquals(0, dbVolume.getHddsVolumeIDs().size());
+    Assertions.assertEquals(0, dbVolume.getHddsVolumeIDs().size());
 
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
           .getVolumesList().get(0);
-      Assert.assertEquals(dbDir, hddsVolume.getDbParentDir());
-      Assert.assertTrue(hddsVolume.isDbLoaded());
+      Assertions.assertEquals(dbDir, hddsVolume.getDbParentDir());
+      Assertions.assertTrue(hddsVolume.isDbLoaded());
     }
   }
 
@@ -367,22 +367,22 @@ public class TestDatanodeUpgradeToSchemaV3 {
       if (hddsVolume.getStorageDir().getAbsolutePath().startsWith(
           newDataVolume.getAbsolutePath())) {
         if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-          Assert.assertEquals(dbVolume, hddsVolume.getDbVolume());
+          Assertions.assertEquals(dbVolume, hddsVolume.getDbVolume());
         }
         // RocksDB of newly added HddsVolume is created on the newly added
         // DbVolume
         dbFile = new File(dbVolume.getStorageDir() + "/" +
             hddsVolume.getClusterID() + "/" + hddsVolume.getStorageID());
       } else {
-        Assert.assertNull(hddsVolume.getDbVolume());
+        Assertions.assertNull(hddsVolume.getDbVolume());
         dbFile = new File(hddsVolume.getStorageDir() + "/" +
             hddsVolume.getClusterID() + "/" + hddsVolume.getStorageID());
       }
       if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-        Assert.assertTrue(hddsVolume.isDbLoaded());
-        Assert.assertTrue(hddsVolume.getDbParentDir().exists());
-        Assert.assertTrue(dbFile.exists());
-        Assert.assertEquals(dbFile, hddsVolume.getDbParentDir());
+        Assertions.assertTrue(hddsVolume.isDbLoaded());
+        Assertions.assertTrue(hddsVolume.getDbParentDir().exists());
+        Assertions.assertTrue(dbFile.exists());
+        Assertions.assertEquals(dbFile, hddsVolume.getDbParentDir());
       }
     }
   }
@@ -421,7 +421,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     KeyValueContainer container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID1);
     // When SchemaV3 is disabled, new data should be saved as SchemaV2.
-    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+    Assertions.assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
 
     // Set SchemaV3 enable status
@@ -438,7 +438,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         dsm.getContainer().getContainerSet().getContainer(containerID2);
     // If SchemaV3 is enabled, new data should be saved as SchemaV3
     // If SchemaV3 is still disabled, new data should still be saved as SchemaV2
-    Assert.assertEquals(expectedVersion,
+    Assertions.assertEquals(expectedVersion,
         container.getContainerData().getSchemaVersion());
   }
 
@@ -500,9 +500,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dataVolume.format(CLUSTER_ID);
     File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
     if (!idDir.mkdir()) {
-      Assert.fail("Failed to create id directory");
+      Assertions.fail("Failed to create id directory");
     }
-    Assert.assertNull(dataVolume.getDbParentDir());
+    Assertions.assertNull(dataVolume.getDbParentDir());
 
     // Restart DN
     restartDatanode(
@@ -516,7 +516,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     closeContainer(containerID, pipeline);
     KeyValueContainer container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID);
-    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+    Assertions.assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
 
 
@@ -538,7 +538,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Check that old data is readable
     container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID);
-    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+    Assertions.assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
     readChunk(writeChunk, pipeline);
 
@@ -549,7 +549,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Old data is readable after DN restart
     container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID);
-    Assert.assertEquals(OzoneConsts.SCHEMA_V2,
+    Assertions.assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
     readChunk(writeChunk, pipeline);
   }
@@ -558,13 +558,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
     KeyValueContainerData data =
         (KeyValueContainerData) dsm.getContainer().getContainerSet()
             .getContainer(containerID).getContainerData();
-    Assert.assertTrue(data.getChunksPath().contains(expectedID));
-    Assert.assertTrue(data.getMetadataPath().contains(expectedID));
+    Assertions.assertTrue(data.getChunksPath().contains(expectedID));
+    Assertions.assertTrue(data.getMetadataPath().contains(expectedID));
   }
 
   public List<File> getHddsSubdirs(File volume) {
     File[] subdirsArray = getHddsRoot(volume).listFiles(File::isDirectory);
-    Assert.assertNotNull(subdirsArray);
+    Assertions.assertNotNull(subdirsArray);
     return Arrays.asList(subdirsArray);
   }
 
@@ -594,7 +594,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
     DatanodeStateMachine newDsm = new DatanodeStateMachine(dd, conf);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
-    Assert.assertEquals(
+    Assertions.assertEquals(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(),
         actualMlv);
     if (dsm != null) {
@@ -615,9 +615,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dsm = new DatanodeStateMachine(dd, conf);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     if (exactMatch) {
-      Assert.assertEquals(expectedMlv, mlv);
+      Assertions.assertEquals(expectedMlv, mlv);
     } else {
-      Assert.assertTrue("Expected minimum mlv(" + expectedMlv
+      Assertions.assertTrue("Expected minimum mlv(" + expectedMlv
           + ") is smaller than mlv(" + mlv + ").", expectedMlv <= mlv);
     }
 
@@ -718,7 +718,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       ContainerProtos.Result expectedResult) {
     ContainerProtos.ContainerCommandResponseProto response =
         dsm.getContainer().getDispatcher().dispatch(request, null);
-    Assert.assertEquals(expectedResult, response.getResult());
+    Assertions.assertEquals(expectedResult, response.getResult());
   }
 
   /// VOLUME OPERATIONS ///

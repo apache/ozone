@@ -58,7 +58,7 @@ import org.apache.hadoop.util.DiskChecker;
 
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.Assume;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
@@ -99,10 +99,10 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ratis.util.Preconditions.assertTrue;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -217,12 +217,12 @@ public class TestKeyValueContainer {
     populate(0);
     KeyValueContainerData data = keyValueContainer.getContainerData();
     File chunksDir = new File(data.getChunksPath());
-    Assert.assertTrue(chunksDir.delete());
+    Assertions.assertTrue(chunksDir.delete());
 
     // When the container is loaded, the missing chunks directory should
     // be created.
     KeyValueContainerUtil.parseKVContainerData(data, CONF);
-    Assert.assertTrue(chunksDir.exists());
+    Assertions.assertTrue(chunksDir.exists());
   }
 
   @Test
@@ -423,12 +423,12 @@ public class TestKeyValueContainer {
   private void checkContainerFilesPresent(KeyValueContainerData data,
       long expectedNumFilesInChunksDir) throws IOException {
     File chunksDir = new File(data.getChunksPath());
-    Assert.assertTrue(Files.isDirectory(chunksDir.toPath()));
+    Assertions.assertTrue(Files.isDirectory(chunksDir.toPath()));
     try (Stream<Path> stream = Files.list(chunksDir.toPath())) {
-      Assert.assertEquals(expectedNumFilesInChunksDir, stream.count());
+      Assertions.assertEquals(expectedNumFilesInChunksDir, stream.count());
     }
-    Assert.assertTrue(data.getDbFile().exists());
-    Assert.assertTrue(KeyValueContainer.getContainerFile(data.getMetadataPath(),
+    Assertions.assertTrue(data.getDbFile().exists());
+    Assertions.assertTrue(KeyValueContainer.getContainerFile(data.getMetadataPath(),
         data.getContainerID()).exists());
   }
 
@@ -610,14 +610,14 @@ public class TestKeyValueContainer {
   @Test
   public void testReportOfUnhealthyContainer() throws Exception {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    Assert.assertNotNull(keyValueContainer.getContainerReport());
+    Assertions.assertNotNull(keyValueContainer.getContainerReport());
     keyValueContainer.markContainerUnhealthy();
     File containerFile = keyValueContainer.getContainerFile();
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         keyValueContainerData.getState());
-    Assert.assertNotNull(keyValueContainer.getContainerReport());
+    Assertions.assertNotNull(keyValueContainer.getContainerReport());
   }
 
   @Test
@@ -672,11 +672,11 @@ public class TestKeyValueContainer {
       long defaultCacheSize = 64 * OzoneConsts.MB;
       long cacheSize = Long.parseLong(store
           .getProperty("rocksdb.block-cache-capacity"));
-      Assert.assertEquals(defaultCacheSize, cacheSize);
+      Assertions.assertEquals(defaultCacheSize, cacheSize);
       for (ColumnFamily handle : store.getColumnFamilies()) {
         cacheSize = Long.parseLong(
             store.getProperty(handle, "rocksdb.block-cache-capacity"));
-        Assert.assertEquals(defaultCacheSize, cacheSize);
+        Assertions.assertEquals(defaultCacheSize, cacheSize);
       }
     }
   }
@@ -693,7 +693,7 @@ public class TestKeyValueContainer {
           .getColumnFamilyOptions(new OzoneConfiguration());
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
           .getColumnFamilyOptions(new OzoneConfiguration());
-      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
+      Assertions.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
       // ColumnFamilyOptions should be same when queried multiple times
       // for a particulat configuration
@@ -701,16 +701,16 @@ public class TestKeyValueContainer {
           .getColumnFamilyOptions(conf);
       columnFamilyOptions2 = dbProfileSupplier.get()
           .getColumnFamilyOptions(conf);
-      Assert.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
+      Assertions.assertEquals(columnFamilyOptions1, columnFamilyOptions2);
     }
 
     // Make sure ColumnFamilyOptions are different for different db profile
     DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
     DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
-    Assert.assertNotEquals(
+    Assertions.assertNotEquals(
         diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
         ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
-    Assert.assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
+    Assertions.assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
         ssdProfile.getColumnFamilyOptions(conf));
   }
 
@@ -724,7 +724,7 @@ public class TestKeyValueContainer {
     try (DBHandle db1 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
-      Assert.assertTrue(store1 instanceof AbstractDatanodeStore);
+      Assertions.assertTrue(store1 instanceof AbstractDatanodeStore);
       outProfile1 = ((AbstractDatanodeStore) store1).getDbProfile();
     }
 
@@ -745,17 +745,17 @@ public class TestKeyValueContainer {
     try (DBHandle db2 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), otherConf)) {
       DatanodeStore store2 = db2.getStore();
-      Assert.assertTrue(store2 instanceof AbstractDatanodeStore);
+      Assertions.assertTrue(store2 instanceof AbstractDatanodeStore);
       outProfile2 = ((AbstractDatanodeStore) store2).getDbProfile();
     }
 
     // DBOtions should be different, except SCHEMA-V3
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
-      Assert.assertEquals(
+      Assertions.assertEquals(
           outProfile1.getDBOptions().compactionReadaheadSize(),
           outProfile2.getDBOptions().compactionReadaheadSize());
     } else {
-      Assert.assertNotEquals(
+      Assertions.assertNotEquals(
           outProfile1.getDBOptions().compactionReadaheadSize(),
           outProfile2.getDBOptions().compactionReadaheadSize());
     }
@@ -875,7 +875,7 @@ public class TestKeyValueContainer {
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      Assert.assertTrue(fileMetaDataList2.size() < fileMetaDataList1.size());
+      Assertions.assertTrue(fileMetaDataList2.size() < fileMetaDataList1.size());
     } catch (Exception e) {
       Fail.fail("TestAutoCompactionSmallSstFile failed");
     } finally {
@@ -930,7 +930,7 @@ public class TestKeyValueContainer {
       }
 
       // After import check whether isEmpty flag is false
-      Assert.assertFalse(container.getContainerData().isEmpty());
+      Assertions.assertFalse(container.getContainerData().isEmpty());
     }
   }
 
@@ -977,7 +977,7 @@ public class TestKeyValueContainer {
 
       // After import check whether isEmpty flag is true
       // since there are no blocks in rocksdb
-      Assert.assertTrue(container.getContainerData().isEmpty());
+      Assertions.assertTrue(container.getContainerData().isEmpty());
     }
   }
 
@@ -1042,10 +1042,10 @@ public class TestKeyValueContainer {
 
     // verify container schema
     if (schemaV3Enabled) {
-      Assert.assertEquals(SCHEMA_V3,
+      Assertions.assertEquals(SCHEMA_V3,
           container.getContainerData().getSchemaVersion());
     } else {
-      Assert.assertEquals(SCHEMA_V2,
+      Assertions.assertEquals(SCHEMA_V2,
           container.getContainerData().getSchemaVersion());
     }
 
@@ -1075,9 +1075,9 @@ public class TestKeyValueContainer {
       importedContainer.importContainerData(fio, packer);
     }
 
-    Assert.assertEquals(schemaV3Enabled ? SCHEMA_V3 : SCHEMA_V2,
+    Assertions.assertEquals(schemaV3Enabled ? SCHEMA_V3 : SCHEMA_V2,
         importedContainer.getContainerData().getSchemaVersion());
-    Assert.assertEquals(pendingDeleteBlockCount,
+    Assertions.assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
   }
 }

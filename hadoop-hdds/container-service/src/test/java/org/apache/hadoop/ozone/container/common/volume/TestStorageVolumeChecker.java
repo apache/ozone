@@ -41,7 +41,7 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
 import org.junit.Rule;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.rules.TemporaryFolder;
 import org.junit.jupiter.api.Test;
@@ -69,8 +69,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.isNull;
@@ -269,14 +269,14 @@ public class TestStorageVolumeChecker {
     // delete the volume directory
     FileUtils.deleteDirectory(volParentDir);
 
-    Assert.assertEquals(2, volumeSet.getVolumesList().size());
+    Assertions.assertEquals(2, volumeSet.getVolumesList().size());
     volumeSet.checkAllVolumes();
     // failed volume should be removed from volumeSet volume list
-    Assert.assertEquals(1, volumeSet.getVolumesList().size());
-    Assert.assertEquals(1, volumeSet.getFailedVolumesList().size());
+    Assertions.assertEquals(1, volumeSet.getVolumesList().size());
+    Assertions.assertEquals(1, volumeSet.getFailedVolumesList().size());
 
     // All containers should be removed from containerSet
-    Assert.assertEquals(0, containerSet.getContainerMap().size());
+    Assertions.assertEquals(0, containerSet.getContainerMap().size());
 
     ozoneContainer.stop();
   }

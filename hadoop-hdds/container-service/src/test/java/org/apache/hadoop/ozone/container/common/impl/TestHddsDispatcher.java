@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -86,9 +86,9 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -150,7 +150,7 @@ public class TestHddsDispatcher {
       hddsDispatcher.setClusterId(scmId.toString());
       ContainerCommandResponseProto responseOne = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
           responseOne.getResult());
       verify(context, times(0))
           .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
@@ -158,7 +158,7 @@ public class TestHddsDispatcher {
           StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
           responseTwo.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
@@ -220,7 +220,7 @@ public class TestHddsDispatcher {
           .ifPresent(volumeInfo -> volumeInfo.incrementUsedSpace(50));
       ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
@@ -262,38 +262,38 @@ public class TestHddsDispatcher {
       // send read chunk request and make sure container does not exist
       ContainerCommandResponseProto response =
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
-      Assert.assertEquals(response.getResult(),
+      Assertions.assertEquals(response.getResult(),
           ContainerProtos.Result.CONTAINER_NOT_FOUND);
       // send write chunk request without sending create container
       response = hddsDispatcher.dispatch(writeChunkRequest, null);
       // container should be created as part of write chunk request
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       // send read chunk request to read the chunk written above
       response =
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       ByteString responseData = BufferUtils.concatByteStrings(
           response.getReadChunk().getDataBuffers().getBuffersList());
-      Assert.assertEquals(writeChunkRequest.getWriteChunk().getData(),
+      Assertions.assertEquals(writeChunkRequest.getWriteChunk().getData(),
           responseData);
       // put block
       ContainerCommandRequestProto putBlockRequest =
           ContainerTestHelper.getPutBlockRequest(writeChunkRequest);
       response =  hddsDispatcher.dispatch(putBlockRequest, null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       // send list block request
       ContainerCommandRequestProto listBlockRequest =
           ContainerTestHelper.getListBlockRequest(writeChunkRequest);
       response =  hddsDispatcher.dispatch(listBlockRequest, null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-      Assert.assertEquals(1, response.getListBlock().getBlockDataList().size());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(1, response.getListBlock().getBlockDataList().size());
       for (ContainerProtos.BlockData blockData :
           response.getListBlock().getBlockDataList()) {
-        Assert.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+        Assertions.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
             blockData.getBlockID());
-        Assert.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
+        Assertions.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
             .getLen(), blockData.getSize());
-        Assert.assertEquals(1, blockData.getChunksCount());
+        Assertions.assertEquals(1, blockData.getChunksCount());
       }
     } finally {
       ContainerMetrics.remove();
@@ -318,7 +318,7 @@ public class TestHddsDispatcher {
       // send read chunk request and make sure container does not exist
       ContainerCommandResponseProto response =
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
-      Assert.assertEquals(
+      Assertions.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
@@ -326,7 +326,7 @@ public class TestHddsDispatcher {
       // send write chunk request without sending create container
       response = hddsDispatcher.dispatch(writeChunkRequest, COMMIT_STAGE);
       // container should not be found
-      Assert.assertEquals(
+      Assertions.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
       assertTrue(logCapturer.getOutput().contains(
@@ -394,15 +394,15 @@ public class TestHddsDispatcher {
       hddsDispatcher.dispatch(writeChunkRequest, null);
       response = hddsDispatcher.dispatch(writeChunkRequest, null);
 
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       // Send Read Chunk request for written chunk.
       response =
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
       ByteString responseData = BufferUtils.concatByteStrings(
           response.getReadChunk().getDataBuffers().getBuffersList());
-      Assert.assertEquals(writeChunkRequest.getWriteChunk().getData(),
+      Assertions.assertEquals(writeChunkRequest.getWriteChunk().getData(),
           responseData);
 
       // Put Block
@@ -413,21 +413,21 @@ public class TestHddsDispatcher {
       hddsDispatcher.dispatch(putBlockRequest, null);
       hddsDispatcher.dispatch(putBlockRequest, null);
       response =  hddsDispatcher.dispatch(putBlockRequest, null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
       // Check PutBlock Data
       ContainerCommandRequestProto listBlockRequest =
           ContainerTestHelper.getListBlockRequest(writeChunkRequest);
       response =  hddsDispatcher.dispatch(listBlockRequest, null);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-      Assert.assertEquals(1, response.getListBlock().getBlockDataList().size());
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      Assertions.assertEquals(1, response.getListBlock().getBlockDataList().size());
       for (ContainerProtos.BlockData blockData :
           response.getListBlock().getBlockDataList()) {
-        Assert.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
+        Assertions.assertEquals(writeChunkRequest.getWriteChunk().getBlockID(),
             blockData.getBlockID());
-        Assert.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
+        Assertions.assertEquals(writeChunkRequest.getWriteChunk().getChunkData()
             .getLen(), blockData.getSize());
-        Assert.assertEquals(1, blockData.getChunksCount());
+        Assertions.assertEquals(1, blockData.getChunksCount());
       }
     } finally {
       ContainerMetrics.remove();
@@ -565,7 +565,7 @@ public class TestHddsDispatcher {
       final TokenVerifier tokenVerifier = new TokenVerifier() {
         private void verify() {
           final boolean previous = verified.getAndSet(true);
-          Assert.assertFalse(previous);
+          Assertions.assertFalse(previous);
         }
 
         @Override
@@ -594,9 +594,9 @@ public class TestHddsDispatcher {
       };
       for (DispatcherContext context : notVerify) {
         LOG.info("notVerify {}", context);
-        Assert.assertFalse(verified.get());
+        Assertions.assertFalse(verified.get());
         dispatcher.dispatch(request, context);
-        Assert.assertFalse(verified.get());
+        Assertions.assertFalse(verified.get());
       }
 
       final Op[] verify = {
@@ -610,9 +610,9 @@ public class TestHddsDispatcher {
 
       for (Op op : verify) {
         final DispatcherContext context = newContext(op);
-        Assert.assertFalse(verified.get());
+        Assertions.assertFalse(verified.get());
         dispatcher.dispatch(request, context);
-        Assert.assertTrue(verified.getAndSet(false));
+        Assertions.assertTrue(verified.getAndSet(false));
       }
     } finally {
       ContainerMetrics.remove();
