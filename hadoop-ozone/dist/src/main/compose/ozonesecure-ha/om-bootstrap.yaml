@@ -20,7 +20,7 @@ x-OM-Ratis-config:
   &common-env-file
   env_file:
     - ./docker-config
-    - ./docker-config-om-ratis
+    - ./docker-config-ratis-om-bootstrap
 
 x-om3-setup:
   &om3-setup
