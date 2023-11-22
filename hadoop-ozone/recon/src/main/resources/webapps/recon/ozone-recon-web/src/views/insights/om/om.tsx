@@ -166,7 +166,7 @@ const MISMATCH_TAB_COLUMNS = [
 
 const OPEN_KEY_TAB_COLUMNS = [
   {
-    title: 'Key',
+    title: 'Key Name',
     dataIndex: 'path',
     key: 'path',
     isSearchable: true
@@ -860,10 +860,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   itemRender = (_: any, type: string, originalElement: any) => {
     if (type === 'prev') {
-      return <div>{this.state.prevClickable ? <Link to="/Om" onClick={this.fetchPreviousRecords}> Prev</Link>: <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
+      return <div>{this.state.prevClickable ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<<  '}</Link>: <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
     }
     if (type === 'next') {
-      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {'>>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
+      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {'  >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
     }
     return originalElement;
   };
@@ -1065,7 +1065,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       return <Table
         expandRowByClick dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
-        loading={loading} rowKey='path'
+        loading={loading} rowKey='key'
         pagination={paginationConfig}
         locale={{filterTitle: ""}} />
     }

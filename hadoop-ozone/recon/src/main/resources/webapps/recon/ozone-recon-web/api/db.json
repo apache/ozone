@@ -2252,8 +2252,7 @@
         "quotaInBytes": -1,
         "quotaInNamespace": -1,
         "usedNamespace": 3000,
-        "acls": [
-        ]
+        "acls": []
       },
       {
         "volume": "vol4",
@@ -3728,8 +3727,8 @@
       "totalReplicatedDataSize": 87873,
       "totalDeletedKeys": 3
   },
-  "omMismatch":{
-    "lastKey":11,
+  "omMismatch": {
+    "lastKey": 11,
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -3927,8 +3926,8 @@
       }
     ]
   },
-  "omMismatch1":{
-    "lastKey":21,
+  "omMismatch1": {
+    "lastKey": 21,
     "containerDiscrepancyInfo": [
       {
         "containerId": 11,
@@ -3938,7 +3937,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3950,7 +3948,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3958,7 +3955,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "SCM"
       },
@@ -4162,12 +4158,12 @@
       }
     ]
   },
-  "omMismatch2":{
+  "omMismatch2": {
     "lastKey": null,
     "containerDiscrepancyInfo": []
   },
-  "scmMismatch":{
-    "lastKey":11,
+  "scmMismatch": {
+    "lastKey": 11,
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -4177,7 +4173,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4189,7 +4184,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4197,7 +4191,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4376,7 +4369,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4388,7 +4380,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4396,7 +4387,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4564,8 +4554,8 @@
       }
     ]
   },
-  "scmMismatch2":{
-    "lastKey":31,
+  "scmMismatch2": {
+    "lastKey": 31,
     "containerDiscrepancyInfo": [
       {
         "containerId": 21,
@@ -4575,7 +4565,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4587,7 +4576,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4595,7 +4583,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4763,8 +4750,8 @@
       }
     ]
   },
-  "scmMismatch3":{
-    "lastKey":41,
+  "scmMismatch3": {
+    "lastKey": 41,
     "containerDiscrepancyInfo": [
       {
         "containerId": 31,
@@ -4774,7 +4761,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4786,7 +4772,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4794,7 +4779,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4962,8 +4946,8 @@
       }
     ]
   },
-  "scmMismatch4":{
-    "lastKey":51,
+  "scmMismatch4": {
+    "lastKey": 51,
     "containerDiscrepancyInfo": [
       {
         "containerId": 41,
@@ -4973,7 +4957,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4985,7 +4968,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4993,7 +4975,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -5161,16 +5142,16 @@
       }
     ]
   },
-  "scmMismatch5":{
+  "scmMismatch5": {
     "lastKey": null,
     "containerDiscrepancyInfo": []
   },
   "nonFSO": {
     "lastKey": "11",
     "keysSummary": {
-        "totalUnreplicatedDataSize": 10485760,
-        "totalReplicatedDataSize": 31457280,
-        "totalOpenKeys": 10
+      "totalUnreplicatedDataSize": 10485760,
+      "totalReplicatedDataSize": 31457280,
+      "totalOpenKeys": 10
     },
     "nonFSO": [
       {
@@ -5243,7 +5224,7 @@
           "replicationFactor": "ONE",
           "requiredNodes": 1,
           "replicationType": "RATIS"
-      }
+        }
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
@@ -5255,16 +5236,16 @@
           "replicationFactor": "ONE",
           "requiredNodes": 1,
           "replicationType": "RATIS"
-      }
+        }
       }
     ],
     "status": "OK"
   },
   "nonFSO3": {
     "keysSummary": {
-        "totalUnreplicatedDataSize": 10485760,
-        "totalReplicatedDataSize": 31457280,
-        "totalOpenKeys": 10
+      "totalUnreplicatedDataSize": 10485760,
+      "totalReplicatedDataSize": 31457280,
+      "totalOpenKeys": 10
     },
     "lastKey": "",
     "replicatedDataSize": 0,
@@ -5273,246 +5254,254 @@
   },
   "fso": {
     "lastKey": "11",
+    "replicatedDataSize": 8053063680,
+    "unreplicatedDataSize": 2684354560,
     "fso": [
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2401/110569623850191713",
-        "path": "1",
-        "inStateSince": 1686156886632,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036151689727/598510/111420452571784477",
+        "path": "598510",
+        "inStateSince": 1700141183041,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2402/110569623850191713",
-        "path": "2",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036151689727/598515/111420452574668067",
+        "path": "598515",
+        "inStateSince": 1700141183085,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2403/110569623850191713",
-        "path": "3",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2404/110569623850191713",
-        "path": "4",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2405/110569623850191713",
-        "path": "5",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036151689727/598518/111420452576437541",
+        "path": "598518",
+        "inStateSince": 1700141183112,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2406/110569623850191713",
-        "path": "6",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036151689727/598519/111420452576699686",
+        "path": "598519",
+        "inStateSince": 1700141183116,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2407/110569623850191713",
-        "path": "7",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036151689727/598520/111420452578075943",
+        "path": "598520",
+        "inStateSince": 1700141183137,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2408/110569623850191713",
-        "path": "8",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036151689727/598521/111420452578731304",
+        "path": "598521",
+        "inStateSince": 1700141183147,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2409/110569623850191713",
-        "path": "9",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/373/111420064337756847",
+        "path": "373",
+        "inStateSince": 1700135259060,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
-
       },
       {
-        "key": "fso 10",
-        "path": "10",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/376/111420064345424562",
+        "path": "376",
+        "inStateSince": 1700135259177,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
-
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/390/111420064378061504",
+        "path": "390",
+        "inStateSince": 1700135259675,
+        "size": 268435456,
+        "replicatedSize": 805306368,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/393/111420064389464773",
+        "path": "393",
+        "inStateSince": 1700135259849,
+        "size": 268435456,
+        "replicatedSize": 805306368,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
       }
     ],
     "status": "OK"
   },
   "fso1": {
     "lastKey": "21",
+    "replicatedDataSize": 4831838964,
+    "unreplicatedDataSize": 1610612988,
     "fso": [
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
-        "path": "11",
-        "inStateSince": 1686156886632,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/399/111420064398967497",
+        "path": "399",
+        "inStateSince": 1700135259994,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 12",
-        "path": "12",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/401/111420064404800203",
+        "path": "401",
+        "inStateSince": 1700135260083,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 13",
-        "path": "13",
-        "inStateSince": 1686156886632,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/402/111420064404800204",
+        "path": "402",
+        "inStateSince": 1700135260083,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 14",
-        "path": "14",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/403/111420064405062349",
+        "path": "403",
+        "inStateSince": 1700135260087,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 15",
-        "path": "15",
-        "inStateSince": 1686156886632,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/404/111420064407225038",
+        "path": "404",
+        "inStateSince": 1700135260120,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 16 key",
-        "path": "16",
-        "inStateSince": 1686156887186,
+        "key": "/-4611686018427388160/-9223372036152054272/-9223372036152053759/405/111420064410305231",
+        "path": "405",
+        "inStateSince": 1700135260166,
         "size": 268435456,
-        "replicatedSize": 268435456,
+        "replicatedSize": 805306368,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 17 key",
-        "path": "17",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/-4611686018427388160/-9223372036854775040/-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key/111404677516683468",
+        "path": "cloudera-health-monitoring-ozone-basic-canary-key",
+        "inStateSince": 1699900474801,
+        "size": 63,
+        "replicatedSize": 189,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 18 key",
-        "path": "18",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/-4611686018427388160/-9223372036854775040/-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key/111404728689551568",
+        "path": "cloudera-health-monitoring-ozone-basic-canary-key",
+        "inStateSince": 1699901255638,
+        "size": 63,
+        "replicatedSize": 189,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       },
       {
-        "key": "fso 19 key",
-        "path": "19",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/-4611686018427388160/-9223372036854775040/-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key/111404733614713041",
+        "path": "cloudera-health-monitoring-ozone-basic-canary-key",
+        "inStateSince": 1699901330789,
+        "size": 63,
+        "replicatedSize": 189,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        }
+      },
+      {
+        "key": "/-4611686018427388160/-9223372036854775040/-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key/111404741844789458",
+        "path": "cloudera-health-monitoring-ozone-basic-canary-key",
+        "inStateSince": 1699901456371,
+        "size": 63,
+        "replicatedSize": 189,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       }
@@ -5521,124 +5510,18 @@
   },
   "fso2": {
     "lastKey": "31",
+    "replicatedDataSize": 189,
+    "unreplicatedDataSize": 63,
     "fso": [
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
-        "path": "21",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/-4611686018427388160/-9223372036854775040/-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key/111410457745813067",
+        "path": "clouder",
+        "inStateSince": 1699988674098,
+        "size": 63,
+        "replicatedSize": 189,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 22",
-        "path": "22",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 23",
-        "path": "23",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 24",
-        "path": "24",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 25",
-        "path": "25",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 26 key",
-        "path": "26",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 17 key",
-        "path": "27",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 18 key",
-        "path": "28",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 19 key",
-        "path": "29",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 20 key",
-        "path": "20",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
         }
       }
@@ -5646,17 +5529,12 @@
     "status": "OK"
   },
   "fso3": {
-    "keysSummary": {
-      "totalUnreplicatedDataSize": 10485760,
-      "totalReplicatedDataSize": 31457280,
-      "totalOpenKeys": 10
-   },
-    "lastKey": "",
+    "lastKey": "41",
     "replicatedDataSize": 0,
     "unreplicatedDataSize": 0,
     "status": "OK"
   },
-  "keydeletePending":{
+  "keydeletePending": {
     "lastKey": "/volume/bucket1/rcmeevblsf/106/-9223372036843950335",
     "keysSummary": {
       "totalUnreplicatedDataSize": 29291,
@@ -5748,7 +5626,6 @@
       {
         "omKeyInfoList": [
           {
-
             "objectID": -9223372036844470015,
             "updateID": 40407,
             "parentObjectID": -9223372036844472575,
@@ -6019,9 +5896,8 @@
     ],
     "status": "OK"
   },
-
   "keydeletePending1": {
-    "lastKey":"/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191",
+    "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191",
     "replicatedTotal": -1530804718628866300,
     "unreplicatedTotal": -1530804718628866300,
     "deletedKeyInfo": [
@@ -6086,7 +5962,7 @@
     "status": "OK"
   },
   "keydeletePending2": {
-    "lastKey":"31",
+    "lastKey": "31",
     "replicatedTotal": -1530804718628866300,
     "unreplicatedTotal": -1530804718628866300,
     "deletedKeyInfo": [
@@ -6206,7 +6082,7 @@
     "status": "OK"
   },
   "keydeletePending3": {
-    "lastKey":"",
+    "lastKey": "",
     "deletedKeyInfo": []
   },
   "deleted": {
