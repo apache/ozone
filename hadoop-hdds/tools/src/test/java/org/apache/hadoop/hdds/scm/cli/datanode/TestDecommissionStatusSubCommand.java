@@ -83,7 +83,7 @@ public class TestDecommissionStatusSubCommand {
     cmd.execute(scmClient);
 
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
-            "DECOMMISSIONING\\s-\\s2\\snodes\n");
+            "DECOMMISSIONING\\s-\\s2\\snode\\(s\\)\n");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
@@ -94,11 +94,6 @@ public class TestDecommissionStatusSubCommand {
     p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
-
-    p = Pattern.compile("Decommission\\sStatus:\\s" +
-        "DECOMMISSIONED\\s-\\s\\d\\snodes\n");
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertFalse(m.find());  // only decommissioning nodes are printed
   }
 
   @Test
@@ -110,32 +105,8 @@ public class TestDecommissionStatusSubCommand {
 
     cmd.execute(scmClient);
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
-        "DECOMMISSIONING\\s-\\s0\\snodes\n");
+        "DECOMMISSIONING\\s-\\s0\\snode\\(s\\)\n");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-  }
-
-  @Test
-  public void testDecommissionedWhenDecommissionStatus() throws IOException {
-    ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> getNodeDetails(2));
-
-    CommandLine decom = new CommandLine(decomCmd);
-    decom.parseArgs("host1", "host2");
-    decomCmd.execute(scmClient);
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--decommissioned");
-    cmd.execute(scmClient);
-
-    Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
-        "DECOMMISSIONING\\s-\\s2\\snodes\n");
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-
-    p = Pattern.compile("Decommission\\sStatus:\\s" +
-        "DECOMMISSIONED\\s-\\s\\d\\snodes\n");
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
