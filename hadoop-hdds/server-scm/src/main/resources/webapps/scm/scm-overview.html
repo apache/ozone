@@ -56,7 +56,14 @@
     </thead>
     <tbody>
         <tr ng-repeat="typestat in nodeStatus|filter:search|orderBy:columnName:reverse">
-            <td><a href="{{typestat.portval.toLowerCase()}}://{{typestat.hostname}}:{{typestat.portno}}" target="_blank">{{typestat.hostname}}</a></td>
+            <td ng-switch="typestat.port > 0">
+                <span ng-switch-when="true">
+                    <a href="{{typestat.protocol}}://{{typestat.hostname}}:{{typestat.port}}" target="_blank">{{typestat.hostname}}</a>
+                </span>
+                <span ng-switch-when="false">
+                    {{typestat.hostname}}
+                </span>
+            </td>
             <td>{{typestat.opstate}}</td>
             <td>{{typestat.comstate}}</td>
        </tr>
