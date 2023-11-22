@@ -169,7 +169,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
           process(container, containerSizeCountMap);
         } catch (Exception e) {
           // FIXME: it is a bug if there is an exception.
-          LOG.error("FIXME: Unexpected failure when processing " + container, e);
+          LOG.error("FIXME: Failed to process " + container, e);
         }
       }
 
@@ -313,7 +313,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     containerSizeCountMap.compute(key,
-        (k, previous) -> previous != null? previous + delta: delta);
+        (k, previous) -> previous != null ? previous + delta : delta);
   }
 
   /**
