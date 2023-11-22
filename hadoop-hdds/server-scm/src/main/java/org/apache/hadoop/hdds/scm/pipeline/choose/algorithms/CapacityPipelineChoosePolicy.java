@@ -53,18 +53,14 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
   @Override
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
-    Pipeline targetPipeline;
     Pipeline pipeline1 = healthPolicy.choosePipeline(pipelineList, pri);
     Pipeline pipeline2 = healthPolicy.choosePipeline(pipelineList, pri);
 
     int result = new CapacityPipelineComparator(this)
         .compare(pipeline1, pipeline2);
-    targetPipeline = result <= 0 ? pipeline1 : pipeline2;
 
-    LOG.debug("Chosen the {} pipeline by compared scmUsed",
-        targetPipeline == pipeline1 ? "first" : "second");
-
-    return targetPipeline;
+    LOG.debug("Chosen the {} pipeline", result <= 0 ? "first" : "second");
+    return result <= 0 ? pipeline1 : pipeline2;
   }
 
   @Override
@@ -110,7 +106,7 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
         LOG.warn("Cannot obtain SCMNodeMetric in pipeline {} or {}", p1, p2);
         return 0;
       }
-      LOG.debug("Compare scmUsed in pipelines, first : {}, second : {}",
+      LOG.debug("Compare scmUsed weight in pipelines, first : {}, second : {}",
           sortedNodes1, sortedNodes2);
       // Compare the scmUsed of the first node in the two sorted node stacks
       int result = sortedNodes1.pop().compareTo(sortedNodes2.pop());
