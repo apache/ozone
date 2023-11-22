@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -71,14 +72,18 @@ public class ECContainerOperationClient implements Closeable {
   private static XceiverClientManager createClientManager(
       ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {
-    CACertificateProvider localCaCerts =
-        () -> HAUtils.buildCAX509List(certificateClient, conf);
-    CACertificateProvider remoteCacerts =
-        () -> HAUtils.buildCAX509List(null, conf);
+    ClientTrustManager trustManager = null;
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      CACertificateProvider localCaCerts =
+          () -> HAUtils.buildCAX509List(certificateClient, conf);
+      CACertificateProvider remoteCacerts =
+          () -> HAUtils.buildCAX509List(null, conf);
+      trustManager = new ClientTrustManager(remoteCacerts, localCaCerts);
+    }
     return new XceiverClientManager(conf,
         new XceiverClientManager.XceiverClientManagerConfigBuilder()
             .setMaxCacheSize(256).setStaleThresholdMs(10 * 1000).build(),
-        new ClientTrustManager(remoteCacerts, localCaCerts));
+        trustManager);
   }
 
   public BlockData[] listBlock(long containerId, DatanodeDetails dn,

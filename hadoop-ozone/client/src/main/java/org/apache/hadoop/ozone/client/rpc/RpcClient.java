@@ -364,11 +364,15 @@ public class RpcClient implements ClientProtocol {
   @VisibleForTesting
   protected XceiverClientFactory createXceiverClientFactory(
       ServiceInfoEx serviceInfo) throws IOException {
-    CACertificateProvider remoteCAProvider =
-        () -> ozoneManagerClient.getServiceInfo().provideCACerts();
+    ClientTrustManager trustManager = null;
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      CACertificateProvider remoteCAProvider =
+          () -> ozoneManagerClient.getServiceInfo().provideCACerts();
+      trustManager = new ClientTrustManager(remoteCAProvider, serviceInfo);
+    }
     return new XceiverClientManager(conf,
         conf.getObject(XceiverClientManager.ScmClientConfig.class),
-        new ClientTrustManager(remoteCAProvider, serviceInfo));
+        trustManager);
   }
 
   @VisibleForTesting
