@@ -36,39 +36,27 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Integration Tests for Recon's tasks.
  */
+@Timeout(300)
 public class TestReconTasks {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
@@ -85,7 +73,7 @@ public class TestReconTasks {
     cluster.waitForClusterToBeReady();
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -120,11 +108,11 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconContainerManager
         .getContainers().size();
-    Assert.assertNotEquals(scmContainersCount, reconContainersCount);
+    assertNotEquals(scmContainersCount, reconContainersCount);
     reconScm.syncWithSCMContainerInfo();
     reconContainersCount = reconContainerManager
         .getContainers().size();
-    Assert.assertEquals(scmContainersCount, reconContainersCount);
+    assertEquals(scmContainersCount, reconContainersCount);
   }
 
   @Test
@@ -153,7 +141,7 @@ public class TestReconTasks {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Make sure Recon got the container report with new container.
-    Assert.assertEquals(scmContainerManager.getContainers(),
+    assertEquals(scmContainerManager.getContainers(),
         reconContainerManager.getContainers());
 
     // Bring down the Datanode that had the container replica.
