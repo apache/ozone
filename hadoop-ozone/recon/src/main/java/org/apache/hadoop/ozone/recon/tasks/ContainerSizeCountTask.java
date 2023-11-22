@@ -121,13 +121,12 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private void process(ContainerInfo container,
       Map<ContainerSizeCountKey, Long> map) {
     final ContainerID id = container.containerID();
-    final Long currentSize = container.getUsedBytes();
+    final long currentSize = container.getUsedBytes();
     final Long previousSize = processedContainers.put(id, currentSize);
-    incrementContainerSizeCount(currentSize, map);
-    if (currentSize.equals(previousSize)) {
-      // Container Size is changed
+    if (previousSize != null) {
       decrementContainerSizeCount(previousSize, map);
     }
+    incrementContainerSizeCount(currentSize, map);
   }
 
   /**
@@ -283,7 +282,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private void incrementContainerSizeCount(long containerSize,
+  private static void incrementContainerSizeCount(long containerSize,
                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     updateContainerSizeCount(containerSize, 1, containerSizeCountMap);
   }
@@ -304,12 +303,12 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private void decrementContainerSizeCount(long containerSize,
+  private static void decrementContainerSizeCount(long containerSize,
                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     updateContainerSizeCount(containerSize, -1, containerSizeCountMap);
   }
 
-  private void updateContainerSizeCount(long containerSize, int delta,
+  private static void updateContainerSizeCount(long containerSize, int delta,
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     containerSizeCountMap.compute(key,
@@ -328,7 +327,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private ContainerSizeCountKey getContainerSizeCountKey(
+  private static ContainerSizeCountKey getContainerSizeCountKey(
       long containerSize) {
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
