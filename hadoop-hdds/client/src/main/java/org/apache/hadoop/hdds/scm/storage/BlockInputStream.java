@@ -303,7 +303,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     return new ChunkInputStream(chunkInfo, blockID,
-        xceiverClientFactory, () -> pipeline, verifyChecksum, token);
+        xceiverClientFactory, () -> pipeline, verifyChecksum, () -> token);
   }
 
   @Override
