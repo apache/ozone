@@ -296,6 +296,34 @@ public class TestDatanodeAdminMonitor {
   }
 
   @Test
+  public void testDecommissionNotBlockedByDeletingContainers()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(3));
+    // Mock Replication Manager to return ContainerReplicaCount's which
+    // is deleting on a decommissioning and an IN_SERVICE node.
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCount(
+            repManager,
+            HddsProtos.LifeCycleState.DELETING,
+            DECOMMISSIONED,
+            IN_SERVICE);
+
+    // Run the monitor for the first time and the node will transition to
+    // DECOMMISSIONED as there are no pipelines to close and no containers to
+    // replicate.
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  @Test
   public void testDecommissionNodeWithUnrecoverableECContainer()
       throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();

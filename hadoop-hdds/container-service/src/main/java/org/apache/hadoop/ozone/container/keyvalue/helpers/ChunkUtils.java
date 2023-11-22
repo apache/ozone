@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
@@ -59,6 +61,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,6 +181,15 @@ public final class ChunkUtils {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  public static ChunkBuffer readData(long len, int bufferCapacity,
+      CheckedConsumer<ByteBuffer[], StorageContainerException> readMethod)
+      throws StorageContainerException {
+    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len,
+        bufferCapacity);
+    readMethod.accept(buffers);
+    return ChunkBuffer.wrap(Arrays.asList(buffers));
   }
 
   /**

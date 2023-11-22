@@ -712,10 +712,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setClosePipeline(closePipelineInfo)
         .setAction(PipelineAction.Action.CLOSE)
         .build();
-    context.addPipelineActionIfAbsent(action);
-    // wait for the next HB timeout or right away?
-    if (triggerHB) {
-      context.getParent().triggerHeartbeat();
+    if (context != null) {
+      context.addPipelineActionIfAbsent(action);
+      // wait for the next HB timeout or right away?
+      if (triggerHB) {
+        context.getParent().triggerHeartbeat();
+      }
     }
     LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
             action.getAction(), pipelineID,

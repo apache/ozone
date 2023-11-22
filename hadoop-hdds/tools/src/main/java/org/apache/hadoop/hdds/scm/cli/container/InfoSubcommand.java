@@ -39,8 +39,10 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,12 +92,14 @@ public class InfoSubcommand extends ScmSubcommand {
       if (container.getPipeline().size() != 0) {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
-                container.getPipeline(), replicas);
+                container.getPipeline(), replicas,
+                container.getContainerInfo().getPipelineID());
         LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       } else {
         ContainerWithoutDatanodes wrapper =
             new ContainerWithoutDatanodes(container.getContainerInfo(),
-                container.getPipeline(), replicas);
+                container.getPipeline(), replicas,
+                container.getContainerInfo().getPipelineID());
         LOG.info(JsonUtils.toJsonStringWithDefaultPrettyPrinter(wrapper));
       }
     } else {
@@ -108,6 +112,21 @@ public class InfoSubcommand extends ScmSubcommand {
         LOG.info("Pipeline Info: {}", container.getPipeline());
       } else {
         LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+      }
+      LOG.info("Write PipelineId: {}",
+          container.getContainerInfo().getPipelineID().getId());
+      try {
+        String pipelineState = scmClient.getPipeline(
+                container.getContainerInfo().getPipelineID().getProtobuf())
+            .getPipelineState().toString();
+        LOG.info("Write Pipeline State: {}", pipelineState);
+      } catch (IOException ioe) {
+        if (SCMHAUtils.unwrapException(
+            ioe) instanceof PipelineNotFoundException) {
+          LOG.info("Write Pipeline State: CLOSED");
+        } else {
+          LOG.error("Failed to retrieve pipeline info");
+        }
       }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
@@ -149,12 +168,14 @@ public class InfoSubcommand extends ScmSubcommand {
     private ContainerInfo containerInfo;
     private Pipeline pipeline;
     private List<ContainerReplicaInfo> replicas;
+    private PipelineID writePipelineID;
 
     ContainerWithPipelineAndReplicas(ContainerInfo container, Pipeline pipeline,
-                                     List<ContainerReplicaInfo> replicas) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
       this.containerInfo = container;
       this.pipeline = pipeline;
       this.replicas = replicas;
+      this.writePipelineID = pipelineID;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -168,6 +189,11 @@ public class InfoSubcommand extends ScmSubcommand {
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
     }
+
+    public PipelineID getWritePipelineID() {
+      return writePipelineID;
+    }
+
   }
 
   private static class ContainerWithoutDatanodes {
@@ -175,12 +201,14 @@ public class InfoSubcommand extends ScmSubcommand {
     private ContainerInfo containerInfo;
     private PipelineWithoutDatanodes pipeline;
     private List<ContainerReplicaInfo> replicas;
+    private PipelineID writePipelineId;
 
     ContainerWithoutDatanodes(ContainerInfo container, Pipeline pipeline,
-                                     List<ContainerReplicaInfo> replicas) {
+        List<ContainerReplicaInfo> replicas, PipelineID pipelineID) {
       this.containerInfo = container;
       this.pipeline = new PipelineWithoutDatanodes(pipeline);
       this.replicas = replicas;
+      this.writePipelineId = pipelineID;
     }
 
     public ContainerInfo getContainerInfo() {
@@ -193,6 +221,10 @@ public class InfoSubcommand extends ScmSubcommand {
 
     public List<ContainerReplicaInfo> getReplicas() {
       return replicas;
+    }
+
+    public PipelineID getWritePipelineId() {
+      return writePipelineId;
     }
   }
 

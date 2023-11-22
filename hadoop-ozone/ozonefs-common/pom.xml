@@ -42,11 +42,6 @@
       <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-client</artifactId>
     </dependency>

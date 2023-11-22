@@ -215,8 +215,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -318,8 +319,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

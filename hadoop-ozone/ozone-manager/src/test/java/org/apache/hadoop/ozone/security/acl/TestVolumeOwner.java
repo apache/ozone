@@ -39,10 +39,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -75,7 +75,7 @@ public class TestVolumeOwner {
   private static OzoneManagerProtocol writeClient;
   private static File testDir;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws IOException, AuthenticationException {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
@@ -103,7 +103,7 @@ public class TestVolumeOwner {
     prepareTestKeys();
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(testDir);
   }
@@ -172,27 +172,29 @@ public class TestVolumeOwner {
     // admin = true, owner = false, ownerName = testvolumeOwner
     RequestContext nonOwnerContext = getUserRequestContext("om",
         IAccessAuthorizer.ACLType.CREATE, false, getTestVolOwnerName(0));
-    Assert.assertTrue("matching admins are allowed to perform admin " +
-        "operations", nativeAuthorizer.checkAccess(vol0, nonOwnerContext));
+    Assertions.assertTrue(nativeAuthorizer.checkAccess(vol0, nonOwnerContext),
+        "matching admins are allowed to perform admin " +
+        "operations");
 
     // admin = true, owner = false, ownerName = null
-    Assert.assertTrue("matching admins are allowed to perform admin " +
-        "operations", nativeAuthorizer.checkAccess(vol0, nonOwnerContext));
+    Assertions.assertTrue(nativeAuthorizer.checkAccess(vol0, nonOwnerContext),
+        "matching admins are allowed to perform admin " +
+        "operations");
 
     // admin = false, owner = false, ownerName = testvolumeOwner
     RequestContext nonAdminNonOwnerContext = getUserRequestContext("testuser",
         IAccessAuthorizer.ACLType.CREATE, false, getTestVolOwnerName(0));
-    Assert.assertFalse("mismatching admins are not allowed to perform admin " +
-        "operations", nativeAuthorizer.checkAccess(vol0,
-        nonAdminNonOwnerContext));
+    Assertions.assertFalse(nativeAuthorizer.checkAccess(vol0,
+        nonAdminNonOwnerContext), "mismatching admins are not allowed to " +
+        "perform admin operations");
 
     // admin = false, owner = true
     RequestContext nonAdminOwnerContext = getUserRequestContext(
         getTestVolOwnerName(0), IAccessAuthorizer.ACLType.CREATE,
         true, getTestVolOwnerName(0));
-    Assert.assertFalse("mismatching admins are not allowed to perform admin " +
-        "operations even for owner", nativeAuthorizer.checkAccess(vol0,
-        nonAdminOwnerContext));
+    Assertions.assertFalse(nativeAuthorizer.checkAccess(vol0,
+        nonAdminOwnerContext), "mismatching admins are not allowed to " +
+        "perform admin operations even for owner");
 
     List<IAccessAuthorizer.ACLType> aclsToTest =
         Arrays.stream(IAccessAuthorizer.ACLType.values()).filter(
@@ -201,9 +203,9 @@ public class TestVolumeOwner {
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       nonAdminOwnerContext = getUserRequestContext(getTestVolOwnerName(0),
           type, true, getTestVolOwnerName(0));
-      Assert.assertTrue("Owner is allowed to perform all non-admin " +
-          "operations", nativeAuthorizer.checkAccess(vol0,
-          nonAdminOwnerContext));
+      Assertions.assertTrue(nativeAuthorizer.checkAccess(vol0,
+          nonAdminOwnerContext), "Owner is allowed to perform all non-admin " +
+          "operations");
     }
   }
 
@@ -216,18 +218,18 @@ public class TestVolumeOwner {
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       RequestContext nonAdminOwnerContext = getUserRequestContext(
           getTestVolOwnerName(1), type, true, getTestVolOwnerName(1));
-      Assert.assertTrue("non admin volume owner without acls are allowed" +
-          " to do " + type + " on bucket",
-          nativeAuthorizer.checkAccess(obj, nonAdminOwnerContext));
+      Assertions.assertTrue(nativeAuthorizer.checkAccess(obj,
+          nonAdminOwnerContext), "non admin volume owner without acls are " +
+          "allowed to do " + type + " on bucket");
     }
 
     // admin = false, owner = false
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       RequestContext nonAdminOwnerContext = getUserRequestContext(
           getTestVolOwnerName(1), type, false, getTestVolOwnerName(0));
-      Assert.assertFalse("non admin non volume owner without acls" +
-          " are not allowed to do " + type + " on bucket",
-          nativeAuthorizer.checkAccess(obj, nonAdminOwnerContext));
+      Assertions.assertFalse(nativeAuthorizer.checkAccess(obj,
+          nonAdminOwnerContext), "non admin non volume owner without acls" +
+          " are not allowed to do " + type + " on bucket");
     }
   }
 
@@ -240,18 +242,19 @@ public class TestVolumeOwner {
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       RequestContext nonAdminOwnerContext = getUserRequestContext(
           getTestVolOwnerName(0), type, true, getTestVolOwnerName(0));
-      Assert.assertTrue("non admin volume owner without acls are allowed to " +
-              "access key",
-          nativeAuthorizer.checkAccess(obj, nonAdminOwnerContext));
+      Assertions.assertTrue(nativeAuthorizer.checkAccess(obj,
+          nonAdminOwnerContext), "non admin volume owner without acls are " +
+          "allowed to access key");
     }
 
     // admin = false, owner = false
     for (IAccessAuthorizer.ACLType type: aclsToTest) {
       RequestContext nonAdminOwnerContext = getUserRequestContext(
           getTestVolOwnerName(0), type, false, getTestVolOwnerName(1));
-      Assert.assertFalse("non admin volume owner without acls are" +
-              " not allowed to access key",
-          nativeAuthorizer.checkAccess(obj, nonAdminOwnerContext));
+      Assertions.assertFalse(nativeAuthorizer.checkAccess(obj,
+              nonAdminOwnerContext),
+          "non admin volume owner without acls are" +
+              " not allowed to access key");
     }
   }
 

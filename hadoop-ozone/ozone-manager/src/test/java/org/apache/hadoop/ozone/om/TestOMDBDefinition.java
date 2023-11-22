@@ -22,12 +22,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -37,13 +37,13 @@ import java.util.Collection;
  */
 public class TestOMDBDefinition {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   @Test
   public void testDBDefinition() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    File metaDir = folder.getRoot();
+    File metaDir = folder.toFile();
     DBStore store = OmMetadataManagerImpl.loadDB(configuration, metaDir);
     OMDBDefinition dbDef = new OMDBDefinition();
 
@@ -65,10 +65,10 @@ public class TestOMDBDefinition {
       }
     }
 
-    Assert.assertEquals("Tables in OmMetadataManagerImpl are:"
-            + missingDBDefTables, 0, missingDBDefTables.size());
-    Assert.assertEquals("Tables missing in OMDBDefinition are:"
-        + missingOmDBTables, 0, missingOmDBTables.size());
-    Assert.assertEquals(countOmDBTables, countOmDefTables);
+    Assertions.assertEquals(0, missingDBDefTables.size(),
+        "Tables in OmMetadataManagerImpl are:" + missingDBDefTables);
+    Assertions.assertEquals(0, missingOmDBTables.size(),
+        "Tables missing in OMDBDefinition are:" + missingOmDBTables);
+    Assertions.assertEquals(countOmDBTables, countOmDefTables);
   }
 }

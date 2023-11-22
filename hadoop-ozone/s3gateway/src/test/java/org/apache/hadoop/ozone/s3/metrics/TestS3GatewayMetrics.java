@@ -392,7 +392,7 @@ public class TestS3GatewayMetrics {
     keyEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
     // GET the key from the bucket
-    Response response = keyEndpoint.get(bucketName, keyName, null, 0, null);
+    Response response = keyEndpoint.get(bucketName, keyName, 0, null, 0, null);
     StreamingOutput stream = (StreamingOutput) response.getEntity();
     stream.write(new ByteArrayOutputStream());
     long curMetric = metrics.getGetKeySuccess();
@@ -404,7 +404,7 @@ public class TestS3GatewayMetrics {
     long oriMetric = metrics.getGetKeyFailure();
     // Fetching a non-existent key
     try {
-      keyEndpoint.get(bucketName, "unknownKey", null, 0,
+      keyEndpoint.get(bucketName, "unknownKey", 0, null, 0,
           null);
       fail();
     } catch (OS3Exception ex) {
@@ -536,7 +536,7 @@ public class TestS3GatewayMetrics {
     String uploadID = initiateMultipartUpload(bucketName, keyName);
 
     // Listing out the parts by providing the uploadID
-    keyEndpoint.get(bucketName, keyName,
+    keyEndpoint.get(bucketName, keyName, 0,
         uploadID, 3, null);
     long curMetric = metrics.getListPartsSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -548,7 +548,7 @@ public class TestS3GatewayMetrics {
     long oriMetric = metrics.getListPartsFailure();
     try {
       // Listing out the parts by providing the uploadID after aborting
-      keyEndpoint.get(bucketName, keyName,
+      keyEndpoint.get(bucketName, keyName, 0,
           "wrong_id", 3, null);
       fail();
     } catch (OS3Exception ex) {

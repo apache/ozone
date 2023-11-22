@@ -19,16 +19,12 @@ services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
     hostname: kdc
-    networks:
-      - ozone
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
     command: ["krb5kdc","-n"]
   kms:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
-    networks:
-      - ozone
+    image: apache/hadoop:3
     ports:
       - 9600:9600
     env_file:
@@ -39,8 +35,6 @@ services:
     command: ["hadoop", "kms"]
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-    networks:
-      - ozone
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -55,8 +49,6 @@ services:
   om:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: om
-    networks:
-      - ozone
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -73,8 +65,6 @@ services:
   s3g:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: s3g
-    networks:
-      - ozone
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -89,8 +79,6 @@ services:
   scm:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
     hostname: scm
-    networks:
-      - ozone
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
@@ -105,54 +93,3 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
-  rm:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
-    hostname: rm
-    networks:
-      - ozone
-    volumes:
-      - ../..:/opt/ozone
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
-      - ../../libexec/transformation.py:/opt/transformation.py
-    ports:
-      - 8088:8088
-    env_file:
-      - ./docker-config
-    command: ["yarn", "resourcemanager"]
-  nm:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
-    hostname: nm
-    networks:
-      - ozone
-    volumes:
-      - ../..:/opt/ozone
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
-      - ../../libexec/transformation.py:/opt/transformation.py
-    env_file:
-      - ./docker-config
-    environment:
-      WAITFOR: rm:8088
-    command: ["yarn","nodemanager"]
-  jhs:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
-    container_name: jhs
-    hostname: jhs
-    networks:
-      - ozone
-    volumes:
-      - ../..:/opt/ozone
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
-      - ../../libexec/transformation.py:/opt/transformation.py
-    ports:
-      - 8188:8188
-    env_file:
-      - ./docker-config
-    environment:
-      WAITFOR: rm:8088
-    command: ["yarn","timelineserver"]
-networks:
-  ozone:
-    name: ozone

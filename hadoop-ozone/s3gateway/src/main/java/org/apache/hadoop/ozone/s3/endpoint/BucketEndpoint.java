@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -99,7 +98,6 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @GET
-  @SuppressFBWarnings
   @SuppressWarnings({"parameternumber", "methodlength"})
   public Response get(
       @PathParam("bucket") String bucketName,
@@ -118,6 +116,7 @@ public class BucketEndpoint extends EndpointBase {
     Iterator<? extends OzoneKey> ozoneKeyIterator;
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
+    OzoneBucket bucket;
 
     try {
       if (aclMarker != null) {
@@ -153,7 +152,7 @@ public class BucketEndpoint extends EndpointBase {
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
 
-      OzoneBucket bucket = getBucket(bucketName);
+      bucket = getBucket(bucketName);
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
     } catch (OMException ex) {
@@ -206,6 +205,13 @@ public class BucketEndpoint extends EndpointBase {
     int count = 0;
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey next = ozoneKeyIterator.next();
+      if (bucket.getBucketLayout().isFileSystemOptimized() &&
+          StringUtils.isNotEmpty(prefix) &&
+          !next.getName().startsWith(prefix)) {
+        // prefix has delimiter but key don't have
+        // example prefix: dir1/ key: dir123
+        continue;
+      }
       String relativeKeyName = next.getName().substring(prefix.length());
 
       int depth = StringUtils.countMatches(relativeKeyName, delimiter);

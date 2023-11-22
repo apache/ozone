@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
@@ -383,6 +384,28 @@ public class TestMultipartUploadWithCopy {
     part.setPartNumber(partNumber);
 
     return part;
+  }
+
+  @Test
+  public void testUploadWithRangeCopyContentLength()
+      throws IOException, OS3Exception {
+    // The contentLength specified when creating the Key should be the same as
+    // the Content-Length, the key Commit will compare the Content-Length with
+    // the actual length of the data written.
+
+    String uploadID = initiateMultipartUpload(KEY);
+    ByteArrayInputStream body = new ByteArrayInputStream("".getBytes(UTF_8));
+    Map<String, String> additionalHeaders = new HashMap<>();
+    additionalHeaders.put(COPY_SOURCE_HEADER,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
+    additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, "bytes=0-3");
+    setHeaders(additionalHeaders);
+    REST.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, uploadID, body);
+    OzoneMultipartUploadPartListParts parts =
+        CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+        .listParts(KEY, uploadID, 0, 100);
+    Assert.assertEquals(1, parts.getPartInfoList().size());
+    Assert.assertEquals(4, parts.getPartInfoList().get(0).getSize());
   }
 
   private void completeMultipartUpload(String key,

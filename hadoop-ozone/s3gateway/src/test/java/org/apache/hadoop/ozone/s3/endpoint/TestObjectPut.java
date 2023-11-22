@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
@@ -141,6 +142,47 @@ public class TestObjectPut {
   }
 
   @Test
+  public void testPutObjectContentLength() throws IOException, OS3Exception {
+    // The contentLength specified when creating the Key should be the same as
+    // the Content-Length, the key Commit will compare the Content-Length with
+    // the actual length of the data written.
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headers);
+    long dataSize = CONTENT.length();
+
+    objectEndpoint.put(bucketName, keyName, dataSize, 0, null, body);
+    Assert.assertEquals(dataSize, getKeyDataSize(keyName));
+  }
+
+  @Test
+  public void testPutObjectContentLengthForStreaming()
+      throws IOException, OS3Exception {
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    objectEndpoint.setHeaders(headers);
+
+    String chunkedContent = "0a;chunk-signature=signature\r\n"
+        + "1234567890\r\n"
+        + "05;chunk-signature=signature\r\n"
+        + "abcde\r\n";
+
+    when(headers.getHeaderString("x-amz-content-sha256"))
+        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
+
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
+        .thenReturn("15");
+    objectEndpoint.put(bucketName, keyName, chunkedContent.length(), 0, null,
+        new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
+    Assert.assertEquals(15, getKeyDataSize(keyName));
+  }
+
+  private long getKeyDataSize(String key) throws IOException {
+    return clientStub.getObjectStore().getS3Bucket(bucketName)
+        .getKey(key).getDataSize();
+  }
+
+  @Test
   public void testPutObjectWithSignedChunks() throws IOException, OS3Exception {
     //GIVEN
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
@@ -153,6 +195,8 @@ public class TestObjectPut {
 
     when(headers.getHeaderString("x-amz-content-sha256"))
         .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
+        .thenReturn("15");
 
     //WHEN
     Response response = objectEndpoint.put(bucketName, keyName,

@@ -72,8 +72,8 @@ public class TestChunkUtils {
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "concurrent");
     try {
-      long len = data.limit();
-      long offset = 0;
+      int len = data.limit();
+      int offset = 0;
       File file = tempFile.toFile();
       ChunkUtils.writeData(file, data, offset, len, null, true);
       int threads = 10;
@@ -168,8 +168,8 @@ public class TestChunkUtils {
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {
       File file = tempFile.toFile();
-      long len = data.limit();
-      long offset = 0;
+      int len = data.limit();
+      int offset = 0;
       ChunkUtils.writeData(file, data, offset, len, null, true);
 
       ByteBuffer[] readBuffers = BufferUtils.assignByteBuffers(len, len);

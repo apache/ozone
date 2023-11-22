@@ -162,6 +162,18 @@ public interface ClientProtocol {
   OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException;
 
+  /**
+   * Get OzoneKey in S3 context.
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @param partNumber Multipart-upload part number
+   * @return {@link OzoneKey}
+   * @throws IOException
+   */
+  OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                  int partNumber)
+      throws IOException;
+
   OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**
@@ -1008,6 +1020,9 @@ public interface ClientProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
+
+  void setIsS3Request(boolean isS3Request);
+
   /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
@@ -1068,6 +1083,18 @@ public interface ClientProtocol {
    */
   void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName) throws IOException;
+
+  /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  OzoneSnapshot getSnapshotInfo(String volumeName,
+                                String bucketName,
+                                String snapshotName) throws IOException;
 
   /**
    * Create an image of the current compaction log DAG in the OM.

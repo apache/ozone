@@ -21,8 +21,8 @@ package org.apache.hadoop.ozone.om.request.volume;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -46,7 +46,7 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
         new OMVolumeDeleteRequest(originalRequest);
 
     OMRequest modifiedRequest = omVolumeDeleteRequest.preExecute(ozoneManager);
-    Assert.assertNotEquals(originalRequest, modifiedRequest);
+    Assertions.assertNotEquals(originalRequest, modifiedRequest);
   }
 
   @Test
@@ -69,8 +69,8 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     String ownerKey = omMetadataManager.getUserKey(ownerName);
 
 
-    Assert.assertNotNull(omMetadataManager.getVolumeTable().get(volumeKey));
-    Assert.assertNotNull(omMetadataManager.getUserTable().get(ownerKey));
+    Assertions.assertNotNull(omMetadataManager.getVolumeTable().get(volumeKey));
+    Assertions.assertNotNull(omMetadataManager.getUserTable().get(ownerKey));
 
     OMClientResponse omClientResponse =
         omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
@@ -78,14 +78,14 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
-    Assert.assertTrue(omMetadataManager.getUserTable().get(ownerKey)
-        .getVolumeNamesList().size() == 0);
+    Assertions.assertEquals(0, omMetadataManager.getUserTable().get(ownerKey)
+        .getVolumeNamesList().size());
     // As now volume is deleted, table should not have those entries.
-    Assert.assertNull(omMetadataManager.getVolumeTable().get(volumeKey));
+    Assertions.assertNull(omMetadataManager.getVolumeTable().get(volumeKey));
   }
 
   @Test
@@ -105,8 +105,8 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
   }
 
@@ -139,8 +139,8 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_EMPTY,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_EMPTY,
         omResponse.getStatus());
   }
 

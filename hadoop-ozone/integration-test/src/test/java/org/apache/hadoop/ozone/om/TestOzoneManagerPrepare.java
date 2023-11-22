@@ -56,6 +56,7 @@ import org.apache.ozone.test.tag.Slow;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -92,14 +93,23 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Make sure OM is out of Prepare state before executing individual tests.
    */
   @BeforeEach
-  @Override
-  protected void setup() throws Exception {
+  void setup() throws Exception {
     initInstanceVariables();
 
     LOG.info("Waiting for OM leader election");
     waitForLeaderToBeReady();
     submitCancelPrepareRequest();
     assertClusterNotPrepared();
+  }
+
+  /**
+   * Reset cluster between tests.
+   */
+  @AfterEach
+  void resetCluster() throws Exception {
+    if (cluster != null) {
+      cluster.restartOzoneManager();
+    }
   }
 
   /**

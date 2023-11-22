@@ -476,8 +476,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmBucketInfo bucketInfo = null;
     if (ozoneManager.getKmsProvider() != null) {
       try {
-        acquireLock = omMetadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volumeName, bucketName));
+        acquireLock = getOmLockDetails().isLockAcquired();
 
         bucketInfo = omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName,
@@ -496,8 +497,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock().releaseReadLock(
-              BUCKET_LOCK, volumeName, bucketName);
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
+              BUCKET_LOCK, volumeName, bucketName));
         }
       }
 
@@ -532,8 +533,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     if (ozoneManager.getKmsProvider() != null) {
-      acquireLock = omMetadataManager.getLock().acquireReadLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
@@ -555,8 +557,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock()
-              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
+          mergeOmLockDetails(omMetadataManager.getLock()
+              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
         }
       }
     }

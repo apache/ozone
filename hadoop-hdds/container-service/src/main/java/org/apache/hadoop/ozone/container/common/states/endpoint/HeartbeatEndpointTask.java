@@ -178,9 +178,7 @@ public class HeartbeatEndpointTask
       addPipelineActions(requestBuilder);
       addQueuedCommandCounts(requestBuilder);
       SCMHeartbeatRequestProto request = requestBuilder.build();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Sending heartbeat message :: {}", request.toString());
-      }
+      LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
       processResponse(response, datanodeDetailsProto);

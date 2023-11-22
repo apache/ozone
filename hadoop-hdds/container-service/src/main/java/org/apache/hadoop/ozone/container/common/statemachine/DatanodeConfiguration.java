@@ -127,6 +127,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
+  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
+      "hdds.datanode.block.delete.command.worker.interval";
+  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT =
+      Duration.ofSeconds(2);
+
   /**
    * The maximum number of threads used to delete containers on a datanode
    * simultaneously.
@@ -183,6 +188,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " a datanode"
   )
   private int blockDeleteQueueLimit = 5;
+
+  @Config(key = "block.delete.command.worker.interval",
+      type = ConfigType.TIME,
+      defaultValue = "2s",
+      tags = {DATANODE},
+      description = "The interval between DeleteCmdWorker execution of " +
+          "delete commands."
+  )
+  private Duration blockDeleteCommandWorkerInterval =
+      BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
   /**
    * The maximum number of commands in queued list.
@@ -634,6 +649,15 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
+    if (blockDeleteCommandWorkerInterval.isNegative()) {
+      LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
+          " must be greater than zero and was set to {}. Defaulting to {}",
+          blockDeleteCommandWorkerInterval,
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
+      blockDeleteCommandWorkerInterval =
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
+    }
+
     if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
@@ -769,6 +793,15 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public Duration getBlockDeleteCommandWorkerInterval() {
+    return blockDeleteCommandWorkerInterval;
+  }
+
+  public void setBlockDeleteCommandWorkerInterval(
+      Duration blockDeleteCommandWorkerInterval) {
+    this.blockDeleteCommandWorkerInterval = blockDeleteCommandWorkerInterval;
   }
 
   public int getCommandQueueLimit() {

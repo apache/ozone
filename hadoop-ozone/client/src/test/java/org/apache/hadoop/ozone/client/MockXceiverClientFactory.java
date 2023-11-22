@@ -25,12 +25,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Factory to create the mock datanode clients.
@@ -39,9 +38,9 @@ public class MockXceiverClientFactory
     implements XceiverClientFactory {
 
   private final Map<DatanodeDetails, MockDatanodeStorage> storage =
-      new HashMap<>();
+      new ConcurrentHashMap<>();
   private final Map<IOException, Set<DatanodeDetails>> pendingDNFailures =
-      new HashMap<>();
+      new ConcurrentHashMap<>();
 
   public void setFailedStorages(List<DatanodeDetails> failedStorages) {
     mockStorageFailure(failedStorages,
@@ -50,10 +49,9 @@ public class MockXceiverClientFactory
 
   public void mockStorageFailure(Collection<DatanodeDetails> datanodes,
       IOException reason) {
-    if (!pendingDNFailures.containsKey(reason)) {
-      pendingDNFailures.put(reason, new HashSet<>());
-    }
-    pendingDNFailures.get(reason).addAll(datanodes);
+    pendingDNFailures
+        .computeIfAbsent(reason, k -> ConcurrentHashMap.newKeySet())
+        .addAll(datanodes);
     mockStorageFailure(reason);
   }
 

@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -110,10 +109,6 @@ public abstract class AbstractTestChunkManager {
     blockID = new BlockID(1L, 1L);
     chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID
         .getLocalID(), 0), 0, bytes.length);
-  }
-
-  protected DispatcherContext getDispatcherContext() {
-    return new DispatcherContext.Builder().build();
   }
 
   protected Buffer rewindBufferToDataStart() {

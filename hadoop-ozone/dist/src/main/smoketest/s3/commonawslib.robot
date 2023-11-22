@@ -34,6 +34,7 @@ Execute AWSS3APICli
     ${output} =       Execute                    aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
+# For possible AWS CLI return codes see: https://docs.aws.amazon.com/cli/latest/topic/return-codes.html
 Execute AWSS3APICli and checkrc
     [Arguments]       ${command}                 ${expected_error_code}
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}
@@ -47,6 +48,11 @@ Execute AWSS3APICli and ignore error
 Execute AWSS3Cli
     [Arguments]       ${command}
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
+    [return]          ${output}
+
+Execute AWSS3CliDebug
+    [Arguments]       ${command}
+    ${output} =       Execute                     aws --debug s3 --endpoint ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
 Install aws cli

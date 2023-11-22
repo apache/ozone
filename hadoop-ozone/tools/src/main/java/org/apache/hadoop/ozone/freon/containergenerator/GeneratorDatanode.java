@@ -341,11 +341,11 @@ public class GeneratorDatanode extends BaseGenerator {
   ) throws IOException {
 
     DispatcherContext context =
-        new DispatcherContext.Builder()
+        DispatcherContext
+            .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
             .setStage(WriteChunkStage.WRITE_DATA)
             .setTerm(1L)
             .setLogIndex(logCounter)
-            .setReadFromTmpFile(false)
             .build();
     chunkManager
         .writeChunk(container, blockId, chunkInfo,
@@ -353,11 +353,11 @@ public class GeneratorDatanode extends BaseGenerator {
             context);
 
     context =
-        new DispatcherContext.Builder()
+        DispatcherContext
+            .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
             .setStage(WriteChunkStage.COMMIT_DATA)
             .setTerm(1L)
             .setLogIndex(logCounter)
-            .setReadFromTmpFile(false)
             .build();
     chunkManager
         .writeChunk(container, blockId, chunkInfo,

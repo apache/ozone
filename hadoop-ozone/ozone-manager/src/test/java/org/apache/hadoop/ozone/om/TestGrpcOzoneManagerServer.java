@@ -18,11 +18,8 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,15 +30,13 @@ import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslat
 /**
  * Tests for GrpcOzoneManagerServer.
  */
+@Timeout(30)
 public class TestGrpcOzoneManagerServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGrpcOzoneManagerServer.class);
   private OzoneManager ozoneManager;
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
   private GrpcOzoneManagerServer server;
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(30));
 
   @Test
   public void testStartStop() throws Exception {

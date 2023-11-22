@@ -57,6 +57,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-container-service</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
     </dependency>
     <dependency>
       <artifactId>ratis-tools</artifactId>

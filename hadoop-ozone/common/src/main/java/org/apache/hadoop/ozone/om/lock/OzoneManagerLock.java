@@ -32,6 +32,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.hadoop.ipc.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +98,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
 
+  private ThreadLocal<OMLockDetails> omLockDetails =
+      ThreadLocal.withInitial(OMLockDetails::new);
+
   /**
    * Creates new OzoneManagerLock instance.
    * @param conf Configuration object
@@ -145,7 +150,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public boolean acquireReadLock(Resource resource, String... keys) {
+  public OMLockDetails acquireReadLock(Resource resource, String... keys) {
     return acquireLock(resource, true, keys);
   }
 
@@ -167,12 +172,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public boolean acquireWriteLock(Resource resource, String... keys) {
+  public OMLockDetails acquireWriteLock(Resource resource, String... keys) {
     return acquireLock(resource, false, keys);
   }
 
-  private boolean acquireLock(Resource resource, boolean isReadLock,
+  private OMLockDetails acquireLock(Resource resource, boolean isReadLock,
       String... keys) {
+    omLockDetails.get().clear();
     if (!resource.canLock(lockSet.get())) {
       String errorMessage = getErrorMessage(resource);
       LOG.error(errorMessage);
@@ -191,7 +197,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
 
     lockSet.set(resource.setLock(lockSet.get()));
-    return true;
+    omLockDetails.get().setLockAcquired(true);
+    return omLockDetails.get();
   }
 
   private void updateReadLockMetrics(Resource resource,
@@ -208,6 +215,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric readLockWaitingTimeMsStat.
       omLockMetrics.setReadLockWaitingTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
+      updateProcessingDetails(Timing.LOCKWAIT, readLockWaitingTimeNanos);
 
       resource.setStartReadHeldTimeNanos(Time.monotonicNowNanos());
     }
@@ -228,6 +236,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric writeLockWaitingTimeMsStat.
       omLockMetrics.setWriteLockWaitingTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
+      updateProcessingDetails(Timing.LOCKWAIT, writeLockWaitingTimeNanos);
 
       resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
     }
@@ -308,8 +317,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public void releaseWriteLock(Resource resource, String... keys) {
-    releaseLock(resource, false, keys);
+  public OMLockDetails releaseWriteLock(Resource resource, String... keys) {
+    return releaseLock(resource, false, keys);
   }
 
   /**
@@ -321,13 +330,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * be passed.
    */
   @Override
-  public void releaseReadLock(Resource resource, String... keys) {
-    releaseLock(resource, true, keys);
+  public OMLockDetails releaseReadLock(Resource resource, String... keys) {
+    return releaseLock(resource, true, keys);
   }
 
-  private void releaseLock(Resource resource, boolean isReadLock,
+  private OMLockDetails releaseLock(Resource resource, boolean isReadLock,
       String... keys) {
-
+    omLockDetails.get().clear();
     ReentrantReadWriteLock lock = getLock(resource, keys);
     if (isReadLock) {
       lock.readLock().unlock();
@@ -339,6 +348,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
 
     lockSet.set(resource.clearLock(lockSet.get()));
+    return omLockDetails.get();
   }
 
   private void updateReadUnlockMetrics(Resource resource,
@@ -354,6 +364,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric readLockHeldTimeMsStat.
       omLockMetrics.setReadLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
+      updateProcessingDetails(Timing.LOCKSHARED, readLockHeldTimeNanos);
     }
   }
 
@@ -371,6 +382,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric writeLockHeldTimeMsStat.
       omLockMetrics.setWriteLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(writeLockHeldTimeNanos));
+      updateProcessingDetails(Timing.LOCKEXCLUSIVE, writeLockHeldTimeNanos);
     }
   }
 
@@ -584,6 +596,38 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     short getMask() {
       return mask;
+    }
+  }
+
+
+  /**
+   * Update the processing details.
+   *
+   * If Server.getCurCall() is null, which means it's write operation on Ratis,
+   * then we need to update the omLockDetails.
+   * If not null, it's read operation, or write operation on non-Ratis cluster,
+   * we can update ThreadLocal variable directly.
+   * @param type IPC Timing types
+   * @param deltaNanos consumed time
+   */
+  private void updateProcessingDetails(Timing type, long deltaNanos) {
+    Server.Call call = Server.getCurCall().get();
+    if (call != null) {
+      call.getProcessingDetails().add(type, deltaNanos, TimeUnit.NANOSECONDS);
+    } else {
+      switch (type) {
+      case LOCKWAIT:
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.WAIT);
+        break;
+      case LOCKSHARED:
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.READ);
+        break;
+      case LOCKEXCLUSIVE:
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.WRITE);
+        break;
+      default:
+        LOG.error("Unsupported Timing type {}", type);
+      }
     }
   }
 }

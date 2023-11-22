@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -55,14 +56,15 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-import org.junit.After;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.mock;
@@ -72,8 +74,8 @@ import static org.mockito.Mockito.mock;
  */
 public class TestReconPipelineManager {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
@@ -82,11 +84,11 @@ public class TestReconPipelineManager {
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS,
-        temporaryFolder.newFolder().getAbsolutePath());
+        temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
@@ -95,7 +97,7 @@ public class TestReconPipelineManager {
     scmContext = SCMContext.emptyContext();
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     store.close();
   }

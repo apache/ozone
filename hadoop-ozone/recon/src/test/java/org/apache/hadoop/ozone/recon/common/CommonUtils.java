@@ -89,17 +89,17 @@ public class CommonUtils {
     Assert.assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
     Assert.assertEquals(5, rootResponseObj.getCountStats().getNumTotalDir());
     Assert.assertEquals(10, rootResponseObj.getCountStats().getNumTotalKey());
-    Assert.assertEquals(IAccessAuthorizer.ACLIdentityType.USER,
+    Assert.assertEquals("USER",
         rootResponseObj.getObjectDBInfo().getAcls().get(0).getType());
-    Assert.assertEquals(IAccessAuthorizer.ACLType.WRITE.toString(),
+    Assert.assertEquals("WRITE",
         rootResponseObj.getObjectDBInfo().getAcls().get(0)
-            .getAclList().get(0).toString());
+            .getAclList().get(0));
     Assert.assertEquals(username,
         rootResponseObj.getObjectDBInfo().getAcls().get(0).getName());
     Assert.assertEquals("value",
         rootResponseObj.getObjectDBInfo().getMetadata().get("key"));
-    Assert.assertEquals(ACCESS,
-        rootResponseObj.getObjectDBInfo().getAcls().get(0).getAclScope());
+    Assert.assertEquals("ACCESS",
+        rootResponseObj.getObjectDBInfo().getAcls().get(0).getScope());
   }
 
   public void testNSSummaryBasicInfoVolume(

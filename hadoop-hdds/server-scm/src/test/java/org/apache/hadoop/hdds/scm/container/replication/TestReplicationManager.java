@@ -51,9 +51,11 @@ import org.apache.hadoop.util.Lists;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -114,7 +116,7 @@ public class TestReplicationManager {
   private ReplicationQueue repQueue;
   private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
@@ -297,13 +299,16 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
-  @Test
-  public void testUnderReplicatedClosedContainerWithOnlyUnhealthyReplicas()
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"CLOSED", "QUASI_CLOSED"})
+  public void testUnderReplicatedClosedContainerWithOnlyUnhealthyReplicas(
+      HddsProtos.LifeCycleState state)
       throws ContainerNotFoundException {
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
     ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
-        HddsProtos.LifeCycleState.CLOSED);
+        state);
     // Container is closed but replicas are UNHEALTHY
     Set<ContainerReplica> replicas =
         addReplicas(container, ContainerReplicaProto.State.UNHEALTHY, 0, 0);

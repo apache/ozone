@@ -15,7 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export COMPOSE_FILE=docker-compose.yaml:../common/hadoop.yaml
+extra_compose_file=hadoop.yaml
+if [[ ${SECURITY_ENABLED} == "true" ]]; then
+  extra_compose_file=hadoop-secure.yaml
+fi
+export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yaml}:../common/${extra_compose_file}
+
+export COMPOSE_FILE
 export HADOOP_MAJOR_VERSION=3
 export HADOOP_VERSION=unused # will be set for each test version below
 export OZONE_REPLICATION_FACTOR=3
@@ -24,6 +30,10 @@ export OZONE_REPLICATION_FACTOR=3
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
+
+if [[ ${SECURITY_ENABLED} == "true" ]]; then
+  execute_robot_test ${SCM} kinit.robot
+fi
 
 execute_robot_test ${SCM} createmrenv.robot
 
@@ -47,9 +57,16 @@ for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.6; do
 
   execute_command_in_container rm hadoop version
 
+  if [[ ${SECURITY_ENABLED} == "true" ]]; then
+    execute_robot_test rm kinit-hadoop.robot
+  fi
+
   for scheme in o3fs ofs; do
     execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
-    execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-mapreduce-${scheme}" mapreduce.robot
+    # TODO secure MapReduce test is failing with 2.7 due to some token problem
+    if [[ ${SECURITY_ENABLED} != "true" ]] || [[ ${HADOOP_MAJOR_VERSION} == "3" ]]; then
+      execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-mapreduce-${scheme}" mapreduce.robot
+    fi
   done
 
   save_container_logs nm rm
