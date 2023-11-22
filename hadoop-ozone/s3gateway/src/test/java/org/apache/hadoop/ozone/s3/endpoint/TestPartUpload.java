@@ -26,9 +26,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import javax.ws.rs.core.HttpHeaders;
@@ -42,10 +41,10 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
 /**
@@ -56,7 +55,7 @@ public class TestPartUpload {
   private static final ObjectEndpoint REST = new ObjectEndpoint();
   private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
 
     client = new OzoneClientStub();
@@ -202,8 +201,8 @@ public class TestPartUpload {
     OzoneMultipartUploadPartListParts parts =
         client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
             .listParts(key, uploadID, 0, 100);
-    Assert.assertEquals(1, parts.getPartInfoList().size());
-    Assert.assertEquals(contentLength,
+    assertEquals(1, parts.getPartInfoList().size());
+    assertEquals(contentLength,
         parts.getPartInfoList().get(0).getSize());
   }
 }

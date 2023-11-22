@@ -21,11 +21,10 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test custom marshalling of MultiDeleteRequest.
@@ -48,7 +47,7 @@ public class TestMultiDeleteRequestUnmarshaller {
         unmarshall(inputBody);
 
     //THEN
-    Assert.assertEquals(3, multiDeleteRequest.getObjects().size());
+    assertEquals(3, multiDeleteRequest.getObjects().size());
   }
 
   @Test
@@ -66,7 +65,7 @@ public class TestMultiDeleteRequestUnmarshaller {
         unmarshall(inputBody);
 
     //THEN
-    Assert.assertEquals(3, multiDeleteRequest.getObjects().size());
+    assertEquals(3, multiDeleteRequest.getObjects().size());
   }
 
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)
