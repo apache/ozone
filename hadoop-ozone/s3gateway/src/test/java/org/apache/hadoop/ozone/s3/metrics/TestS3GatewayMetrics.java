@@ -157,9 +157,8 @@ public class TestS3GatewayMetrics {
     long oriMetric = metrics.getGetBucketFailure();
 
     // Searching for a bucket that does not exist
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("newBucket", null,
-        null, null, 1000, null,
-        null, "random", null,
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
+        "newBucket", null, null, null, 1000, null, null, "random", null,
         null, null));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
@@ -207,7 +206,8 @@ public class TestS3GatewayMetrics {
     bucketEndpoint.delete(bucketName);
 
     // Deleting a bucket that does not exist will result in delete failure
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.delete(bucketName));
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.delete(bucketName));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());

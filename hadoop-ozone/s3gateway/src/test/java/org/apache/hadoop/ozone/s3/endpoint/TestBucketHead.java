@@ -63,7 +63,8 @@ public class TestBucketHead {
 
   @Test
   public void testHeadFail() throws Exception {
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.head("unknownbucket"));
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.head("unknownbucket"));
     assertEquals(HTTP_NOT_FOUND, e.getHttpCode());
     assertEquals("NoSuchBucket", e.getCode());
   }
