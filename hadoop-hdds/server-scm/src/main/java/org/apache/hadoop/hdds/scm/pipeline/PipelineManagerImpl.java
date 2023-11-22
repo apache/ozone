@@ -387,14 +387,14 @@ public class PipelineManagerImpl implements PipelineManager {
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
-    stateManager.addContainerToPipeline(pipelineID, containerID, true);
+    stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
   public void addContainerToPipelineSCMStart(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
-    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+    stateManager.addContainerToPipelineUnchecked(pipelineID, containerID);
   }
 
   @Override

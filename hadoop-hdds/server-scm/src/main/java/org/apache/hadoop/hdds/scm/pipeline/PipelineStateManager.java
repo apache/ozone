@@ -65,9 +65,17 @@ public interface PipelineStateManager {
 
   void addContainerToPipeline(
       PipelineID pipelineID,
-      ContainerID containerID, boolean checkPipelineClosed) throws IOException;
+      ContainerID containerID
+  ) throws IOException;
 
-  void addContainerToPipelineSCMStart(
+  /**
+   * Adds container to SCM Pipeline without checking whether pipeline
+   * is closed.
+   * @param pipelineID
+   * @param containerID
+   * @throws IOException
+   */
+  void addContainerToPipelineUnchecked(
       PipelineID pipelineID,
       ContainerID containerID
   ) throws IOException;

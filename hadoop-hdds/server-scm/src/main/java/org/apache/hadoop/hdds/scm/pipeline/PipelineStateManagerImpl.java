@@ -108,20 +108,18 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
 
   @Override
   public void addContainerToPipeline(
-      PipelineID pipelineId, ContainerID containerID,
-      boolean checkPipelineClosed)
+      PipelineID pipelineId, ContainerID containerID)
       throws IOException {
     lock.writeLock().lock();
     try {
-      pipelineStateMap.addContainerToPipeline(pipelineId, containerID,
-          checkPipelineClosed);
+      pipelineStateMap.addContainerToPipeline(pipelineId, containerID);
     } finally {
       lock.writeLock().unlock();
     }
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
+  public void addContainerToPipelineUnchecked(
           PipelineID pipelineId, ContainerID containerID)
           throws IOException {
     lock.writeLock().lock();

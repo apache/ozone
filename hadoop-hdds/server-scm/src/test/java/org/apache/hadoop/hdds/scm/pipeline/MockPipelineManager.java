@@ -201,13 +201,13 @@ public class MockPipelineManager implements PipelineManager {
   public void addContainerToPipeline(final PipelineID pipelineID,
                                      final ContainerID containerID)
       throws IOException {
-    stateManager.addContainerToPipeline(pipelineID, containerID, true);
+    stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
   public void addContainerToPipelineSCMStart(
           PipelineID pipelineID, ContainerID containerID) throws IOException {
-    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+    stateManager.addContainerToPipelineUnchecked(pipelineID, containerID);
   }
 
   @Override

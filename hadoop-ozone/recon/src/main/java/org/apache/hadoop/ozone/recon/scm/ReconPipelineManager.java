@@ -179,6 +179,6 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
   @Override
   public void addContainerToPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException {
-    getStateManager().addContainerToPipeline(pipelineID, containerID, false);
+    getStateManager().addContainerToPipelineUnchecked(pipelineID, containerID);
   }
 }
