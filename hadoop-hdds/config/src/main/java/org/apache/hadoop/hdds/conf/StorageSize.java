@@ -95,12 +95,7 @@ public class StorageSize {
     try {
       return parse(value);
     } catch (IllegalArgumentException e) {
-      try {
-        return parse(value + defaultUnit.getShortName());
-      } catch (IllegalArgumentException ex) {
-        throw new IllegalArgumentException(value + " is not in expected " +
-            "format. Expected format is <number><unit>. e.g. 1000MB");
-      }
+      return new StorageSize(defaultUnit, Double.parseDouble(value));
     }
   }
 
