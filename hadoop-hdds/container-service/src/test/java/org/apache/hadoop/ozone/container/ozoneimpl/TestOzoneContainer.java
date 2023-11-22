@@ -250,8 +250,8 @@ public class TestOzoneContainer {
       String key = getVolumeKey(dnVol);
       long expectedCommit = commitSpaceMap.get(key).longValue();
       long volumeCommitted = dnVol.getCommittedBytes();
-      assertEquals("Volume committed space not initialized correctly",
-          expectedCommit, volumeCommitted);
+      assertEquals(expectedCommit, volumeCommitted,
+          "Volume committed space not initialized correctly");
     }
   }
 

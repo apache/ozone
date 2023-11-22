@@ -344,8 +344,9 @@ public class TestKeyValueHandler {
     ContainerProtos.ContainerCommandResponseProto response =
         handler.handleCloseContainer(closeContainerRequest, container);
 
-    assertEquals("Close container should return Invalid container error",
-        ContainerProtos.Result.INVALID_CONTAINER_STATE, response.getResult());
+    assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
+        response.getResult(),
+        "Close container should return Invalid container error");
   }
 
   @Test

@@ -617,8 +617,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
     if (exactMatch) {
       Assertions.assertEquals(expectedMlv, mlv);
     } else {
-      Assertions.assertTrue("Expected minimum mlv(" + expectedMlv
-          + ") is smaller than mlv(" + mlv + ").", expectedMlv <= mlv);
+      Assertions.assertTrue(expectedMlv <= mlv,
+          "Expected minimum mlv(" + expectedMlv
+              + ") is smaller than mlv(" + mlv + ").");
     }
 
     callVersionEndpointTask();

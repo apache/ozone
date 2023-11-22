@@ -573,17 +573,17 @@ public class TestKeyValueContainer {
         .getMetadataPath();
     File containerMetaDataLoc = new File(containerMetaDataPath);
 
-    assertFalse("Container directory still exists", containerMetaDataLoc
-        .getParentFile().exists());
+    assertFalse(containerMetaDataLoc
+        .getParentFile().exists(), "Container directory still exists");
 
-    assertFalse("Container File still exists",
-        keyValueContainer.getContainerFile().exists());
+    assertFalse(keyValueContainer.getContainerFile().exists(),
+        "Container File still exists");
 
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       assertTrue(keyValueContainer.getContainerDBFile().exists());
     } else {
-      assertFalse("Container DB file still exists",
-          keyValueContainer.getContainerDBFile().exists());
+      assertFalse(keyValueContainer.getContainerDBFile().exists(),
+          "Container DB file still exists");
     }
   }
 

@@ -188,8 +188,8 @@ public class TestContainerDataYaml {
     final String content =
         FileUtils.readFileToString(containerFile, Charset.defaultCharset());
 
-    Assertions.assertFalse("ReplicaIndex shouldn't be persisted if zero",
-        content.contains("replicaIndex"));
+    Assertions.assertFalse(content.contains("replicaIndex"),
+        "ReplicaIndex shouldn't be persisted if zero");
     cleanup();
   }
 

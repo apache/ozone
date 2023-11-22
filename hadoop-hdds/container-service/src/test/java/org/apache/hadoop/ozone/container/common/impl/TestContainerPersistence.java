@@ -457,11 +457,12 @@ public class TestContainerPersistence {
     // Volume setup should have created the tmp directory for container
     // deletion.
     File volumeTmpDir = hddsVolume.getTmpDir();
-    Assertions.assertTrue(String.format("Volume level tmp dir %s not created.",
-            volumeTmpDir), volumeTmpDir.exists());
+    Assertions.assertTrue(volumeTmpDir.exists(), String.format("Volume level " +
+        "tmp dir %s not created.", volumeTmpDir));
     File deletedContainerDir = hddsVolume.getDeletedContainerDir();
-    Assertions.assertTrue(String.format("Volume level container deleted directory" +
-        " %s not created.", deletedContainerDir), deletedContainerDir.exists());
+    Assertions.assertTrue(deletedContainerDir.exists(),
+        String.format("Volume level container deleted directory" +
+            " %s not created.", deletedContainerDir));
 
     // Move containers to delete directory. RocksDB should not yet be updated.
     KeyValueContainerUtil.moveToDeletedContainerDir(container1Data, hddsVolume);
@@ -912,8 +913,8 @@ public class TestContainerPersistence {
     File containerBaseDir = new File(actualNewData.getMetadataPath())
         .getParentFile();
     File newContainerFile = ContainerUtils.getContainerFile(containerBaseDir);
-    Assertions.assertTrue("Container file should exist.",
-        newContainerFile.exists());
+    Assertions.assertTrue(newContainerFile.exists(),
+        "Container file should exist.");
     Assertions.assertEquals("Container file should be in same location.",
         orgContainerFile.getAbsolutePath(),
         newContainerFile.getAbsolutePath());

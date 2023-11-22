@@ -245,10 +245,9 @@ public class TestTarContainerPacker {
     assertExampleChunkFileIsGood(
         Paths.get(destinationContainerData.getChunksPath()),
         TEST_CHUNK_FILE_NAME);
-    Assertions.assertFalse(
+    Assertions.assertFalse(destinationContainer.getContainerFile().exists(),
         "Descriptor file should not have been extracted by the "
-            + "unpackContainerData Call",
-        destinationContainer.getContainerFile().exists());
+            + "unpackContainerData Call");
     Assertions.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
     inputForUnpackData.assertClosedExactlyOnce();
   }
@@ -403,10 +402,9 @@ public class TestTarContainerPacker {
 
     Path exampleFile = parentPath.resolve(filename);
 
-    Assertions.assertTrue(
-        "example file is missing after pack/unpackContainerData: "
-            + exampleFile,
-        Files.exists(exampleFile));
+    Assertions.assertTrue(Files.exists(exampleFile),
+        "example file is missing after pack/unpackContainerData: " +
+            exampleFile);
 
     try (FileInputStream testFile =
              new FileInputStream(exampleFile.toFile())) {
