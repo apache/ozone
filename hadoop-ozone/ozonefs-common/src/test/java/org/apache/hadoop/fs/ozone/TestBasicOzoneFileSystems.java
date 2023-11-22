@@ -41,10 +41,10 @@ import static org.mockito.Matchers.any;
  * Unit test for Basic*OzoneFileSystem.
  */
 public class TestBasicOzoneFileSystems {
-  public static Collection<Object[]> data() {
+  public static Collection<FileSystem> data() {
     return Arrays.asList(
-        new Object[]{new BasicOzoneFileSystem()},
-        new Object[]{new BasicRootedOzoneFileSystem()}
+        new BasicOzoneFileSystem(),
+        new BasicRootedOzoneFileSystem()
     );
   }
 
