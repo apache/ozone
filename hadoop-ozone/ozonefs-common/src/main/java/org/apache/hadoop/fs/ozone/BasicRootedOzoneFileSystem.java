@@ -535,6 +535,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     adapter.deleteSnapshot(pathToKey(path), snapshotName);
   }
 
+  /**
+   * A public class implementation for storing the deletion results.
+   */
   public class InnerDeleteResult {
     private boolean success;
     private boolean partiallyDeleted;
@@ -680,8 +683,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-    public InnerDeleteResult getDeleteResult(Path f, boolean recursive)
-        throws IOException {
+  public InnerDeleteResult getDeleteResult(Path f, boolean recursive)
+      throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
@@ -775,10 +778,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // remove orphan link bucket directly
       if (isLinkBucket(f, ofsPath)) {
         deleteBucketFromVolume(f, ofsPath);
-        return new InnerDeleteResult(true,false);
+        return new InnerDeleteResult(true, false);
       }
       LOG.warn("delete: Path does not exist: {}", f);
-      return new InnerDeleteResult(false,false);
+      return new InnerDeleteResult(false, false);
     }
 
     // handling posix symlink delete behaviours
@@ -789,7 +792,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     // rm path does not have trailing slash
     if (isLinkBucket(f, ofsPath) && !handleTrailingSlash) {
       deleteBucketFromVolume(f, ofsPath);
-      return new InnerDeleteResult(true,false);
+      return new InnerDeleteResult(true, false);
     }
 
     // delete inner content of bucket
