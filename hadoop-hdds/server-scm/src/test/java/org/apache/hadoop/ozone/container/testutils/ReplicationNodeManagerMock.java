@@ -536,17 +536,6 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public long getLastStateChangeTime(DatanodeDetails datanodeDetails) {
-    return 0L;
-  }
-
-  @Override
-  public void setLastStateChangeTime(DatanodeDetails datanodeDetails,
-                                     long stateChangeTime) {
-    return;
-  }
-
-  @Override
   public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
     return -1;
   }

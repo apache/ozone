@@ -20,12 +20,10 @@ package org.apache.hadoop.hdds.scm.client;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -41,8 +39,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 
 /**
  * The interface to call into underlying container layer.
@@ -366,43 +362,6 @@ public interface ScmClient extends Closeable {
    */
   List<String> getScmRatisRoles() throws IOException;
 
-  /**
-   * returns the set of container IDs in a datanode.
-   *
-   * @param datanodeDetails
-   * @return Set of ContainerID of containers in DN
-   * @throws IOException
-   */
-  Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
-      throws IOException;
-
-  /**
-   * returns the map of number of pipelines in each datanode in decommissioning.
-   *
-   * @return Map of uuid of Datanode to no. of containers in that DN
-   * @throws IOException
-   */
-  Map<UUID, Integer> getPipelineMap() throws IOException;
-
-  /**
-   * returns the map of number of containers in each state in all datanode in
-   * decommissioning.
-   *
-   * @return Map of uuid of Datanode to no. of containers in each state
-   * in that DN
-   * @throws IOException
-   */
-  Map<UUID, Map<HddsProtos.LifeCycleState, Long>> getContainerMap()
-      throws IOException;
-
-  /**
-   * returns the last state change time of a datanode.
-   *
-   * @param datanodeDetails
-   * @return time of state change
-   * @throws IOException
-   */
-  long getLastChangeTime(DatanodeDetails datanodeDetails) throws IOException;
   /**
    * Force generates new secret keys (rotate).
    *

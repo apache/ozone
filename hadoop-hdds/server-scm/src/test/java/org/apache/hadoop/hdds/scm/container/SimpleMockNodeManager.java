@@ -437,16 +437,4 @@ public class SimpleMockNodeManager implements NodeManager {
   public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
     return false;
   }
-
-  @Override
-  public long getLastStateChangeTime(DatanodeDetails datanodeDetails) {
-    return 0L;
-  }
-
-  @Override
-  public void setLastStateChangeTime(DatanodeDetails datanodeDetails,
-                                     long stateChangeTime) {
-    return;
-  }
-
 }

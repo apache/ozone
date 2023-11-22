@@ -130,7 +130,6 @@ public class SCMNodeManager implements NodeManager {
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
-  private Map<UUID, Long> lastStateChangeTime;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -177,10 +176,6 @@ public class SCMNodeManager implements NodeManager {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
     this.scmContext = scmContext;
-    this.lastStateChangeTime = new HashMap<>();
-    for (DatanodeDetails d : getAllNodes()) {
-      this.lastStateChangeTime.put(d.getUuid(), 0L);
-    }
   }
 
   private void registerMXBean() {
@@ -280,27 +275,6 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Returns the last operation state change time of a specific datanode.
-   * @param datanodeDetails DatanodeDetails
-   * @return time of last state change
-   */
-  @Override
-  public long getLastStateChangeTime(DatanodeDetails datanodeDetails) {
-    return lastStateChangeTime.get(datanodeDetails.getUuid());
-  }
-
-  /**
-   * Set the last operation state change time of a specific datanode.
-   * @param datanodeDetails DatanodeDetails
-   * @param stateChangeTime the state change time
-   */
-  @Override
-  public void setLastStateChangeTime(DatanodeDetails datanodeDetails,
-                                     long stateChangeTime) {
-    this.lastStateChangeTime.put(datanodeDetails.getUuid(), stateChangeTime);
-  }
-
-  /**
    * Set the operation state of a node.
    * @param datanodeDetails The datanode to set the new state for
    * @param newState The new operational state for the node
@@ -325,7 +299,6 @@ public class SCMNodeManager implements NodeManager {
       throws NodeNotFoundException {
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
-    setLastStateChangeTime(datanodeDetails, Time.now());
   }
 
   /**
