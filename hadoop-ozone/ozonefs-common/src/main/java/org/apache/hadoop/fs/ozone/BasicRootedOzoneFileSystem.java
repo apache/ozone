@@ -535,7 +535,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     adapter.deleteSnapshot(pathToKey(path), snapshotName);
   }
 
-  private class InnerDeleteResult {
+  public class InnerDeleteResult {
     private boolean success;
     private boolean partiallyDeleted;
 
@@ -680,8 +680,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public boolean delete(Path f, boolean recursive, boolean partiallyDeleted)
-      throws IOException {
+    public InnerDeleteResult getDeleteResult(Path f, boolean recursive)
+        throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
@@ -695,7 +695,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // because it is too dangerous and doesn't provide much value
       LOG.warn("delete: OFS does not support rm root. "
           + "To wipe the cluster, please re-init OM instead.");
-      return false;
+      return new InnerDeleteResult(false, false);
     }
 
     // Handle delete volume
@@ -707,16 +707,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
             "Instead use 'ozone sh volume delete -r -skipTrash " +
             "-id <OM_SERVICE_ID> <Volume_URI>' command");
       }
-      return deleteVolume(f, ofsPath);
+      return new InnerDeleteResult(deleteVolume(f, ofsPath), false);
     }
 
     // delete bucket
     if (ofsPath.isBucket()) {
       InnerDeleteResult innerDeleteResult = deleteBucket(f, recursive, ofsPath);
-      if (innerDeleteResult.isPartiallyDeleted()){
-        partiallyDeleted = true;
-      }
-      return innerDeleteResult.isSuccess();
+      return innerDeleteResult;
     }
     // delete files and directory
     FileStatus status;
@@ -724,7 +721,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       status = getFileStatus(f);
     } catch (FileNotFoundException ex) {
       LOG.warn("delete: Path does not exist: {}", f);
-      return false;
+      return new InnerDeleteResult(false, false);
     }
 
     boolean result;
@@ -735,15 +732,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (bucket.getBucketLayout().isFileSystemOptimized()) {
         String ofsKeyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
             OZONE_URI_DELIMITER + ofsPath.getKeyName();
-        return adapterImpl.deleteObject(ofsKeyPath, recursive);
+        return new InnerDeleteResult(
+            adapterImpl.deleteObject(ofsKeyPath, recursive), false);
       }
 
       // delete inner content of directory with manual recursion
-      InnerDeleteResult innerDeleteResult = innerDelete(f, recursive);
-      result = innerDeleteResult.isSuccess();
-      if (innerDeleteResult.isPartiallyDeleted()){
-        partiallyDeleted = true;
-      }
+
+      return innerDelete(f, recursive);
     } else {
       LOG.debug("delete: Path is a file: {}", f);
       result = adapter.deleteObject(key);
@@ -755,7 +750,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       createFakeParentDirectory(f);
     }
 
-    return result;
+    return new InnerDeleteResult(result, false);
   }
 
 
@@ -768,7 +763,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    return delete(f, recursive, false);
+    return getDeleteResult(f, recursive).isSuccess();
   }
 
   private InnerDeleteResult deleteBucket(Path f, boolean recursive,

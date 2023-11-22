@@ -140,19 +140,19 @@ public final class OzoneFsDelete {
       if (moveToTrash(item) || !canBeSafelyDeleted(item)) {
         return;
       }
-      boolean partiallyDeleted = false;
+      BasicRootedOzoneFileSystem.InnerDeleteResult innerDeleteResult = null;
       if (item.fs.getUri().getScheme().equals(OZONE_OFS_URI_SCHEME)) {
         BasicRootedOzoneFileSystem ofs = (BasicRootedOzoneFileSystem) item.fs;
-        ofs.delete(path, deleteDirs, partiallyDeleted);
+        innerDeleteResult = ofs.getDeleteResult(path, deleteDirs);
       } else {
         if (!item.fs.delete(path, deleteDirs)) {
           throw new PathIOException(item.toString());
         }
       }
-      if (partiallyDeleted) {
+      if (innerDeleteResult != null && innerDeleteResult.isPartiallyDeleted()) {
         out.println(
-            "Partially Deleted." + item + (trailing ? OZONE_URI_DELIMITER :
-                ""));
+            "Path might not have been deleted completely: " + item + (trailing ?
+                OZONE_URI_DELIMITER : ""));
       } else {
         out.println("Deleted " + item + (trailing ? OZONE_URI_DELIMITER : ""));
       }
