@@ -206,14 +206,14 @@ public class TestReconUtils {
     assertNextClosestPowerIndexOfTwo(Long.MAX_VALUE);
     assertNextClosestPowerIndexOfTwo(Long.MIN_VALUE);
 
-    for(long n = 1; n != 0; n <<= 1) {
+    for (long n = 1; n != 0; n <<= 1) {
       assertNextClosestPowerIndexOfTwo(n);
       assertNextClosestPowerIndexOfTwo(n + 1);
       assertNextClosestPowerIndexOfTwo(n - 1);
     }
 
     final Random random = new Random();
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       assertNextClosestPowerIndexOfTwo(random.nextLong());
     }
   }
