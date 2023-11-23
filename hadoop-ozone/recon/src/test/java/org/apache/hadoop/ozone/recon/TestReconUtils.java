@@ -20,8 +20,9 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
@@ -36,6 +37,8 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.net.URL;
 
@@ -43,46 +46,36 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 /**
  * Test Recon Utility methods.
  */
 public class TestReconUtils {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private static Path temporaryFolder;
 
   @Test
-  public void testGetReconDbDir() throws Exception {
+  public void testGetReconDbDir(@TempDir File newDir) throws Exception {
 
-    String filePath = folder.getRoot().getAbsolutePath();
     OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set("TEST_DB_DIR", filePath);
+    configuration.set("TEST_DB_DIR", newDir.getPath());
 
     File file = new ReconUtils().getReconDbDir(configuration,
         "TEST_DB_DIR");
-    Assert.assertEquals(filePath, file.getAbsolutePath());
+    assertEquals(newDir.getPath(), file.getAbsolutePath());
   }
 
   @Test
-  public void testCreateTarFile() throws Exception {
+  public void testCreateTarFile(@TempDir File tempSnapshotDir) throws Exception {
 
-    File tempSnapshotDir = null;
     FileInputStream fis = null;
     FileOutputStream fos = null;
     File tarFile = null;
 
     try {
-      String testDirName = System.getProperty("java.io.tmpdir");
-      if (!testDirName.endsWith("/")) {
-        testDirName += "/";
-      }
-      testDirName += "TestCreateTarFile_Dir" + System.currentTimeMillis();
-      tempSnapshotDir = new File(testDirName);
-      tempSnapshotDir.mkdirs();
+      String testDirName = tempSnapshotDir.getPath();
 
       File file = new File(testDirName + "/temp1.txt");
       OutputStreamWriter writer = new OutputStreamWriter(
@@ -97,7 +90,7 @@ public class TestReconUtils {
       writer.close();
 
       tarFile = createTarFile(Paths.get(testDirName));
-      Assert.assertNotNull(tarFile);
+      assertNotNull(tarFile);
 
     } finally {
       org.apache.hadoop.io.IOUtils.closeStream(fis);
@@ -110,8 +103,7 @@ public class TestReconUtils {
   @Test
   public void testUntarCheckpointFile() throws Exception {
 
-    File newDir = folder.newFolder();
-
+    File newDir = Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile();
     File file1 = Paths.get(newDir.getAbsolutePath(), "file1")
         .toFile();
     String str = "File1 Contents";
@@ -130,17 +122,17 @@ public class TestReconUtils {
 
     //Create test tar file.
     File tarFile = createTarFile(newDir.toPath());
-    File outputDir = folder.newFolder();
+    File outputDir = Files.createDirectory(temporaryFolder.resolve("OutputDir")).toFile();
     new ReconUtils().untarCheckpointFile(tarFile, outputDir.toPath());
 
     assertTrue(outputDir.isDirectory());
-    assertTrue(outputDir.listFiles().length == 2);
+    assertEquals(2, outputDir.listFiles().length);
   }
 
   @Test
   public void testMakeHttpCall() throws Exception {
     String url = "http://localhost:9874/dbCheckpoint";
-    File file1 = Paths.get(folder.getRoot().getPath(), "file1")
+    File file1 = Paths.get(temporaryFolder.toString(), "file1")
         .toFile();
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
         new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
@@ -164,8 +156,7 @@ public class TestReconUtils {
   }
 
   @Test
-  public void testGetLastKnownDB() throws IOException {
-    File newDir = folder.newFolder();
+  public void testGetLastKnownDB(@TempDir File newDir) throws IOException {
 
     File file1 = Paths.get(newDir.getAbsolutePath(), "valid_1")
         .toFile();
@@ -194,6 +185,6 @@ public class TestReconUtils {
 
     ReconUtils reconUtils = new ReconUtils();
     File latestValidFile = reconUtils.getLastKnownDB(newDir, "valid");
-    assertTrue(latestValidFile.getName().equals("valid_2"));
+    assertEquals("valid_2", latestValidFile.getName());
   }
 }
