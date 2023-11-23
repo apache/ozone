@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
@@ -164,7 +165,7 @@ public class TestRatisOverReplicationHandler {
    */
   @Test
   public void testOverReplicatedQuasiClosedContainerWithDifferentOrigins()
-      throws IOException {
+      throws IOException, NodeNotFoundException {
     container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
         RATIS_REPLICATION_CONFIG);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
@@ -178,6 +179,35 @@ public class TestRatisOverReplicationHandler {
             HddsProtos.NodeOperationalState.IN_SERVICE,
             ContainerReplicaProto.State.UNHEALTHY);
     replicas.add(unhealthyReplica);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+
+    /*
+    Now, introduce two UNHEALTHY replicas that share the same origin node as
+    the existing UNHEALTHY replica. They're on decommissioning and stale
+    nodes, respectively. Still no replica should be deleted, because these are
+    likely going away soon anyway.
+     */
+    replicas.add(
+        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
+            State.UNHEALTHY, container.getNumberOfKeys(),
+            container.getUsedBytes(),
+            MockDatanodeDetails.randomDatanodeDetails(),
+            unhealthyReplica.getOriginDatanodeId()));
+    DatanodeDetails staleNode =
+        MockDatanodeDetails.randomDatanodeDetails();
+    replicas.add(
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.UNHEALTHY, container.getNumberOfKeys(),
+            container.getUsedBytes(), staleNode,
+            unhealthyReplica.getOriginDatanodeId()));
+    Mockito.when(replicationManager.getNodeStatus(eq(staleNode)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.STALE, 0);
+        });
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
