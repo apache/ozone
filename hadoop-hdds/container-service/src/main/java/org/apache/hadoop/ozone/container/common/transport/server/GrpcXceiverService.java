@@ -94,7 +94,8 @@ public class GrpcXceiverService extends
         .setRequestMarshaller(zeroCopyMarshaller)
         .build();
     ServerCallHandler<Req, Resp> serverCallHandler =
-        (ServerCallHandler<Req, Resp>) orig.getMethod(newMethod.getFullMethodName()).getServerCallHandler();
+        (ServerCallHandler<Req, Resp>) orig.getMethod(
+            newMethod.getFullMethodName()).getServerCallHandler();
     newServiceBuilder.addMethod(newMethod, serverCallHandler);
   }
 
