@@ -68,10 +68,6 @@ public class GrpcXceiverService extends
       LOG.info("Zerocopy is not enabled.");
       return orig;
     }
-    if (!ZeroCopyReadinessChecker.isReady()) {
-      LOG.info("Zerocopy is not ready.");
-      return orig;
-    }
 
     ServerServiceDefinition.Builder builder =
         ServerServiceDefinition.builder(orig.getServiceDescriptor().getName());
