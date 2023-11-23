@@ -243,7 +243,7 @@ public class TestReconInsightsForDeletedDirectories {
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    // Assert the size of deleted directory is 700.
+    // Assert the size of deleted directory is 10.
     Assert.assertEquals(10, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
@@ -334,7 +334,7 @@ public class TestReconInsightsForDeletedDirectories {
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    // Assert the size of deleted directory is 1000.
+    // Assert the size of deleted directory is 3.
     Assert.assertEquals(3, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
