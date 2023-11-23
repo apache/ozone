@@ -75,6 +75,7 @@
                             });
 
                     nodeStatusCopy = [...$scope.nodeStatus];
+                    $scope.totalItems = nodeStatusCopy.length;
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
                 });
@@ -91,10 +92,11 @@
             }
             /* Page Slicing  logic */
             $scope.handlePagination = (pageIndex, isDisabled) => {
-                if(!isDisabled) {
+                if(!isDisabled && $scope.RecordsToDisplay != 'All') {
+                    pageIndex = parseInt(pageIndex);
                     let startIndex = 0, endIndex = 0;
                     $scope.currentPage = pageIndex;
-                    startIndex = (pageIndex * $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
+                    startIndex = ($scope.currentPage - 1) * parseInt($scope.RecordsToDisplay);
                     endIndex = startIndex + parseInt($scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
                 }
@@ -104,6 +106,27 @@
                 $scope.columnName = colName;
                 $scope.reverse = !$scope.reverse;
             }
+            /*show page*/
+            $scope.getPagesArray = function () {
+                return Array.from({ length: $scope.lastIndex }, (_, index) => index + 1);
+            };
+            /*show last item index*/
+            $scope.getCurrentPageLastItemIndex = ()  => {
+                if ($scope.RecordsToDisplay == 'All') {
+                    return $scope.totalItems;
+                }
+
+                let endIndex = $scope.currentPage * parseInt($scope.RecordsToDisplay);
+                return Math.min(endIndex, $scope.totalItems);
+            }
+            /*show first item index*/
+            $scope.getCurrentPageFirstItemIndex = () => {
+                if ($scope.RecordsToDisplay == 'All') {
+                    return 1;
+                }
+                return ($scope.currentPage - 1) * $scope.RecordsToDisplay + 1;
+            }
+
             const nodeOpStateSortOrder = {
                 "IN_SERVICE": "a",
                 "DECOMMISSIONING": "b",
