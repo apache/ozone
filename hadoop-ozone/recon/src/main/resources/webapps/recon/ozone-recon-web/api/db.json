@@ -5898,185 +5898,226 @@
   },
   "keydeletePending1": {
     "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191",
-    "replicatedTotal": -1530804718628866300,
-    "unreplicatedTotal": -1530804718628866300,
+    "replicatedDataSize": 189,
+    "unreplicatedDataSize": 63,
     "deletedKeyInfo": [
       {
         "omKeyInfoList": [
           {
-            "objectID": 0,
-            "updateID": 0,
-            "parentObjectID": 0,
-            "volumeName": "sampleVol",
-            "bucketName": "bucketOne",
-            "keyName": "key22",
-            "dataSize": 1000,
-            "keyLocationVersions": [],
-            "creationTime": 0,
-            "modificationTime": 0,
-            "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "STANDALONE"
-            },
-            "fileChecksum": null,
-            "fileName": "file_key22",
-            "acls": [],
-            "path": "0/key_one",
-            "file": false,
-            "latestVersionLocations": null,
-            "replicatedSize": 120000000,
-            "fileEncryptionInfo": null,
-            "updateIDset": false
-          },
-          {
             "metadata": {},
-            "objectID": 0,
-            "updateID": 0,
-            "parentObjectID": 0,
-            "volumeName": "sampleVol",
-            "bucketName": "bucketOne",
-            "keyName": "key22",
-            "dataSize": 2000,
+            "objectID": -9223372036593159000,
+            "updateID": 1021946,
+            "parentObjectID": -9223372036854775000,
+            "volumeName": "s3v",
+            "bucketName": "cloudera-health-monitoring-ozone-basic-canary-bucket",
+            "keyName": "cloudera-health-monitoring-ozone-basic-canary-key",
+            "dataSize": 63,
             "keyLocationVersions": [],
-            "creationTime": 0,
-            "modificationTime": 0,
+            "creationTime": 1700650064098,
+            "modificationTime": 1700650065472,
             "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "STANDALONE"
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "file_key22",
+            "fileName": "cloudera-health-monitoring-ozone-basic-canary-key",
             "acls": [],
-            "path": "0/key_one",
             "file": false,
-            "latestVersionLocations": null,
-            "replicatedSize": -1530804718628866300,
+            "replicatedSize": 189,
             "fileEncryptionInfo": null,
-            "updateIDset": false
+            "objectInfo": "OMKeyInfo{volume='s3v', bucket='cloudera-health-monitoring-ozone-basic-canary-bucket', key='cloudera-health-monitoring-ozone-basic-canary-key', dataSize='63', creationTime='1700650064098', objectID='-9223372036593159167', parentID='-9223372036854775040', replication='RATIS/THREE', fileChecksum='null}",
+            "path": "-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key",
+            "updateIDset": true
           }
-        ]
+        ],
+        "totalSize": {
+          "63": 189
+        }
       }
     ],
     "status": "OK"
   },
   "keydeletePending2": {
     "lastKey": "31",
-    "replicatedTotal": -1530804718628866300,
-    "unreplicatedTotal": -1530804718628866300,
+    "replicatedDataSize": 123069,
+    "unreplicatedDataSize": 41023,
     "deletedKeyInfo": [
       {
         "omKeyInfoList": [
           {
             "metadata": {},
-            "objectID": 0,
-            "updateID": 0,
-            "parentObjectID": 0,
-            "volumeName": "sampleVol",
-            "bucketName": "bucketOne",
-            "keyName": "key_31",
-            "dataSize": -1530804718628866300,
-            "keyLocationVersions": [],
-            "creationTime": 0,
-            "modificationTime": 0,
+            "objectID": -9223372036594882000,
+            "updateID": 1016658,
+            "parentObjectID": -9223372036854775000,
+            "volumeName": "s3v",
+            "bucketName": "cloudera-health-monitoring-ozone-basic-canary-bucket",
+            "keyName": "cloudera-health-monitoring-ozone-basic-canary-key",
+            "dataSize": 63,
+            "keyLocationVersions":[],
+            "creationTime": 1700643987599,
+            "modificationTime": 1700643991172,
             "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "STANDALONE"
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "key_one",
+            "fileName": "cloudera-health-monitoring-ozone-basic-canary-key",
             "acls": [],
-            "path": "0/key_one",
             "file": false,
-            "latestVersionLocations": null,
-            "replicatedSize": -1530804718628866300,
+            "latestVersionLocations": {},
+            "replicatedSize": 189,
             "fileEncryptionInfo": null,
-            "updateIDset": false
-          },
-          {
-            "metadata": {},
-            "objectID": 0,
-            "updateID": 0,
-            "parentObjectID": 0,
-            "volumeName": "sampleVol",
-            "bucketName": "bucketOne",
-            "keyName": "key_32",
-            "dataSize": -1530804718628866300,
-            "keyLocationVersions": [],
-            "creationTime": 0,
-            "modificationTime": 0,
-            "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "STANDALONE"
-            },
-            "fileChecksum": null,
-            "fileName": "key_two",
-            "acls": [],
-            "path": "0/key_two",
-            "file": false,
-            "latestVersionLocations": null,
-            "replicatedSize": -1530804718628866300,
-            "fileEncryptionInfo": null,
-            "updateIDset": false
-          },
-          {
-            "metadata": {},
-            "objectID": 0,
-            "updateID": 0,
-            "parentObjectID": 0,
-            "volumeName": "sampleVol",
-            "bucketName": "bucketOne",
-            "keyName": "key_33",
-            "dataSize": -1530804718628866300,
-            "keyLocationVersions": [],
-            "creationTime": 0,
-            "modificationTime": 0,
-            "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "STANDALONE"
-            },
-            "fileChecksum": null,
-            "fileName": "key_one",
-            "acls": [],
-            "path": "0/key_one",
-            "file": false,
-            "latestVersionLocations": null,
-            "replicatedSize": -1530804718628866300,
-            "fileEncryptionInfo": null,
-            "updateIDset": false
-          },
-          {
-            "metadata": {},
-            "objectID": 0,
-            "updateID": 0,
-            "parentObjectID": 0,
-            "volumeName": "sampleVol",
-            "bucketName": "bucketOne",
-            "keyName": "key_34",
-            "dataSize": -1530804718628866300,
-            "keyLocationVersions": [],
-            "creationTime": 0,
-            "modificationTime": 0,
-            "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "STANDALONE"
-            },
-            "fileChecksum": null,
-            "fileName": "key_two",
-            "acls": [],
-            "path": "0/key_two",
-            "file": false,
-            "latestVersionLocations": null,
-            "replicatedSize": -1530804718628866300,
-            "fileEncryptionInfo": null,
-            "updateIDset": false
+            "objectInfo": "OMKeyInfo{volume='s3v', bucket='cloudera-health-monitoring-ozone-basic-canary-bucket', key='cloudera-health-monitoring-ozone-basic-canary-key', dataSize='63', creationTime='1700643987599', objectID='-9223372036594882047', parentID='-9223372036854775040', replication='RATIS/THREE', fileChecksum='null}",
+            "path": "-9223372036854775040/cloudera-health-monitoring-ozone-basic-canary-key",
+            "updateIDset": true
           }
-        ]
+        ],
+        "totalSize": {
+          "63": 189
+        }
+      },
+      {
+        "omKeyInfoList": [
+          {
+            "metadata": {},
+            "objectID": 0,
+            "updateID": 1015001,
+            "parentObjectID": -9223372036763767000,
+            "volumeName": "vol-2-66056",
+            "bucketName": "bucket-758-07162",
+            "keyName": "key-16-70762",
+            "dataSize": 10240,
+            "keyLocationVersions": [],
+            "creationTime": 1700643966359,
+            "modificationTime": 1700643979430,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileChecksum": null,
+            "fileName": "key-16-70762",
+            "acls": [],
+            "file": false,
+            "latestVersionLocations": {},
+            "hsync": false,
+            "replicatedSize": 30720,
+            "fileEncryptionInfo": null,
+            "objectInfo": "OMKeyInfo{volume='vol-2-66056', bucket='bucket-758-07162', key='key-16-70762', dataSize='10240', creationTime='1700643966359', objectID='0', parentID='-9223372036763767296', replication='RATIS/THREE', fileChecksum='null}",
+            "path": "-9223372036763767296/key-16-70762",
+            "updateIDset": true
+          }
+        ],
+        "totalSize": {
+          "10240": 30720
+        }
+      },
+      {
+        "omKeyInfoList": [
+          {
+            "metadata": {},
+            "objectID": 0,
+            "updateID": 1014996,
+            "parentObjectID": -9223372036763771000,
+            "volumeName": "vol-4-05361",
+            "bucketName": "bucket-757-56694",
+            "keyName": "key-16-17518",
+            "dataSize": 10240,
+            "keyLocationVersions": [],
+            "creationTime": 1700643934563,
+            "modificationTime": 1700643979428,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileChecksum": null,
+            "fileName": "key-16-17518",
+            "acls": [],
+            "file": false,
+            "latestVersionLocations": {},
+            "replicatedSize": 30720,
+            "fileEncryptionInfo": null,
+            "objectInfo": "OMKeyInfo{volume='vol-4-05361', bucket='bucket-757-56694', key='key-16-17518', dataSize='10240', creationTime='1700643934563', objectID='0', parentID='-9223372036763770368', replication='RATIS/THREE', fileChecksum='null}",
+            "path": "-9223372036763770368/key-16-17518",
+            "updateIDset": true
+          }
+        ],
+        "totalSize": {
+          "10240": 30720
+        }
+      },
+      {
+        "omKeyInfoList": [
+          {
+            "metadata": {},
+            "objectID": 0,
+            "updateID": 1014998,
+            "parentObjectID": -9223372036763770000,
+            "volumeName": "vol-5-97279",
+            "bucketName": "bucket-757-09296",
+            "keyName": "key-16-38011",
+            "dataSize": 10240,
+            "keyLocationVersions": [],
+            "creationTime": 1700643943522,
+            "modificationTime": 1700643979429,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileName": "key-16-38011",
+            "acls": [],
+            "file": false,
+            "latestVersionLocations": {},
+            "hsync": false,
+            "replicatedSize": 30720,
+            "fileEncryptionInfo": null,
+            "objectInfo": "OMKeyInfo{volume='vol-5-97279', bucket='bucket-757-09296', key='key-16-38011', dataSize='10240', creationTime='1700643943522', objectID='0', parentID='-9223372036763769856', replication='RATIS/THREE', fileChecksum='null}",
+            "path": "-9223372036763769856/key-16-38011",
+            "updateIDset": true
+          }
+        ],
+        "totalSize": {
+          "10240": 30720
+        }
+      },
+      {
+        "omKeyInfoList": [
+          {
+            "metadata": {},
+            "objectID": 0,
+            "updateID": 1015151,
+            "parentObjectID": -9223372036763982000,
+            "volumeName": "vol-7-06302",
+            "bucketName": "bucket-697-42370",
+            "keyName": "key-16-50710",
+            "dataSize": 10240,
+            "keyLocationVersions": [],
+            "creationTime": 1700643912499,
+            "modificationTime": 1700643985991,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileChecksum": null,
+            "fileName": "key-16-50710",
+            "acls": [],
+            "file": false,
+            "latestVersionLocations": {},
+            "replicatedSize": 30720,
+            "fileEncryptionInfo": null,
+            "objectInfo": "OMKeyInfo{volume='vol-7-06302', bucket='bucket-697-42370', key='key-16-50710', dataSize='10240', creationTime='1700643912499', objectID='0', parentID='-9223372036763981824', replication='RATIS/THREE', fileChecksum='null}",
+            "path": "-9223372036763981824/key-16-50710",
+            "updateIDset": true
+          }
+        ],
+        "totalSize": {
+          "10240": 30720
+        }
       }
     ],
     "status": "OK"
