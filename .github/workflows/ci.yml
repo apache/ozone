@@ -25,17 +25,13 @@ jobs:
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
-      acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      needs-unit-check: ${{ steps.categorize-basic-checks.outputs.needs-unit-check }}
-      basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
-      unit-checks: ${{ steps.categorize-basic-checks.outputs.unit-checks }}
-      needs-build: ${{ steps.selective-checks.outputs.needs-build }}
-      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
-      needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
+      needs-basic-checks: false
+      needs-build: false
+      needs-compile: false
+      needs-compose-tests: false
+      needs-dependency-check: false
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
-      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      needs-kubernetes-tests: false
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@v3
@@ -61,19 +57,11 @@ jobs:
             # Run all checks
             dev-support/ci/selective_ci_checks.sh
           fi
-      - name: Acceptance suites
-        id: acceptance-suites
-        run: dev-support/ci/acceptance_suites.sh
-      - name: Categorize Basic Checks
-        id: categorize-basic-checks
-        env:
-          ALL_BASIC_CHECKS: "${{ steps.selective-checks.outputs.basic-checks }}"
-        run: dev-support/ci/categorize_basic_checks.sh
   build:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    timeout-minutes: 45
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
@@ -106,8 +94,6 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Run a full build
         run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
-        env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Store binaries for tests
         uses: actions/upload-artifact@v3
         with:
@@ -122,13 +108,6 @@ jobs:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
-      - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v3
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-          retention-days: 1
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -139,7 +118,6 @@ jobs:
     needs:
       - build-info
       - build
-      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-compile == 'true'
@@ -172,7 +150,6 @@ jobs:
         run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
         env:
           OZONE_WITH_COVERAGE: false
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -183,8 +160,8 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 30
-    if: needs.build-info.outputs.needs-basic-check == 'true'
+    timeout-minutes: 90
+    if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
@@ -215,60 +192,8 @@ jobs:
           java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
-        continue-on-error: true
-        env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v3
-        if: ${{ !cancelled() }}
-        with:
-          name: ${{ matrix.check }}
-          path: target/${{ matrix.check }}
-        continue-on-error: true
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
-          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
-        if: always()
-  unit:
-    needs:
-      - build-info
-      - basic
-    runs-on: ubuntu-20.04
-    timeout-minutes: 150
-    if: needs.build-info.outputs.needs-unit-check == 'true'
-    strategy:
-      matrix:
-        check: ${{ fromJson(needs.build-info.outputs.unit-checks) }}
-      fail-fast: false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v3
-      - name: Cache for maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.profile }}
-          restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
-            maven-repo-
-      - name: Setup java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: 8
-      - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
-        continue-on-error: true
-        env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
+        run: cat target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
@@ -316,13 +241,20 @@ jobs:
     needs:
       - build-info
       - build
-      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
-        suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
+        suite:
+          - secure
+          - unsecure
+          - compat
+          - EC
+          - HA-secure
+          - HA-unsecure
+          - MR
+          - misc
       fail-fast: false
     steps:
       - name: Checkout project
@@ -335,7 +267,6 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
-          rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
@@ -347,10 +278,6 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_VOLUME_OWNER: 1000
-        continue-on-error: true
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -362,7 +289,6 @@ jobs:
     needs:
       - build-info
       - build
-      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
@@ -383,10 +309,6 @@ jobs:
           sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           popd
           ./hadoop-ozone/dev-support/checks/kubernetes.sh
-        continue-on-error: true
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -397,23 +319,12 @@ jobs:
   integration:
     needs:
       - build-info
-      - build
-      - basic
     runs-on: ubuntu-20.04
-    timeout-minutes: 150
+    timeout-minutes: 600
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
       matrix:
-        profile:
-          - client
-          - contract
-          - filesystem
-          - hdds
-          - om
-          - ozone
-          - scm
-          - shell
-          - flaky
+        profile: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
       fail-fast: false
     steps:
       - name: Checkout project
@@ -427,37 +338,21 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}-8
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
-      - name: Download Ozone repo
-        id: download-ozone-repo
-        uses: actions/download-artifact@v3
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-        continue-on-error: true
       - name: Setup java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        continue-on-error: true
-        run: |
-          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
-            export OZONE_REPO_CACHED=true
-          fi
-
-          args=
-          if [[ "${{ matrix.profile }}" == "flaky" ]]; then
-            args="-Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
-          fi
-
-          hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
+        run: hadoop-ozone/dev-support/checks/integration.sh -Dtest=TestReconInsightsForDeletedDirectories
         env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          ITERATIONS: 10
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Number of failures
+        run: cat target/${{ github.job }}/failures
+        if: always()
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -476,14 +371,12 @@ jobs:
     timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
-      - unit
       - acceptance
+      - basic
       - integration
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - name: Cache for maven dependencies
         uses: actions/cache@v3
         with:
@@ -503,17 +396,16 @@ jobs:
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
-      - name: Setup java 17
+      - name: Setup java 11
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 11
       - name: Upload coverage to Sonar
         run: ./hadoop-ozone/dev-support/checks/sonar.sh
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         with:
