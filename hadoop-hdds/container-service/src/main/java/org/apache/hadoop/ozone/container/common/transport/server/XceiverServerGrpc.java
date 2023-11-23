@@ -134,13 +134,13 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
-    final boolean zerocopyEnabled = conf.getBoolean(
+    final boolean zeroCopyEnabled = conf.getBoolean(
         OZONE_EC_GRPC_ZERO_COPY_ENABLED,
         OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT);
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
     GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher,
-        zerocopyEnabled);
+        zeroCopyEnabled);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)

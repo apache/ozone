@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServi
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
-import org.apache.ratis.grpc.util.ZeroCopyReadinessChecker;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
@@ -46,15 +45,15 @@ public class GrpcXceiverService extends
       LOG = LoggerFactory.getLogger(GrpcXceiverService.class);
 
   private final ContainerDispatcher dispatcher;
-  private final boolean zerocopyEnabled;
+  private final boolean zeroCopyEnabled;
   private final ZeroCopyMessageMarshaller<ContainerCommandRequestProto>
       zeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
           ContainerCommandRequestProto.getDefaultInstance());
 
   public GrpcXceiverService(ContainerDispatcher dispatcher,
-      boolean zerocopyEnabled) {
+      boolean zeroCopyEnabled) {
     this.dispatcher = dispatcher;
-    this.zerocopyEnabled = zerocopyEnabled;
+    this.zeroCopyEnabled = zeroCopyEnabled;
   }
 
   /**
@@ -64,7 +63,7 @@ public class GrpcXceiverService extends
    */
   public ServerServiceDefinition bindServiceWithZerocopy() {
     ServerServiceDefinition orig = super.bindService();
-    if (!zerocopyEnabled) {
+    if (!zeroCopyEnabled) {
       LOG.info("Zerocopy is not enabled.");
       return orig;
     }
@@ -85,13 +84,12 @@ public class GrpcXceiverService extends
     return builder.build();
   }
 
-
   @SuppressWarnings("unchecked")
   private static <Req extends MessageLite, Resp> void addZeroCopyMethod(
-      ServerServiceDefinition orig, ServerServiceDefinition.Builder newServiceBuilder,
+      ServerServiceDefinition orig,
+      ServerServiceDefinition.Builder newServiceBuilder,
       MethodDescriptor<Req, Resp> origMethod,
       ZeroCopyMessageMarshaller<Req> zeroCopyMarshaller) {
-
     MethodDescriptor<Req, Resp> newMethod = origMethod.toBuilder()
         .setRequestMarshaller(zeroCopyMarshaller)
         .build();
