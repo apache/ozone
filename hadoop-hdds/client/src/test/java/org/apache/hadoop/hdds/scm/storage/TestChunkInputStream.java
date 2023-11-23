@@ -34,10 +34,13 @@ import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,14 +55,13 @@ public class TestChunkInputStream {
   private static final String CHUNK_NAME = "dummyChunk";
   private static final Random RANDOM = new Random();
 
-  private Checksum checksum;
   private DummyChunkInputStream chunkStream;
   private ChunkInfo chunkInfo;
   private byte[] chunkData;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
+    Checksum checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
 
     chunkData = generateRandomData(CHUNK_SIZE);
 
@@ -92,7 +94,7 @@ public class TestChunkInputStream {
   private void matchWithInputData(byte[] readData, int inputDataStartIndex,
       int length) {
     for (int i = inputDataStartIndex; i < inputDataStartIndex + length; i++) {
-      Assert.assertEquals(chunkData[i], readData[i - inputDataStartIndex]);
+      assertEquals(chunkData[i], readData[i - inputDataStartIndex]);
     }
   }
 
@@ -106,7 +108,7 @@ public class TestChunkInputStream {
       offset += bufferLen;
       totalBufferLen += bufferLen;
     }
-    Assert.assertEquals(length, totalBufferLen);
+    assertEquals(length, totalBufferLen);
   }
 
   /**
@@ -114,15 +116,14 @@ public class TestChunkInputStream {
    */
   private void seekAndVerify(int pos) throws Exception {
     chunkStream.seek(pos);
-    Assert.assertEquals("Current position of buffer does not match with the " +
-        "seeked position", pos, chunkStream.getPos());
+    assertEquals(pos, chunkStream.getPos(),
+        "Current position of buffer does not match with the sought position");
   }
 
   @Test
   public void testFullChunkRead() throws Exception {
     byte[] b = new byte[CHUNK_SIZE];
     chunkStream.read(b, 0, CHUNK_SIZE);
-
     matchWithInputData(b, 0, CHUNK_SIZE);
   }
 
@@ -149,16 +150,16 @@ public class TestChunkInputStream {
 
     try {
       seekAndVerify(CHUNK_SIZE + 1);
-      Assert.fail("Seeking to more than the length of Chunk should fail.");
+      fail("Seeking to more than the length of Chunk should fail.");
     } catch (EOFException e) {
       GenericTestUtils.assertExceptionContains("EOF encountered at pos: "
           + (CHUNK_SIZE + 1) + " for chunk: " + CHUNK_NAME, e);
     }
     // Seek before read should update the ChunkInputStream#chunkPosition
     seekAndVerify(25);
-    Assert.assertEquals(25, chunkStream.getChunkPosition());
+    assertEquals(25, chunkStream.getChunkPosition());
 
-    // Read from the seeked position.
+    // Read from the sought position.
     // Reading from index 25 to 54 should result in the ChunkInputStream
     // copying chunk data from index 20 to 59 into the buffers (checksum
     // boundaries).
@@ -169,7 +170,7 @@ public class TestChunkInputStream {
 
     // After read, the position of the chunkStream is evaluated from the
     // buffers and the chunkPosition should be reset to -1.
-    Assert.assertEquals(-1, chunkStream.getChunkPosition());
+    assertEquals(-1, chunkStream.getChunkPosition());
 
     // Only the last BYTES_PER_CHECKSUM will be cached in the buffers as
     // buffers are released after each checksum boundary is read. So the
@@ -177,12 +178,12 @@ public class TestChunkInputStream {
     // Seek to a position within the cached buffers. ChunkPosition should
     // still not be used to set the position.
     seekAndVerify(45);
-    Assert.assertEquals(-1, chunkStream.getChunkPosition());
+    assertEquals(-1, chunkStream.getChunkPosition());
 
     // Seek to a position outside the current cached buffers. In this case, the
     // chunkPosition should be updated to the seeked position.
     seekAndVerify(75);
-    Assert.assertEquals(75, chunkStream.getChunkPosition());
+    assertEquals(75, chunkStream.getChunkPosition());
 
     // Read upto checksum boundary should result in all the buffers being
     // released and hence chunkPosition updated with current position of chunk.
@@ -190,7 +191,7 @@ public class TestChunkInputStream {
     b = new byte[15];
     chunkStream.read(b, 0, 15);
     matchWithInputData(b, 25, 15);
-    Assert.assertEquals(40, chunkStream.getChunkPosition());
+    assertEquals(40, chunkStream.getChunkPosition());
   }
 
   @Test
@@ -208,14 +209,14 @@ public class TestChunkInputStream {
   }
 
   @Test
-  public void testUnbuffer() throws Exception {
+  public void testUnbuffered() throws Exception {
     byte[] b1 = new byte[20];
     chunkStream.read(b1, 0, 20);
     matchWithInputData(b1, 0, 20);
 
     chunkStream.unbuffer();
 
-    Assert.assertFalse(chunkStream.buffersAllocated());
+    assertFalse(chunkStream.buffersAllocated());
 
     // Next read should start from the position of the last read + 1 i.e. 20
     byte[] b2 = new byte[20];
@@ -235,26 +236,22 @@ public class TestChunkInputStream {
 
     AtomicReference<Pipeline> pipelineRef = new AtomicReference<>(pipeline);
 
-    ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
+    try (ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
         clientFactory, pipelineRef::get, false, null) {
       @Override
       protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
         return ByteString.copyFrom(chunkData).asReadOnlyByteBufferList()
             .toArray(new ByteBuffer[0]);
       }
-    };
-
-    try {
+    }) {
       // WHEN
       subject.unbuffer();
       pipelineRef.set(newPipeline);
       int b = subject.read();
 
       // THEN
-      Assert.assertNotEquals(-1, b);
+      assertNotEquals(-1, b);
       verify(clientFactory).acquireClientForReadData(newPipeline);
-    } finally {
-      subject.close();
     }
   }
 }

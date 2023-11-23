@@ -26,7 +26,7 @@ services:
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
       env_file:
         - ./docker-config
    om:
