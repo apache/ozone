@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -135,8 +135,8 @@ class TestOzoneRpcClientWithKeyLatestVersion {
     }
   }
 
-  private void assertKeyContent(OzoneBucket bucket, String key, byte[] expected)
-      throws Exception {
+  public static void assertKeyContent(OzoneBucket bucket, String key,
+      byte[] expected) throws Exception {
     try (InputStream in = bucket.readKey(key)) {
       assertArrayEquals(expected, IOUtils.readFully(in, expected.length));
     }
