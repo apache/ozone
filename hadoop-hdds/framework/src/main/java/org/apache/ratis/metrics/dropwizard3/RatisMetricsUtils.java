@@ -6,40 +6,36 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.ratis.metrics.dropwizard3;
 
-import com.google.common.primitives.Longs;
-import org.junit.jupiter.api.Test;
+import com.codahale.metrics.MetricRegistry;
+import org.apache.ratis.metrics.RatisMetricRegistry;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.util.function.Consumer;
 
 /**
- * Test for class {@link FixedLengthStringCodec}.
+ * Utilities for ratis metrics dropwizard3.
  */
-public class TestFixedLengthStringCodec {
+public interface RatisMetricsUtils {
 
-  @Test
-  public void testStringEncodeAndDecode() {
-    long[] testContainerIDs = {
-        0L, 1L, 2L, 12345L,
-        Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, Long.MAX_VALUE
-    };
+  static MetricRegistry getDropWizardMetricRegistry(RatisMetricRegistry r) {
+    return ((Dm3RatisMetricRegistryImpl) r).getDropWizardMetricRegistry();
+  }
 
-    for (long containerID : testContainerIDs) {
-      String containerPrefix = FixedLengthStringCodec.bytes2String(
-          Longs.toByteArray(containerID));
-      long decodedContainerID = Longs.fromByteArray(
-          FixedLengthStringCodec.string2Bytes(containerPrefix));
-      assertEquals(containerID, decodedContainerID);
-    }
+  static Consumer<RatisMetricRegistry> jmxReporter() {
+    return Dm3MetricsReporting.jmxReporter();
+  }
+
+  static Consumer<RatisMetricRegistry> stopJmxReporter() {
+    return Dm3MetricsReporting.stopJmxReporter();
   }
 }
