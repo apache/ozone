@@ -52,8 +52,8 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChun
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -111,8 +111,8 @@ public class TestOzoneBlockTokenSecretManager {
     assertEquals(EnumSet.allOf(AccessModeProto.class),
         identifier.getAccessModes());
     assertEquals(secretKeyId, identifier.getSecretKeyId());
-    assertFalse(secretKey.isValidSignature(token.getPassword(),
-        token.getIdentifier()));
+    assertTrue(secretKey.isValidSignature(token.getIdentifier(),
+        token.getPassword()));
   }
 
   @Test
@@ -129,7 +129,7 @@ public class TestOzoneBlockTokenSecretManager {
         btIdentifier.getAccessModes());
     byte[] hash = secretManager.createPassword(btIdentifier);
     assertEquals(secretKeyId, btIdentifier.getSecretKeyId());
-    assertFalse(secretKey.isValidSignature(hash, btIdentifier.getBytes()));
+    assertTrue(secretKey.isValidSignature(btIdentifier.getBytes(), hash));
   }
 
   @Test

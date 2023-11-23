@@ -738,7 +738,7 @@ public class TestRDBTableStore {
       // check dump file exist
       assertTrue(dumpFile.exists());
       // empty dump file
-      Assertions.assertEquals(0, dumpFile.length());
+      assertEquals(0, dumpFile.length());
     }
 
     // load dump file into another table
