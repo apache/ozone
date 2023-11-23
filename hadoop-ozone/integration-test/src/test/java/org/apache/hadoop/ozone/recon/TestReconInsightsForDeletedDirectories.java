@@ -176,8 +176,6 @@ public class TestReconInsightsForDeletedDirectories {
     assertTableRowCount(omDirTable, 1, false);
 
     // Sync data from Ozone Manager to Recon.
-    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
     syncDataFromOM();
 
     // Retrieve tables from Recon's OM-DB.
@@ -290,8 +288,6 @@ public class TestReconInsightsForDeletedDirectories {
     assertTableRowCount(omDirTable, 3, false);
 
     // Sync data from Ozone Manager to Recon.
-    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
     syncDataFromOM();
 
     // Retrieve tables from Recon's OM-DB.
@@ -379,8 +375,6 @@ public class TestReconInsightsForDeletedDirectories {
     Assertions.assertFalse(fs.exists(rootDir), "Directory was not deleted");
 
     // Sync data from Ozone Manager to Recon.
-    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
     syncDataFromOM();
 
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
