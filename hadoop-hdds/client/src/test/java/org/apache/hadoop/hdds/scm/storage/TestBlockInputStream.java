@@ -97,7 +97,8 @@ public class TestBlockInputStream {
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
 
-    blockStream = new DummyBlockInputStream(blockID, blockSize, null, null,
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         false, null, refreshFunction, chunks, chunkDataMap);
   }
 
@@ -413,8 +414,7 @@ public class TestBlockInputStream {
     BlockInputStream subject = new BlockInputStream(blockID, blockSize,
         pipeline, null, false, clientFactory, refreshFunction) {
       @Override
-      protected List<ChunkInfo> getChunkInfos() throws IOException {
-        acquireClient();
+      protected List<ChunkInfo> getChunkInfoListUsingClient() {
         return chunks;
       }
 
