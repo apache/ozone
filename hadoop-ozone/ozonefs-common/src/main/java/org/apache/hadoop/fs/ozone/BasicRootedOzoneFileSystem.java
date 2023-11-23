@@ -538,7 +538,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   /**
    * A public class implementation for storing the deletion results.
    */
-  public class InnerDeleteResult {
+  public static class InnerDeleteResult {
     private boolean success;
     private boolean partiallyDeleted;
 
@@ -586,9 +586,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // deleteObject and issue deletes for other keys and set partiallyDeleted
       // to true
       if (recursive && !succeed) {
-        if (!isPartiallyComplete()) {
-          setPartiallyComplete(true);
-        }
+        setPartiallyComplete(true);
       }
       return recursive || succeed;
     }
@@ -683,7 +681,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public InnerDeleteResult getDeleteResult(Path f, boolean recursive)
+  public InnerDeleteResult getDeleteResponse(Path f, boolean recursive)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
@@ -766,7 +764,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    return getDeleteResult(f, recursive).isSuccess();
+    return getDeleteResponse(f, recursive).isSuccess();
   }
 
   private InnerDeleteResult deleteBucket(Path f, boolean recursive,

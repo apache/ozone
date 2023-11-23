@@ -149,6 +149,9 @@ public final class OzoneFsDelete {
           throw new PathIOException(item.toString());
         }
       }
+      if (innerDeleteResult != null && !innerDeleteResult.isSuccess()) {
+        throw new PathIOException(item.toString());
+      }
       if (innerDeleteResult != null && innerDeleteResult.isPartiallyDeleted()) {
         out.println(
             "Path might not have been deleted completely: " + item + (trailing ?
