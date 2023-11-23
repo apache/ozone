@@ -36,9 +36,8 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.slf4j.event.Level;
@@ -57,6 +56,10 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -76,7 +79,7 @@ public class TestRatisOverReplicationHandler {
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
-  @Before
+  @BeforeEach
   public void setup() throws NodeNotFoundException, NotLeaderException,
       CommandTargetOverloadedException {
     container = createContainer(HddsProtos.LifeCycleState.CLOSED,
@@ -263,8 +266,7 @@ public class TestRatisOverReplicationHandler {
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
     Set<DatanodeDetails> datanodes =
         commands.stream().map(Pair::getKey).collect(Collectors.toSet());
-    Assert.assertTrue(
-        datanodes.contains(quasiClosedReplica.getDatanodeDetails()));
+    assertTrue(datanodes.contains(quasiClosedReplica.getDatanodeDetails()));
   }
 
   @Test
@@ -287,9 +289,9 @@ public class TestRatisOverReplicationHandler {
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     Set<DatanodeDetails> datanodes =
         commands.stream().map(Pair::getKey).collect(Collectors.toSet());
-    Assert.assertFalse(
+    assertFalse(
         datanodes.contains(decommissioningReplica.getDatanodeDetails()));
-    Assert.assertFalse(
+    assertFalse(
         datanodes.contains(maintenanceReplica.getDatanodeDetails()));
   }
 
@@ -374,9 +376,9 @@ public class TestRatisOverReplicationHandler {
     } catch (CommandTargetOverloadedException e) {
       // Expected
     }
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    Assert.assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
+    assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
         cmd.getKey());
   }
 
@@ -410,7 +412,7 @@ public class TestRatisOverReplicationHandler {
 
     handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 2);
-    Assert.assertEquals(2, commandsSent.size());
+    assertEquals(2, commandsSent.size());
   }
 
   /**
@@ -434,7 +436,7 @@ public class TestRatisOverReplicationHandler {
 
     handler.processAndSendCommands(replicas, pendingOps,
             healthResult, 2);
-    Assert.assertEquals(expectNumCommands, commandsSent.size());
+    assertEquals(expectNumCommands, commandsSent.size());
 
     return commandsSent;
   }
