@@ -93,7 +93,8 @@ public class TestOzoneManagerServiceProviderImpl {
   private CommonUtils commonUtils;
 
   @BeforeEach
-  public void setUp(@TempDir File dirReconSnapDB, @TempDir File dirReconDB) throws Exception {
+  public void setUp(@TempDir File dirReconSnapDB, @TempDir File dirReconDB)
+      throws Exception {
     configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
         dirReconSnapDB.getAbsolutePath());
@@ -105,7 +106,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testUpdateReconOmDBWithNewSnapshot(@TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testUpdateReconOmDBWithNewSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     OMMetadataManager omMetadataManager =
         initializeNewOmMetadataManager(dirOmMetadata);
@@ -149,7 +152,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testReconOmDBCloseAndOpenNewSnapshotDb(@TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testReconOmDBCloseAndOpenNewSnapshotDb(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
     OMMetadataManager omMetadataManager =
         initializeNewOmMetadataManager(dirOmMetadata);
     ReconOMMetadataManager reconOMMetadataManager =
@@ -192,7 +197,8 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testGetOzoneManagerDBSnapshot(@TempDir File dirReconMetadata) throws Exception {
+  public void testGetOzoneManagerDBSnapshot(@TempDir File dirReconMetadata)
+      throws Exception {
 
     File checkpointDir = Paths.get(dirReconMetadata.getAbsolutePath(),
         "testGetOzoneManagerDBSnapshot").toFile();
@@ -202,7 +208,7 @@ public class TestOzoneManagerServiceProviderImpl {
         .toFile();
     String str = "File1 Contents";
 
-    try(BufferedWriter writer1 = new BufferedWriter(new OutputStreamWriter(
+    try (BufferedWriter writer1 = new BufferedWriter(new OutputStreamWriter(
         new FileOutputStream(file1), UTF_8))) {
       writer1.write(str);
     }
@@ -210,7 +216,7 @@ public class TestOzoneManagerServiceProviderImpl {
     File file2 = Paths.get(checkpointDir.getAbsolutePath(), "file2")
         .toFile();
     str = "File2 Contents";
-    try(BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
         new FileOutputStream(file2), UTF_8))) {
       writer.write(str);
     }
@@ -250,7 +256,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testGetAndApplyDeltaUpdatesFromOM(@TempDir File dirSrcOmMetadata, @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testGetAndApplyDeltaUpdatesFromOM(
+      @TempDir File dirSrcOmMetadata, @TempDir File dirOmMetadata,
+      @TempDir File dirReconMetadata) throws Exception {
 
     // Writing 2 Keys into a source OM DB and collecting it in a
     // DBUpdatesWrapper.
@@ -310,7 +318,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testGetAndApplyDeltaUpdatesFromOMWithLimit(@TempDir File dirSrcOmMetadata, @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testGetAndApplyDeltaUpdatesFromOMWithLimit(
+      @TempDir File dirSrcOmMetadata, @TempDir File dirOmMetadata,
+      @TempDir File dirReconMetadata) throws Exception {
 
     // Writing 2 Keys into a source OM DB and collecting it in a
     // DBUpdatesWrapper.
@@ -383,7 +393,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testSyncDataFromOMFullSnapshot(@TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testSyncDataFromOMFullSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     // Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
@@ -420,7 +432,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testSyncDataFromOMDeltaUpdates(@TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testSyncDataFromOMDeltaUpdates(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
@@ -459,7 +473,9 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testSyncDataFromOMFullSnapshotForSNNFE(@TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+  public void testSyncDataFromOMFullSnapshotForSNNFE(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(

@@ -68,7 +68,8 @@ public class TestReconUtils {
   }
 
   @Test
-  public void testCreateTarFile(@TempDir File tempSnapshotDir) throws Exception {
+  public void testCreateTarFile(@TempDir File tempSnapshotDir)
+      throws Exception {
 
     FileInputStream fis = null;
     FileOutputStream fos = null;
@@ -103,7 +104,8 @@ public class TestReconUtils {
   @Test
   public void testUntarCheckpointFile() throws Exception {
 
-    File newDir = Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile();
+    File newDir = Files.createDirectory(
+        temporaryFolder.resolve("NewDir")).toFile();
     File file1 = Paths.get(newDir.getAbsolutePath(), "file1")
         .toFile();
     String str = "File1 Contents";
@@ -122,7 +124,8 @@ public class TestReconUtils {
 
     //Create test tar file.
     File tarFile = createTarFile(newDir.toPath());
-    File outputDir = Files.createDirectory(temporaryFolder.resolve("OutputDir")).toFile();
+    File outputDir = Files.createDirectory(
+        temporaryFolder.resolve("OutputDir")).toFile();
     new ReconUtils().untarCheckpointFile(tarFile, outputDir.toPath());
 
     assertTrue(outputDir.isDirectory());
