@@ -180,7 +180,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   public void connect() throws Exception {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Connecting to pipeline:{} datanode:{}", getPipeline().getId(),
-          RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
+          RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
     if (!client.compareAndSet(null,

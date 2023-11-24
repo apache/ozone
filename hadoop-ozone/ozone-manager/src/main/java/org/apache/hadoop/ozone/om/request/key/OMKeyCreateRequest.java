@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,7 +142,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  bucket/key/volume or not and also with out any authorization checks.
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
-
+      UserInfo userInfo = getUserInfo();
       List<OmKeyLocationInfo> omKeyLocationInfoList =
           allocateBlock(ozoneManager.getScmClient(),
               ozoneManager.getBlockTokenSecretManager(), repConfig,
@@ -149,7 +150,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
               ozoneManager.getOMServiceId(),
-              ozoneManager.getMetrics());
+              ozoneManager.getMetrics(),
+              keyArgs.getSortDatanodes(),
+              userInfo);
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)

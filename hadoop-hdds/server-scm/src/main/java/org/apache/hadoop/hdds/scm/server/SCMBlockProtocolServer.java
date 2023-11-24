@@ -30,7 +30,9 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -179,7 +181,8 @@ public class SCMBlockProtocolServer implements
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      String owner, ExcludeList excludeList,
+      String clientMachine
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
@@ -198,6 +201,13 @@ public class SCMBlockProtocolServer implements
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
+          // Sort the datanodes if client machine is specified
+          if (StringUtils.isNotEmpty(clientMachine)) {
+            List<String> uuidList = HddsUtils.toNodeUuid(
+                block.getPipeline().getNodes());
+            block.getPipeline().setNodesInOrder(
+                sortDatanodes(uuidList, clientMachine));
+          }
         }
       }
 
