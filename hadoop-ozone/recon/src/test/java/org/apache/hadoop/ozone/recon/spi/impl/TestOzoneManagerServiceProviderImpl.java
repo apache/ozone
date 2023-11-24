@@ -223,31 +223,32 @@ public class TestOzoneManagerServiceProviderImpl {
 
     //Create test tar file.
     File tarFile = createTarFile(checkpointDir.toPath());
-    InputStream fileInputStream = new FileInputStream(tarFile);
-    ReconUtils reconUtilsMock = getMockReconUtils();
-    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock);
-    when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
-    ReconOMMetadataManager reconOMMetadataManager =
-        mock(ReconOMMetadataManager.class);
-    ReconTaskController reconTaskController = getMockTaskController();
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol);
+    try (InputStream fileInputStream = new FileInputStream(tarFile)) {
+      ReconUtils reconUtilsMock = getMockReconUtils();
+      HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+      when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
+      when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+          .thenReturn(httpURLConnectionMock);
+      when(reconUtilsMock.getReconNodeDetails(
+          any(OzoneConfiguration.class))).thenReturn(
+          commonUtils.getReconNodeDetails());
+      ReconOMMetadataManager reconOMMetadataManager =
+          mock(ReconOMMetadataManager.class);
+      ReconTaskController reconTaskController = getMockTaskController();
+      OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+          new OzoneManagerServiceProviderImpl(configuration,
+              reconOMMetadataManager, reconTaskController, reconUtilsMock,
+              ozoneManagerProtocol);
 
-    DBCheckpoint checkpoint = ozoneManagerServiceProvider
-        .getOzoneManagerDBSnapshot();
-    assertNotNull(checkpoint);
-    assertTrue(checkpoint.getCheckpointLocation().toFile().isDirectory());
+      DBCheckpoint checkpoint = ozoneManagerServiceProvider
+          .getOzoneManagerDBSnapshot();
+      assertNotNull(checkpoint);
+      assertTrue(checkpoint.getCheckpointLocation().toFile().isDirectory());
 
-    File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
-    assertNotNull(files);
-    assertEquals(2, files.length);
+      File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
+      assertNotNull(files);
+      assertEquals(2, files.length);
+    }
   }
 
 
