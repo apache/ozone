@@ -129,7 +129,7 @@ public class TestOmBucketReadWriteKeyOps {
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
               .setTotalThreadCount(10).setNumOfReadOperations(5)
               .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3).setKeySizeInBytes(64)
+              .setKeyCountForWrite(3).setKeySize("64B")
               .setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
@@ -161,7 +161,7 @@ public class TestOmBucketReadWriteKeyOps {
             "-b", parameterBuilder.bucketName,
             "-k", String.valueOf(parameterBuilder.keyCountForRead),
             "-w", String.valueOf(parameterBuilder.keyCountForWrite),
-            "-g", String.valueOf(parameterBuilder.keySizeInBytes),
+            "-g", parameterBuilder.keySize,
             "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
@@ -242,7 +242,7 @@ public class TestOmBucketReadWriteKeyOps {
     private String bucketName = "bucket1";
     private int keyCountForRead = 100;
     private int keyCountForWrite = 10;
-    private long keySizeInBytes = 256;
+    private String keySize = "256B";
     private int bufferSize = 64;
     private int length = 10;
     private int totalThreadCount = 100;
@@ -270,8 +270,8 @@ public class TestOmBucketReadWriteKeyOps {
       return this;
     }
 
-    private ParameterBuilder setKeySizeInBytes(long keySizeInBytesParam) {
-      keySizeInBytes = keySizeInBytesParam;
+    private ParameterBuilder setKeySize(String keySizeParam) {
+      keySize = keySizeParam;
       return this;
     }
 

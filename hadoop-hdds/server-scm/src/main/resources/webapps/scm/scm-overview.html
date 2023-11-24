@@ -69,22 +69,35 @@
        </tr>
     </tbody>
 </table>
-<div>
-    <nav aria-label="...">
-        <ul class="pagination">
-            <li class="page-item" ng-class="{disabled:currentPage==1}"
-                ng-click="handlePagination(currentPage-1,(currentPage==1))">
-                <span class="page-link" tabindex="-1">Previous</span>
-            </li>
-            <li class="page-item active">
-                <span class="page-link">{{currentPage}} </span>
-            </li>
-            <li class="page-item" ng-class="{disabled:lastIndex==currentPage}"
-                ng-click="handlePagination(currentPage+1, (lastIndex==currentPage))">
-                <span class="page-link" tabindex="-1">Next</span>
-            </li>
-        </ul>
-    </nav>
+
+<div class="row">
+    <div class="col-md-6 text-left">
+        <label>Page:</label>
+        <select class="form-select" ng-model="currentPage" ng-change="handlePagination(currentPage, false)">
+            <option ng-repeat="page in getPagesArray()" ng-value="page">{{page}}</option>
+        </select>
+        <span>of {{lastIndex}}. </span>
+        <span ng-if="nodeStatus && nodeStatus.length > 0">
+            Showing {{getCurrentPageFirstItemIndex()}} to {{getCurrentPageLastItemIndex()}} of the total {{totalItems}} entries.
+        </span>
+    </div>
+    <div class="col-md-6 text-right">
+        <nav aria-label="..." ng-show="RecordsToDisplay !== 'All'">
+            <ul class="pagination" style="margin: 0; padding: 0">
+                <li class="page-item" ng-class="{disabled:currentPage==1}"
+                    ng-click="handlePagination(currentPage-1,(currentPage==1))">
+                    <span class="page-link" tabindex="-1">Previous</span>
+                </li>
+                <li class="page-item active">
+                    <span class="page-link">{{currentPage}} </span>
+                </li>
+                <li class="page-item" ng-class="{disabled:lastIndex==currentPage}"
+                    ng-click="handlePagination(currentPage+1, (lastIndex==currentPage))">
+                    <span class="page-link" tabindex="-1">Next</span>
+                </li>
+            </ul>
+        </nav>
+    </div>
 </div>
 
 <h2>Status</h2>

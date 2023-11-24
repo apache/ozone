@@ -62,7 +62,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </organization>
 
   <properties>
-    <hadoop2.version>2.7.3</hadoop2.version>
+    <hadoop2.version>2.10.2</hadoop2.version>
     <hadoop.version>3.3.6</hadoop.version>
 
     <!-- version for hdds/ozone components -->
@@ -75,10 +75,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>2.5.1</ratis.version>
+    <ratis.version>3.0.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.4</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.5</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -237,7 +237,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Use netty version known to work with grpc-netty. See table: -->
     <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
     <netty.version>4.1.100.Final</netty.version>
-    <io.grpc.version>1.51.1</io.grpc.version>
+    <io.grpc.version>1.58.0</io.grpc.version>
 
     <rocksdb.version>7.7.3</rocksdb.version>
     <sqlite.version>3.41.2.2</sqlite.version>
@@ -1040,6 +1040,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <artifactId>ratis-server</artifactId>
+        <groupId>org.apache.ratis</groupId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
+        <artifactId>ratis-metrics-dropwizard3</artifactId>
         <groupId>org.apache.ratis</groupId>
         <version>${ratis.version}</version>
       </dependency>
