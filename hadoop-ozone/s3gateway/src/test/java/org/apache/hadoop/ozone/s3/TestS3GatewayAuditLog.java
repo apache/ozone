@@ -117,7 +117,7 @@ public class TestS3GatewayAuditLog {
 
     bucketEndpoint.head(bucketName);
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {bucket=[bucket]} performance=null | ret=SUCCESS";
+        "op=HEAD_BUCKET {bucket=[bucket]} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -126,7 +126,7 @@ public class TestS3GatewayAuditLog {
 
     rootEndpoint.get().getEntity();
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=LIST_S3_BUCKETS {} performance=null | ret=SUCCESS";
+        "op=LIST_S3_BUCKETS {} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -145,8 +145,7 @@ public class TestS3GatewayAuditLog {
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {bucket=[bucket], path=[key1]} performance=null |" +
-        " ret=SUCCESS";
+        "op=HEAD_KEY {bucket=[bucket], path=[key1]} | ret=SUCCESS";
     verifyLog(expected);
 
   }

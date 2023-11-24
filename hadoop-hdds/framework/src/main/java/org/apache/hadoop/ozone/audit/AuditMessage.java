@@ -127,9 +127,10 @@ public final class AuditMessage implements Message {
   private String formMessage(String userStr, String ipStr, String opStr,
       Map<String, String> paramsMap, String retStr,
       Map<String, String> performanceMap) {
+    String perf = performanceMap != null && !performanceMap.isEmpty()
+        ? " | perf=" + performanceMap
+        : "";
     return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
-        + " " + paramsMap + " performance=" + performanceMap
-        + " | ret=" + retStr;
-
+        + " " + paramsMap + " | ret=" + retStr + perf;
   }
 }
