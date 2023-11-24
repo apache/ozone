@@ -1,5 +1,8 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +102,28 @@ public class OpenKeyTableHandler implements OmTableHandler {
       LOG.warn("Update event does not have the Key Info for {}.",
           event.getKey());
     }
+  }
+
+  @Override
+  public Triple<Long, Long, Long> getTableSizeAndCount(
+      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
+      throws IOException {
+    long count = 0;
+    long unReplicatedSize = 0;
+    long replicatedSize = 0;
+
+    if (iterator != null) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, ?> kv = iterator.next();
+        if (kv != null && kv.getValue() != null) {
+          OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
+          unReplicatedSize += omKeyInfo.getDataSize();
+          replicatedSize += omKeyInfo.getReplicatedSize();
+          count++;
+        }
+      }
+    }
+    return Triple.of(count, unReplicatedSize, replicatedSize);
   }
 
   public static String getTableCountKeyFromTable(String tableName) {

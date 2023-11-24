@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -83,5 +84,10 @@ public class ReconNamespaceSummaryManagerImpl
 
   public Table getNSSummaryTable() {
     return nsSummaryTable;
+  }
+
+  @VisibleForTesting
+  public void setNsSummaryTable(Table<Long, NSSummary> nsSummaryTable) {
+    this.nsSummaryTable = nsSummaryTable;
   }
 }

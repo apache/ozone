@@ -43,6 +43,7 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
 
   private static GlobalStatsDao globalStatsDao;
   private static OmTableInsightTask omTableInsightTask;
+  private static DeletedDirectoryTableHandler deletedDirectoryTableHandler;
   private static DSLContext dslContext;
   private boolean isSetupDone = false;
   private static ReconOMMetadataManager reconOMMetadataManager;
@@ -311,10 +312,12 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
     // Testing DELETE events
     // Create 2 OMDBUpdateEvent instances for 2 different deletedDirectory paths
     ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
-    deleteEvents.add(getOMUpdateEvent(paths.get(0), mock(OmKeyInfo.class),
-        DELETED_DIR_TABLE, DELETE, null));
-    deleteEvents.add(getOMUpdateEvent(paths.get(2), mock(OmKeyInfo.class),
-        DELETED_DIR_TABLE, DELETE, null));
+    deleteEvents.add(getOMUpdateEvent(paths.get(0),
+        getOmKeyInfo("vol1", "bucket1", DIR_ONE, 1L, false), DELETED_DIR_TABLE,
+        DELETE, null));
+    deleteEvents.add(getOMUpdateEvent(paths.get(2),
+        getOmKeyInfo("vol1", "bucket1", DIR_ONE, 3L, false), DELETED_DIR_TABLE,
+        DELETE, null));
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
     omTableInsightTask.process(deleteEventBatch);
     // After 2 DELETEs, size should be 8000-(1000+2000) = 3000
@@ -323,40 +326,44 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocessForCount() throws Exception {
+  public void testReprocessForCount2() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
 
     // Mock 5 rows in each table and test the count
     for (String tableName : omTableInsightTask.getTaskTables()) {
       TypedTable<String, Object> table = mock(TypedTable.class);
-      TypedTable.TypedTableIterator mockIter = mock(TypedTable
-          .TypedTableIterator.class);
+      TypedTable.TypedTableIterator mockIter =
+          mock(TypedTable.TypedTableIterator.class);
       when(table.iterator()).thenReturn(mockIter);
       when(omMetadataManager.getTable(tableName)).thenReturn(table);
-      when(mockIter.hasNext())
-          .thenReturn(true)
-          .thenReturn(true)
-          .thenReturn(true)
-          .thenReturn(true)
-          .thenReturn(true)
-          .thenReturn(false);
+      when(mockIter.hasNext()).thenReturn(true, true, true, true, true, false);
+
       TypedTable.TypedKeyValue mockKeyValue =
           mock(TypedTable.TypedKeyValue.class);
-      when(mockKeyValue.getValue()).thenReturn(mock(OmKeyInfo.class));
+
+      if (tableName.equals(DELETED_TABLE)) {
+        RepeatedOmKeyInfo keyInfo = mock(RepeatedOmKeyInfo.class);
+        when(keyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
+        when(keyInfo.getOmKeyInfoList()).thenReturn(
+            Arrays.asList(mock(OmKeyInfo.class)));
+        when(mockKeyValue.getValue()).thenReturn(keyInfo);
+      } else {
+        when(mockKeyValue.getValue()).thenReturn(mock(OmKeyInfo.class));
+      }
+
       when(mockIter.next()).thenReturn(mockKeyValue);
     }
 
     Pair<String, Boolean> result =
         omTableInsightTask.reprocess(omMetadataManager);
-    assertTrue(result.getRight());
 
+    assertTrue(result.getRight());
     assertEquals(5L, getCountForTable(KEY_TABLE));
     assertEquals(5L, getCountForTable(VOLUME_TABLE));
     assertEquals(5L, getCountForTable(BUCKET_TABLE));
     assertEquals(5L, getCountForTable(OPEN_KEY_TABLE));
     assertEquals(5L, getCountForTable(DELETED_TABLE));
   }
-
 
   @Test
   public void testReprocessForOpenKeyTable() throws Exception {
@@ -426,14 +433,29 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
     // Create 5 put, 1 delete and 1 update event for each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
       for (int i = 0; i < 5; i++) {
-        events.add(getOMUpdateEvent("item" + i, null, tableName, PUT, null));
+        if(tableName.equals(DELETED_TABLE)) {
+          RepeatedOmKeyInfo repeatedKeyInfo = mock(RepeatedOmKeyInfo.class);
+          when(repeatedKeyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
+          when(repeatedKeyInfo.getOmKeyInfoList()).thenReturn(
+              Arrays.asList(mock(OmKeyInfo.class)));
+          events.add(getOMUpdateEvent("item" + i, repeatedKeyInfo,
+              tableName, PUT, 100L));
+          // for delete event, if value is set to null, the counter will not be
+          // decremented. This is because the value will be null if item does not
+          // exist in the database and there is no need to delete.
+          events.add(getOMUpdateEvent("item0",repeatedKeyInfo, tableName,
+              DELETE, null));
+        } else {
+          events.add(getOMUpdateEvent("item" + i, mock(OmKeyInfo.class),
+              tableName, PUT, null));
+          // for delete event, if value is set to null, the counter will not be
+          // decremented. This is because the value will be null if item does not
+          // exist in the database and there is no need to delete.
+          events.add(getOMUpdateEvent("item0", mock(OmKeyInfo.class), tableName,
+              DELETE, null));
+        }
+        events.add(getOMUpdateEvent("item1", null, tableName, UPDATE, null));
       }
-      // for delete event, if value is set to null, the counter will not be
-      // decremented. This is because the value will be null if item does not
-      // exist in the database and there is no need to delete.
-      events.add(getOMUpdateEvent("item0", mock(OmKeyInfo.class), tableName,
-          DELETE, null));
-      events.add(getOMUpdateEvent("item1", null, tableName, UPDATE, null));
     }
     OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(events);
     omTableInsightTask.process(omUpdateEventBatch);

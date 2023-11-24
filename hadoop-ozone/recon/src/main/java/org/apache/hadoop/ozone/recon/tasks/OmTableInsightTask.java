@@ -52,7 +52,7 @@ import static org.jooq.impl.DSL.*;
  */
 public class OmTableInsightTask implements ReconOmTask {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmTableInsightTask2.class);
+      LoggerFactory.getLogger(OmTableInsightTask.class);
 
   private GlobalStatsDao globalStatsDao;
   private Configuration sqlConfiguration;
@@ -62,7 +62,7 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, OmTableHandler> tableHandlers;
 
   @Inject
-  public OmTableInsightTask2(GlobalStatsDao globalStatsDao,
+  public OmTableInsightTask(GlobalStatsDao globalStatsDao,
                              Configuration sqlConfiguration,
                              ReconOMMetadataManager reconOMMetadataManager,
                              ReconNamespaceSummaryManagerImpl
@@ -106,12 +106,11 @@ public class OmTableInsightTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
 
-      try (
-          TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-              = table.iterator()) {
+      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
+               = table.iterator()) {
         if (getTablesToCalculateSize().contains(tableName)) {
-          Triple<Long, Long, Long> details = getTableSizeAndCount(iterator,
-              tableName);
+          Triple<Long, Long, Long> details =
+              tableHandlers.get(tableName).getTableSizeAndCount(iterator);
           objectCountMap.put(getTableCountKeyFromTable(tableName),
               details.getLeft());
           unReplicatedSizeCountMap.put(
@@ -140,83 +139,6 @@ public class OmTableInsightTask implements ReconOmTask {
 
     LOG.info("Completed a 'reprocess' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
-  }
-
-  /**
-   * Returns a triple with the total count of records (left), total unreplicated
-   * size (middle), and total replicated size (right) in the given iterator.
-   * Increments count for each record and adds the dataSize if a record's value
-   * is an instance of OmKeyInfo,RepeatedOmKeyInfo.
-   * If the iterator is null, returns (0, 0, 0).
-   *
-   * @param iterator The iterator over the table to be iterated.
-   * @param tableName The name of the table being iterated.
-   * @return A Triple with three Long values representing the count,
-   *         unreplicated size and replicated size.
-   * @throws IOException If an I/O error occurs during the iterator traversal.
-   */
-  private Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator,
-      String tableName)
-      throws IOException {
-    long count = 0;
-    long unReplicatedSize = 0;
-    long replicatedSize = 0;
-
-    boolean isFileTable = tableName.equals(OPEN_FILE_TABLE);
-    boolean isKeyTable = tableName.equals(OPEN_KEY_TABLE);
-    boolean isDeletedDirTable = tableName.equals(DELETED_DIR_TABLE);
-
-    if (iterator != null) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, ?> kv = iterator.next();
-        if (kv != null && kv.getValue() != null) {
-          if (kv.getValue() instanceof OmKeyInfo) {
-            OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
-            if (isFileTable || isKeyTable) {
-              unReplicatedSize += omKeyInfo.getDataSize();
-              replicatedSize += omKeyInfo.getReplicatedSize();
-            } else if (isDeletedDirTable) {
-              unReplicatedSize +=
-                  fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
-            }
-            count++;
-          }
-          if (kv.getValue() instanceof RepeatedOmKeyInfo) {
-            RepeatedOmKeyInfo repeatedOmKeyInfo = (RepeatedOmKeyInfo) kv
-                .getValue();
-            Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-            unReplicatedSize += result.getRight();
-            replicatedSize += result.getLeft();
-            // Since we can have multiple deleted keys of same name
-            count += repeatedOmKeyInfo.getOmKeyInfoList().size();
-          }
-        }
-      }
-    }
-
-    return Triple.of(count, unReplicatedSize, replicatedSize);
-  }
-
-  /**
-   * Given an object ID, return total data size (no replication)
-   * under this object. Note:- This method is RECURSIVE.
-   *
-   * @param objectId the object's ID
-   * @return total used data size in bytes
-   * @throws IOException ioEx
-   */
-  protected long fetchSizeForDeletedDirectory(long objectId)
-      throws IOException {
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return 0L;
-    }
-    long totalSize = nsSummary.getSizeOfFiles();
-    for (long childId : nsSummary.getChildDir()) {
-      totalSize += fetchSizeForDeletedDirectory(childId);
-    }
-    return totalSize;
   }
 
   /**
@@ -346,6 +268,9 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
 
+  /**
+   * Handle update events for size related tables.
+   */
   private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName,
                                  Collection<String> sizeRelatedTables,
@@ -364,7 +289,11 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
-
+  /**
+   * Write the updated count and size information to the database.
+   *
+   * @param dataMap Map containing the updated count and size information.
+   */
   private void writeDataToDB(Map<String, Long> dataMap) {
     List<GlobalStats> insertGlobalStats = new ArrayList<>();
     List<GlobalStats> updateGlobalStats = new ArrayList<>();
@@ -388,6 +317,11 @@ public class OmTableInsightTask implements ReconOmTask {
     globalStatsDao.update(updateGlobalStats);
   }
 
+  /**
+   * Initializes and returns a count map with the counts for the tables.
+   *
+   * @return The count map containing the counts for each table.
+   */
   private HashMap<String, Long> initializeCountMap() {
     Collection<String> tables = getTaskTables();
     HashMap<String, Long> objectCountMap = new HashMap<>(tables.size());
@@ -442,7 +376,7 @@ public class OmTableInsightTask implements ReconOmTask {
 
   @VisibleForTesting
   public void setNsSummaryTable(Table<Long, NSSummary> nsSummaryTable) {
-    this.nsSummaryTable = nsSummaryTable;
+    this.reconNamespaceSummaryManager.setNsSummaryTable(nsSummaryTable);
   }
 
 }
