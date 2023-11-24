@@ -95,6 +95,14 @@ public class KeyOutputStream extends OutputStream
 
   private long clientID;
 
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
+
   public KeyOutputStream(ReplicationConfig replicationConfig,
       ContainerClientMetrics clientMetrics) {
     this.replication = replicationConfig;
@@ -142,7 +150,8 @@ public class KeyOutputStream extends OutputStream
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics,
+      boolean atomicKeyCreation
   ) {
     this.config = config;
     this.replication = replicationConfig;
@@ -163,6 +172,7 @@ public class KeyOutputStream extends OutputStream
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
+    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -555,6 +565,12 @@ public class KeyOutputStream extends OutputStream
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
+      if (atomicKeyCreation) {
+        long expectedSize = blockOutputStreamEntryPool.getDataSize();
+        Preconditions.checkState(expectedSize == offset,
+            String.format("Expected: %d and actual %d write sizes do not match",
+                expectedSize, offset));
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
@@ -591,6 +607,7 @@ public class KeyOutputStream extends OutputStream
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
     private ContainerClientMetrics clientMetrics;
+    private boolean atomicKeyCreation = false;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -677,6 +694,11 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
+    public Builder setAtomicKeyCreation(boolean atomicKey) {
+      this.atomicKeyCreation = atomicKey;
+      return this;
+    }
+
     public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
       this.clientMetrics = clientMetrics;
       return this;
@@ -684,6 +706,10 @@ public class KeyOutputStream extends OutputStream
 
     public ContainerClientMetrics getClientMetrics() {
       return clientMetrics;
+    }
+
+    public boolean getAtomicKeyCreation() {
+      return atomicKeyCreation;
     }
 
     public KeyOutputStream build() {
@@ -698,7 +724,8 @@ public class KeyOutputStream extends OutputStream
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion,
-          clientMetrics);
+          clientMetrics,
+          atomicKeyCreation);
     }
 
   }

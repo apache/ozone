@@ -22,6 +22,7 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -145,18 +146,24 @@ final class ObjectEndpointStreaming {
                                             String uploadID, int chunkSize,
                                             DigestInputStream body)
       throws IOException, OS3Exception {
-    OzoneDataStreamOutput streamOutput = null;
     String eTag;
     S3GatewayMetrics metrics = S3GatewayMetrics.create();
+    // OmMultipartCommitUploadPartInfo can only be gotten after the
+    // OzoneDataStreamOutput is closed, so we need to save the
+    // KeyDataStreamOutput in the OzoneDataStreamOutput and use it to get the
+    // OmMultipartCommitUploadPartInfo after OzoneDataStreamOutput is closed.
+    KeyDataStreamOutput keyDataStreamOutput = null;
     try {
-      streamOutput = ozoneBucket
-          .createMultipartStreamKey(key, length, partNumber, uploadID);
-      long putLength =
-          writeToStreamOutput(streamOutput, body, chunkSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
-          .toLowerCase();
-      ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
-      metrics.incPutKeySuccessLength(putLength);
+      try (OzoneDataStreamOutput streamOutput = ozoneBucket
+          .createMultipartStreamKey(key, length, partNumber, uploadID)) {
+        long putLength =
+            writeToStreamOutput(streamOutput, body, chunkSize, length);
+        eTag = DatatypeConverter.printHexBinary(
+            body.getMessageDigest().digest()).toLowerCase();
+        ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
+        metrics.incPutKeySuccessLength(putLength);
+        keyDataStreamOutput = streamOutput.getKeyDataStreamOutput();
+      }
     } catch (OMException ex) {
       if (ex.getResult() ==
           OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
@@ -168,10 +175,9 @@ final class ObjectEndpointStreaming {
       }
       throw ex;
     } finally {
-      if (streamOutput != null) {
-        streamOutput.close();
+      if (keyDataStreamOutput != null) {
         OmMultipartCommitUploadPartInfo commitUploadPartInfo =
-            streamOutput.getCommitUploadPartInfo();
+            keyDataStreamOutput.getCommitUploadPartInfo();
         eTag = commitUploadPartInfo.getPartName();
       }
     }

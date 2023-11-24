@@ -31,10 +31,11 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import org.apache.http.HttpStatus;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests delete bucket functionality.
@@ -46,7 +47,7 @@ public class TestBucketDelete {
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     //Create client stub and object store stub.

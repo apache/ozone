@@ -37,6 +37,8 @@ ozone.security.enabled| *true*
 ozone.security.http.kerberos.enabled| *true*
 ozone.acl.enabled| *true*
 
+Checkout an interactive version of the API powered by Swagger [here]({{< relref "./SwaggerReconApi.md" >}})
+
 ## Containers (admin only)
 
 ### GET /api/v1/containers

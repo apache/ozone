@@ -228,6 +228,17 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
+                               String snapshotName) throws IOException;
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name
@@ -577,4 +588,14 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return {@link BlockGroup}
    */
   List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
+
+  /**
+   * Given a volume/bucket, check whether it contains incomplete MPUs.
+   *
+   * @param volume - Volume name
+   * @param bucket - Bucket name
+   * @return true if the bucket is empty
+   */
+  boolean containsIncompleteMPUs(String volume, String bucket)
+      throws IOException;
 }

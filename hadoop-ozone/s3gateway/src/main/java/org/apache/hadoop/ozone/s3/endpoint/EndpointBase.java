@@ -127,9 +127,10 @@ public abstract class EndpointBase implements Auditor {
         signatureInfo.getSignature(),
         signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
-    getClient().getObjectStore()
-        .getClientProxy()
-        .setThreadLocalS3Auth(s3Auth);
+    ClientProtocol clientProtocol =
+        getClient().getObjectStore().getClientProxy();
+    clientProtocol.setThreadLocalS3Auth(s3Auth);
+    clientProtocol.setIsS3Request(true);
     init();
   }
 
