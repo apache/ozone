@@ -566,8 +566,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       return false;
     }
 
-    return getMatchingReplicaCount() >= repFactor &&
-        getMatchingReplicaCount() - repFactor >= inFlightDel;
+    return getMatchingReplicaCount() >= repFactor;
   }
 
   /**

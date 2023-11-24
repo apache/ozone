@@ -42,6 +42,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
  * and current replica details, along with replicas pending add and delete,
  * this class will return a ContainerHealthResult indicating if the container
  * is healthy, or under / over replicated etc.
+ * <p>
+ * For example, this class handles:
+ * <ul>
+ *   <li>A CLOSED container with 4 CLOSED replicas.</li>
+ *   <li>A CLOSED container with 1 CLOSED replica.</li>
+ *   <li>A CLOSED container with 3 CLOSED and 1 UNHEALTHY replica. Or 3
+ *   CLOSED and 1 QUASI_CLOSED replica with incorrect sequence ID.</li>
+ *   <li>etc.</li>
+ * </ul>
  */
 public class RatisReplicationCheckHandler extends AbstractCheck {
   public static final Logger LOG =
@@ -126,7 +135,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending() &&
-          !overHealth.hasMismatchedReplicas()) {
+          !overHealth.hasMismatchedReplicas() &&
+          overHealth.isSafelyOverReplicated()) {
         /*
         A mis matched replica is one whose state does not match the
         container's state and the state is not UNHEALTHY.
@@ -138,9 +148,12 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         request.getReplicationQueue().enqueue(overHealth);
       }
       LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +
-              " is [{}]. hasMismatchedReplicas is [{}]", container,
+              " is [{}]. hasMismatchedReplicas is [{}]. " +
+              "isSafelyOverReplicated is [{}].",
+          container,
           overHealth.isReplicatedOkAfterPending(),
-          overHealth.hasMismatchedReplicas());
+          overHealth.hasMismatchedReplicas(),
+          overHealth.isSafelyOverReplicated());
       return true;
     }
 
@@ -195,7 +208,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     that other than checking over replication of healthy replicas (such as 4
     CLOSED replicas of a CLOSED container), we're also checking for an excess
     of UNHEALTHY replicas (such as 3 CLOSED and 1 UNHEALTHY replicas of a
-    CLOSED container).
+    CLOSED container, or 3 CLOSED and 1 QUASI_CLOSED with incorrect sequence
+    ID for a CLOSED container).
      */
     RatisContainerReplicaCount consideringUnhealthy =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,

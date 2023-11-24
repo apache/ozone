@@ -373,6 +373,52 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testClosedContainerWithOverReplicatedAllUnhealthy()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(),
+            ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0, 0);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assertions.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assertions.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assertions.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assertions.assertEquals(1, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testClosedContainerWithExcessUnhealthy()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(),
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assertions.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assertions.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assertions.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assertions.assertEquals(1, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
   public void testQuasiClosedContainerWithUnhealthyReplicaOnUniqueOrigin()
       throws IOException, NodeNotFoundException {
     RatisReplicationConfig ratisRepConfig =

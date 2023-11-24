@@ -642,13 +642,11 @@ class TestRatisContainerReplicaCount {
    * A container is safely over replicated if:
    * 1. It is over replicated.
    * 2. Has at least replication factor number of matching replicas.
-   * 3. # matching replicas - replication factor >= pending deletes.
    */
   @Test
   void testSafelyOverReplicated() {
     /*
     First case: 3 CLOSED, 2 UNHEALTHY, 1 pending delete.
-    Expectation: Not safely over replicated because rule 3 is violated.
      */
     ContainerInfo container =
         createContainerInfo(RatisReplicationConfig.getInstance(
@@ -666,12 +664,13 @@ class TestRatisContainerReplicaCount {
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);
     validate(withoutUnhealthy, true, 0, false, false);
+    // not safely over replicated (3 CLOSED - 1 pending delete)
     assertFalse(withoutUnhealthy.isSafelyOverReplicated());
 
     RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, true);
     validate(withUnhealthy, true, -1, true, false);
-    assertFalse(withUnhealthy.isSafelyOverReplicated());
+    assertTrue(withUnhealthy.isSafelyOverReplicated());
 
     /*
     Second case: 2 CLOSED, 1 CLOSING, 1 UNHEALTHY
