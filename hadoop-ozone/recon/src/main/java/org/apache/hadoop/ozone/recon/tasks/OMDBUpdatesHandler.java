@@ -81,12 +81,13 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   }
 
   /**
+   * Processes an OM DB update event based on the provided parameters.
    *
-   * @param cfIndex
-   * @param keyBytes
-   * @param valueBytes
-   * @param action
-   * @throws IOException
+   * @param cfIndex     Index of the column family.
+   * @param keyBytes    Serialized key bytes.
+   * @param valueBytes  Serialized value bytes.
+   * @param action      Type of the database action (e.g., PUT, DELETE).
+   * @throws IOException If an I/O error occurs.
    */
   private void processEvent(int cfIndex, byte[] keyBytes, byte[]
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
@@ -111,10 +112,11 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       final Object key = cf.getKeyCodec().fromPersistedFormat(keyBytes);
       builder.setKey(key);
 
-      // Put new
-      // Put existing --> Update
-      // Delete existing
-      // Delete non-existing
+      // Handle the event based on its type:
+      // - PUT with a new key: Insert the new value.
+      // - PUT with an existing key: Update the existing value.
+      // - DELETE with an existing key: Remove the value.
+      // - DELETE with a non-existing key: No action, log a warning if necessary.
       Table table = omMetadataManager.getTable(tableName);
 
       OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
@@ -127,7 +129,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
         oldValue = table.getSkipCache(key);
       }
 
-      if (action == PUT) {
+      if (action.equals(PUT)) {
         final Object value = cf.getValueCodec().fromPersistedFormat(valueBytes);
 
         // If the updated value is not valid for this event, we skip it.
@@ -137,8 +139,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
         }
 
         builder.setValue(value);
-        // If a PUT operation happens on an existing Key, it is tagged
-        // as an "UPDATE" event.
+        // Tag PUT operations on existing keys as "UPDATE" events.
         if (oldValue != null) {
 
           // If the oldValue is not valid for this event, we skip it.
@@ -184,8 +185,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       omdbUpdateEvents.add(event);
       omdbLatestUpdateEvents.put(key, event);
     } else {
-      // key type or value type cannot be determined for this table.
-      // log a warn message and ignore the update.
+      // Log and ignore events if key or value types are undetermined.
       if (LOG.isWarnEnabled()) {
         LOG.warn(String.format("KeyType or ValueType could not be determined" +
             " for table %s. Ignoring the event.", tableName));
