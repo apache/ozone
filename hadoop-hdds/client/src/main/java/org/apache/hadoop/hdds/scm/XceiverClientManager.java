@@ -277,7 +277,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
         .getReplicationType() == HddsProtos.ReplicationType.EC;
     if (topologyAware || isEC) {
       try {
-        key += pipeline.getClosestNode().getHostName();
+        key += pipeline.getClosestNode().getUuidString();
         if (isEC) {
           // Currently EC uses standalone client.
           key += pipeline.getClosestNode()
