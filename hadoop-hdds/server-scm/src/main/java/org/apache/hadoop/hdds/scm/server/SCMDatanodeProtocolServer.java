@@ -189,6 +189,11 @@ public class SCMDatanodeProtocolServer implements
     HddsServerUtil.addSuppressedLoggingExceptions(datanodeRpcServer);
   }
 
+  @VisibleForTesting
+  public SCMDatanodeHeartbeatDispatcher getHeartbeatDispatcher() {
+    return heartbeatDispatcher;
+  }
+
   public void start() {
     LOG.info(
         StorageContainerManager.buildRpcServerStartMessage(

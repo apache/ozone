@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -236,6 +238,82 @@ public class TestSCMNodeManager {
       Thread.sleep(4 * 1000);
       assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
           "Heartbeat thread should have picked up the scheduled heartbeats.");
+    }
+  }
+
+  @Test
+  public void testCmdStateUpdate() throws Exception {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails datanodeDetails = registerWithCapacity(nodeManager);
+      // Generate DeletedBlocksTransaction set
+      List<StorageContainerDatanodeProtocolProtos.
+          DeletedBlocksTransaction> dnTXs = new ArrayList<>();
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+          transaction1 = StorageContainerDatanodeProtocolProtos.
+              DeletedBlocksTransaction.newBuilder().
+          setContainerID(100).setCount(10).setTxID(101).build();
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+          transaction2 = StorageContainerDatanodeProtocolProtos.
+              DeletedBlocksTransaction.newBuilder().
+          setContainerID(110).setCount(10).setTxID(102).build();
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+          transaction3 = StorageContainerDatanodeProtocolProtos.
+              DeletedBlocksTransaction.newBuilder().
+          setContainerID(120).setCount(10).setTxID(103).build();
+      dnTXs.add(transaction1);
+      dnTXs.add(transaction2);
+      dnTXs.add(transaction3);
+      SCMCommand deleteCommand = new DeleteBlocksCommand(dnTXs);
+      nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), deleteCommand);
+
+      // Generate CommandStatusReports
+      StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.
+          DeleteBlockTransactionResult txResult =
+          StorageContainerDatanodeProtocolProtos.
+              ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult.
+                  newBuilder().setTxID(103).setContainerID(120).
+                  setSuccess(true).build();
+
+      List<StorageContainerDatanodeProtocolProtos.
+          ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult>
+              results = new ArrayList<>();
+      results.add(txResult);
+      StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
+          ackProto = StorageContainerDatanodeProtocolProtos.
+          ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results).
+          setDnId(datanodeDetails.getUuidString()).build();
+
+      StorageContainerDatanodeProtocolProtos.CommandStatus cmdStatus =
+          StorageContainerDatanodeProtocolProtos.CommandStatus.newBuilder().
+          setBlockDeletionAck(ackProto).setCmdId(deleteCommand.getId()).
+          setStatus(StorageContainerDatanodeProtocolProtos.
+              CommandStatus.Status.EXECUTED).
+          setType(StorageContainerDatanodeProtocolProtos.SCMCommandProto.
+              Type.deleteBlocksCommand).build();
+      StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto
+          commandStatusReport = StorageContainerDatanodeProtocolProtos.
+              CommandStatusReportsProto.newBuilder().
+              addCmdStatus(cmdStatus).build();
+
+      // Generate heartbeat
+      StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto
+          heartbeat = StorageContainerDatanodeProtocolProtos.
+              SCMHeartbeatRequestProto.newBuilder()
+              .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+              .addCommandStatusReports(commandStatusReport).build();
+      SCMDatanodeHeartbeatDispatcher dispatcher = scm.
+          getDatanodeProtocolServer().getHeartbeatDispatcher();
+      List<SCMCommand> commands = dispatcher.dispatch(heartbeat);
+      for (SCMCommand command : commands) {
+        if (command instanceof DeleteBlocksCommand) {
+          DeleteBlocksCommand deleteBlocksCommand =
+              (DeleteBlocksCommand) command;
+          for (StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+              transaction: deleteBlocksCommand.blocksTobeDeleted()) {
+            assertTrue(transaction.getTxID() != 103);
+          }
+        }
+      }
     }
   }
 

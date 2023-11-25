@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CRLStatusReport;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -51,6 +53,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -200,11 +203,57 @@ public final class SCMDatanodeHeartbeatDispatcher {
               new CommandStatusReportFromDatanode(
                   datanodeDetails,
                   commandStatusReport));
+          // update commands
+          updateCommands(commands, commandStatusReport);
         }
       }
     }
 
     return commands;
+  }
+
+  private void updateCommands(List<SCMCommand> commands,
+      CommandStatusReportsProto commandStatusReport) {
+    if (commands != null) {
+      List<StorageContainerDatanodeProtocolProtos.CommandStatus> cmdStatusList
+          = commandStatusReport.getCmdStatusList();
+      cmdStatusList.forEach(cmdStatus -> {
+        if (cmdStatus.getType() == SCMCommandProto.Type.deleteBlocksCommand &&
+            cmdStatus.getStatus() == StorageContainerDatanodeProtocolProtos.
+                CommandStatus.Status.EXECUTED) {
+          StorageContainerDatanodeProtocolProtos.
+              ContainerBlocksDeletionACKProto ackProto =
+                  cmdStatus.getBlockDeletionAck();
+          List<StorageContainerDatanodeProtocolProtos.
+              ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult>
+                  results = ackProto.getResultsList();
+          for (SCMCommand command : commands) {
+            if (command.getType() == SCMCommandProto.Type.
+                deleteBlocksCommand) {
+              DeleteBlocksCommand deleteBlocksCommand =
+                  (DeleteBlocksCommand) command;
+              List<StorageContainerDatanodeProtocolProtos.
+                  DeletedBlocksTransaction> deleteds =
+                      deleteBlocksCommand.blocksTobeDeleted();
+              for (StorageContainerDatanodeProtocolProtos.
+                    ContainerBlocksDeletionACKProto.
+                    DeleteBlockTransactionResult result : results) {
+                Iterator<StorageContainerDatanodeProtocolProtos.
+                    DeletedBlocksTransaction> iterator = deleteds.iterator();
+                while (iterator.hasNext()) {
+                  StorageContainerDatanodeProtocolProtos.
+                      DeletedBlocksTransaction delete = iterator.next();
+                  if (delete.getTxID() == result.getTxID()) {
+                    iterator.remove();
+                  }
+                }
+              }
+            }
+          }
+        }
+        // Other commands
+      });
+    }
   }
 
   /**
