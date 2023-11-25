@@ -22,11 +22,16 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -47,6 +52,16 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 public abstract class CommonChunkManagerTestCases
     extends AbstractTestChunkManager {
+
+  @BeforeAll
+  public static void beforeAll() {
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void after() throws Exception {
+    CodecTestUtil.gc();
+  }
 
   @Test
   public void testWriteChunkIncorrectLength() {
@@ -95,6 +110,7 @@ public abstract class CommonChunkManagerTestCases
     // WHEN+THEN
     assertThrows(StorageContainerException.class, () ->
         chunkManager.readChunk(container, blockID, chunkInfo, null)
+            .close()
     );
   }
 
@@ -133,14 +149,14 @@ public abstract class CommonChunkManagerTestCases
     blockData.addChunk(chunkInfo.getProtoBufMessage());
     getBlockManager().putBlock(container, blockData);
 
-    ByteBuffer expectedData = chunkManager
-        .readChunk(container, blockID, chunkInfo, null)
-        .toByteString().asReadOnlyByteBuffer();
-
     // THEN
-    assertEquals(chunkInfo.getLen(), expectedData.remaining());
-    assertEquals(expectedData.rewind(), rewindBufferToDataStart());
-    checkReadIOStats(expectedData.limit(), 1);
+    try (ChunkBuffer chunk = chunkManager.readChunk(
+        container, blockID, chunkInfo, null)) {
+      final ByteBuffer bytes = chunk.toByteString().asReadOnlyByteBuffer();
+      assertEquals(chunkInfo.getLen(), bytes.remaining());
+      assertEquals(rewindBufferToDataStart(), bytes.rewind());
+      checkReadIOStats(bytes.limit(), 1);
+    }
   }
 
   @Test
@@ -186,11 +202,10 @@ public abstract class CommonChunkManagerTestCases
   public void testReadChunkFileNotExists() {
     // GIVEN
     ChunkManager chunkManager = createTestSubject();
-    try {
 
-      // WHEN
-      chunkManager.readChunk(getKeyValueContainer(),
-          getBlockID(), getChunkInfo(), null);
+    // WHEN
+    try (ChunkBuffer ignored = chunkManager.readChunk(getKeyValueContainer(),
+        getBlockID(), getChunkInfo(), null)) {
 
       // THEN
       fail("testReadChunkFileNotExists failed");
@@ -228,7 +243,7 @@ public abstract class CommonChunkManagerTestCases
     for (int i = 0; i < count; i++) {
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
           i * len, len);
-      chunkManager.readChunk(container, blockID, info, null);
+      chunkManager.readChunk(container, blockID, info, null).close();
     }
 
     // THEN

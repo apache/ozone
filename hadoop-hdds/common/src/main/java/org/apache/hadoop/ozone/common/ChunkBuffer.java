@@ -20,17 +20,22 @@ package org.apache.hadoop.ozone.common;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Buffer for a block chunk. */
-public interface ChunkBuffer {
+public interface ChunkBuffer extends UncheckedAutoCloseable {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
@@ -50,6 +55,30 @@ public interface ChunkBuffer {
       return new IncrementalChunkBuffer(capacity, increment, false);
     }
     return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
+  }
+
+  /** Preallocate the entire buffer. */
+  static ChunkBuffer preallocate(long capacity, int increment) {
+    Preconditions.assertTrue(increment > 0);
+    if (capacity <= increment) {
+      final CodecBuffer c = CodecBuffer.allocateDirect(Math.toIntExact(capacity));
+      return new ChunkBufferImplWithByteBuffer(c.asWritableByteBuffer(), c);
+    }
+
+    final List<CodecBuffer> buffers = new ArrayList<>();
+    try {
+      for (int size = 0; size < capacity; size += increment) {
+        final int n = Math.toIntExact(Math.min(increment, capacity - size));
+        buffers.add(CodecBuffer.allocateDirect(n));
+      }
+    } catch (Throwable t) {
+      buffers.forEach(CodecBuffer::release);
+    }
+    final List<ByteBuffer> list = buffers.stream()
+        .map(CodecBuffer::asWritableByteBuffer)
+        .collect(Collectors.toList());
+    return new ChunkBufferImplWithByteBufferList(list,
+        () -> buffers.forEach(CodecBuffer::close));
   }
 
   /** Wrap the given {@link ByteBuffer} as a {@link ChunkBuffer}. */
@@ -128,6 +157,9 @@ public interface ChunkBuffer {
   Iterable<ByteBuffer> iterate(int bufferSize);
 
   List<ByteBuffer> asByteBufferList();
+
+  /** Release the underlying buffer(s). */
+  void close();
 
   /**
    * Write the contents of the buffer from the current position to the limit

@@ -20,9 +20,12 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * DispatcherContext class holds transport protocol specific context info
@@ -30,18 +33,14 @@ import java.util.Objects;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public final class DispatcherContext {
-  private static final DispatcherContext HANDLE_READ_CHUNK
-      = newBuilder(Op.HANDLE_READ_CHUNK).build();
+public final class DispatcherContext implements UncheckedAutoCloseable {
   private static final DispatcherContext HANDLE_WRITE_CHUNK
       = newBuilder(Op.HANDLE_WRITE_CHUNK).build();
-  private static final DispatcherContext HANDLE_GET_SMALL_FILE
-      = newBuilder(Op.HANDLE_GET_SMALL_FILE).build();
   private static final DispatcherContext HANDLE_PUT_SMALL_FILE
       = newBuilder(Op.HANDLE_PUT_SMALL_FILE).build();
 
   public static DispatcherContext getHandleReadChunk() {
-    return HANDLE_READ_CHUNK;
+    return newBuilder(Op.HANDLE_READ_CHUNK).build();
   }
 
   public static DispatcherContext getHandleWriteChunk() {
@@ -49,7 +48,7 @@ public final class DispatcherContext {
   }
 
   public static DispatcherContext getHandleGetSmallFile() {
-    return HANDLE_GET_SMALL_FILE;
+    return newBuilder(Op.HANDLE_GET_SMALL_FILE).build();
   }
 
   public static DispatcherContext getHandlePutSmallFile() {
@@ -108,6 +107,11 @@ public final class DispatcherContext {
     return context == null ? Op.NULL : context.getOp();
   }
 
+  public static void assertOp(DispatcherContext context, Op expected) {
+    Objects.requireNonNull(context, "context == null");
+    Preconditions.assertSame(expected, context.getOp(), "op");
+  }
+
   private final Op op;
   // whether the chunk data needs to be written or committed or both
   private final WriteChunkStage stage;
@@ -117,6 +121,8 @@ public final class DispatcherContext {
   private final long logIndex;
 
   private final Map<Long, Long> container2BCSIDMap;
+
+  private final AtomicReference<UncheckedAutoCloseable> resource = new AtomicReference<>();
 
   private DispatcherContext(Builder b) {
     this.op = Objects.requireNonNull(b.op, "op == null");
@@ -145,6 +151,19 @@ public final class DispatcherContext {
 
   public Map<Long, Long> getContainer2BCSIDMap() {
     return container2BCSIDMap;
+  }
+
+  public void setResource(UncheckedAutoCloseable closeable) {
+    final UncheckedAutoCloseable previous = resource.getAndSet(closeable);
+    Preconditions.assertNull(previous, "Resource is already set");
+  }
+
+  @Override
+  public void close() {
+    final UncheckedAutoCloseable closeable = resource.getAndSet(null);
+    if (closeable != null) {
+      closeable.close();
+    }
   }
 
   @Override

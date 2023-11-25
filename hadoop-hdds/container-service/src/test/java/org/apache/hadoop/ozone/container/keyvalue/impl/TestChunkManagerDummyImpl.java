@@ -50,9 +50,9 @@ public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
   public void dummyManagerReadsAnyChunk() throws Exception {
     ChunkManager dummy = createTestSubject();
 
-    ChunkBuffer dataRead = dummy.readChunk(getKeyValueContainer(),
-        getBlockID(), getChunkInfo(), null);
-
-    assertNotNull(dataRead);
+    try (ChunkBuffer dataRead = dummy.readChunk(getKeyValueContainer(),
+        getBlockID(), getChunkInfo(), null)) {
+      assertNotNull(dataRead);
+    }
   }
 }

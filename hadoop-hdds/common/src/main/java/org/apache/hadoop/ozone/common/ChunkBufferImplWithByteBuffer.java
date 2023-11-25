@@ -28,13 +28,27 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** {@link ChunkBuffer} implementation using a single {@link ByteBuffer}. */
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
+  private final UncheckedAutoCloseable underlying;
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
+    this(buffer, null);
+  }
+
+  ChunkBufferImplWithByteBuffer(ByteBuffer buffer, UncheckedAutoCloseable underlying) {
     this.buffer = Objects.requireNonNull(buffer, "buffer == null");
+    this.underlying = underlying;
+  }
+
+  @Override
+  public void close() {
+    if (underlying != null) {
+      underlying.close();
+    }
   }
 
   @Override

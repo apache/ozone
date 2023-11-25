@@ -247,7 +247,7 @@ public class TestKeyValueHandler {
     KeyValueHandler
         .dispatchRequest(handler, getSmallFileRequest, container, null);
     Mockito.verify(handler, times(1)).handleGetSmallFile(
-        any(ContainerCommandRequestProto.class), any());
+        any(ContainerCommandRequestProto.class), any(), any());
   }
 
   @Test

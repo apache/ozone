@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -268,10 +269,9 @@ public class KeyValueHandler extends Handler {
     case CompactChunk:
       return handler.handleUnsupportedOp(request);
     case PutSmallFile:
-      return handler
-          .handlePutSmallFile(request, kvContainer, dispatcherContext);
+      return handler.handlePutSmallFile(request, kvContainer, dispatcherContext);
     case GetSmallFile:
-      return handler.handleGetSmallFile(request, kvContainer);
+      return handler.handleGetSmallFile(request, kvContainer, dispatcherContext);
     case GetCommittedBlockLength:
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     default:
@@ -686,6 +686,7 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleReadChunk(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
+    DispatcherContext.assertOp(dispatcherContext, Op.HANDLE_READ_CHUNK);
 
     if (!request.hasReadChunk()) {
       if (LOG.isDebugEnabled()) {
@@ -695,7 +696,7 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    ChunkBuffer data;
+    ChunkBuffer data = null;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getReadChunk().getBlockID());
@@ -705,9 +706,6 @@ public class KeyValueHandler extends Handler {
 
       checkContainerIsHealthy(kvContainer, blockID, Type.ReadChunk);
       BlockUtils.verifyBCSId(kvContainer, blockID);
-      if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandleReadChunk();
-      }
 
       boolean isReadChunkV0 = getReadChunkVersion(request.getReadChunk())
           .equals(ContainerProtos.ReadChunkVersion.V0);
@@ -727,26 +725,19 @@ public class KeyValueHandler extends Handler {
       if (DispatcherContext.op(dispatcherContext).readFromTmpFile()) {
         validateChunkChecksumData(data, chunkInfo);
       }
+      dispatcherContext.setResource(data);
       metrics.incContainerBytesStats(Type.ReadChunk, chunkInfo.getLen());
-    } catch (StorageContainerException ex) {
+      return getReadChunkResponse(request, data, byteBufferToByteString);
+    } catch (Exception e) {
+      if (data != null) {
+        data.close();
+      }
+      final StorageContainerException ex = e instanceof StorageContainerException?
+          (StorageContainerException) e : new StorageContainerException("Read Chunk failed", e, IO_EXCEPTION);
       return ContainerUtils.logAndReturnError(LOG, ex, request);
-    } catch (IOException ex) {
-      return ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Read Chunk failed", ex, IO_EXCEPTION),
-          request);
     }
-
-    Preconditions.checkNotNull(data, "Chunk data is null");
-
-    return getReadChunkResponse(request, data, byteBufferToByteString);
   }
 
-  /**
-   * Throw an exception if the container is unhealthy.
-   *
-   * @throws StorageContainerException if the container is unhealthy.
-   */
-  @VisibleForTesting
   void checkContainerIsHealthy(KeyValueContainer kvContainer, BlockID blockID,
       Type cmd) {
     kvContainer.readLock();
@@ -908,7 +899,9 @@ public class KeyValueHandler extends Handler {
    * ChunkManager to process the request.
    */
   ContainerCommandResponseProto handleGetSmallFile(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
+    DispatcherContext.assertOp(dispatcherContext, Op.HANDLE_GET_SMALL_FILE);
 
     if (!request.hasGetSmallFile()) {
       if (LOG.isDebugEnabled()) {
@@ -928,8 +921,7 @@ public class KeyValueHandler extends Handler {
 
       ContainerProtos.ChunkInfo chunkInfoProto = null;
       List<ByteString> dataBuffers = new ArrayList<>();
-      final DispatcherContext dispatcherContext
-          = DispatcherContext.getHandleGetSmallFile();
+      List<ChunkBuffer> chunkBuffers = new ArrayList<>();
       for (ContainerProtos.ChunkInfo chunk : responseData.getChunks()) {
         // if the block is committed, all chunks must have been committed.
         // Tmp chunk files won't exist here.
@@ -946,10 +938,12 @@ public class KeyValueHandler extends Handler {
         ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
             chunkInfo, dispatcherContext);
         dataBuffers.addAll(data.toByteStringList(byteBufferToByteString));
+        chunkBuffers.add(data);
         chunkInfoProto = chunk;
       }
       metrics.incContainerBytesStats(Type.GetSmallFile,
           BufferUtils.getBuffersLen(dataBuffers));
+      dispatcherContext.setResource(() -> chunkBuffers.forEach(ChunkBuffer::close));
       return getGetSmallFileResponseSuccess(request, dataBuffers,
           chunkInfoProto);
     } catch (StorageContainerException e) {
