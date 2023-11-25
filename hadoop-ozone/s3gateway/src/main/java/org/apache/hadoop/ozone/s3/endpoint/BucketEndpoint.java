@@ -64,14 +64,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
@@ -116,7 +114,7 @@ public class BucketEndpoint extends EndpointBase {
       @Context HttpHeaders hh) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
-    Map<String, String> perf  = new HashMap<>();
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
     Iterator<? extends OzoneKey> ozoneKeyIterator;
     ContinueToken decodedToken =
@@ -271,12 +269,11 @@ public class BucketEndpoint extends EndpointBase {
 
     int keyCount =
         response.getCommonPrefixes().size() + response.getContents().size();
-    long getBucketLatency =
+    long opLatencyNs =
         getMetrics().updateGetBucketSuccessStats(startNanos);
     getMetrics().incListKeyCount(keyCount);
-    perf.put("getBucketKeyCount", String.valueOf(keyCount));
-    perf.put("getBucketLatencyMs",
-        String.valueOf(TimeUnit.NANOSECONDS.toMillis(getBucketLatency)));
+    perf.append("keyCount", keyCount);
+    perf.appendOpLatencyNanos(opLatencyNs);
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters(), perf));
     response.setKeyCount(keyCount);

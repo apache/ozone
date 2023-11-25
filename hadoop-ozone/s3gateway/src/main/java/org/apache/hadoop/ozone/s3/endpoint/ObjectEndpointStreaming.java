@@ -39,8 +39,8 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
@@ -61,7 +61,7 @@ final class ObjectEndpointStreaming {
       OzoneBucket bucket, String keyPath,
       long length, ReplicationConfig replicationConfig,
       int chunkSize, Map<String, String> keyMetadata,
-      DigestInputStream body, Map<String, String> perf)
+      DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     try {
@@ -97,7 +97,7 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      DigestInputStream body, Map<String, String> perf)
+      DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException {
     S3GatewayMetrics metrics = S3GatewayMetrics.create();
     long startNanos = Time.monotonicNowNanos();
@@ -105,12 +105,11 @@ final class ObjectEndpointStreaming {
     String eTag;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
-      long metadataLatency = metrics.updatePutKeyMetadataStats(startNanos);
+      long metadataLatencyNs = metrics.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
           .toLowerCase();
-      perf.put("metadataLatencyMs",
-          String.valueOf(TimeUnit.NANOSECONDS.toMillis(metadataLatency)));
+      perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
     }
     return Pair.of(eTag, writeLen);
@@ -124,16 +123,15 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      InputStream body, Map<String, String> perf, long startNanos)
+      InputStream body, PerformanceStringBuilder perf, long startNanos)
       throws IOException {
     long writeLen = 0;
     S3GatewayMetrics metrics = S3GatewayMetrics.create();
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
-      long metadataLatency =
+      long metadataLatencyNs =
           metrics.updateCopyKeyMetadataStats(startNanos);
-      perf.put("metadataLatencyMs",
-          String.valueOf(TimeUnit.NANOSECONDS.toMillis(metadataLatency)));
+      perf.appendMetaLatencyNanos(metadataLatencyNs);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
     }
     return writeLen;
@@ -160,7 +158,7 @@ final class ObjectEndpointStreaming {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static Response createMultipartKey(OzoneBucket ozoneBucket, String key,
       long length, int partNumber, String uploadID, int chunkSize,
-      DigestInputStream body, Map<String, String> perf)
+      DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String eTag;
@@ -173,16 +171,15 @@ final class ObjectEndpointStreaming {
     try {
       try (OzoneDataStreamOutput streamOutput = ozoneBucket
           .createMultipartStreamKey(key, length, partNumber, uploadID)) {
-        long metadataLatency = metrics.updatePutKeyMetadataStats(startNanos);
+        long metadataLatencyNs = metrics.updatePutKeyMetadataStats(startNanos);
         long putLength =
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
             body.getMessageDigest().digest()).toLowerCase();
         ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
         metrics.incPutKeySuccessLength(putLength);
-        perf.put("metadataLatencyMs",
-            String.valueOf(TimeUnit.NANOSECONDS.toMillis(metadataLatency)));
-        perf.put("putLength", String.valueOf(putLength));
+        perf.appendMetaLatencyNanos(metadataLatencyNs);
+        perf.appendSizeBytes(putLength);
         keyDataStreamOutput = streamOutput.getKeyDataStreamOutput();
       }
     } catch (OMException ex) {

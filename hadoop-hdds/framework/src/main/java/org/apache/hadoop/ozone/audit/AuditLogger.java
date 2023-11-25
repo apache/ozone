@@ -134,8 +134,56 @@ public class AuditLogger {
         .contains(auditMessage.getOp().toLowerCase(Locale.ROOT));
   }
 
+  /**
+   * Utility class for building performance log strings.
+   */
+  public static class PerformanceStringBuilder {
+    private final StringBuilder builder = new StringBuilder(128).append('{');
 
-  public static String nanosToMillisString(long nanos) {
-    return Long.toString(TimeUnit.NANOSECONDS.toMillis(nanos));
+    /**
+     * Appends metadata operation latency in milliseconds.
+     * @param nanos Latency in nanoseconds.
+     */
+    public void appendMetaLatencyNanos(long nanos) {
+      append("MetaLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+    }
+
+    /**
+     * Appends whole operation latency in milliseconds.
+     * @param nanos Latency in nanoseconds.
+     */
+    public void appendOpLatencyNanos(long nanos) {
+      append("OpLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+    }
+
+    /**
+     * Appends the size in bytes for various operations.
+     * @param bytes Size in bytes.
+     */
+    public void appendSizeBytes(long bytes) {
+      append("sizeByte", bytes);
+    }
+
+    /**
+     * Appends a name-value pair to the log string.
+     * @param name Name of the metric.
+     * @param value Value of the metric.
+     */
+    public void append(String name, long value) {
+      builder.append(name)
+          .append('=')
+          .append(value)
+          .append(", ");
+    }
+
+    public String build() {
+      final int length = builder.length();
+      if (length < 2) {
+        return "{}";
+      }
+      builder.setCharAt(length - 2, '}');
+      builder.setLength(length - 1);
+      return builder.toString();
+    }
   }
 }

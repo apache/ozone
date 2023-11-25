@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.audit;
 
 import org.apache.logging.log4j.message.Message;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
+
 import java.util.Map;
 
 /**
@@ -32,11 +34,11 @@ public final class AuditMessage implements Message {
   private final Map<String, String> params;
   private final String ret;
   private final Throwable throwable;
-  private final Map<String, String> performance;
+  private final PerformanceStringBuilder performance;
 
   private AuditMessage(String user, String ip, String op,
       Map<String, String> params, String ret, Throwable throwable,
-      Map<String, String> performance) {
+      PerformanceStringBuilder performance) {
     this.user = user;
     this.ip = ip;
     this.op = op;
@@ -81,7 +83,7 @@ public final class AuditMessage implements Message {
     private String op;
     private Map<String, String> params;
     private String ret;
-    private Map<String, String> performance;
+    private PerformanceStringBuilder performance;
 
     public Builder setUser(String usr) {
       this.user = usr;
@@ -113,7 +115,7 @@ public final class AuditMessage implements Message {
       return this;
     }
 
-    public Builder setPerformance(Map<String, String> perf) {
+    public Builder setPerformance(PerformanceStringBuilder perf) {
       this.performance = perf;
       return this;
     }
@@ -126,10 +128,8 @@ public final class AuditMessage implements Message {
 
   private String formMessage(String userStr, String ipStr, String opStr,
       Map<String, String> paramsMap, String retStr,
-      Map<String, String> performanceMap) {
-    String perf = performanceMap != null && !performanceMap.isEmpty()
-        ? " | perf=" + performanceMap
-        : "";
+      PerformanceStringBuilder performanceMap) {
+    String perf = performanceMap != null ? " | perf=" + performanceMap : "";
     return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
         + " " + paramsMap + " | ret=" + retStr + perf;
   }

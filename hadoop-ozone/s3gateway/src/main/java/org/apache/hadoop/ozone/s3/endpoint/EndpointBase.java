@@ -63,6 +63,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
@@ -354,7 +355,7 @@ public abstract class EndpointBase implements Auditor {
   }
 
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
-      Map<String, String> auditMap, Map<String, String> performance) {
+      Map<String, String> auditMap, PerformanceStringBuilder performance) {
     AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
         .withResult(AuditEventStatus.SUCCESS);
     builder.setPerformance(performance);
