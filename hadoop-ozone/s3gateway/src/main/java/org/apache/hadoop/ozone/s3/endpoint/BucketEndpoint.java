@@ -272,7 +272,7 @@ public class BucketEndpoint extends EndpointBase {
     long opLatencyNs =
         getMetrics().updateGetBucketSuccessStats(startNanos);
     getMetrics().incListKeyCount(keyCount);
-    perf.append("keyCount", keyCount);
+    perf.appendCount(keyCount);
     perf.appendOpLatencyNanos(opLatencyNs);
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters(), perf));

@@ -478,9 +478,9 @@ public final class S3GatewayMetrics implements MetricsSource {
     createKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateListPartsSuccessStats(long startNanos) {
+  public long updateListPartsSuccessStats(long startNanos) {
     listPartsSuccess.incr();
-    listPartsSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(listPartsSuccessLatencyNs, startNanos);
   }
 
   public void updateListPartsFailureStats(long startNanos) {

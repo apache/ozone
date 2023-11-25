@@ -139,13 +139,12 @@ public class AuditLogger {
    */
   public static class PerformanceStringBuilder {
     private final StringBuilder builder = new StringBuilder(128).append('{');
-
     /**
      * Appends metadata operation latency in milliseconds.
      * @param nanos Latency in nanoseconds.
      */
     public void appendMetaLatencyNanos(long nanos) {
-      append("MetaLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+      append("metaLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
     }
 
     /**
@@ -153,11 +152,11 @@ public class AuditLogger {
      * @param nanos Latency in nanoseconds.
      */
     public void appendOpLatencyNanos(long nanos) {
-      append("OpLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+      append("opLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
     }
 
     /**
-     * Appends the size in bytes for various operations.
+     * Appends the size in bytes.
      * @param bytes Size in bytes.
      */
     public void appendSizeBytes(long bytes) {
@@ -165,11 +164,30 @@ public class AuditLogger {
     }
 
     /**
+     * Appends the count.
+     * @param count The count value to be appended.
+     */
+    public void appendCount(long count) {
+      append("count", count);
+    }
+
+    /**
+     * Appends a stream mode flag.
+     */
+    public void appendStreamMode() {
+      append("streamMode", "true");
+    }
+
+    private void append(String name, long value) {
+      append(name, String.valueOf(value));
+    }
+
+    /**
      * Appends a name-value pair to the log string.
      * @param name Name of the metric.
      * @param value Value of the metric.
      */
-    public void append(String name, long value) {
+    private void append(String name, String value) {
       builder.append(name)
           .append('=')
           .append(value)
