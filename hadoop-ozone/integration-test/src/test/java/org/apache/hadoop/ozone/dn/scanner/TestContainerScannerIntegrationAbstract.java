@@ -45,12 +45,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,9 +54,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -75,17 +69,19 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests the data scanner functionality.
  */
+@Timeout(300)
 public abstract class TestContainerScannerIntegrationAbstract {
 
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
@@ -120,8 +116,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
     bucket = volume.getBucket(bucketName);
   }
 
-  @AfterClass
-  public static void shutdown() throws IOException {
+  @AfterAll
+  static void shutdown() throws IOException {
     if (ozClient != null) {
       ozClient.close();
     }
@@ -148,7 +144,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
   }
 
   protected Container<?> getDnContainer(long containerID) {
-    Assert.assertEquals(1, cluster.getHddsDatanodes().size());
+    assertEquals(1, cluster.getHddsDatanodes().size());
     HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
     return oc.getContainerSet().getContainer(containerID);
@@ -202,7 +198,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         ContainerID.valueOf(
             containerId));
     // Only using a single datanode cluster.
-    Assert.assertEquals(1, containerReplicas.size());
+    assertEquals(1, containerReplicas.size());
     return containerReplicas.iterator().next();
   }
 
@@ -210,7 +206,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
   @SuppressWarnings("ResultOfMethodCallIgnored")
   protected void readFromCorruptedKey(String keyName) throws IOException {
     try (OzoneInputStream key = bucket.readKey(keyName)) {
-      Assert.assertThrows(IOException.class, key::read);
+      assertThrows(IOException.class, key::read);
     }
   }
 
@@ -233,7 +229,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-      Assert.assertFalse(chunksDir.exists());
+      assertFalse(chunksDir.exists());
     }, ScanResult.FailureType.MISSING_CHUNKS_DIR),
 
     MISSING_METADATA_DIR(container -> {
@@ -246,13 +242,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-      Assert.assertFalse(metadataDir.exists());
+      assertFalse(metadataDir.exists());
     }, ScanResult.FailureType.MISSING_METADATA_DIR),
 
     MISSING_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
-      Assert.assertTrue(containerFile.delete());
-      Assert.assertFalse(containerFile.exists());
+      assertTrue(containerFile.delete());
+      assertFalse(containerFile.exists());
     }, ScanResult.FailureType.MISSING_CONTAINER_FILE),
 
     MISSING_CONTAINER_DIR(container -> {
@@ -264,7 +260,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-      Assert.assertFalse(containerDir.exists());
+      assertFalse(containerDir.exists());
     }, ScanResult.FailureType.MISSING_CONTAINER_DIR),
 
     MISSING_BLOCK(container -> {
@@ -297,7 +293,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
       Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
               chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
           .findFirst();
-      Assert.assertTrue(blockFile.isPresent());
+      assertTrue(blockFile.isPresent());
       corruptFile(blockFile.get());
     }, ScanResult.FailureType.CORRUPT_CHUNK),
 
@@ -307,7 +303,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
       Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
               chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
           .findFirst();
-      Assert.assertTrue(blockFile.isPresent());
+      assertTrue(blockFile.isPresent());
       truncateFile(blockFile.get());
     }, ScanResult.FailureType.INCONSISTENT_CHUNK_LENGTH);
 
@@ -330,27 +326,20 @@ public abstract class TestContainerScannerIntegrationAbstract {
      * Check that the correct corruption type was written to the container log.
      */
     public void assertLogged(LogCapturer logCapturer) {
-      Assert.assertTrue(logCapturer.getOutput()
-          .contains(expectedResult.toString()));
+      assertThat(logCapturer.getOutput(),
+          containsString(expectedResult.toString()));
     }
 
     /**
      * Get all container corruption types as parameters for junit 4
      * parameterized tests, except the ones specified.
      */
-    public static Collection<Object[]> getAllParamsExcept(
+    public static Set<ContainerCorruptions> getAllParamsExcept(
         ContainerCorruptions... exclude) {
-      Collection<Object[]> params = new ArrayList<>();
       Set<ContainerCorruptions> includeSet =
           EnumSet.allOf(ContainerCorruptions.class);
       Arrays.asList(exclude).forEach(includeSet::remove);
-
-      for (ContainerCorruptions c: values()) {
-        if (includeSet.contains(c)) {
-          params.add(new Object[]{c});
-        }
-      }
-      return params;
+      return includeSet;
     }
 
     /**
