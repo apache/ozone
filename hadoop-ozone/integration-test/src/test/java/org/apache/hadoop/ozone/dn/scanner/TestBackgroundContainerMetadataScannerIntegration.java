@@ -45,7 +45,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class TestBackgroundContainerMetadataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
-  private final GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
+  private final GenericTestUtils.LogCapturer logCapturer =
+      GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
   static Collection<ContainerCorruptions> supportedCorruptionTypes() {
     return ContainerCorruptions.getAllParamsExcept(
