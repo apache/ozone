@@ -275,7 +275,7 @@ public class BucketEndpoint extends EndpointBase {
     perf.appendCount(keyCount);
     perf.appendOpLatencyNanos(opLatencyNs);
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters(), perf));
+        getAuditParameters(), perf.build()));
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
   }

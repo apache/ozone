@@ -18,8 +18,6 @@ package org.apache.hadoop.ozone.audit;
 
 import org.apache.logging.log4j.message.Message;
 
-import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
-
 import java.util.Map;
 
 /**
@@ -34,11 +32,10 @@ public final class AuditMessage implements Message {
   private final Map<String, String> params;
   private final String ret;
   private final Throwable throwable;
-  private final PerformanceStringBuilder performance;
 
   private AuditMessage(String user, String ip, String op,
       Map<String, String> params, String ret, Throwable throwable,
-      PerformanceStringBuilder performance) {
+      String performance) {
     this.user = user;
     this.ip = ip;
     this.op = op;
@@ -46,7 +43,6 @@ public final class AuditMessage implements Message {
     this.ret = ret;
     this.message = formMessage(user, ip, op, params, ret, performance);
     this.throwable = throwable;
-    this.performance = performance;
   }
 
   @Override
@@ -83,7 +79,7 @@ public final class AuditMessage implements Message {
     private String op;
     private Map<String, String> params;
     private String ret;
-    private PerformanceStringBuilder performance;
+    private String performance;
 
     public Builder setUser(String usr) {
       this.user = usr;
@@ -115,7 +111,7 @@ public final class AuditMessage implements Message {
       return this;
     }
 
-    public Builder setPerformance(PerformanceStringBuilder perf) {
+    public Builder setPerformance(String perf) {
       this.performance = perf;
       return this;
     }
@@ -128,8 +124,9 @@ public final class AuditMessage implements Message {
 
   private String formMessage(String userStr, String ipStr, String opStr,
       Map<String, String> paramsMap, String retStr,
-      PerformanceStringBuilder performanceMap) {
-    String perf = performanceMap != null ? " | perf=" + performanceMap : "";
+      String performanceMap) {
+    String perf = performanceMap != null && !performanceMap.isEmpty()
+        ? " | perf=" + performanceMap : "";
     return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
         + " " + paramsMap + " | ret=" + retStr + perf;
   }
