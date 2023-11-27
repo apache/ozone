@@ -20,13 +20,13 @@ package org.apache.hadoop.ozone.scm.pipeline;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
+import javax.management.*;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 import java.io.IOException;
@@ -55,9 +55,6 @@ public class TestPipelineManagerMXBean {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     mbs = ManagementFactory.getPlatformMBeanServer();
-    // Added sleep to wait before getting all pipelines in various
-    // states and becomes stable in their respective states.
-    Thread.sleep(2000);
   }
 
   /**
@@ -69,15 +66,16 @@ public class TestPipelineManagerMXBean {
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
         "Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo");
-
-    TabularData data = (TabularData) mbs.getAttribute(bean, "PipelineInfo");
+    TabularData data =
+        (TabularData) mbs.getAttribute(bean, "PipelineInfo");
     Map<String, Integer> datanodeInfo = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelineInfo();
-    verifyEquals(data, datanodeInfo);
+    verifyEquals(data, datanodeInfo, bean);
   }
 
   private void verifyEquals(TabularData actualData,
-      Map<String, Integer> expectedData) {
+                            Map<String, Integer> expectedData, ObjectName bean)
+      throws InterruptedException, TimeoutException {
     assertNotNull(actualData);
     assertNotNull(expectedData);
     for (Object obj : actualData.values()) {
@@ -86,12 +84,44 @@ public class TestPipelineManagerMXBean {
       assertEquals(2, cds.values().size());
       Iterator<?> it = cds.values().iterator();
       String key = it.next().toString();
-      String value = it.next().toString();
-      long num = Long.parseLong(value);
       assertTrue(expectedData.containsKey(key));
-      assertEquals(expectedData.remove(key).longValue(), num);
+      // Wait before all pipelines becomes stable in their respective states.
+      GenericTestUtils.waitFor(() -> {
+        long actualCountForPipelineState =
+            getActualCountForPipelineState(key, bean);
+        return expectedData.remove(key).longValue() ==
+            actualCountForPipelineState;
+      }, 500, 3000);
     }
     assertTrue(expectedData.isEmpty());
+  }
+
+  private long getActualCountForPipelineState(String pipelineState,
+                                              ObjectName bean) {
+    TabularData data = null;
+    try {
+      data = (TabularData) mbs.getAttribute(bean, "PipelineInfo");
+    } catch (MBeanException e) {
+      throw new RuntimeException(e);
+    } catch (AttributeNotFoundException e) {
+      throw new RuntimeException(e);
+    } catch (InstanceNotFoundException e) {
+      throw new RuntimeException(e);
+    } catch (ReflectionException e) {
+      throw new RuntimeException(e);
+    }
+    String value = null;
+    for (Object obj : data.values()) {
+      assertTrue(obj instanceof CompositeData);
+      CompositeData cds = (CompositeData) obj;
+      Iterator<?> it = cds.values().iterator();
+      String key = it.next().toString();
+      if (key.equals(pipelineState)) {
+        value = it.next().toString();
+        break;
+      }
+    }
+    return Long.parseLong(value);
   }
 
   @AfterEach
