@@ -150,7 +150,7 @@ public class TestMultipartObjectGet {
 
     CompleteMultipartUploadRequest.Part
         part = new CompleteMultipartUploadRequest.Part();
-    part.seteTag(response.getHeaderString("ETag"));
+    part.setETag(response.getHeaderString("ETag"));
     part.setPartNumber(partNumber);
     return part;
   }

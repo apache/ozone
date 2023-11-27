@@ -102,11 +102,14 @@ import static org.junit.Assert.fail;
  */
 public class TestOzoneClientMultipartUploadWithFSO {
 
+  private static final String ETAG = "ETag";
+
   private static ObjectStore store = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
 
   private static String scmId = UUID.randomUUID().toString();
+  private static MessageDigest eTagProvider;
 
   /**
    * Set a timeout for each test.
@@ -131,6 +134,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneConfiguration conf = new OzoneConfiguration();
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     startCluster(conf);
+    eTagProvider = MessageDigest.getInstance("Md5");
   }
 
   /**
@@ -229,7 +233,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
             sampleData.length(), 1, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(sampleData));
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -487,9 +491,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
             data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -498,9 +502,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     // Do not close output stream for part 2.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
             data.length, 2, uploadID);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.write(data, 0, data.length);
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -981,9 +985,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
             data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0,
             data.length);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =

@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -161,6 +162,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.slf4j.event.Level.DEBUG;
 
 import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -177,6 +179,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public abstract class TestOzoneRpcClientAbstract {
+
+  private static final String ETAG = "ETag";
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -197,6 +201,12 @@ public abstract class TestOzoneRpcClientAbstract {
 
   private static String scmId = UUID.randomUUID().toString();
   private static String clusterId;
+  private static MessageDigest eTagProvider;
+
+  @BeforeAll
+  public static void initialize() throws NoSuchAlgorithmException {
+    eTagProvider = MessageDigest.getInstance("Md5");
+  }
 
 
   /**
@@ -1516,7 +1526,7 @@ public abstract class TestOzoneRpcClientAbstract {
         sampleData.length(), 1, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0,
         sampleData.length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(sampleData));
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     assertEquals(valueLength, store.getVolume(volumeName)
@@ -2682,7 +2692,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), 1, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(sampleData));
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -2720,7 +2730,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(sampleData));
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -2736,7 +2746,7 @@ public abstract class TestOzoneRpcClientAbstract {
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(sampleData));
+    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     commitUploadPartInfo = ozoneOutputStream
@@ -3127,9 +3137,9 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -3138,9 +3148,9 @@ public abstract class TestOzoneRpcClientAbstract {
     // Do not close output stream for part 2.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 2, omMultipartInfo.getUploadID());
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.write(data, 0, data.length);
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -3832,9 +3842,9 @@ public abstract class TestOzoneRpcClientAbstract {
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0,
         data.length);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =

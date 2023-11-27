@@ -98,6 +98,8 @@ import org.mockito.Mockito;
 
 class TestOzoneAtRestEncryption {
 
+  private static final String ETAG = "ETag";
+
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
   private static OzoneClient ozClient = null;
@@ -119,6 +121,7 @@ class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
+  private static MessageDigest eTagProvider;
 
   @BeforeAll
   static void init() throws Exception {
@@ -168,6 +171,7 @@ class TestOzoneAtRestEncryption {
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
+    eTagProvider = MessageDigest.getInstance("Md5");
   }
 
   @AfterAll
@@ -631,9 +635,9 @@ class TestOzoneAtRestEncryption {
 
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     multipartStreamKey.write(dataBuffer, 0, length);
-    multipartStreamKey.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    multipartStreamKey.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     multipartStreamKey.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -649,9 +653,9 @@ class TestOzoneAtRestEncryption {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
-            .digest(data)).toLowerCase());
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
+            .toLowerCase());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
