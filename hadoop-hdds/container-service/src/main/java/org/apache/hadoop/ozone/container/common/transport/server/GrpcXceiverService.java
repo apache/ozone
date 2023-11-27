@@ -84,7 +84,6 @@ public class GrpcXceiverService extends
     return builder.build();
   }
 
-  @SuppressWarnings("unchecked")
   private static <Req extends MessageLite, Resp> void addZeroCopyMethod(
       ServerServiceDefinition orig,
       ServerServiceDefinition.Builder newServiceBuilder,
@@ -93,6 +92,7 @@ public class GrpcXceiverService extends
     MethodDescriptor<Req, Resp> newMethod = origMethod.toBuilder()
         .setRequestMarshaller(zeroCopyMarshaller)
         .build();
+    @SuppressWarnings("unchecked")
     ServerCallHandler<Req, Resp> serverCallHandler =
         (ServerCallHandler<Req, Resp>) orig.getMethod(
             newMethod.getFullMethodName()).getServerCallHandler();
@@ -107,7 +107,6 @@ public class GrpcXceiverService extends
 
       @Override
       public void onNext(ContainerCommandRequestProto request) {
-        InputStream popStream = zeroCopyMessageMarshaller.popStream(request);
         try {
           ContainerCommandResponseProto resp =
               dispatcher.dispatch(request, null);
@@ -118,6 +117,7 @@ public class GrpcXceiverService extends
           isClosed.set(true);
           responseObserver.onError(e);
         } finally {
+          InputStream popStream = zeroCopyMessageMarshaller.popStream(request);
           if (popStream != null) {
             IOUtils.close(LOG, popStream);
           }
