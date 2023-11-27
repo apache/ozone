@@ -143,7 +143,7 @@ public final class OzoneFsDelete {
       BasicRootedOzoneFileSystem.InnerDeleteResult innerDeleteResult = null;
       if (item.fs.getUri().getScheme().equals(OZONE_OFS_URI_SCHEME)) {
         BasicRootedOzoneFileSystem ofs = (BasicRootedOzoneFileSystem) item.fs;
-        innerDeleteResult = ofs.getDeleteResponse(path, deleteDirs);
+        innerDeleteResult = ofs.deleteKeys(path, deleteDirs);
       } else {
         if (!item.fs.delete(path, deleteDirs)) {
           throw new PathIOException(item.toString());

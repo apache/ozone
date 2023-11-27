@@ -681,7 +681,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public InnerDeleteResult getDeleteResponse(Path f, boolean recursive)
+  public InnerDeleteResult deleteKeys(Path f, boolean recursive)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
@@ -764,7 +764,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    return getDeleteResponse(f, recursive).isSuccess();
+    return deleteKeys(f, recursive).isSuccess();
   }
 
   private InnerDeleteResult deleteBucket(Path f, boolean recursive,
