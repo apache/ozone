@@ -813,7 +813,8 @@ public final class OmUtils {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
   
-  public static List<List<String>> format(List<ServiceInfo> nodes, int port, String leaderId) {
+  public static List<List<String>> format(List<ServiceInfo> nodes,
+                                     int port, String leaderId) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -824,7 +825,8 @@ public final class OmUtils {
     for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role = info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" : "FOLLOWER";
+        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
+                      ? "LEADER" : "FOLLOWER";
         List<String> omInfo = new ArrayList<>();
         omInfo.add(info.getHostname());
         omInfo.add(info.getOmRoleInfo().getNodeId());
