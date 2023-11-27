@@ -73,6 +73,10 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
  */
 public abstract class EndpointBase implements Auditor {
 
+  protected static final String ETAG = "ETag";
+
+  protected static final String ETAG_CUSTOM = "etag-custom";
+
   @Inject
   private OzoneClient client;
   @Inject
@@ -123,9 +127,10 @@ public abstract class EndpointBase implements Auditor {
         signatureInfo.getSignature(),
         signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
-    getClient().getObjectStore()
-        .getClientProxy()
-        .setThreadLocalS3Auth(s3Auth);
+    ClientProtocol clientProtocol =
+        getClient().getObjectStore().getClientProxy();
+    clientProtocol.setThreadLocalS3Auth(s3Auth);
+    clientProtocol.setIsS3Request(true);
     init();
   }
 
@@ -311,8 +316,15 @@ public abstract class EndpointBase implements Auditor {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
+      if (entry.getKey().equals(ETAG)) {
+        continue;
+      }
+      String metadataKey = entry.getKey();
+      if (metadataKey.equals(ETAG_CUSTOM)) {
+        metadataKey = ETAG.toLowerCase();
+      }
       responseBuilder
-          .header(CUSTOM_METADATA_HEADER_PREFIX + entry.getKey(),
+          .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
     }
   }

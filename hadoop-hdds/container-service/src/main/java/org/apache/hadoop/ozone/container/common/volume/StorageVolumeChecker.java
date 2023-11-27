@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -107,7 +108,8 @@ public class StorageVolumeChecker {
    * @param conf  Configuration object.
    * @param timer {@link Timer} object used for throttling checks.
    */
-  public StorageVolumeChecker(ConfigurationSource conf, Timer timer) {
+  public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
+      String threadNamePrefix) {
 
     this.timer = timer;
 
@@ -125,22 +127,25 @@ public class StorageVolumeChecker {
         timer, minDiskCheckGapMs, maxAllowedTimeForCheckMs,
         Executors.newCachedThreadPool(
             new ThreadFactoryBuilder()
-                .setNameFormat("DataNode DiskChecker thread %d")
+                .setNameFormat(threadNamePrefix + "DataNodeDiskChecker" +
+                    "Thread-%d")
                 .setDaemon(true)
                 .build()));
 
     checkVolumeResultHandlerExecutorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder()
-            .setNameFormat("VolumeCheck ResultHandler thread %d")
+            .setNameFormat(threadNamePrefix + "VolumeCheckResultHandler" +
+                "Thread-%d")
             .setDaemon(true)
             .build());
 
-    this.diskCheckerservice = Executors.newScheduledThreadPool(
-        1, r -> {
-          Thread t = new Thread(r, "Periodic HDDS volume checker");
-          t.setDaemon(true);
-          return t;
-        });
+    ThreadFactory threadFactory = r -> {
+      Thread t = new Thread(r, threadNamePrefix + "PeriodicHDDSVolumeChecker");
+      t.setDaemon(true);
+      return t;
+    };
+    this.diskCheckerservice = Executors.newSingleThreadScheduledExecutor(
+        threadFactory);
 
     started = new AtomicBoolean(false);
   }

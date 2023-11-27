@@ -38,14 +38,14 @@ public class ReconTaskConfig {
       description = "The time interval of periodic sync of pipeline state " +
           "from SCM to Recon."
   )
-  private long pipelineSyncTaskInterval = Duration.ofMinutes(5).toMillis();
+  private Duration pipelineSyncTaskInterval = Duration.ofMinutes(5);
 
   public Duration getPipelineSyncTaskInterval() {
-    return Duration.ofMillis(pipelineSyncTaskInterval);
+    return pipelineSyncTaskInterval;
   }
 
   public void setPipelineSyncTaskInterval(Duration interval) {
-    this.pipelineSyncTaskInterval = interval.toMillis();
+    this.pipelineSyncTaskInterval = interval;
   }
 
   @Config(key = "missingcontainer.interval",
@@ -56,14 +56,14 @@ public class ReconTaskConfig {
           "unhealthy containers in the cluster as reported " +
           "by Datanodes."
   )
-  private long missingContainerTaskInterval = Duration.ofMinutes(5).toMillis();
+  private Duration missingContainerTaskInterval = Duration.ofMinutes(5);
 
   public Duration getMissingContainerTaskInterval() {
-    return Duration.ofMillis(missingContainerTaskInterval);
+    return missingContainerTaskInterval;
   }
 
   public void setMissingContainerTaskInterval(Duration interval) {
-    this.missingContainerTaskInterval = interval.toMillis();
+    this.missingContainerTaskInterval = interval;
   }
 
   @Config(key = "safemode.wait.threshold",
@@ -74,14 +74,14 @@ public class ReconTaskConfig {
           "health task and pipeline sync task before recon " +
           "exits out of safe or warmup mode. "
   )
-  private long safeModeWaitThreshold = Duration.ofMinutes(5).toMillis();
+  private Duration safeModeWaitThreshold = Duration.ofMinutes(5);
 
   public Duration getSafeModeWaitThreshold() {
-    return Duration.ofMillis(safeModeWaitThreshold);
+    return safeModeWaitThreshold;
   }
 
   public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
-    this.safeModeWaitThreshold = safeModeWaitThreshold.toMillis();
+    this.safeModeWaitThreshold = safeModeWaitThreshold;
   }
 
   @Config(key = "containercounttask.interval",
@@ -91,15 +91,14 @@ public class ReconTaskConfig {
       description = "The time interval to wait between each runs of " +
           "container count task."
   )
-  private long containerSizeCountTaskInterval =
-      Duration.ofMinutes(1).toMillis();
+  private Duration containerSizeCountTaskInterval = Duration.ofMinutes(1);
 
   public Duration getContainerSizeCountTaskInterval() {
-    return Duration.ofMillis(containerSizeCountTaskInterval);
+    return containerSizeCountTaskInterval;
   }
 
   public void setContainerSizeCountTaskInterval(Duration interval) {
-    this.containerSizeCountTaskInterval = interval.toMillis();
+    this.containerSizeCountTaskInterval = interval;
   }
 
 }

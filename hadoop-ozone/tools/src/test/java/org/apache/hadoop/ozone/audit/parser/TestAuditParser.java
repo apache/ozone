@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.audit.parser;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -43,8 +45,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * Tests AuditParser.
@@ -71,7 +71,7 @@ public class TestAuditParser {
    *
    * @throws Exception In case of exception while creating output directory.
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     outputBaseDir = getRandomTempDir();
     dbName = getRandomTempDir() + "/testAudit.db";
@@ -80,13 +80,13 @@ public class TestAuditParser {
     execute(args, "");
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     System.setOut(new PrintStream(OUT, false, DEFAULT_CODING));
     System.setErr(new PrintStream(err, false, DEFAULT_CODING));
   }
 
-  @After
+  @AfterEach
   public void reset() {
     // reset stream after each unit test
     OUT.reset();
@@ -100,7 +100,7 @@ public class TestAuditParser {
   /**
    * Cleans up the output base directory.
    */
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(outputBaseDir);
   }
@@ -128,9 +128,8 @@ public class TestAuditParser {
         exceptionHandler, args);
     try {
       String output = OUT.toString(DEFAULT_CODING);
-      Assert.assertTrue(
-          "Output:\n" + output + "\nshould contain:\n" + msg,
-          output.contains(msg));
+      assertTrue(output.contains(msg),
+          "Output:\n" + output + "\nshould contain:\n" + msg);
     } catch (UnsupportedEncodingException ignored) {
     }
   }
@@ -193,8 +192,8 @@ public class TestAuditParser {
       execute(args1, "");
       fail("No exception thrown.");
     } catch (Exception e) {
-      assertTrue(e.getMessage()
-          .contains("java.lang.ArrayIndexOutOfBoundsException: 5"));
+      assertTrue(e.getCause() instanceof ArrayIndexOutOfBoundsException);
+      assertTrue(e.getMessage().contains(": 5"));
     }
   }
 

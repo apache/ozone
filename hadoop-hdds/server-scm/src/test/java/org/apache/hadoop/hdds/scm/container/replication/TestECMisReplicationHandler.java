@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,8 +44,8 @@ import java.util.Set;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -95,7 +94,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
                     any(), any(), any(),
                     Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(new IOException("No nodes found"));
-    Assertions.assertThrows(SCMException.class, () -> testMisReplication(
+    assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),
             0, 2, 0));
   }
@@ -233,7 +232,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   protected void assertReplicaIndex(
       Map<DatanodeDetails, Integer> expectedReplicaIndexes,
       DatanodeDetails sourceDatanode, int actualReplicaIndex) {
-    Assertions.assertEquals(
-        expectedReplicaIndexes.get(sourceDatanode), actualReplicaIndex);
+    assertEquals(expectedReplicaIndexes.get(sourceDatanode),
+        actualReplicaIndex);
   }
 }

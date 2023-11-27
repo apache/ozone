@@ -117,7 +117,7 @@ public class ScmConfig extends ReconfigurableConfig {
               + "queued for deletion. Unit could be defined with "
               + "postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+  private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
   @Config(key = "init.default.layout.version",
       defaultValue = "-1",
@@ -131,11 +131,11 @@ public class ScmConfig extends ReconfigurableConfig {
   private int defaultLayoutVersionOnInit = -1;
 
   public Duration getBlockDeletionInterval() {
-    return Duration.ofMillis(blockDeletionInterval);
+    return blockDeletionInterval;
   }
 
   public void setBlockDeletionInterval(Duration duration) {
-    this.blockDeletionInterval = duration.toMillis();
+    blockDeletionInterval = duration;
   }
 
   public void setKerberosPrincipal(String kerberosPrincipal) {

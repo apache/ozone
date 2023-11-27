@@ -96,6 +96,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
@@ -3782,8 +3783,12 @@ public abstract class TestOzoneRpcClientAbstract {
         .setBucketName(bucket.getName())
         .setKeyName(keyName)
         .build();
+    ResolvedBucket resolvedBucket = new ResolvedBucket(
+        bucket.getVolumeName(), bucket.getName(),
+        bucket.getVolumeName(), bucket.getName(),
+        "", bucket.getBucketLayout());
     OmKeyInfo omKeyInfo = ozoneManager.getKeyManager().getKeyInfo(keyArgs,
-        UUID.randomUUID().toString());
+        resolvedBucket, UUID.randomUUID().toString());
 
     OmKeyLocationInfoGroup latestVersionLocations =
         omKeyInfo.getLatestVersionLocations();

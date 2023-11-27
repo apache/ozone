@@ -717,6 +717,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       dataSource={filteredData}
         pagination={true}
         rowKey='dataSize'
+      locale={{filterTitle: ""}}
     />
     );
   }
@@ -968,7 +969,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         <Table
           loading={containerKeys.loading} dataSource={dataSource}
           columns={KEY_TABLE_COLUMNS} pagination={paginationConfig}
-          rowKey='uid' />
+          rowKey='uid'
+          locale={{filterTitle: ""}}/>
       );
     }
     return <div>Loading...</div>;
@@ -1055,7 +1057,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         columns={this.searchMismatchColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerId'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick} />
+        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
+        locale={{filterTitle: ""}}/>
     }
 
     const generateOpenKeyTable = (dataSource: any) => {
@@ -1063,7 +1066,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         expandRowByClick dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
         loading={loading} rowKey='path'
-        pagination={paginationConfig} />
+        pagination={paginationConfig}
+        locale={{filterTitle: ""}} />
     }
 
     const generateKeysPendingTable = (dataSource: any) => {
@@ -1082,6 +1086,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         loading={loading}
         pagination={paginationConfig} rowKey='containerId'
         expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
+        locale={{filterTitle: ""}}
       />
     }
 

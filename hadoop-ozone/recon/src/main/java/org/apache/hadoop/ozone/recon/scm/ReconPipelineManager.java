@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -173,5 +174,11 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
     } finally {
       releaseWriteLock();
     }
+  }
+
+  @Override
+  public void addContainerToPipeline(PipelineID pipelineID,
+      ContainerID containerID) throws IOException {
+    getStateManager().addContainerToPipelineForce(pipelineID, containerID);
   }
 }

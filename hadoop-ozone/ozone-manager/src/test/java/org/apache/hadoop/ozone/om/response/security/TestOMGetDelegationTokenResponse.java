@@ -31,9 +31,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import java.io.IOException;
 import java.util.UUID;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /** The class tests OMGetDelegationTokenResponse. */
 public class TestOMGetDelegationTokenResponse extends
@@ -42,7 +42,7 @@ public class TestOMGetDelegationTokenResponse extends
   private OzoneTokenIdentifier identifier;
   private UpdateGetDelegationTokenRequest updateGetDelegationTokenRequest;
 
-  @Before
+  @BeforeEach
   public void setupGetDelegationToken() {
     Text tester = new Text("tester");
     identifier = new OzoneTokenIdentifier(tester, tester, tester);
@@ -86,10 +86,10 @@ public class TestOMGetDelegationTokenResponse extends
     long rowNumInTable = 1;
     long rowNumInTokenTable = omMetadataManager
         .countRowsInTable(omMetadataManager.getDelegationTokenTable());
-    Assert.assertEquals(rowNumInTable, rowNumInTokenTable);
+    Assertions.assertEquals(rowNumInTable, rowNumInTokenTable);
 
     long renewTimeInTable = omMetadataManager.getDelegationTokenTable()
         .get(identifier);
-    Assert.assertEquals(renewTime, renewTimeInTable);
+    Assertions.assertEquals(renewTime, renewTimeInTable);
   }
 }

@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -88,11 +88,11 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         keyName, multipartUploadID);
 
     // Check table and response.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assert.assertNull(
+    Assertions.assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assert.assertNull(omMetadataManager
+    Assertions.assertNull(omMetadataManager
         .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
         .get(multipartOpenKey));
 
@@ -121,7 +121,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
             ozoneManagerDoubleBufferHelper);
 
     // Check table and response.
-    Assert.assertEquals(
+    Assertions.assertEquals(
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
         omClientResponse.getOMResponse().getStatus());
 
@@ -149,7 +149,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
             ozoneManagerDoubleBufferHelper);
 
     // Check table and response.
-    Assert.assertEquals(
+    Assertions.assertEquals(
         OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
@@ -178,7 +178,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
             ozoneManagerDoubleBufferHelper);
 
     // Check table and response.
-    Assert.assertEquals(
+    Assertions.assertEquals(
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 

@@ -18,23 +18,33 @@
 
 package org.apache.hadoop.ozone.recon.recovery;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.google.common.base.Strings;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,5 +156,159 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   @Override
   public boolean isOmTablesInitialized() {
     return omTablesInitialized;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<OmVolumeArgs> listVolumes(String startKey,
+       int maxKeys) throws IOException {
+    List<OmVolumeArgs> result = Lists.newArrayList();
+
+    String volumeName;
+    OmVolumeArgs omVolumeArgs;
+
+    boolean startKeyIsEmpty = Strings.isNullOrEmpty(startKey);
+
+    // Unlike in {@link OmMetadataManagerImpl}, the volumes are queried directly
+    // from the volume table (not through cache) since Recon does not use
+    // Table cache.
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+             iterator = getVolumeTable().iterator()) {
+
+      while (iterator.hasNext() && result.size() < maxKeys) {
+        Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
+        omVolumeArgs = kv.getValue();
+        volumeName = omVolumeArgs.getVolume();
+
+
+        if (!startKeyIsEmpty) {
+          if (volumeName.equals(startKey)) {
+            startKeyIsEmpty = true;
+          }
+          continue;
+        }
+
+        result.add(omVolumeArgs);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Return all volumes in the file system.
+   * This method can be optimized by using username as a filter.
+   * @return a list of volume names under the system
+   */
+  @Override
+  public List<OmVolumeArgs> listVolumes() throws IOException {
+    return listVolumes(null, Integer.MAX_VALUE);
+  }
+
+  @Override
+  public boolean volumeExists(String volName) throws IOException {
+    String volDBKey = getVolumeKey(volName);
+    return getVolumeTable().getSkipCache(volDBKey) != null;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName,
+       final String startBucket, final int maxNumOfBuckets) throws IOException {
+    List<OmBucketInfo> result = new ArrayList<>();
+
+    // List all buckets if volume is empty
+    if (Strings.isNullOrEmpty(volumeName)) {
+      // startBucket requires the knowledge of the volume, for example
+      // there might be buckets with the same names under different
+      // volumes. Hence, startBucket will be ignored if
+      // volumeName is not specified
+      return listAllBuckets(maxNumOfBuckets);
+    }
+
+    if (!volumeExists(volumeName)) {
+      return result;
+    }
+
+    String startKey;
+    boolean skipStartKey = false;
+    if (StringUtil.isNotBlank(startBucket)) {
+      startKey = getBucketKey(volumeName, startBucket);
+      skipStartKey = true;
+    } else {
+      startKey = getBucketKey(volumeName, null);
+    }
+
+    String seekPrefix = getVolumeKey(volumeName + OM_KEY_PREFIX);
+
+    int currentCount = 0;
+
+    // Unlike in {@link OmMetadataManagerImpl}, the buckets are queried directly
+    // from the volume table (not through cache) since Recon does not use
+    // Table cache.
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+        iterator = getBucketTable().iterator(seekPrefix)) {
+
+      while (currentCount < maxNumOfBuckets && iterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> kv =
+            iterator.next();
+
+        String key = kv.getKey();
+        OmBucketInfo omBucketInfo = kv.getValue();
+
+        if (omBucketInfo != null) {
+          if (key.equals(startKey) && skipStartKey) {
+            continue;
+          }
+
+          // We should return only the keys, whose keys match with prefix and
+          // the keys after the startBucket.
+          if (key.startsWith(seekPrefix) && key.compareTo(startKey) >= 0) {
+            result.add(omBucketInfo);
+            currentCount++;
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * List all buckets under a volume, if volume name is null, return all buckets
+   * under the system.
+   * @param volumeName volume name without protocol prefix
+   * @return buckets under volume or all buckets if volume is null
+   * @throws IOException IOE
+   */
+  public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
+      throws IOException {
+    return listBucketsUnderVolume(volumeName, null,
+        Integer.MAX_VALUE);
+  }
+
+  private List<OmBucketInfo> listAllBuckets(final int maxNumberOfBuckets)
+      throws IOException {
+    List<OmBucketInfo> result = new ArrayList<>();
+
+    int currentCount = 0;
+    Table<String, OmBucketInfo> bucketTable = getBucketTable();
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+             iterator = bucketTable.iterator()) {
+      while (currentCount < maxNumberOfBuckets && iterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
+        OmBucketInfo omBucketInfo = kv.getValue();
+        if (omBucketInfo != null) {
+          result.add(omBucketInfo);
+          currentCount++;
+        }
+      }
+    }
+
+    return result;
   }
 }

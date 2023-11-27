@@ -20,10 +20,12 @@ package org.apache.hadoop.hdds.scm.net;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,12 +49,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,10 +74,24 @@ public class TestNetworkTopologyImpl {
   private NetworkTopology cluster;
   private Node[] dataNodes;
   private Random random = new Random();
+  private Consumer<List<? extends Node>> mockedShuffleOperation;
+
+  @BeforeEach
+  void beforeAll() {
+    mockedShuffleOperation =
+        Mockito.mock(Consumer.class);
+    doAnswer(args -> {
+          List<? extends Node> collection = args.getArgument(0);
+          Collections.shuffle(collection);
+          return null;
+        }
+    ).when(mockedShuffleOperation).accept(any());
+  }
 
   public void initNetworkTopology(NodeSchema[] schemas, Node[] nodeArray) {
     NodeSchemaManager.getInstance().init(schemas, true);
-    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance(),
+        mockedShuffleOperation);
     dataNodes = nodeArray.clone();
     for (int i = 0; i < dataNodes.length; i++) {
       cluster.add(dataNodes[i]);
@@ -208,7 +232,7 @@ public class TestNetworkTopologyImpl {
         new NodeSchema[]{ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
     NetworkTopology newCluster = new NetworkTopologyImpl(
-        NodeSchemaManager.getInstance());
+        NodeSchemaManager.getInstance(), mockedShuffleOperation);
     Node[] invalidDataNodes = new Node[] {
         createDatanode("1.1.1.1", "/r1"),
         createDatanode("2.2.2.2", "/r2"),
@@ -765,7 +789,7 @@ public class TestNetworkTopologyImpl {
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
     NetworkTopology newCluster =
-        new NetworkTopologyImpl(manager);
+        new NetworkTopologyImpl(manager, mockedShuffleOperation);
     Node[] nodeList = new Node[] {
         createDatanode("1.1.1.1", "/r1/ng1"),
         createDatanode("2.2.2.2", "/r1/ng1"),
@@ -806,7 +830,7 @@ public class TestNetworkTopologyImpl {
         .setType(NodeSchema.LayerType.LEAF_NODE).build());
     manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
-    newCluster = new NetworkTopologyImpl(manager);
+    newCluster = new NetworkTopologyImpl(manager, mockedShuffleOperation);
     for (Node node: nodeList) {
       newCluster.add(node);
     }
@@ -866,6 +890,7 @@ public class TestNetworkTopologyImpl {
         while (length > 0) {
           List<? extends Node> ret = cluster.sortByDistanceCost(reader,
               Arrays.asList(nodeList), length);
+          assertEquals(length, ret.size());
           for (int i = 0; i < ret.size(); i++) {
             if ((i + 1) < ret.size()) {
               int cost1 = cluster.getDistanceCost(reader, ret.get(i));
@@ -890,6 +915,7 @@ public class TestNetworkTopologyImpl {
       while (length >= 0) {
         List<? extends Node> sortedNodeList =
             cluster.sortByDistanceCost(reader, nodeList, length);
+        assertEquals(length, sortedNodeList.size());
         for (int i = 0; i < sortedNodeList.size(); i++) {
           if ((i + 1) < sortedNodeList.size()) {
             int cost1 = cluster.getDistanceCost(reader, sortedNodeList.get(i));
@@ -909,6 +935,33 @@ public class TestNetworkTopologyImpl {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("topologies")
+  public void testSortByDistanceCostNullReader(NodeSchema[] schemas,
+                                               Node[] nodeArray) {
+    // GIVEN
+    // various cluster topologies with null reader
+    initNetworkTopology(schemas, nodeArray);
+    List<Node> nodeList = Arrays.asList(dataNodes.clone());
+    final Node reader = null;
+    NetworkTopology spyCluster = spy(cluster);
+    int length = nodeList.size();
+    while (length > 0) {
+      // WHEN
+      List<? extends Node> ret = spyCluster.sortByDistanceCost(reader,
+          nodeList, length);
+      // THEN
+      // no actual distance cost calculated
+      // only shuffle input node list with given length limit
+      verify(mockedShuffleOperation).accept(any());
+      verify(spyCluster, never()).getDistanceCost(any(), any());
+      assertEquals(length, ret.size());
+      assertTrue(nodeList.containsAll(ret));
+      reset(mockedShuffleOperation);
+      length--;
+    }
+  }
+
   @Test
   public void testSingleNodeRackWithAffinityNode() {
     // network topology with default cost
@@ -920,7 +973,7 @@ public class TestNetworkTopologyImpl {
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
     NetworkTopology newCluster =
-        new NetworkTopologyImpl(manager);
+        new NetworkTopologyImpl(manager, mockedShuffleOperation);
     Node node = createDatanode("1.1.1.1", "/r1");
     newCluster.add(node);
     Node chosenNode =
@@ -945,7 +998,7 @@ public class TestNetworkTopologyImpl {
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
     NetworkTopology newCluster =
-            new NetworkTopologyImpl(manager);
+            new NetworkTopologyImpl(manager, mockedShuffleOperation);
     Node node = createDatanode("1.1.1.1", "/d1/r1");
     newCluster.add(node);
     assertTrue(newCluster.contains(node));

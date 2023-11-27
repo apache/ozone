@@ -33,6 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,30 +53,28 @@ import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for Recon Node Manager.
  */
 public class TestReconNodeManager {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private OzoneConfiguration conf;
   private DBStore store;
   private ReconStorageConfig reconStorageConfig;
   private HDDSLayoutVersionManager versionManager;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
-    conf.set(OZONE_METADATA_DIRS,
-        temporaryFolder.newFolder().getAbsolutePath());
+    conf.set(OZONE_METADATA_DIRS, temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     reconStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     versionManager = new HDDSLayoutVersionManager(
@@ -83,7 +82,7 @@ public class TestReconNodeManager {
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     store.close();
   }

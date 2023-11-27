@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -45,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -60,7 +59,6 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
  * support for OBS buckets. Check that the NSSummary
  * for the OBS bucket is null.
  */
-@SuppressFBWarnings
 public final class TestNSSummaryTask {
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
@@ -267,13 +265,7 @@ public final class TestNSSummaryTask {
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
           .build();
 
-      OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
-          new ArrayList<OMDBUpdateEvent>() {{
-              add(keyEvent1);
-              add(keyEvent2);
-              }});
-
-      return omUpdateEventBatch;
+      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2));
     }
 
     @Test

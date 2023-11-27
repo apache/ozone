@@ -70,7 +70,7 @@ public class TestCloseContainerCommandHandler {
   private ContainerController controller;
   private ContainerSet containerSet;
   private CloseContainerCommandHandler subject =
-      new CloseContainerCommandHandler(1, 1000);
+      new CloseContainerCommandHandler(1, 1000, "");
 
   private final ContainerLayoutVersion layout;
 

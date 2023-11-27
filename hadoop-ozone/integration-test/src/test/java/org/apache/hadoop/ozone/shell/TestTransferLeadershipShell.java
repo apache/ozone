@@ -19,11 +19,15 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +35,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -96,12 +101,14 @@ public class TestTransferLeadershipShell {
     ozoneAdmin.execute(args1);
     Thread.sleep(3000);
     Assertions.assertEquals(newLeader, cluster.getOMLeader());
+    assertOMResetPriorities();
 
     oldLeader = cluster.getOMLeader();
     String[] args3 = {"om", "transfer", "-r"};
     ozoneAdmin.execute(args3);
     Thread.sleep(3000);
     Assertions.assertNotSame(oldLeader, cluster.getOMLeader());
+    assertOMResetPriorities();
   }
 
   @Test
@@ -118,12 +125,45 @@ public class TestTransferLeadershipShell {
     ozoneAdmin.execute(args1);
     cluster.waitForClusterToBeReady();
     Assertions.assertEquals(newLeader, getScmLeader(cluster));
+    assertSCMResetPriorities();
 
     oldLeader = getScmLeader(cluster);
     String[] args3 = {"scm", "transfer", "-r"};
     ozoneAdmin.execute(args3);
     cluster.waitForClusterToBeReady();
     Assertions.assertNotSame(oldLeader, getScmLeader(cluster));
+    assertSCMResetPriorities();
+  }
+
+  private void assertOMResetPriorities() throws IOException {
+    OzoneManagerRatisServer ratisServer = cluster.getOMLeader()
+        .getOmRatisServer();
+    RaftGroupId raftGroupId = ratisServer.getRaftGroupId();
+    Collection<RaftPeer> raftPeers = ratisServer
+        .getServer()
+        .getDivision(raftGroupId)
+        .getGroup()
+        .getPeers();
+
+    for (RaftPeer raftPeer: raftPeers) {
+      Assertions.assertEquals(RatisHelper.NEUTRAL_PRIORITY,
+          raftPeer.getPriority());
+    }
+  }
+
+  private void assertSCMResetPriorities() {
+    StorageContainerManager scm = getScmLeader(cluster);
+    Assertions.assertNotNull(scm);
+    Collection<RaftPeer> raftPeers = scm
+        .getScmHAManager()
+        .getRatisServer()
+        .getDivision()
+        .getGroup()
+        .getPeers();
+    for (RaftPeer raftPeer: raftPeers) {
+      Assertions.assertEquals(RatisHelper.NEUTRAL_PRIORITY,
+          raftPeer.getPriority());
+    }
   }
 
   static StorageContainerManager getScmLeader(MiniOzoneHAClusterImpl impl) {

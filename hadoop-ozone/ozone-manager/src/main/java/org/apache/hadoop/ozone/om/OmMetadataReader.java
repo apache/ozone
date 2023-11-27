@@ -37,7 +37,9 @@ import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -126,12 +128,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getLookupAclCheckLatencyNs(),
             () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
-                ACLType.READ, bucket.realVolume(), bucket.realBucket(),
+                ACLType.READ, bucket,
                 args.getKeyName())
         );
       }
       metrics.incNumKeyLookups();
-      return keyManager.lookupKey(resolvedArgs, getClientAddress());
+      return keyManager.lookupKey(resolvedArgs, bucket, getClientAddress());
     } catch (Exception ex) {
       metrics.incNumKeyLookupFails();
       auditSuccess = false;
@@ -180,13 +182,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
                 StoreType.OZONE, ACLType.READ,
-                bucket.realVolume(), bucket.realBucket(), args.getKeyName())
+                bucket, args.getKeyName())
         );
       }
 
       metrics.incNumGetKeyInfo();
-      OmKeyInfo keyInfo =
-          keyManager.getKeyInfo(resolvedArgs,
+      OmKeyInfo keyInfo = keyManager.getKeyInfo(resolvedArgs, bucket,
               OmMetadataReader.getClientAddress());
       KeyInfoWithVolumeContext.Builder builder = KeyInfoWithVolumeContext
           .newBuilder()
@@ -233,7 +234,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     try {
       if (isAclEnabled) {
         checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+            bucket, args.getKeyName());
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -250,6 +251,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             OMAction.LIST_STATUS, auditMap));
       }
     }
+  }
+
+  @Override
+  public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
+      boolean recursive, String startKey, long numEntries,
+      boolean allowPartialPrefixes) throws IOException {
+    List<OzoneFileStatus> ozoneFileStatuses =
+        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+
+    return ozoneFileStatuses.stream()
+        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .collect(Collectors.toList());
   }
   
   @Override
@@ -290,7 +303,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     try {
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
+            bucket, args.getKeyName());
       }
       metrics.incNumLookupFile();
       return keyManager.lookupFile(args, getClientAddress());
@@ -447,6 +460,43 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             ozoneManager.getOmRpcServerAddr().getHostName());
   }
 
+  /**
+   * Checks if current caller has acl permissions.
+   *
+   * @param resType - Type of ozone resource. Ex volume, bucket.
+   * @param store   - Store type. i.e Ozone, S3.
+   * @param acl     - type of access to be checked.
+   * @param resolvedBucket - resolved bucket information.
+   * @param key     - key
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
+   */
+  void checkAcls(ResourceType resType, StoreType store,
+      ACLType acl, ResolvedBucket resolvedBucket, String key)
+      throws IOException {
+    UserGroupInformation user;
+    if (getS3Auth() != null) {
+      String principal =
+          OzoneAclUtils.accessIdToUserPrincipal(getS3Auth().getAccessId());
+      user = UserGroupInformation.createRemoteUser(principal);
+    } else {
+      user = ProtobufRpcEngine.Server.getRemoteUser();
+    }
+
+    String vol = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
+    InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
+    String volumeOwner = ozoneManager.getVolumeOwner(vol, acl, resType);
+    String bucketOwner = resolvedBucket.bucketOwner();
+
+    OzoneAclUtils.checkAllAcls(this, resType, store, acl,
+        vol, bucket, key, volumeOwner, bucketOwner,
+        user != null ? user : getRemoteUser(),
+        remoteIp != null ? remoteIp :
+            ozoneManager.getOmRpcServerAddr().getAddress(),
+        remoteIp != null ? remoteIp.getHostName() :
+            ozoneManager.getOmRpcServerAddr().getHostName());
+  }
+
   
   /**
    * CheckAcls for the ozone object.
@@ -516,7 +566,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   static String getClientAddress() {
     String clientMachine = Server.getRemoteAddress();
     if (clientMachine == null) { //not a RPC client
-      clientMachine = "";
+      String clientIpAddress =
+          GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get();
+      if (clientIpAddress != null) {
+        clientMachine = clientIpAddress;
+      } else {
+        clientMachine = "";
+      }
     }
     return clientMachine;
   }
@@ -527,7 +583,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return new AuditMessage.Builder()
         .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .atIp(getClientAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.SUCCESS)
@@ -540,7 +596,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return new AuditMessage.Builder()
         .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .atIp(getClientAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.FAILURE)

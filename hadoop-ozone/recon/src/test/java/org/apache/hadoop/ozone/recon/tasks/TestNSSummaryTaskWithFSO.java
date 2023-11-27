@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,7 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -57,7 +56,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NS
 /**
  * Test for NSSummaryTaskWithFSO.
  */
-@SuppressFBWarnings
 public final class TestNSSummaryTaskWithFSO {
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
@@ -390,18 +388,10 @@ public final class TestNSSummaryTaskWithFSO {
           .setTable(omMetadataManager.getDirectoryTable().getName())
           .build();
 
-      OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
-              new ArrayList<OMDBUpdateEvent>() {{
-              add(keyEvent1);
-              add(keyEvent2);
-              add(keyEvent3);
-              add(keyEvent4);
-              add(keyEvent5);
-              add(keyEvent6);
-              add(keyEvent7);
-              }});
-
-      return omUpdateEventBatch;
+      return new OMUpdateEventBatch(Arrays.asList(
+          keyEvent1, keyEvent2, keyEvent3, keyEvent4, keyEvent5,
+          keyEvent6, keyEvent7
+      ));
     }
 
     @Test

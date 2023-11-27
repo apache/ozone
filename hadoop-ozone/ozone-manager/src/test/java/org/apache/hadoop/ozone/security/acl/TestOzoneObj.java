@@ -18,12 +18,10 @@ package org.apache.hadoop.ozone.security.acl;
 
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -43,19 +41,19 @@ public class TestOzoneObj {
 
     builder = getBuilder(volume, bucket, key);
     objInfo = builder.build();
-    assertEquals(objInfo.getVolumeName(), volume);
-    assertNotNull("unexpected path accessor",
-        objInfo.getOzonePrefixPathViewer());
+    Assertions.assertEquals(objInfo.getVolumeName(), volume);
+    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(),
+        "unexpected path accessor");
 
     objInfo = getBuilder(null, null, null).build();
-    assertEquals(objInfo.getVolumeName(), null);
-    assertNotNull("unexpected path accessor",
-        objInfo.getOzonePrefixPathViewer());
+    Assertions.assertNull(objInfo.getVolumeName());
+    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(),
+        "unexpected path accessor");
 
     objInfo = getBuilder(volume, null, null).build();
-    assertEquals(objInfo.getVolumeName(), volume);
-    assertNotNull("unexpected path accessor",
-        objInfo.getOzonePrefixPathViewer());
+    Assertions.assertEquals(objInfo.getVolumeName(), volume);
+    Assertions.assertNotNull(objInfo.getOzonePrefixPathViewer(),
+        "unexpected path accessor");
 
   }
 

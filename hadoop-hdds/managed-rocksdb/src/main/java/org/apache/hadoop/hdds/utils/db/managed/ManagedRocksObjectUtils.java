@@ -26,6 +26,7 @@ import org.rocksdb.RocksObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -43,10 +44,6 @@ public final class ManagedRocksObjectUtils {
   private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
 
-  static void assertClosed(RocksObject rocksObject) {
-    assertClosed(rocksObject, null);
-  }
-
   public static void assertClosed(ManagedObject<?> object) {
     assertClosed(object.get(), object.getStackTrace());
   }
@@ -54,23 +51,27 @@ public final class ManagedRocksObjectUtils {
   static void assertClosed(RocksObject rocksObject, String stackTrace) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (rocksObject.isOwningHandle()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      String warning = String.format("%s is not closed properly",
-          rocksObject.getClass().getSimpleName());
-      if (stackTrace != null && LOG.isDebugEnabled()) {
-        String debugMessage = String
-            .format("%nStackTrace for unclosed instance: %s", stackTrace);
-        warning = warning.concat(debugMessage);
-      }
-      LOG.warn(warning);
+      reportLeak(rocksObject, stackTrace);
     }
   }
 
-  static StackTraceElement[] getStackTrace() {
+  static void reportLeak(Object object, String stackTrace) {
+    ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
+    String warning = String.format("%s is not closed properly",
+        object.getClass().getSimpleName());
+    if (stackTrace != null && LOG.isDebugEnabled()) {
+      String debugMessage = String
+          .format("%nStackTrace for unclosed instance: %s", stackTrace);
+      warning = warning.concat(debugMessage);
+    }
+    LOG.warn(warning);
+  }
+
+  static @Nullable StackTraceElement[] getStackTrace() {
     return HddsUtils.getStackTrace(LOG);
   }
 
-  static String formatStackTrace(StackTraceElement[] elements) {
+  static String formatStackTrace(@Nullable StackTraceElement[] elements) {
     return HddsUtils.formatStackTrace(elements, 3);
   }
 

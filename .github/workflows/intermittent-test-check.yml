@@ -135,6 +135,7 @@ jobs:
         continue-on-error: true
         env:
           CHECK: ${{ needs.prepare-job.outputs.test_type }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
         if: ${{ !cancelled() }}
