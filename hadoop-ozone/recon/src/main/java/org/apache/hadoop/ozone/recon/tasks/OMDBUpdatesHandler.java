@@ -116,7 +116,8 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // - PUT with a new key: Insert the new value.
       // - PUT with an existing key: Update the existing value.
       // - DELETE with an existing key: Remove the value.
-      // - DELETE with a non-existing key: No action, log a warning if necessary.
+      // - DELETE with a non-existing key: No action, log a warning if
+      // necessary.
       Table table = omMetadataManager.getTable(tableName);
 
       OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
