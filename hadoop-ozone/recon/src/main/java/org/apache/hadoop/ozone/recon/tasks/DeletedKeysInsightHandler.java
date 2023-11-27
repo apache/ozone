@@ -16,10 +16,10 @@ import java.util.HashMap;
  * Manages records in the Deleted Table, updating counts and sizes of
  * pending Key Deletions in the backend.
  */
-public class DeletedTableHandler implements OmTableHandler {
+public class DeletedKeysInsightHandler implements OmTableHandler {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(DeletedTableHandler.class);
+      LoggerFactory.getLogger(DeletedKeysInsightHandler.class);
 
   /**
    * Invoked by the process method to add information on those keys that have

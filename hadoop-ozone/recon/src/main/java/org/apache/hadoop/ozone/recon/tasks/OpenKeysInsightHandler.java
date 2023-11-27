@@ -15,10 +15,10 @@ import java.util.HashMap;
  * Manages records in the OpenKey Table, updating counts and sizes of
  * open keys in the backend.
  */
-public class OpenKeyTableHandler implements OmTableHandler {
+public class OpenKeysInsightHandler implements OmTableHandler {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OpenKeyTableHandler.class);
+      LoggerFactory.getLogger(OpenKeysInsightHandler.class);
 
   /**
    * Invoked by the process method to add information on those keys that have

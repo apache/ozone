@@ -23,7 +23,7 @@ public class DeletedDirectoriesInsightHandler implements  OmTableHandler {
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(DeletedTableHandler.class);
+      LoggerFactory.getLogger(DeletedKeysInsightHandler.class);
 
   public DeletedDirectoriesInsightHandler(
       ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager) {

@@ -83,10 +83,11 @@ public class OmTableInsightTask implements ReconOmTask {
 
     // Initialize table handlers
     tableHandlers = new HashMap<>();
-    tableHandlers.put(OPEN_KEY_TABLE, new OpenKeyTableHandler());
-    tableHandlers.put(OPEN_FILE_TABLE, new OpenFileTableHandler());
-    tableHandlers.put(DELETED_TABLE, new DeletedTableHandler());
-    tableHandlers.put(DELETED_DIR_TABLE, new DeletedDirectoryTableHandler(reconNamespaceSummaryManager));
+    tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
+    tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
+    tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+    tableHandlers.put(DELETED_DIR_TABLE,
+        new DeletedDirectoriesInsightHandler(reconNamespaceSummaryManager));
   }
 
   /**
@@ -194,7 +195,7 @@ public class OmTableInsightTask implements ReconOmTask {
       if (!taskTables.contains(tableName)) {
         continue;
       }
-        try {
+      try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
           handlePutEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
