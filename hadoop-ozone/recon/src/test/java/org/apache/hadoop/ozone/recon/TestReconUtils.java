@@ -38,6 +38,7 @@ import java.net.HttpURLConnection;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.net.URL;
+import java.util.Random;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -195,5 +196,49 @@ public class TestReconUtils {
     ReconUtils reconUtils = new ReconUtils();
     File latestValidFile = reconUtils.getLastKnownDB(newDir, "valid");
     assertTrue(latestValidFile.getName().equals("valid_2"));
+  }
+
+  @Test
+  public void testNextClosestPowerIndexOfTwo() {
+    assertNextClosestPowerIndexOfTwo(0);
+    assertNextClosestPowerIndexOfTwo(1);
+    assertNextClosestPowerIndexOfTwo(-1);
+    assertNextClosestPowerIndexOfTwo(Long.MAX_VALUE);
+    assertNextClosestPowerIndexOfTwo(Long.MIN_VALUE);
+
+    for (long n = 1; n != 0; n <<= 1) {
+      assertNextClosestPowerIndexOfTwo(n);
+      assertNextClosestPowerIndexOfTwo(n + 1);
+      assertNextClosestPowerIndexOfTwo(n - 1);
+    }
+
+    final Random random = new Random();
+    for (int i = 0; i < 10; i++) {
+      assertNextClosestPowerIndexOfTwo(random.nextLong());
+    }
+  }
+
+  static void assertNextClosestPowerIndexOfTwo(long n) {
+    final int expected = oldNextClosestPowerIndexOfTwoFixed(n);
+    final int computed = ReconUtils.nextClosestPowerIndexOfTwo(n);
+    Assert.assertEquals("n=" + n, expected, computed);
+  }
+
+  private static int oldNextClosestPowerIndexOfTwoFixed(long n) {
+    return n == 0 ? 0
+        : n == Long.MIN_VALUE ? -63
+        : n == Long.highestOneBit(n) ? 63 - Long.numberOfLeadingZeros(n)
+        : n > 0 ? oldNextClosestPowerIndexOfTwo(n)
+        : -oldNextClosestPowerIndexOfTwoFixed(-n);
+  }
+
+  /** The old buggy method works only for n >= 0 with n not a power of 2. */
+  private static int oldNextClosestPowerIndexOfTwo(long dataSize) {
+    int index = 0;
+    while (dataSize != 0) {
+      dataSize >>= 1;
+      index += 1;
+    }
+    return index;
   }
 }

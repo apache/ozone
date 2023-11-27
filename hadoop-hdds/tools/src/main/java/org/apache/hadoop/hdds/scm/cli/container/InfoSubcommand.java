@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.time.Instant;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
@@ -73,21 +74,101 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
-  @Parameters(description = "Decimal id of the container.")
-  private long containerID;
+  @Parameters(description = "One or more container IDs separated by spaces. " +
+      "To read from stdin, specify '-' and supply the container IDs " +
+      "separated by newlines.",
+      arity = "1..*",
+      paramLabel = "<container ID>")
+  private String[] containerList;
+
+  private boolean multiContainer = false;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    final ContainerWithPipeline container = scmClient.
-        getContainerWithPipeline(containerID);
-    Preconditions.checkNotNull(container, "Container cannot be null");
+    boolean first = true;
+    boolean stdin = false;
+    if (containerList.length > 1) {
+      multiContainer = true;
+    } else if (containerList[0].equals("-")) {
+      stdin = true;
+      // Assume multiple containers if reading from stdin
+      multiContainer = true;
+    }
+
+    printHeader();
+    if (stdin) {
+      Scanner scanner = new Scanner(System.in, "UTF-8");
+      while (scanner.hasNextLine()) {
+        String id = scanner.nextLine().trim();
+        printOutput(scmClient, id, first);
+        first = false;
+      }
+    } else {
+      for (String id : containerList) {
+        printOutput(scmClient, id, first);
+        first = false;
+      }
+    }
+    printFooter();
+  }
+
+  private void printOutput(ScmClient scmClient, String id, boolean first)
+      throws IOException {
+    long containerID;
+    try {
+      containerID = Long.parseLong(id);
+    } catch (NumberFormatException e) {
+      printError("Invalid container ID: " + id);
+      return;
+    }
+    printDetails(scmClient, containerID, first);
+  }
+
+  private void printHeader() {
+    if (json && multiContainer) {
+      LOG.info("[");
+    }
+  }
+
+  private void printFooter() {
+    if (json && multiContainer) {
+      LOG.info("]");
+    }
+  }
+
+  private void printError(String error) {
+    System.err.println(error);
+  }
+
+  private void printBreak() {
+    if (json) {
+      LOG.info(",");
+    } else {
+      LOG.info("");
+    }
+  }
+
+  private void printDetails(ScmClient scmClient, long containerID,
+      boolean first) throws IOException {
+    final ContainerWithPipeline container;
+    try {
+      container = scmClient.getContainerWithPipeline(containerID);
+      Preconditions.checkNotNull(container, "Container cannot be null");
+    } catch (IOException e) {
+      printError("Unable to retrieve the container details for " + containerID);
+      return;
+    }
+
     List<ContainerReplicaInfo> replicas = null;
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      LOG.error("Unable to retrieve the replica details", e);
+      printError("Unable to retrieve the replica details: " + e.getMessage());
     }
 
+    if (!first) {
+      printBreak();
+    }
     if (json) {
       if (container.getPipeline().size() != 0) {
         ContainerWithPipelineAndReplicas wrapper =
@@ -125,14 +206,14 @@ public class InfoSubcommand extends ScmSubcommand {
             ioe) instanceof PipelineNotFoundException) {
           LOG.info("Write Pipeline State: CLOSED");
         } else {
-          LOG.error("Failed to retrieve pipeline info");
+          printError("Failed to retrieve pipeline info");
         }
       }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
-          InfoSubcommand::buildDatanodeDetails)
+              InfoSubcommand::buildDatanodeDetails)
           .collect(Collectors.joining(",\n"));
       LOG.info("Datanodes: [{}]", machinesStr);
 

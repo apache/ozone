@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -44,7 +44,7 @@ public class TestOverReplicatedProcessor {
   private OverReplicatedProcessor overReplicatedProcessor;
   private ReplicationQueue queue;
 
-  @Before
+  @BeforeEach
   public void setup() {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
@@ -60,7 +60,7 @@ public class TestOverReplicatedProcessor {
 
     // Even through the limit has been exceeded, it should not stop over-rep
     // processing, as the over-rep handler ignores the limit as it only does
-    // deletes.
+    // delete.
     Mockito.when(replicationManager.getReplicationInFlightLimit())
         .thenReturn(1L);
     Mockito.when(replicationManager.getInflightReplicationCount())
@@ -82,7 +82,7 @@ public class TestOverReplicatedProcessor {
   }
 
   @Test
-  public void testMessageRequeuedOnException() throws IOException {
+  public void testMessageReQueuedOnException() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     OverReplicatedHealthResult result = new OverReplicatedHealthResult(

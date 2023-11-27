@@ -46,9 +46,11 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Helpers for container tests.
@@ -445,8 +447,8 @@ public final class ContainerTestHelper {
    */
   public static void verifyGetBlock(ContainerCommandRequestProto request,
       ContainerCommandResponseProto response, int expectedChunksCount) {
-    Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-    Assert.assertEquals(expectedChunksCount,
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    assertEquals(expectedChunksCount,
         response.getGetBlock().getBlockData().getChunksCount());
   }
 
@@ -626,7 +628,7 @@ public final class ContainerTestHelper {
       break;
 
     default:
-      Assert.fail("Unhandled request type " + cmdType + " in unit test");
+      fail("Unhandled request type " + cmdType + " in unit test");
     }
 
     return builder.build();

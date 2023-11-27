@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -46,7 +46,7 @@ public class TestUnderReplicatedProcessor {
   private ReplicationQueue queue;
   private ReplicationManagerMetrics rmMetrics;
 
-  @Before
+  @BeforeEach
   public void setup() {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =

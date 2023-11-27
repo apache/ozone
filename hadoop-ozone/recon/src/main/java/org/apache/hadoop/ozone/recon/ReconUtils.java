@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 
+import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -314,6 +315,8 @@ public class ReconUtils {
 
 
   public static int getFileSizeBinIndex(long fileSize) {
+    Preconditions.checkArgument(fileSize >= 0,
+        "fileSize = %s < 0", fileSize);
     // if the file size is larger than our track scope,
     // we map it to the last bin
     if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
@@ -326,6 +329,8 @@ public class ReconUtils {
   }
 
   public static int getContainerSizeBinIndex(long containerSize) {
+    Preconditions.checkArgument(containerSize >= 0,
+        "containerSize = %s < 0", containerSize);
     // if the container size is larger than our track scope,
     // we map it to the last bin
     if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
@@ -337,13 +342,11 @@ public class ReconUtils {
     return index < 29 ? 0 : index - 29;
   }
 
-  private static int nextClosestPowerIndexOfTwo(long dataSize) {
-    int index = 0;
-    while (dataSize != 0) {
-      dataSize >>= 1;
-      index += 1;
-    }
-    return index;
+  static int nextClosestPowerIndexOfTwo(long n) {
+    return n > 0 ? 64 - Long.numberOfLeadingZeros(n - 1)
+        : n == 0 ? 0
+        : n == Long.MIN_VALUE ? -63
+        : -nextClosestPowerIndexOfTwo(-n);
   }
 
   public SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {

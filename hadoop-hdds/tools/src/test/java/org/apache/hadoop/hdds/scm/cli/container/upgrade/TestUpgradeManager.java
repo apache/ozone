@@ -46,9 +46,9 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -65,8 +65,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -75,19 +75,19 @@ import static org.mockito.Mockito.mock;
  * Tests for UpgradeManager class.
  */
 public class TestUpgradeManager {
+  private static final String SCM_ID = UUID.randomUUID().toString();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   private File testRoot;
-  private String scmId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private UUID datanodeId;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   private BlockManager blockManager;
   private FilePerBlockStrategy chunkManager;
   private ContainerSet containerSet;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3Enabled(true);
@@ -112,14 +112,15 @@ public class TestUpgradeManager {
         volume1Path.getAbsolutePath() + "," + volume2Path.getAbsolutePath());
     CONF.set(OZONE_METADATA_DIRS, metadataPath.getAbsolutePath());
     datanodeId = UUID.randomUUID();
-    volumeSet = new MutableVolumeSet(datanodeId.toString(), scmId, CONF,
+    volumeSet = new MutableVolumeSet(datanodeId.toString(), SCM_ID, CONF,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     // create rocksdb instance in volume dir
     final List<HddsVolume> volumes = new ArrayList<>();
     for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
-      StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, CONF, null, null);
+      StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, SCM_ID, CONF, null,
+          null);
       volumes.add(hddsVolume);
     }
 
@@ -142,7 +143,7 @@ public class TestUpgradeManager {
     chunkManager = new FilePerBlockStrategy(true, blockManager, null);
   }
 
-  @After
+  @AfterEach
   public void after() throws IOException {
     FileUtils.deleteDirectory(testRoot);
   }
@@ -242,7 +243,7 @@ public class TestUpgradeManager {
       data.setSchemaVersion(OzoneConsts.SCHEMA_V2);
 
       KeyValueContainer container = new KeyValueContainer(data, CONF);
-      container.create(volumeSet, volumeChoosingPolicy, scmId);
+      container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
 
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(containerId)
