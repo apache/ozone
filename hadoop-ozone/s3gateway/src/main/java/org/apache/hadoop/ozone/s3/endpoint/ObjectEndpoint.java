@@ -218,7 +218,6 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
       InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
-    // Set to an Array so that S3GAction can be changed within the function.
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
