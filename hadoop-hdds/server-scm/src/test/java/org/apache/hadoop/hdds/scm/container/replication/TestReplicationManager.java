@@ -386,12 +386,12 @@ public class TestReplicationManager {
     storeContainerAndReplicas(container, replicas);
 
     replicationManager.processContainer(container, repQueue, repReport);
-    Assertions.assertEquals(0, repReport.getStat(
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assertions.assertEquals(1, repReport.getStat(
+    assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assertions.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assertions.assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -411,12 +411,12 @@ public class TestReplicationManager {
     storeContainerAndReplicas(container, replicas);
 
     replicationManager.processContainer(container, repQueue, repReport);
-    Assertions.assertEquals(0, repReport.getStat(
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assertions.assertEquals(1, repReport.getStat(
+    assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assertions.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assertions.assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
   }
 
   @Test

@@ -245,7 +245,7 @@ public class TestRatisOverReplicationHandler {
             getOverReplicatedHealthResult(),
             1);
     Pair<DatanodeDetails, SCMCommand<?>> command = commands.iterator().next();
-    Assert.assertEquals(unhealthyReplica.getDatanodeDetails(),
+    assertEquals(unhealthyReplica.getDatanodeDetails(),
         command.getKey());
   }
 
