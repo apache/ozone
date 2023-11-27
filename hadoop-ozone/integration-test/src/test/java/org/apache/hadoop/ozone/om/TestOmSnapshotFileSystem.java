@@ -271,7 +271,7 @@ public abstract class TestOmSnapshotFileSystem {
     deleteSnapshot(snapshotName);
     String expectedMessage = String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName);
+        VOLUME_NAME, bucketName, snapshotName);
     OMException exception = assertThrows(OMException.class,
         () -> ozoneBucket.listKeys(keyPrefix + "a/", null));
     assertEquals(expectedMessage, exception.getMessage());
@@ -491,21 +491,21 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot1));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName1), exception1.getMessage());
+        VOLUME_NAME, bucketName, snapshotName1), exception1.getMessage());
 
     deleteSnapshot(snapshotName2);
     FileNotFoundException exception2 = assertThrows(FileNotFoundException.class,
         () -> fs.listStatus(snapshotRoot2));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName2), exception2.getMessage());
+        VOLUME_NAME, bucketName, snapshotName2), exception2.getMessage());
 
     deleteSnapshot(snapshotName3);
     FileNotFoundException exception3 = assertThrows(FileNotFoundException.class,
         () -> fs.listStatus(snapshotParent3));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName3), exception3.getMessage());
+        VOLUME_NAME, bucketName, snapshotName3), exception3.getMessage());
   }
 
   @Test
@@ -540,7 +540,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotParent));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   @Test
@@ -576,7 +576,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotParent));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   @Test
@@ -619,7 +619,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.open(fileInSnapshot));
     assertEquals(String.format("FILE_NOT_FOUND: Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   private void createAndCommitKey(String keyName) throws IOException {
@@ -668,7 +668,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   /**
@@ -725,7 +725,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   private String createSnapshot(String snapshotName)
