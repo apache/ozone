@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -496,13 +496,13 @@ public class TestRatisReplicationCheckHandler {
     ContainerInfo container =
         createContainerInfo(repConfig, 1L, HddsProtos.LifeCycleState.CLOSED);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED, 0, 0);
+        ContainerReplicaProto.State.CLOSED, 0, 0);
     ContainerReplica unhealthyReplica =
         createContainerReplica(container.containerID(), 0, IN_SERVICE,
-            StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY);
+            ContainerReplicaProto.State.UNHEALTHY);
     ContainerReplica mismatchedReplica =
         createContainerReplica(container.containerID(), 0, IN_SERVICE,
-            StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED);
+            ContainerReplicaProto.State.QUASI_CLOSED);
     replicas.add(mismatchedReplica);
     replicas.add(unhealthyReplica);
 
