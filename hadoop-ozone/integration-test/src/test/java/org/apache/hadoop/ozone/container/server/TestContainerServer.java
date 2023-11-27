@@ -77,14 +77,12 @@ import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.apache.ozone.test.tag.Slow;
 import org.junit.jupiter.api.Test;
 
 
 /**
  * Test Containers.
  */
-@Slow
 public class TestContainerServer {
   static final String TEST_DIR = GenericTestUtils.getTestDir("dfs")
       .getAbsolutePath() + File.separator;
