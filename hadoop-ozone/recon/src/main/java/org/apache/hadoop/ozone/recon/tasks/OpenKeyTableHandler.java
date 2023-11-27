@@ -11,7 +11,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 
-
+/**
+ * Manages records in the OpenKey Table, updating counts and sizes of
+ * open keys in the backend.
+ */
 public class OpenKeyTableHandler implements OmTableHandler {
 
   private static final Logger LOG =

@@ -1,6 +1,5 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -15,6 +14,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Manages records in the Deleted Directory Table, updating counts and sizes of
+ * pending Directory Deletions in the backend.
+ */
 public class DeletedDirectoryTableHandler implements  OmTableHandler {
 
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
@@ -136,16 +139,6 @@ public class DeletedDirectoryTableHandler implements  OmTableHandler {
     Table<Long, NSSummary> summaryTable =
         reconNamespaceSummaryManager.getNSSummaryTable();
     Map<Long, NSSummary> summaryMap = new HashMap<>();
-
-//    try (TableIterator<Long, ? extends Table.KeyValue<Long, NSSummary>>
-//             iterator = summaryTable.iterator()) {
-//      // Add a for loop to iterate the entire table and transfer to a map.
-//      for (TableIterator<Long, ? extends Table.KeyValue<Long, NSSummary>> it =
-//           iterator; it.hasNext(); ) {
-//        Table.KeyValue<Long, NSSummary> entry = it.next();
-//        summaryMap.put(entry.getKey(), entry.getValue());
-//      }
-//    }
 
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary == null) {

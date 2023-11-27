@@ -8,6 +8,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 
+/**
+ * Interface for handling PUT, DELETE and UPDATE events for size-related
+ * tables for OM Insights.
+ */
 public interface OmTableHandler {
 
   /**

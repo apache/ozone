@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
+public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
   private static GlobalStatsDao globalStatsDao;
   private static OmTableInsightTask omTableInsightTask;
@@ -247,28 +247,6 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testFetchSizeForDeletedDirectory() throws IOException {
-    // Check for valid and invalid paths
-    String validPath = "/volumeId/bucketId/parentId/dirName/12345";
-    String invalidPath = "/volumeId/bucketId/parentId/dirName/invalid";
-    long expectedSize = 500L;
-    NSSummary nsSummary = new NSSummary();
-    nsSummary.setSizeOfFiles(expectedSize);
-
-    when(nsSummaryTable.get(12345L)).thenReturn(nsSummary);
-    omTableInsightTask.setNsSummaryTable(nsSummaryTable);
-
-    // Act and Assert
-//    long actualValidSize =
-//        omTableInsightTask.fetchSizeForDeletedDirectory(validPath);
-//    assertEquals(expectedSize, actualValidSize);
-//
-//    long actualInvalidSize =
-//        omTableInsightTask.fetchSizeForDeletedDirectory(invalidPath);
-//    assertEquals(0L, actualInvalidSize);
-  }
-
-  @Test
   public void testProcessForDeletedDirectoryTable() throws IOException {
     // Prepare mock data size
     Long expectedSize1 = 1000L;
@@ -326,7 +304,7 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testReprocessForCount2() throws Exception {
+  public void testReprocessForCount() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
 
     // Mock 5 rows in each table and test the count
@@ -429,59 +407,73 @@ public class TestOmTableInsightTask2 extends AbstractReconSqlDBTest {
 
   @Test
   public void testProcessForCount() {
-    ArrayList<OMDBUpdateEvent> events = new ArrayList<>();
-    // Create 5 put, 1 delete and 1 update event for each table
+    List<OMDBUpdateEvent> initialEvents = new ArrayList<>();
+
+    // Creating events for each table except the deleted table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      for (int i = 0; i < 5; i++) {
-        if(tableName.equals(DELETED_TABLE)) {
-          RepeatedOmKeyInfo repeatedKeyInfo = mock(RepeatedOmKeyInfo.class);
-          when(repeatedKeyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
-          when(repeatedKeyInfo.getOmKeyInfoList()).thenReturn(
-              Arrays.asList(mock(OmKeyInfo.class)));
-          events.add(getOMUpdateEvent("item" + i, repeatedKeyInfo,
-              tableName, PUT, 100L));
-          // for delete event, if value is set to null, the counter will not be
-          // decremented. This is because the value will be null if item does not
-          // exist in the database and there is no need to delete.
-          events.add(getOMUpdateEvent("item0",repeatedKeyInfo, tableName,
-              DELETE, null));
-        } else {
-          events.add(getOMUpdateEvent("item" + i, mock(OmKeyInfo.class),
-              tableName, PUT, null));
-          // for delete event, if value is set to null, the counter will not be
-          // decremented. This is because the value will be null if item does not
-          // exist in the database and there is no need to delete.
-          events.add(getOMUpdateEvent("item0", mock(OmKeyInfo.class), tableName,
-              DELETE, null));
-        }
-        events.add(getOMUpdateEvent("item1", null, tableName, UPDATE, null));
+      if (tableName.equals(DELETED_TABLE)) {
+        continue; // Skipping deleted table as it has a separate test
       }
+
+      // Adding 5 PUT events per table
+      for (int i = 0; i < 5; i++) {
+        initialEvents.add(
+            getOMUpdateEvent("item" + i, mock(OmKeyInfo.class), tableName, PUT,
+                null));
+      }
+
+      // Adding 1 DELETE event where value is null, indicating non-existence
+      // in the database.
+      initialEvents.add(
+          getOMUpdateEvent("item0", mock(OmKeyInfo.class), tableName, DELETE,
+              null));
+      // Adding 1 UPDATE event. This should not affect the count.
+      initialEvents.add(
+          getOMUpdateEvent("item1", mock(OmKeyInfo.class), tableName, UPDATE,
+              mock(OmKeyInfo.class)));
     }
-    OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(events);
-    omTableInsightTask.process(omUpdateEventBatch);
 
-    // Verify 4 items in each table. (5 puts - 1 delete + 0 update)
-    assertEquals(4L, getCountForTable(KEY_TABLE));
-    assertEquals(4L, getCountForTable(VOLUME_TABLE));
-    assertEquals(4L, getCountForTable(BUCKET_TABLE));
-    assertEquals(4L, getCountForTable(FILE_TABLE));
+    // Processing the initial batch of events
+    OMUpdateEventBatch initialBatch = new OMUpdateEventBatch(initialEvents);
+    omTableInsightTask.process(initialBatch);
 
-    // add a new key and simulate delete on non-existing item (value: null)
-    ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
+    // Verifying the count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      newEvents.add(getOMUpdateEvent("item5", null, tableName, PUT, null));
-      // This delete event should be a noop since value is null
-      newEvents.add(getOMUpdateEvent("item0", null, tableName, DELETE, null));
+      if (tableName.equals(DELETED_TABLE)) {
+        continue;
+      }
+      assertEquals(4L, getCountForTable(
+          tableName)); // 4 items expected after processing (5 puts - 1 delete)
     }
 
-    omUpdateEventBatch = new OMUpdateEventBatch(newEvents);
-    omTableInsightTask.process(omUpdateEventBatch);
+    List<OMDBUpdateEvent> additionalEvents = new ArrayList<>();
+    // Simulating new PUT and DELETE events
+    for (String tableName : omTableInsightTask.getTaskTables()) {
+      if (tableName.equals(DELETED_TABLE)) {
+        continue;
+      }
+      // Adding 1 new PUT event
+      additionalEvents.add(
+          getOMUpdateEvent("item6", mock(OmKeyInfo.class), tableName, PUT,
+              null));
+      // Attempting to delete a non-existing item (value: null)
+      additionalEvents.add(
+          getOMUpdateEvent("item0", null, tableName, DELETE, null));
+    }
 
-    // Verify 5 items in each table. (1 new put + 0 delete)
-    assertEquals(5L, getCountForTable(KEY_TABLE));
-    assertEquals(5L, getCountForTable(VOLUME_TABLE));
-    assertEquals(5L, getCountForTable(BUCKET_TABLE));
-    assertEquals(5L, getCountForTable(FILE_TABLE));
+    // Processing the additional events
+    OMUpdateEventBatch additionalBatch =
+        new OMUpdateEventBatch(additionalEvents);
+    omTableInsightTask.process(additionalBatch);
+    // Verifying the final count in each table
+    for (String tableName : omTableInsightTask.getTaskTables()) {
+      if (tableName.equals(DELETED_TABLE)) {
+        continue;
+      }
+      // 5 items expected after processing the additional events.
+      assertEquals(5L, getCountForTable(
+          tableName));
+    }
   }
 
   @Test

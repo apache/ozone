@@ -1,11 +1,9 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,9 +11,11 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 
-
+/**
+ * Manages records in the OpenFile Table, updating counts and sizes of
+ * open files in the backend.
+ */
 public class OpenFileTableHandler implements OmTableHandler {
 
   private static final Logger LOG =
@@ -91,8 +91,8 @@ public class OpenFileTableHandler implements OmTableHandler {
       String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
       String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
 
-      // In Update event the count for the open table will not change. So we don't
-      // need to update the count.
+      // In Update event the count for the open table will not change. So we
+      // don't need to update the count.
       OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
       OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
       unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,

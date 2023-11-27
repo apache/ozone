@@ -27,8 +27,6 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
@@ -40,11 +38,21 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.Timestamp;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Collection;
 import java.util.Map.Entry;
+import java.util.ArrayList;
+import java.util.List;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
-import static org.jooq.impl.DSL.*;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
+import static org.jooq.impl.DSL.currentTimestamp;
 
 /**
  * Class to iterate over the OM DB and store the total counts of volumes,
@@ -145,7 +153,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * Returns a collection of table names that require data size calculation.
    */
   public Collection<String> getTablesToCalculateSize() {
-    List<String> taskTables = new ArrayList<>();
+    java.util.List<String> taskTables = new ArrayList<>();
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
     taskTables.add(DELETED_TABLE);

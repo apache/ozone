@@ -4,7 +4,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +12,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
-
+/**
+ * Manages records in the Deleted Table, updating counts and sizes of
+ * pending Key Deletions in the backend.
+ */
 public class DeletedTableHandler implements OmTableHandler {
 
   private static final Logger LOG =
