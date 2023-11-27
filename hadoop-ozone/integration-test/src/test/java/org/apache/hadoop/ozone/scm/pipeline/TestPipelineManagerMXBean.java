@@ -55,6 +55,9 @@ public class TestPipelineManagerMXBean {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     mbs = ManagementFactory.getPlatformMBeanServer();
+    // Added sleep to wait before getting all pipelines in various
+    // states and becomes stable in their respective states.
+    Thread.sleep(3000);
   }
 
   /**
