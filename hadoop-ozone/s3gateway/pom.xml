@@ -28,6 +28,7 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
+    <allow.junit4>false</allow.junit4>
   </properties>
 
   <dependencies>
@@ -152,11 +153,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-docs</artifactId>
       <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

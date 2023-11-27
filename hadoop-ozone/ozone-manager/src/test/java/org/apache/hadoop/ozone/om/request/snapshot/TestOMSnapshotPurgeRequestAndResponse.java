@@ -452,7 +452,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
   private void validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
       List<SnapshotInfo> snapshotInfoList
-  ) {
+  ) throws IOException {
     if (snapshotInfoList.isEmpty()) {
       return;
     }

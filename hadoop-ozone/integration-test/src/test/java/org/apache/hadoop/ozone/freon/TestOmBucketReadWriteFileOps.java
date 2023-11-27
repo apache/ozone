@@ -129,7 +129,7 @@ public class TestOmBucketReadWriteFileOps {
               .setPrefixFilePath("/dir1/").setTotalThreadCount(10)
               .setNumOfReadOperations(5).setNumOfWriteOperations(3)
               .setFileCountForRead(5).setFileCountForWrite(3).
-              setFileSizeInBytes(64).setBufferSize(16));
+              setFileSize("64B").setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3").setTotalThreadCount(10)
@@ -157,7 +157,7 @@ public class TestOmBucketReadWriteFileOps {
         new String[]{"-conf", confPath, "obrwf", "-P", rootPath,
             "-r", String.valueOf(parameterBuilder.fileCountForRead),
             "-w", String.valueOf(parameterBuilder.fileCountForWrite),
-            "-g", String.valueOf(parameterBuilder.fileSizeInBytes),
+            "-g", parameterBuilder.fileSize,
             "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
@@ -257,7 +257,7 @@ public class TestOmBucketReadWriteFileOps {
     private String prefixFilePath = "/dir1/dir2";
     private int fileCountForRead = 100;
     private int fileCountForWrite = 10;
-    private long fileSizeInBytes = 256;
+    private String fileSize = "256B";
     private int bufferSize = 64;
     private int length = 10;
     private int totalThreadCount = 100;
@@ -290,8 +290,8 @@ public class TestOmBucketReadWriteFileOps {
       return this;
     }
 
-    private ParameterBuilder setFileSizeInBytes(long fileSizeInBytesParam) {
-      fileSizeInBytes = fileSizeInBytesParam;
+    private ParameterBuilder setFileSize(String fileSizeParam) {
+      fileSize = fileSizeParam;
       return this;
     }
 

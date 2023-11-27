@@ -266,35 +266,93 @@ public final class ReplicationManagerUtil {
 
     if (containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
       List<ContainerReplica> nonUniqueOrigins =
-          findNonUniqueDeleteCandidates(replicas, deleteCandidates);
+          findNonUniqueDeleteCandidates(replicas, deleteCandidates,
+              nodeStatusFn);
       return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins.get(0) : null;
     }
     return null;
   }
 
-  private static List<ContainerReplica> findNonUniqueDeleteCandidates(
+  /**
+   * Given a list of all replicas (including deleteCandidates), finds and
+   * returns replicas which don't have unique origin node IDs. This method
+   * preserves the order of the passed deleteCandidates list. This means that
+   * the order of the returned list depends on the order of deleteCandidates;
+   * if the same deleteCandidates with the same order is passed into this
+   * method on different invocations, the order of the returned list will be
+   * the same on each invocation. To protect against different SCMs
+   * (old leader and new leader) selecting different replicas to delete,
+   * callers of this method are responsible for ensuring consistent ordering.
+   * @see
+   * <a href="https://issues.apache.org/jira/browse/HDDS-4589">HDDS-4589</a>
+   * @param allReplicas all replicas of this container including
+   * deleteCandidates
+   * @param deleteCandidates replicas that are being considered for deletion
+   * @param nodeStatusFn a Function that can be called to check the
+   * NodeStatus of each DN
+   * @return a List of replicas that can be deleted because they do not have
+   * unique origin node IDs
+   */
+  static List<ContainerReplica> findNonUniqueDeleteCandidates(
       Set<ContainerReplica> allReplicas,
-      List<ContainerReplica> deleteCandidates) {
+      List<ContainerReplica> deleteCandidates,
+      Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
     // Gather the origin node IDs of replicas which are not candidates for
     // deletion.
     Set<UUID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
+        .filter(r -> {
+          NodeStatus status = nodeStatusFn.apply(r.getDatanodeDetails());
+          /*
+           Replicas on datanodes that are not in-service, healthy are not
+           valid because it's likely they will be gone soon or are already
+           lost. See https://issues.apache.org/jira/browse/HDDS-9352. This
+           means that these replicas don't count as having unique origin IDs.
+           */
+          return status != null && status.isHealthy() && status.isInService();
+        })
         .map(ContainerReplica::getOriginDatanodeId)
         .collect(Collectors.toSet());
 
+    /*
+    In the case of {QUASI_CLOSED, QUASI_CLOSED, QUASI_CLOSED, UNHEALTHY}, if
+    both the first and last replicas have the same origin node ID (and no
+    other replicas have it), we prefer saving the QUASI_CLOSED replica and
+    deleting the UNHEALTHY one. So, we'll first loop through healthy replicas
+    and check for uniqueness.
+     */
     List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
     for (ContainerReplica replica : deleteCandidates) {
-      if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
-        nonUniqueDeleteCandidates.add(replica);
-      } else {
-        // Spare this replica with this new origin node ID from deletion.
-        // delete candidates seen later in the loop with this same origin
-        // node ID can be deleted.
-        existingOriginNodeIDs.add(replica.getOriginDatanodeId());
+      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        continue;
       }
+      checkUniqueness(existingOriginNodeIDs, nonUniqueDeleteCandidates,
+          replica);
+    }
+
+    // now, see which UNHEALTHY replicas are not unique and can be deleted
+    for (ContainerReplica replica : deleteCandidates) {
+      if (replica.getState() != ContainerReplicaProto.State.UNHEALTHY) {
+        continue;
+      }
+      checkUniqueness(existingOriginNodeIDs, nonUniqueDeleteCandidates,
+          replica);
     }
 
     return nonUniqueDeleteCandidates;
+  }
+
+  private static void checkUniqueness(Set<UUID> existingOriginNodeIDs,
+      List<ContainerReplica> nonUniqueDeleteCandidates,
+      ContainerReplica replica) {
+    if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
+      nonUniqueDeleteCandidates.add(replica);
+    } else {
+      // Spare this replica with this new origin node ID from deletion.
+      // delete candidates seen later with this same origin node ID can be
+      // deleted.
+      existingOriginNodeIDs.add(replica.getOriginDatanodeId());
+    }
   }
 
 }
