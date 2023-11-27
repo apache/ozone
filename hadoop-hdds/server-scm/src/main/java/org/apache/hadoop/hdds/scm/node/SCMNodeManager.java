@@ -396,8 +396,7 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addToDnsToUuidMap(ipAddress, uuid);
-        addToDnsToUuidMap(hostName, uuid);
+        addToDnsToUuidMap(uuid, ipAddress, hostName);
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
         LOG.info("Registered datanode: {}", datanodeDetails.toDebugString());
@@ -414,28 +413,20 @@ public class SCMNodeManager implements NodeManager {
     } else {
       // Update datanode if it is registered but the ip or hostname changes
       try {
-        final DatanodeInfo datanodeInfo =
-                nodeStateManager.getNode(datanodeDetails);
-        final String oldIpAddress = datanodeInfo.getIpAddress();
-        final String oldHostName = datanodeInfo.getHostName();
-        if (!Objects.equals(oldIpAddress, ipAddress)
-            || !Objects.equals(oldHostName, hostName)) {
+        final DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
+        if (updateDnsToUuidMap(oldNode.getHostName(), oldNode.getIpAddress(),
+            hostName, ipAddress, uuid)) {
           LOG.info("Updating datanode {} from {} to {}",
                   datanodeDetails.getUuidString(),
-                  datanodeInfo,
+                  oldNode,
                   datanodeDetails);
-          clusterMap.update(datanodeInfo, datanodeDetails);
-
-          updateDnsToUuidMap(oldIpAddress, ipAddress, uuid);
-          updateDnsToUuidMap(oldHostName, hostName, uuid);
-
+          clusterMap.update(oldNode, datanodeDetails);
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
           Preconditions.checkState(dn.getParent() != null);
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
-          scmNodeEventPublisher
-                  .fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+          scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -452,33 +443,49 @@ public class SCMNodeManager implements NodeManager {
   /**
    * Add an entry to the dnsToUuidMap, which maps hostname / IP to the DNs
    * running on that host. As each address can have many DNs running on it,
-   * this is a one to many mapping.
+   * and each host can have multiple addresses,
+   * this is a many to many mapping.
    *
-   * @param addr the hostname or IP of the node
    * @param uuid the UUID of the registered node.
+   * @param addresses hostname and/or IP of the node
    */
-  private synchronized void addToDnsToUuidMap(String addr, UUID uuid) {
-    if (!Strings.isNullOrEmpty(addr)) {
-      dnsToUuidMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
-          .add(uuid);
+  private synchronized void addToDnsToUuidMap(UUID uuid, String... addresses) {
+    for (String addr : addresses) {
+      if (!Strings.isNullOrEmpty(addr)) {
+        dnsToUuidMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
+            .add(uuid);
+      }
     }
   }
 
-  private synchronized void removeFromDnsToUuidMap(String addr, UUID uuid) {
-    Set<UUID> dnSet = dnsToUuidMap.get(addr);
-    if (dnSet != null && dnSet.remove(uuid) && dnSet.isEmpty()) {
-      dnsToUuidMap.remove(addr);
+  private synchronized void removeFromDnsToUuidMap(UUID uuid, String address) {
+    if (address != null) {
+      Set<UUID> dnSet = dnsToUuidMap.get(address);
+      if (dnSet != null && dnSet.remove(uuid) && dnSet.isEmpty()) {
+        dnsToUuidMap.remove(address);
+      }
     }
   }
 
-  private synchronized void updateDnsToUuidMap(
-      String oldDnsName, String newDnsName, UUID uuid) {
-    Preconditions.checkNotNull(oldDnsName, "old address == null");
-    Preconditions.checkNotNull(newDnsName, "new address == null");
-    if (!oldDnsName.equals(newDnsName)) {
-      removeFromDnsToUuidMap(oldDnsName, uuid);
-      addToDnsToUuidMap(newDnsName, uuid);
+  private boolean updateDnsToUuidMap(
+      String oldHostName, String oldIpAddress,
+      String newHostName, String newIpAddress,
+      UUID uuid) {
+    final boolean ipChanged = !Objects.equals(oldIpAddress, newIpAddress);
+    final boolean hostNameChanged = !Objects.equals(oldHostName, newHostName);
+    if (ipChanged || hostNameChanged) {
+      synchronized (this) {
+        if (ipChanged) {
+          removeFromDnsToUuidMap(uuid, oldIpAddress);
+          addToDnsToUuidMap(uuid, newIpAddress);
+        }
+        if (hostNameChanged) {
+          removeFromDnsToUuidMap(uuid, oldHostName);
+          addToDnsToUuidMap(uuid, newHostName);
+        }
+      }
     }
+    return ipChanged || hostNameChanged;
   }
 
   /**
