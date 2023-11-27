@@ -25,11 +25,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -52,6 +52,8 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
+
 /**
  * An {@link InputStream} called from KeyInputStream to read a block from the
  * container.
@@ -65,8 +67,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private final BlockID blockID;
   private final long length;
-  private Pipeline pipeline;
-  private Token<OzoneBlockTokenIdentifier> token;
+  private final AtomicReference<Pipeline> pipelineRef =
+      new AtomicReference<>();
+  private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef =
+      new AtomicReference<>();
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
@@ -113,8 +117,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
       Function<BlockID, BlockLocationInfo> refreshFunction) {
     this.blockID = blockId;
     this.length = blockLen;
-    this.pipeline = pipeline;
-    this.token = token;
+    setPipeline(pipeline);
+    tokenRef.set(token);
     this.verifyChecksum = verifyChecksum;
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
@@ -143,7 +147,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     IOException catchEx = null;
     do {
       try {
-        chunks = getChunkInfos();
+        chunks = getChunkInfoList();
         break;
         // If we get a StorageContainerException or an IOException due to
         // datanodes are not reachable, refresh to get the latest pipeline
@@ -203,7 +207,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private void refreshBlockInfo(IOException cause) throws IOException {
     LOG.info("Unable to read information for block {} from pipeline {}: {}",
-        blockID, pipeline.getId(), cause.getMessage());
+        blockID, pipelineRef.get().getId(), cause.getMessage());
     if (refreshFunction != null) {
       LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
       BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
@@ -212,8 +216,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } else {
         LOG.debug("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
-        this.pipeline = blockLocationInfo.getPipeline();
-        this.token = blockLocationInfo.getToken();
+        setPipeline(blockLocationInfo.getPipeline());
+        tokenRef.set(blockLocationInfo.getToken());
       }
     } else {
       throw cause;
@@ -224,46 +228,55 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * Send RPC call to get the block info from the container.
    * @return List of chunks in this block.
    */
-  protected List<ChunkInfo> getChunkInfos() throws IOException {
-    // irrespective of the container state, we will always read via Standalone
-    // protocol.
-    if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE && pipeline
-        .getType() != HddsProtos.ReplicationType.EC) {
-      pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-              ReplicationConfig
-                  .getLegacyFactor(pipeline.getReplicationConfig())))
-          .build();
-    }
+  protected List<ChunkInfo> getChunkInfoList() throws IOException {
+    acquireClient();
     try {
-      acquireClient();
-    } catch (IOException ioe) {
-      LOG.warn("Failed to acquire client for pipeline {}, block {}",
-          pipeline, blockID);
-      throw ioe;
-    }
-    try {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Initializing BlockInputStream for get key to access {}",
-            blockID.getContainerID());
-      }
-
-      DatanodeBlockID.Builder blkIDBuilder =
-          DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
-              .setLocalID(blockID.getLocalID())
-              .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-
-      int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
-      if (replicaIndex > 0) {
-        blkIDBuilder.setReplicaIndex(replicaIndex);
-      }
-      GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, VALIDATORS, blkIDBuilder.build(), token);
-
-      return response.getBlockData().getChunksList();
+      return getChunkInfoListUsingClient();
     } finally {
       releaseClient();
     }
+  }
+
+  @VisibleForTesting
+  protected List<ChunkInfo> getChunkInfoListUsingClient() throws IOException {
+    final Pipeline pipeline = xceiverClient.getPipeline();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Initializing BlockInputStream for get key to access {}",
+          blockID.getContainerID());
+    }
+
+    DatanodeBlockID.Builder blkIDBuilder =
+        DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
+            .setLocalID(blockID.getLocalID())
+            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+
+    int replicaIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
+    if (replicaIndex > 0) {
+      blkIDBuilder.setReplicaIndex(replicaIndex);
+    }
+
+    GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
+        xceiverClient, VALIDATORS, blkIDBuilder.build(), tokenRef.get());
+
+    return response.getBlockData().getChunksList();
+  }
+
+  private void setPipeline(Pipeline pipeline) {
+    if (pipeline == null) {
+      return;
+    }
+
+    // irrespective of the container state, we will always read via Standalone
+    // protocol.
+    boolean okForRead =
+        pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
+            || pipeline.getType() == HddsProtos.ReplicationType.EC;
+    Pipeline readPipeline = okForRead ? pipeline : Pipeline.newBuilder(pipeline)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+            getLegacyFactor(pipeline.getReplicationConfig())))
+        .build();
+    pipelineRef.set(readPipeline);
   }
 
   private static final List<Validator> VALIDATORS
@@ -286,9 +299,16 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  protected void acquireClient() throws IOException {
+  private void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
-      xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+      final Pipeline pipeline = pipelineRef.get();
+      try {
+        xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+      } catch (IOException ioe) {
+        LOG.warn("Failed to acquire client for pipeline {}, block {}",
+            pipeline, blockID);
+        throw ioe;
+      }
     }
   }
 
@@ -303,7 +323,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     return new ChunkInputStream(chunkInfo, blockID,
-        xceiverClientFactory, () -> pipeline, verifyChecksum, token);
+        xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
   }
 
   @Override

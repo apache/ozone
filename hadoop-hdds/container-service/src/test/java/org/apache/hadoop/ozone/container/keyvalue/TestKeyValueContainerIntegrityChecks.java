@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -50,6 +49,8 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertNotNull;
 
@@ -66,7 +67,6 @@ public class TestKeyValueContainerIntegrityChecks {
   private OzoneConfiguration conf;
   private File testRoot;
   private ChunkManager chunkManager;
-  private String datanodeID = UUID.randomUUID().toString();
   private String clusterID = UUID.randomUUID().toString();
 
   protected static final int UNIT_LEN = 1024;
@@ -133,12 +133,6 @@ public class TestKeyValueContainerIntegrityChecks {
         bytesPerChecksum);
     byte[] chunkData = RandomStringUtils.randomAscii(CHUNK_LEN).getBytes(UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
-    DispatcherContext writeStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
-        .build();
-    DispatcherContext commitStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-        .build();
 
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         containerLayoutTestInfo.getLayout(),
@@ -166,9 +160,9 @@ public class TestKeyValueContainerIntegrityChecks {
           info.setChecksumData(checksumData);
           chunkList.add(info.getProtoBufMessage());
           chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), writeStage);
+              ByteBuffer.wrap(chunkData), WRITE_STAGE);
           chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), commitStage);
+              ByteBuffer.wrap(chunkData), COMMIT_STAGE);
         }
         blockData.setChunks(chunkList);
 

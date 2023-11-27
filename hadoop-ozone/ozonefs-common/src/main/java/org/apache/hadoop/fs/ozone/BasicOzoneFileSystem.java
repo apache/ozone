@@ -1277,7 +1277,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     FileStatus fileStatus = constructFileStatus(fileStatusAdapter);
 
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
-    if (blockLocations == null || blockLocations.length == 0) {
+    if (blockLocations.length == 0) {
       return fileStatus;
     }
     return new LocatedFileStatus(fileStatus, blockLocations);

@@ -932,7 +932,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Builds request for datanode usage information and receives response.
    *
-   * @param ipaddress Address String
+   * @param address Address String
    * @param uuid UUID String
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
@@ -940,11 +940,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, int clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
-            .setIpaddress(ipaddress)
+            .setIpaddress(address)
             .setUuid(uuid)
             .build();
 

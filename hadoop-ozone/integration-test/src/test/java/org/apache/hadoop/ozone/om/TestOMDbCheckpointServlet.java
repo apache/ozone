@@ -54,7 +54,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -786,7 +785,6 @@ public class TestOMDbCheckpointServlet {
   }
 
   // Get all files below path, recursively, (skipping fabricated files).
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private Set<String> getFiles(Path path, int truncateLength,
       Set<String> fileSet) throws IOException {
     try (Stream<Path> files = Files.list(path)) {
@@ -794,7 +792,7 @@ public class TestOMDbCheckpointServlet {
         if (file.toFile().isDirectory()) {
           getFiles(file, truncateLength, fileSet);
         }
-        String filename = file.getFileName().toString();
+        String filename = String.valueOf(file.getFileName());
         if (!filename.startsWith("fabricated") &&
             !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME)) {
           fileSet.add(truncateFileName(truncateLength, file));
@@ -816,7 +814,6 @@ public class TestOMDbCheckpointServlet {
    * @param lines Text lines defining the link paths.
    * @param testDirName Name of test directory.
    */
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkFabricatedLines(Set<String> directories, List<String> lines,
                                     String testDirName) {
     // find the real file
@@ -845,9 +842,11 @@ public class TestOMDbCheckpointServlet {
           "fabricated entry contains correct real directory: " + line);
       Path path0 = Paths.get(files[0]);
       Path path1 = Paths.get(files[1]);
-      Assertions.assertTrue(
-          path0.getFileName().toString().equals(FABRICATED_FILE_NAME) &&
-              path1.getFileName().toString().equals(FABRICATED_FILE_NAME),
+      Assertions.assertEquals(FABRICATED_FILE_NAME,
+          String.valueOf(path0.getFileName()),
+          "fabricated entries contains correct file name: " + line);
+      Assertions.assertEquals(FABRICATED_FILE_NAME,
+          String.valueOf(path1.getFileName()),
           "fabricated entries contains correct file name: " + line);
     }
   }
