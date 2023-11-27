@@ -1370,7 +1370,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
             bucketName, snapshotInfoTable)) {
       while (snapshotIterator.hasNext() && maxListResult > 0) {
-        snapshotInfos.add((SnapshotInfo) snapshotIterator.next().getValue());
+        SnapshotInfo snapshotInfo = (SnapshotInfo) snapshotIterator.next()
+            .getValue();
+        if (!snapshotInfo.getName().equals(prevSnapshot)) {
+          snapshotInfos.add(snapshotInfo);
+          maxListResult--;
+        }
       }
     }
     return snapshotInfos;

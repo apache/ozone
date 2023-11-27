@@ -312,7 +312,8 @@ public class ListIterator {
           iterators.add(new CacheIter<>(iteratorId, table.getName(),
                   table.cacheIterator(), startKey, prefixKey));
           iteratorId++;
-          iterators.add(new DbTableIter<>(iteratorId, table, prefixKey, startKey));
+          iterators.add(new DbTableIter<>(iteratorId, table, prefixKey,
+              startKey));
           iteratorId++;
         }
       } finally {
