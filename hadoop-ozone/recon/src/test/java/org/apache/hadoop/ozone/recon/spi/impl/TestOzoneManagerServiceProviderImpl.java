@@ -99,7 +99,7 @@ public class TestOzoneManagerServiceProviderImpl {
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
         dirReconSnapDB.getAbsolutePath());
     configuration.set(OZONE_RECON_DB_DIR,
-        dirReconSnapDB.getAbsolutePath());
+        dirReconDB.getAbsolutePath());
     configuration.set("ozone.om.address", "localhost:9862");
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
     commonUtils = new CommonUtils();

@@ -55,17 +55,17 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestReconUtils {
 
   @TempDir
-  private static Path temporaryFolder;
+  private Path temporaryFolder;
 
   @Test
-  public void testGetReconDbDir(@TempDir File newDir) throws Exception {
+  public void testGetReconDbDir() throws Exception {
 
     OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set("TEST_DB_DIR", newDir.getPath());
+    configuration.set("TEST_DB_DIR", temporaryFolder.toString());
 
     File file = new ReconUtils().getReconDbDir(configuration,
         "TEST_DB_DIR");
-    assertEquals(newDir.getPath(), file.getAbsolutePath());
+    assertEquals(temporaryFolder.toString(), file.getAbsolutePath());
   }
 
   @Test
