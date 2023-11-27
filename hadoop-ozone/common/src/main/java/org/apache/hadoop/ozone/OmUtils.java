@@ -813,8 +813,8 @@ public final class OmUtils {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
   
-  public static List<List<String>> format(List<ServiceInfo> nodes,
-                                     int port, String leaderId) {
+  public static List<List<String>> format(
+    List<ServiceInfo> nodes, int port, String leaderId) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
