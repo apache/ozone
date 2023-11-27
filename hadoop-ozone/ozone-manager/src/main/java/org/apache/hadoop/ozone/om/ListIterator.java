@@ -115,7 +115,6 @@ public class ListIterator {
   public static class DbTableIter<Value> implements
       ClosableIterator {
     private final int entryIteratorId;
-    private final String prefixKey;
     private final TableIterator<String,
         ? extends Table.KeyValue<String, Value>> tableIterator;
 
@@ -127,7 +126,6 @@ public class ListIterator {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
-      this.prefixKey = prefixKey;
       this.currentKey = null;
 
       // only seek for the start key if the start key is lexicographically
@@ -142,23 +140,15 @@ public class ListIterator {
           startKey.compareTo(prefixKey) > 0) {
         tableIterator.seek(startKey);
       }
-
-      getNextKey();
     }
 
     private void getNextKey() throws IOException {
       while (tableIterator.hasNext() && currentKey == null) {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
-        if (entryKey.startsWith(prefixKey)) {
-          if (!KeyManagerImpl.isKeyInCache(entryKey, table)) {
-            currentKey = new HeapEntry(entryIteratorId,
-                table.getName(), entryKey, entry.getValue());
-          }
-        } else {
-          // if the prefix key does not match, then break
-          // as the iterator is beyond the prefix.
-          break;
+        if (!KeyManagerImpl.isKeyInCache(entryKey, table)) {
+          currentKey = new HeapEntry(entryIteratorId,
+              table.getName(), entryKey, entry.getValue());
         }
       }
     }
