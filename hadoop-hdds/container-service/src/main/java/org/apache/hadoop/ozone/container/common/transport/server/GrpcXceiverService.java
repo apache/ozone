@@ -57,7 +57,7 @@ public class GrpcXceiverService extends
   }
 
   /**
-   * Bind service with zerocopy marshaller equiped for the `send` API if
+   * Bind service with zerocopy marshaller equipped for the `send` API if
    * zerocopy is enabled.
    * @return  service definition.
    */
