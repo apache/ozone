@@ -518,7 +518,6 @@ public class TestOzoneFileInterfaces {
   }
 
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-3506")
   public void testOzoneManagerLocatedFileStatusBlockOffsetsWithMultiBlockFile()
       throws Exception {
     // naive assumption: MiniOzoneCluster will not have larger than ~1GB
