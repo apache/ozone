@@ -380,7 +380,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
-    initializeOmTables(CacheType.FULL_CACHE, false);
+    initializeOmTables(CacheType.PARTIAL_CACHE, false);
   }
 
 
