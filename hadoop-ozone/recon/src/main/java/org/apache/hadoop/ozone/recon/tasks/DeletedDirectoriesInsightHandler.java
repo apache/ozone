@@ -4,23 +4,36 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
-
+import java.util.Map;
 
 /**
- * Manages records in the OpenFile Table, updating counts and sizes of
- * open files in the backend.
+ * Manages records in the Deleted Directory Table, updating counts and sizes of
+ * pending Directory Deletions in the backend.
  */
-public class OpenFileTableHandler implements OmTableHandler {
+public class DeletedDirectoriesInsightHandler implements  OmTableHandler {
+
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OpenFileTableHandler.class);
+      LoggerFactory.getLogger(DeletedTableHandler.class);
 
+  public DeletedDirectoriesInsightHandler(
+      ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager) {
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+  }
+
+  /**
+   * Invoked by the process method to add information on those directories that
+   * have been backlogged in the backend for deletion.
+   */
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                              String tableName,
@@ -31,21 +44,24 @@ public class OpenFileTableHandler implements OmTableHandler {
       throws IOException {
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
+      Long newDeletedDirectorySize =
+          fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
       unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-          (k, size) -> size + omKeyInfo.getDataSize());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-          (k, size) -> size + omKeyInfo.getReplicatedSize());
+          (k, size) -> size + newDeletedDirectorySize);
     } else {
       LOG.warn("Put event does not have the Key Info for {}.",
           event.getKey());
     }
   }
 
+  /**
+   * Invoked by the process method to remove information on those directories
+   * that have been successfully deleted from the backend.
+   */
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
@@ -56,24 +72,17 @@ public class OpenFileTableHandler implements OmTableHandler {
       throws IOException {
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey,
-          (k, count) -> count > 0 ? count - 1L : 0L);
+      objectCountMap.computeIfPresent(countKey, (k, count) -> count - 1L);
+      Long newDeletedDirectorySize =
+          fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
       unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-          (k, size) -> size > omKeyInfo.getDataSize() ?
-              size - omKeyInfo.getDataSize() : 0L);
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-          (k, size) -> size > omKeyInfo.getReplicatedSize() ?
-              size - omKeyInfo.getReplicatedSize() : 0L);
-    } else {
-      LOG.warn("Delete event does not have the Key Info for {}.",
-          event.getKey());
+          (k, size) -> size > newDeletedDirectorySize ?
+              size - newDeletedDirectorySize : 0L);
     }
   }
-
 
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
@@ -82,31 +91,14 @@ public class OpenFileTableHandler implements OmTableHandler {
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unreplicatedSizeCountMap,
                                 HashMap<String, Long> replicatedSizeCountMap) {
-    if (event.getValue() != null) {
-      if (event.getOldValue() == null) {
-        LOG.warn("Update event does not have the old Key Info for {}.",
-            event.getKey());
-        return;
-      }
-      String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-      String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
-
-      // In Update event the count for the open table will not change. So we
-      // don't need to update the count.
-      OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
-      OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-          (k, size) -> size - oldKeyInfo.getDataSize() +
-              newKeyInfo.getDataSize());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-          (k, size) -> size - oldKeyInfo.getReplicatedSize() +
-              newKeyInfo.getReplicatedSize());
-    } else {
-      LOG.warn("Update event does not have the Key Info for {}.",
-          event.getKey());
-    }
+    // The size of deleted directories cannot change hence no-op.
+    return;
   }
 
+  /**
+   * Invoked by the reprocess method to calculate the records count of the
+   * deleted directories and their sizes.
+   */
   @Override
   public Triple<Long, Long, Long> getTableSizeAndCount(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
@@ -120,13 +112,39 @@ public class OpenFileTableHandler implements OmTableHandler {
         Table.KeyValue<String, ?> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
           OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
-          unReplicatedSize += omKeyInfo.getDataSize();
-          replicatedSize += omKeyInfo.getReplicatedSize();
+          unReplicatedSize +=
+              fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
           count++;
         }
       }
     }
     return Triple.of(count, unReplicatedSize, replicatedSize);
+  }
+
+  /**
+   * Given an object ID, return total data size (no replication)
+   * under this object. Note:- This method is RECURSIVE.
+   *
+   * @param objectId the object's ID
+   * @return total used data size in bytes
+   * @throws IOException ioEx
+   */
+  protected long fetchSizeForDeletedDirectory(long objectId)
+      throws IOException {
+    // Iterate the NSSummary table.
+    Table<Long, NSSummary> summaryTable =
+        reconNamespaceSummaryManager.getNSSummaryTable();
+    Map<Long, NSSummary> summaryMap = new HashMap<>();
+
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (nsSummary == null) {
+      return 0L;
+    }
+    long totalSize = nsSummary.getSizeOfFiles();
+    for (long childId : nsSummary.getChildDir()) {
+      totalSize += fetchSizeForDeletedDirectory(childId);
+    }
+    return totalSize;
   }
 
   public static String getTableCountKeyFromTable(String tableName) {
@@ -140,5 +158,4 @@ public class OpenFileTableHandler implements OmTableHandler {
   public static String getUnReplicatedSizeKeyFromTable(String tableName) {
     return tableName + "UnReplicatedDataSize";
   }
-
 }
