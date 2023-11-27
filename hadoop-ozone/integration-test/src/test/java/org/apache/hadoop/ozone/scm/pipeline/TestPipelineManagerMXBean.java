@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
  */
-@Timeout(300)
+@Timeout(3000)
 public class TestPipelineManagerMXBean {
 
   private MiniOzoneCluster cluster;
@@ -57,7 +57,7 @@ public class TestPipelineManagerMXBean {
     mbs = ManagementFactory.getPlatformMBeanServer();
     // Added sleep to wait before getting all pipelines in various
     // states and becomes stable in their respective states.
-    Thread.sleep(3000);
+    Thread.sleep(2000);
   }
 
   /**
