@@ -1051,7 +1051,7 @@ public class LegacyReplicationManager {
     synchronized (container) {
       final Set<ContainerReplica> replica = containerManager
           .getContainerReplicas(container.containerID());
-      return getContainerReplicaCount(container, replica);
+      return getReplicaCountOptionallyConsiderUnhealthy(container, replica);
     }
   }
 
@@ -1070,6 +1070,28 @@ public class LegacyReplicationManager {
     return new LegacyRatisContainerReplicaCount(
         container,
         replica,
+        getInflightAdd(container.containerID()),
+        getInflightDel(container.containerID()),
+        container.getReplicationConfig().getRequiredNodes(),
+        minHealthyForMaintenance);
+  }
+
+  private RatisContainerReplicaCount getReplicaCountOptionallyConsiderUnhealthy(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    LegacyRatisContainerReplicaCount withUnhealthy =
+        new LegacyRatisContainerReplicaCount(container, replicas,
+            getPendingOps(container.containerID()), minHealthyForMaintenance,
+            true);
+    if (withUnhealthy.getHealthyReplicaCount() == 0 &&
+        withUnhealthy.getUnhealthyReplicaCount() > 0) {
+      // if the container has only UNHEALTHY replicas, return the correct
+      // RatisContainerReplicaCount object which can handle UNHEALTHY replicas
+      return withUnhealthy;
+    }
+
+    return new LegacyRatisContainerReplicaCount(
+        container,
+        replicas,
         getInflightAdd(container.containerID()),
         getInflightDel(container.containerID()),
         container.getReplicationConfig().getRequiredNodes(),
@@ -1345,7 +1367,7 @@ public class LegacyReplicationManager {
     List<ContainerReplica> replicas = replicaSet.getReplicas();
 
     RatisContainerReplicaCount unhealthyReplicaSet =
-        new RatisContainerReplicaCount(container,
+        new LegacyRatisContainerReplicaCount(container,
             new HashSet<>(replicaSet.getReplicas()),
             getPendingOps(container.containerID()),
             minHealthyForMaintenance,
