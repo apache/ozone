@@ -215,7 +215,7 @@ public class TestReconUtils {
   static void assertNextClosestPowerIndexOfTwo(long n) {
     final int expected = oldNextClosestPowerIndexOfTwoFixed(n);
     final int computed = ReconUtils.nextClosestPowerIndexOfTwo(n);
-    Assert.assertEquals("n=" + n, expected, computed);
+    assertEquals(expected, computed, "n=" + n);
   }
 
   private static int oldNextClosestPowerIndexOfTwoFixed(long n) {
