@@ -790,12 +790,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
     for (int i = 0; i < activeLen; i++) {
       int cost = costs[i];
       N node = nodes.get(i);
-      List<N> list = tree.get(cost);
-      if (list == null) {
-        list = Lists.newArrayListWithExpectedSize(1);
-        tree.put(cost, list);
-      }
-      list.add(node);
+      tree.computeIfAbsent(cost, k -> Lists.newArrayListWithExpectedSize(1))
+          .add(node);
     }
 
     List<N> ret = new ArrayList<>();
