@@ -72,13 +72,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
     description = "Parse a list of container IDs"
 )
 @MetaInfServices(SubcommandWithParent.class)
-// TODO use dirinfotable field as FSOdirpathresolver
 public class ContainerKeyScanner implements Callable<Void>,
     SubcommandWithParent {
 
-  public static final String FILE_TABLE = "fileTable";
-  public static final String KEY_TABLE = "keyTable";
-  public static final String DIRECTORY_TABLE = "directoryTable";
+  private static final String FILE_TABLE = "fileTable";
+  private static final String KEY_TABLE = "keyTable";
+  private static final String DIRECTORY_TABLE = "directoryTable";
 
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
