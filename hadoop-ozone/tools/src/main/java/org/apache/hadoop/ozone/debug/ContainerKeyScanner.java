@@ -92,18 +92,12 @@ public class ContainerKeyScanner implements Callable<Void>,
           "their keys. Example-usage: 1,11,2.(Separated by ',')")
   private Set<Long> containerIds;
 
-  private DbAccessInfo dbAccessInfo;
-
   @Override
   public Void call() throws Exception {
-    dbAccessInfo = DbAccessInfo.createDbAccessInfo(parent.getDbPath());
-
     ContainerKeyInfoWrapper containerKeyInfoWrapper =
         scanDBForContainerKeys(parent.getDbPath());
 
     printOutput(containerKeyInfoWrapper);
-
-    dbAccessInfo.close();
 
     return null;
   }
@@ -127,8 +121,9 @@ public class ContainerKeyScanner implements Callable<Void>,
   //  and not connect to it for every method call
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public Map<Long, Path> getAbsolutePathForObjectIDs(
-      long bucketId, String prefix, Optional<Set<Long>> dirObjIds)
-      throws IOException {
+      long bucketId, String prefix, Optional<Set<Long>> dirObjIds,
+      String dbPath)
+      throws IOException, RocksDBException {
     // Root of a bucket would always have the
     // key as /volumeId/bucketId/bucketId/
     if (!dirObjIds.isPresent() || dirObjIds.get().isEmpty()) {
@@ -144,28 +139,60 @@ public class ContainerKeyScanner implements Callable<Void>,
     while (!objectIdPathVals.isEmpty() && !objIds.isEmpty()) {
       Pair<Long, Path> parentPair = objectIdPathVals.poll();
 
-      // Get iterator for directory table
-      try (ManagedRocksIterator iterator = new ManagedRocksIterator(
-          dbAccessInfo.getDb().get().newIterator(dbAccessInfo.getHandle()))) {
-        iterator.get().seekToFirst();
-        while (!objIds.isEmpty() && iterator.get().isValid()) {
-          String subDir = prefix + parentPair.getKey() + OM_KEY_PREFIX;
-          String key = new String(iterator.get().key(), UTF_8);
+      // Get all tables from RocksDB
+      List<ColumnFamilyDescriptor> columnFamilyDescriptors =
+          RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+      final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
-          // Skip key if it does not contain subDir
-          if (!key.contains(subDir)) {
+      // Get all table handles
+      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath,
+          columnFamilyDescriptors, columnFamilyHandles)) {
+        dbPath = removeTrailingSlashIfNeeded(dbPath);
+        DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
+            Paths.get(dbPath), new OzoneConfiguration());
+        if (dbDefinition == null) {
+          throw new IllegalStateException("Incorrect DB Path");
+        }
+
+        // Get directory table
+        DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
+            dbDefinition.getColumnFamily(DIRECTORY_TABLE);
+        if (columnFamilyDefinition == null) {
+          throw new IllegalStateException(
+              "Table with name" + DIRECTORY_TABLE + " not found");
+        }
+
+        // Get directory table handle
+        ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
+            columnFamilyDefinition.getName().getBytes(UTF_8),
+            columnFamilyHandles);
+        if (columnFamilyHandle == null) {
+          throw new IllegalStateException("columnFamilyHandle is null");
+        }
+
+        // Get iterator for directory table
+        try (ManagedRocksIterator iterator = new ManagedRocksIterator(
+            db.get().newIterator(columnFamilyHandle))) {
+          iterator.get().seekToFirst();
+          while (!objIds.isEmpty() && iterator.get().isValid()) {
+            String subDir = prefix + parentPair.getKey() + OM_KEY_PREFIX;
+            String key = new String(iterator.get().key(), UTF_8);
+
+            // Skip key if it does not contain subDir
+            if (!key.contains(subDir)) {
+              iterator.get().next();
+              continue;
+            }
+
+            OmDirectoryInfo childDir =
+                ((OmDirectoryInfo) columnFamilyDefinition.getValueCodec()
+                    .fromPersistedFormat(iterator.get().value()));
+            Pair<Long, Path> pathVal = Pair.of(childDir.getObjectID(),
+                parentPair.getValue().resolve(childDir.getName()));
+            addToPathMap(pathVal, objIds, objectIdPathMap);
+            objectIdPathVals.add(pathVal);
             iterator.get().next();
-            continue;
           }
-
-          OmDirectoryInfo childDir =
-              ((OmDirectoryInfo) dbAccessInfo.getDefinition().getValueCodec()
-                  .fromPersistedFormat(iterator.get().value()));
-          Pair<Long, Path> pathVal = Pair.of(childDir.getObjectID(),
-              parentPair.getValue().resolve(childDir.getName()));
-          addToPathMap(pathVal, objIds, objectIdPathMap);
-          objectIdPathVals.add(pathVal);
-          iterator.get().next();
         }
       }
     }
@@ -205,10 +232,10 @@ public class ContainerKeyScanner implements Callable<Void>,
 
       keysProcessed +=
           processTable(dbDefinition, columnFamilyHandles, db,
-              containerKeyInfos, FILE_TABLE);
+              containerKeyInfos, FILE_TABLE, dbPath);
       keysProcessed +=
           processTable(dbDefinition, columnFamilyHandles, db,
-              containerKeyInfos, KEY_TABLE);
+              containerKeyInfos, KEY_TABLE, dbPath);
     }
     return new ContainerKeyInfoWrapper(keysProcessed, containerKeyInfos);
   }
@@ -217,8 +244,8 @@ public class ContainerKeyScanner implements Callable<Void>,
                             List<ColumnFamilyHandle> columnFamilyHandles,
                             ManagedRocksDB db,
                             List<ContainerKeyInfo> containerKeyInfos,
-                            String tableName)
-      throws IOException {
+                            String tableName, String dbPath)
+      throws IOException, RocksDBException {
     long keysProcessed = 0;
     DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
         dbDefinition.getColumnFamily(tableName);
@@ -267,7 +294,7 @@ public class ContainerKeyScanner implements Callable<Void>,
                 StringBuilder keyName = new StringBuilder();
                 if (tableName.equals(FILE_TABLE)) {
                   keyName.append(
-                      getFsoKeyPrefix(volumeId, bucketId, value));
+                      getFsoKeyPrefix(dbPath, volumeId, bucketId, value));
                 }
                 keyName.append(value.getKeyName());
                 containerKeyInfos.add(
@@ -294,15 +321,17 @@ public class ContainerKeyScanner implements Callable<Void>,
     return path;
   }
 
-  private String getFsoKeyPrefix(long volumeId, long bucketId, OmKeyInfo value)
-      throws IOException {
+  private String getFsoKeyPrefix(String dbPath, long volumeId, long bucketId,
+                                 OmKeyInfo value)
+      throws IOException, RocksDBException {
     String prefix =
         OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId +
             OM_KEY_PREFIX;
     Set<Long> dirObjIds = new HashSet<>();
     dirObjIds.add(value.getParentObjectID());
     Map<Long, Path> absolutePaths =
-        getAbsolutePathForObjectIDs(bucketId, prefix, Optional.of(dirObjIds));
+        getAbsolutePathForObjectIDs(bucketId, prefix,
+            Optional.of(dirObjIds), dbPath);
     Path path = absolutePaths.get(value.getParentObjectID());
     String keyPath;
     if (path.toString().equals(OM_KEY_PREFIX)) {
@@ -315,7 +344,7 @@ public class ContainerKeyScanner implements Callable<Void>,
   }
 
 
-  private static ColumnFamilyHandle getColumnFamilyHandle(
+  private ColumnFamilyHandle getColumnFamilyHandle(
       byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
         .stream()
@@ -331,7 +360,7 @@ public class ContainerKeyScanner implements Callable<Void>,
         .orElse(null);
   }
 
-  private static String removeTrailingSlashIfNeeded(String dbPath) {
+  private String removeTrailingSlashIfNeeded(String dbPath) {
     if (dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)) {
       dbPath = dbPath.substring(0, dbPath.length() - 1);
     }
@@ -371,75 +400,6 @@ public class ContainerKeyScanner implements Callable<Void>,
     try (PrintWriter out = out()) {
       out.println(prettyJson);
     }
-  }
-
-  static class DbAccessInfo {
-    private final ManagedRocksDB db;
-    private final ColumnFamilyHandle handle;
-
-    private final DBColumnFamilyDefinition definition;
-
-    DbAccessInfo(ManagedRocksDB db, ColumnFamilyHandle handle,
-                 DBColumnFamilyDefinition definition) {
-      this.db = db;
-      this.handle = handle;
-      this.definition = definition;
-    }
-
-    public ManagedRocksDB getDb() {
-      return db;
-    }
-
-    public ColumnFamilyHandle getHandle() {
-      return handle;
-    }
-
-    public DBColumnFamilyDefinition getDefinition() {
-      return definition;
-    }
-
-    public static DbAccessInfo createDbAccessInfo(String dbPath)
-        throws RocksDBException {
-      // Get all tables from RocksDB
-      List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-          RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-      final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-
-      // Get all table handles
-      ManagedRocksDB managedRocksDB = ManagedRocksDB.openReadOnly(dbPath,
-          columnFamilyDescriptors, columnFamilyHandles);
-      dbPath = removeTrailingSlashIfNeeded(dbPath);
-      DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
-          Paths.get(dbPath), new OzoneConfiguration());
-      if (dbDefinition == null) {
-        throw new IllegalStateException("Incorrect DB Path");
-      }
-
-      // Get directory table
-      DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-          dbDefinition.getColumnFamily(DIRECTORY_TABLE);
-      if (columnFamilyDefinition == null) {
-        throw new IllegalStateException(
-            "Table with name" + DIRECTORY_TABLE + " not found");
-      }
-
-      // Get directory table handle
-      ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-          columnFamilyDefinition.getName().getBytes(UTF_8),
-          columnFamilyHandles);
-      if (columnFamilyHandle == null) {
-        throw new IllegalStateException("columnFamilyHandle is null");
-      }
-
-      return new DbAccessInfo(managedRocksDB, columnFamilyHandle,
-          columnFamilyDefinition);
-    }
-
-    public void close() {
-      db.close();
-      handle.close();
-    }
-
   }
 
 }
