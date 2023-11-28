@@ -54,9 +54,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
-import org.apache.hadoop.net.DNSToSwitchMapping;
-import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -65,7 +62,6 @@ import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -88,6 +84,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
@@ -123,7 +120,7 @@ public class SCMNodeManager implements NodeManager {
   private ObjectName nmInfoBean;
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
-  private final DNSToSwitchMapping dnsToSwitchMapping;
+  private final Function<String, String> nodeResolver;
   private final boolean useHostname;
   private final Map<String, Set<UUID>> dnsToUuidMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
@@ -142,12 +139,25 @@ public class SCMNodeManager implements NodeManager {
   /**
    * Constructs SCM machine Manager.
    */
-  public SCMNodeManager(OzoneConfiguration conf,
-                        SCMStorageConfig scmStorageConfig,
-                        EventPublisher eventPublisher,
-                        NetworkTopology networkTopology,
-                        SCMContext scmContext,
-                        HDDSLayoutVersionManager layoutVersionManager) {
+  public SCMNodeManager(
+      OzoneConfiguration conf,
+      SCMStorageConfig scmStorageConfig,
+      EventPublisher eventPublisher,
+      NetworkTopology networkTopology,
+      SCMContext scmContext,
+      HDDSLayoutVersionManager layoutVersionManager) {
+    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
+        layoutVersionManager, hostname -> null);
+  }
+
+  public SCMNodeManager(
+      OzoneConfiguration conf,
+      SCMStorageConfig scmStorageConfig,
+      EventPublisher eventPublisher,
+      NetworkTopology networkTopology,
+      SCMContext scmContext,
+      HDDSLayoutVersionManager layoutVersionManager,
+      Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager, scmContext);
@@ -159,15 +169,7 @@ public class SCMNodeManager implements NodeManager {
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
     this.clusterMap = networkTopology;
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, conf);
-    this.dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
@@ -383,7 +385,8 @@ public class SCMNodeManager implements NodeManager {
     final String ipAddress = datanodeDetails.getIpAddress();
     final String hostName = datanodeDetails.getHostName();
     datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-    String networkLocation = nodeResolve(useHostname ? hostName : ipAddress);
+    String networkLocation = nodeResolver.apply(
+        useHostname ? hostName : ipAddress);
     if (networkLocation != null) {
       datanodeDetails.setNetworkLocation(networkLocation);
     }
@@ -1409,23 +1412,6 @@ public class SCMNodeManager implements NodeManager {
       return node.getLastHeartbeatTime();
     } catch (NodeNotFoundException e) {
       return -1;
-    }
-  }
-
-  private String nodeResolve(String hostname) {
-    List<String> hosts = new ArrayList<>(1);
-    hosts.add(hostname);
-    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
-    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
-      String location = resolvedHosts.get(0);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Resolve datanode {} return location {}", hostname, location);
-      }
-      return location;
-    } else {
-      LOG.error("Node {} Resolution failed. Please make sure that DNS table " +
-          "mapping or configured mapping is functional.", hostname);
-      return null;
     }
   }
 
