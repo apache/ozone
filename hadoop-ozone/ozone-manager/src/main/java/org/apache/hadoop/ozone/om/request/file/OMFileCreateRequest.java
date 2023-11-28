@@ -88,7 +88,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
+    CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
+        .getCreateFileRequest();
     Preconditions.checkNotNull(createFileRequest);
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();

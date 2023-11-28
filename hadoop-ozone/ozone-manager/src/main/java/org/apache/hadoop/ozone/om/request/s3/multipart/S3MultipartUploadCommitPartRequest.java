@@ -84,7 +84,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
-        getOmRequest().getCommitMultiPartUploadRequest();
+        super.preExecute(ozoneManager).getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
