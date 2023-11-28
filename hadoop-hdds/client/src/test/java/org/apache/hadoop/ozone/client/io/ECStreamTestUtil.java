@@ -33,7 +33,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.util.Preconditions;
-import org.junit.Assert;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -46,6 +45,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.function.Function;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Utility class providing methods useful in EC tests.
@@ -151,8 +152,8 @@ public final class ECStreamTestUtil {
     int i = 0;
     while (b.hasRemaining()) {
       i++;
-      Assert.assertEquals("Failed on iteration " + i,
-          (byte)rand.nextInt(255), b.get());
+      assertEquals((byte) rand.nextInt(255), b.get(),
+          "Failed on iteration " + i);
     }
   }
 

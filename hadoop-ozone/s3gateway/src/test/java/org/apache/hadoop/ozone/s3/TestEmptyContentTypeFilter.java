@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.s3;
 import java.util.Vector;
 
 import org.apache.hadoop.ozone.s3.EmptyContentTypeFilter.EnumerationWrapper;
+import org.junit.jupiter.api.Test;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link EmptyContentTypeFilter}.
@@ -40,11 +42,11 @@ public class TestEmptyContentTypeFilter {
     final EnumerationWrapper enumerationWrapper =
         new EnumerationWrapper(values.elements());
 
-    Assert.assertTrue(enumerationWrapper.hasMoreElements());
-    Assert.assertEquals("1", enumerationWrapper.nextElement());
-    Assert.assertTrue(enumerationWrapper.hasMoreElements());
-    Assert.assertEquals("2", enumerationWrapper.nextElement());
-    Assert.assertFalse(enumerationWrapper.hasMoreElements());
+    assertTrue(enumerationWrapper.hasMoreElements());
+    assertEquals("1", enumerationWrapper.nextElement());
+    assertTrue(enumerationWrapper.hasMoreElements());
+    assertEquals("2", enumerationWrapper.nextElement());
+    assertFalse(enumerationWrapper.hasMoreElements());
   }
 
   @Test
@@ -55,7 +57,7 @@ public class TestEmptyContentTypeFilter {
     final EnumerationWrapper enumerationWrapper =
         new EnumerationWrapper(values.elements());
 
-    Assert.assertFalse(enumerationWrapper.hasMoreElements());
+    assertFalse(enumerationWrapper.hasMoreElements());
   }
 
 }

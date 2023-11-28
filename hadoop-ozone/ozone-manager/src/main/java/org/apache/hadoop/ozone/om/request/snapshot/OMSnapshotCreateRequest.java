@@ -146,13 +146,15 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     try {
       // Lock bucket so it doesn't
       //  get deleted while creating snapshot
-      acquiredBucketLock =
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
-              volumeName, bucketName);
+              volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      acquiredSnapshotLock =
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
-              volumeName, bucketName, snapshotName);
+              volumeName, bucketName, snapshotName));
+      acquiredSnapshotLock = getOmLockDetails().isLockAcquired();
 
       // Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
@@ -191,7 +193,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
           omResponse.build(), snapshotInfo);
-    } catch (IOException | InvalidPathException | IllegalStateException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -199,12 +201,17 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredSnapshotLock) {
-        omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
-            bucketName, snapshotName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
+                volumeName, bucketName, snapshotName));
       }
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+                bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -267,7 +274,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
                 CacheValue.get(transactionLogIndex, snapshotInfo));
-      } catch (Exception exception) {
+      } catch (IOException exception) {
         // Remove snapshot from the SnapshotChainManager in case of any failure.
         // It is possible that createSnapshot request fails after snapshot gets
         // added to snapshot chain manager because couldn't add it to cache/DB.
@@ -300,7 +307,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   ) {
     try {
       snapshotChainManager.deleteSnapshot(info);
-    } catch (IllegalStateException exception) {
+    } catch (IOException exception) {
       LOG.error("Failed to remove snapshot: {} from SnapshotChainManager.",
           info, exception);
     }

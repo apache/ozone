@@ -19,11 +19,11 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
@@ -39,11 +39,9 @@ public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
   @Test
   public void dummyManagerDoesNotWriteToFile() throws Exception {
     ChunkManager subject = createTestSubject();
-    DispatcherContext ctx = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
 
     subject.writeChunk(getKeyValueContainer(), getBlockID(), getChunkInfo(),
-        getData(), ctx);
+        getData(), WRITE_STAGE);
 
     checkChunkFileCount(0);
   }
@@ -53,7 +51,7 @@ public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
     ChunkManager dummy = createTestSubject();
 
     ChunkBuffer dataRead = dummy.readChunk(getKeyValueContainer(),
-        getBlockID(), getChunkInfo(), getDispatcherContext());
+        getBlockID(), getChunkInfo(), null);
 
     assertNotNull(dataRead);
   }

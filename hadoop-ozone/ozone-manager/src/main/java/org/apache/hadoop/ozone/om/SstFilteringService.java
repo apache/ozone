@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.rocksdb.RocksDBException;
@@ -122,8 +123,9 @@ public class SstFilteringService extends BackgroundService
      */
     private void markSSTFilteredFlagForSnapshot(String volume, String bucket,
         String snapshotName) throws IOException {
-      boolean acquiredSnapshotLock = ozoneManager.getMetadataManager().getLock()
+      OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
               .acquireWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+      boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
       if (acquiredSnapshotLock) {
         Table<String, SnapshotInfo> snapshotInfoTable =
             ozoneManager.getMetadataManager().getSnapshotInfoTable();

@@ -1646,7 +1646,6 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OmKeyInfo keyInfo =
         getKeyInfo(volumeName, bucketName, keyName, false);
-
     return getOzoneKeyDetails(keyInfo);
   }
 
@@ -1675,6 +1674,22 @@ public class RpcClient implements ClientProtocol {
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
     OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
+    return getOzoneKeyDetails(keyInfo);
+  }
+
+  @Override
+  public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                         int partNumber) throws IOException {
+    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
+    List<OmKeyLocationInfo> filteredKeyLocationInfo = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly().stream()
+        .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
+            partNumber)
+        .collect(Collectors.toList());
+    keyInfo.updateLocationInfoList(filteredKeyLocationInfo, false);
+    keyInfo.setDataSize(filteredKeyLocationInfo.stream()
+        .mapToLong(OmKeyLocationInfo::getLength)
+        .sum());
     return getOzoneKeyDetails(keyInfo);
   }
 

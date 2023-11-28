@@ -20,23 +20,25 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
+import org.apache.ratis.util.MemoizedSupplier;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * {@link PolicyProvider} for Recon protocols.
  */
 public final class ReconPolicyProvider extends PolicyProvider {
 
-  private static AtomicReference<ReconPolicyProvider> atomicReference =
-      new AtomicReference<>();
+  private static final Supplier<ReconPolicyProvider> SUPPLIER =
+      MemoizedSupplier.valueOf(ReconPolicyProvider::new);
 
   private ReconPolicyProvider() {
   }
@@ -44,23 +46,19 @@ public final class ReconPolicyProvider extends PolicyProvider {
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   public static ReconPolicyProvider getInstance() {
-    if (atomicReference.get() == null) {
-      atomicReference.compareAndSet(null, new ReconPolicyProvider());
-    }
-    return atomicReference.get();
+    return SUPPLIER.get();
   }
 
-  private static final Service[] RECON_SERVICES =
-      new Service[]{
+  private static final List<Service> RECON_SERVICES =
+      Collections.singletonList(
           new Service(
               OZONE_RECON_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL,
               ReconDatanodeProtocol.class)
-      };
+      );
 
-  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public Service[] getServices() {
-    return RECON_SERVICES;
+    return RECON_SERVICES.toArray(new Service[0]);
   }
 
 }

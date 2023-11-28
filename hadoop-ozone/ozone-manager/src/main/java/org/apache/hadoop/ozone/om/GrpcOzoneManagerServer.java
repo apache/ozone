@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerTransportFilter;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressServerInterceptor;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
@@ -153,6 +154,7 @@ public class GrpcOzoneManagerServer {
             new OzoneManagerServiceGrpc(omTranslator,
                 delegationTokenMgr,
                 omServerConfig),
+            new ClientAddressServerInterceptor(),
             new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
             new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
         .addTransportFilter(

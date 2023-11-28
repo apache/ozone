@@ -88,6 +88,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -113,7 +114,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -1408,31 +1408,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
 
-    CertificateClient certClient =
+    OMCertificateClient certClient =
         new OMCertificateClient(
             new SecurityConfig(conf), scmSecurityClient, omStore, omInfo,
-            "", scmId, null, null);
-    CertificateClient.InitResponse response = certClient.init();
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful.");
-      break;
-    case GETCERT:
-      // Sign and persist OM cert.
-      CertificateSignRequest.Builder builder = certClient.getCSRBuilder();
-      omStore.setOmCertSerialId(
-          certClient.signAndStoreCertificate(builder.build()));
-      LOG.info("Successfully stored SCM signed certificate.");
-      break;
-    case FAILURE:
-      LOG.error("OM security initialization failed.");
-      throw new RuntimeException("OM security initialization failed.");
-    default:
-      LOG.error("OM security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("OM security initialization failed.");
-    }
+            "", scmId,
+            certId -> {
+              try {
+                omStore.setOmCertSerialId(certId);
+              } catch (IOException e) {
+                LOG.error("Failed to set new certificate ID", e);
+                throw new RuntimeException("Failed to set new certificate ID");
+              }
+            }, null);
+    certClient.initWithRecovery();
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
@@ -2473,8 +2461,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String getVolumeOwner(String volume) throws OMException {
-    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
+    OMLockDetails omLockDetails = metadataManager.getLock().acquireReadLock(
         VOLUME_LOCK, volume);
+    boolean lockAcquired = omLockDetails.isLockAcquired();
     String dbVolumeKey = metadataManager.getVolumeKey(volume);
     OmVolumeArgs volumeArgs;
     try {
@@ -2518,8 +2507,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws OMException {
     OmBucketInfo bucketInfo;
 
-    boolean lockAcquired = metadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volume, bucket);
+    OMLockDetails omLockDetails = metadataManager.getLock().acquireReadLock(
+        BUCKET_LOCK, volume, bucket);
+    boolean lockAcquired = omLockDetails.isLockAcquired();
+
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
       bucketInfo = metadataManager.getBucketTable().get(dbBucketKey);
@@ -3442,8 +3433,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.VOLUME, volumeName);
     auditMap.put(OzoneConsts.USER_PREFIX, prefix);
 
-    boolean lockAcquired =
+    OMLockDetails omLockDetails =
         metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
+    boolean lockAcquired = omLockDetails.isLockAcquired();
     try {
       final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
       if (!multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
@@ -3536,9 +3528,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               s3Volume);
         }
 
-        boolean acquiredVolumeLock =
-            getMetadataManager().getLock().acquireReadLock(
-                VOLUME_LOCK, s3Volume);
+        OMLockDetails omLockDetails = getMetadataManager().getLock()
+            .acquireReadLock(VOLUME_LOCK, s3Volume);
+        boolean acquiredVolumeLock = omLockDetails.isLockAcquired();
 
         try {
           // Inject user name to the response to be used for KMS on the client

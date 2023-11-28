@@ -22,5 +22,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   CI:
+    if: github.event_name == 'pull_request' || !startsWith(github.ref_name, 'dependabot')
     uses: ./.github/workflows/ci.yml
     secrets: inherit
