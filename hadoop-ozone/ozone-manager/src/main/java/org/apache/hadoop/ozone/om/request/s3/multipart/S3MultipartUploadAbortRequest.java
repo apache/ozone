@@ -90,8 +90,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath).build();
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs, ozoneManager,
-        ACLType.WRITE);
+    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
+        ozoneManager, ACLType.WRITE);
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();
