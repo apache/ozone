@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -786,7 +787,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       costs[i] = getDistanceCost(reader, nodes.get(i));
     }
     // Add cost/node pairs to a TreeMap to sort
-    TreeMap<Integer, List<N>> tree = new TreeMap<>();
+    NavigableMap<Integer, List<N>> tree = new TreeMap<>();
     for (int i = 0; i < activeLen; i++) {
       int cost = costs[i];
       N node = nodes.get(i);
