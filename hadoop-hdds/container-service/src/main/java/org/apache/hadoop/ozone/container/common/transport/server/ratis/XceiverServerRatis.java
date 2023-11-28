@@ -162,6 +162,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
+    ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     assignPorts();
     this.streamEnable = conf.getBoolean(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
@@ -173,7 +174,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
     chunkExecutors = createChunkExecutors(conf, threadNamePrefix);
-    ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     nodeFailureTimeoutMs = ratisServerConfig.getFollowerSlownessTimeout();
     shouldDeleteRatisLogDirectory =
         ratisServerConfig.shouldDeleteRatisLogDirectory();
