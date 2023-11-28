@@ -122,13 +122,19 @@ public class TestAbstractLayoutVersionManager {
   }
 
   @Test
-  public void testFeatureFinalizationFailsIfFeatureIsAlreadyFinalized()
+  public void testFeatureFinalizationIfFeatureIsAlreadyFinalized()
       throws IOException {
+    /*
+     * Feature finalization call is idempotent, it should not have any
+     * side effects even if it's executed again.
+     */
     LayoutFeature[] lfs = getTestLayoutFeatures(3);
-    versionManager.init(1, lfs);
-
-    assertThrows(IllegalArgumentException.class,
-        () -> versionManager.finalized(lfs[0]));
+    versionManager.init(2, lfs);
+    assertEquals(2, versionManager.getMetadataLayoutVersion());
+    versionManager.finalized(lfs[0]);
+    assertEquals(2, versionManager.getMetadataLayoutVersion());
+    versionManager.finalized(lfs[1]);
+    assertEquals(2, versionManager.getMetadataLayoutVersion());
   }
 
   @Test
