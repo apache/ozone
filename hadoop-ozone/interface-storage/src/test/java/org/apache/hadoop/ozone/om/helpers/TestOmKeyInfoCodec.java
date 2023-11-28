@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.util.Time;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
