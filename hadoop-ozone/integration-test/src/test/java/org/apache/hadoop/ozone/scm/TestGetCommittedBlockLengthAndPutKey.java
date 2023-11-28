@@ -85,7 +85,6 @@ public class TestGetCommittedBlockLengthAndPutKey {
   }
 
   @Test
-  @Flaky("HDDS-6627")
   public void tesGetCommittedBlockLength() throws Exception {
     ContainerProtos.GetCommittedBlockLengthResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
