@@ -340,6 +340,10 @@ class TestOzoneManagerDoubleBuffer {
     Assertions.assertEquals("alice", ugiAlice.getShortUserName());
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
+    // Stop the double buffer thread to prevent automatic flushing every second
+    // and to enable manual flushing.
+    doubleBuffer.stopDaemon();
+
     // Create 3 secrets and store them in the cache and double buffer.
     processSuccessSecretRequest(userPrincipalId1, 1, true);
     processSuccessSecretRequest(userPrincipalId2, 2, true);
@@ -353,7 +357,7 @@ class TestOzoneManagerDoubleBuffer {
 
     // Flush the current buffer.
     doubleBuffer.flushCurrentBuffer();
-
+    cache = secretManager.cache();
     // Check if all the three secrets are cleared from the cache.
     Assertions.assertTrue(cache.get(userPrincipalId3) == null);
     Assertions.assertTrue(cache.get(userPrincipalId2) == null);
