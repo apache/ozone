@@ -634,7 +634,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
         .addCodec(OmBucketInfo.class, OmBucketInfo.getCodec())
         .addCodec(OmVolumeArgs.class, OmVolumeArgs.getCodec())
-        .addProto2Codec(PersistedUserVolumeInfo.class)
+        .addProto2Codec(PersistedUserVolumeInfo.getDefaultInstance())
         .addCodec(OmMultipartKeyInfo.class, OmMultipartKeyInfo.getCodec())
         .addCodec(S3SecretValue.class, S3SecretValue.getCodec())
         .addCodec(OmPrefixInfo.class, OmPrefixInfo.getCodec())

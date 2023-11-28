@@ -62,7 +62,7 @@ public final class Pipeline {
    * -- the creation time may change.
    */
   private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.Pipeline.class),
+      Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
       DelegatedCodec.CopyType.UNSUPPORTED);

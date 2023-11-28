@@ -44,7 +44,7 @@ public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
 
   private static final Codec<DiffReportEntry> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(DiffReportEntryProto.class),
+      Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
       DelegatedCodec.CopyType.SHALLOW);
