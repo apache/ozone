@@ -771,11 +771,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
    * by activeLen parameter.
    */
   @Override
-  public List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen) {
+  public <N extends Node> List<N> sortByDistanceCost(Node reader,
+      List<N> nodes, int activeLen) {
     // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      List<? extends Node> shuffledNodes =
+      List<N> shuffledNodes =
           new ArrayList<>(nodes.subList(0, activeLen));
       shuffleOperation.accept(shuffledNodes);
       return shuffledNodes;
@@ -786,11 +786,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
       costs[i] = getDistanceCost(reader, nodes.get(i));
     }
     // Add cost/node pairs to a TreeMap to sort
-    TreeMap<Integer, List<Node>> tree = new TreeMap<Integer, List<Node>>();
+    TreeMap<Integer, List<N>> tree = new TreeMap<>();
     for (int i = 0; i < activeLen; i++) {
       int cost = costs[i];
-      Node node = nodes.get(i);
-      List<Node> list = tree.get(cost);
+      N node = nodes.get(i);
+      List<N> list = tree.get(cost);
       if (list == null) {
         list = Lists.newArrayListWithExpectedSize(1);
         tree.put(cost, list);
@@ -798,11 +798,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
       list.add(node);
     }
 
-    List<Node> ret = new ArrayList<>();
-    for (List<Node> list: tree.values()) {
+    List<N> ret = new ArrayList<>();
+    for (List<N> list : tree.values()) {
       if (list != null) {
         shuffleOperation.accept(list);
-        for (Node n: list) {
+        for (N n : list) {
           ret.add(n);
         }
       }
