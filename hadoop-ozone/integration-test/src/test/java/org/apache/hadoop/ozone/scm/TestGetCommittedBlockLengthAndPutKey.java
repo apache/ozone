@@ -42,12 +42,16 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -56,7 +60,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @Timeout(300)
 public class TestGetCommittedBlockLengthAndPutKey {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
@@ -86,7 +91,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
   @Test
   public void tesGetCommittedBlockLength() throws Exception {
-    ContainerProtos.GetCommittedBlockLengthResponseProto response;
+    final ContainerProtos.GetCommittedBlockLengthResponseProto[] response =
+        new ContainerProtos.GetCommittedBlockLengthResponseProto[1];
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(SCMTestUtils.getReplicationType(ozoneConfig),
             HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
@@ -109,12 +115,21 @@ public class TestGetCommittedBlockLengthAndPutKey {
         ContainerTestHelper
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     client.sendCommand(putKeyRequest);
-    response = ContainerProtocolCalls
-        .getCommittedBlockLength(client, blockID, null);
+    GenericTestUtils.waitFor(() -> {
+      boolean success = true;
+      try {
+        response[0] = ContainerProtocolCalls
+            .getCommittedBlockLength(client, blockID, null);
+      } catch (IOException e) {
+        success = false;
+        LOG.error("Ignore the exception till wait: {}", e.getMessage());
+      }
+      return success;
+    }, 1000, 5000);
     // make sure the block ids in the request and response are same.
     Assertions.assertTrue(
-        BlockID.getFromProtobuf(response.getBlockID()).equals(blockID));
-    Assertions.assertTrue(response.getBlockLength() == data.length);
+        BlockID.getFromProtobuf(response[0].getBlockID()).equals(blockID));
+    Assertions.assertTrue(response[0].getBlockLength() == data.length);
     xceiverClientManager.releaseClient(client, false);
   }
 
