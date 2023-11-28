@@ -55,7 +55,7 @@ public class NodeDecommissionManager {
   private DatanodeAdminMonitor monitor;
 
   private NodeManager nodeManager;
-  // private ContainerManager containerManager;
+  //private ContainerManager containerManager;
   private SCMContext scmContext;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
@@ -266,7 +266,7 @@ public class NodeDecommissionManager {
              EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
-    // this.containerManager = containerManager;
+    //this.containerManager = containerManager;
     this.scmContext = scmContext;
     this.eventQueue = eventQueue;
     this.replicationManager = rm;

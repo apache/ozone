@@ -437,4 +437,5 @@ public class SimpleMockNodeManager implements NodeManager {
   public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
     return false;
   }
+
 }

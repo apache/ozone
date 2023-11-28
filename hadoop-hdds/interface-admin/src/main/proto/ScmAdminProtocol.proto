@@ -78,7 +78,7 @@ message ScmContainerLocationRequest {
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
-  optional TransferLeadershipRequestProto transferScmLeadershipRequest = 42;
+  optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
 }
@@ -130,7 +130,7 @@ message ScmContainerLocationResponse {
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
-  optional TransferLeadershipResponseProto transferScmLeadershipResponse = 42;
+  optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
 
