@@ -587,7 +587,7 @@ public class TestContainerCommandsEC {
                 .build();
         scm.getPipelineManager().activatePipeline(newPipeline.getId());
 
-        try{
+        try {
           dnClient.sendCommand(writeChunkRequest);
         } catch (StorageContainerException e) {
           Assert.assertEquals(CONTAINER_UNHEALTHY, e.getResult());
