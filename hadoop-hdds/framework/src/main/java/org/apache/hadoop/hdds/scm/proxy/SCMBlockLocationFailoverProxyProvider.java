@@ -56,6 +56,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     FailoverProxyProvider<ScmBlockLocationProtocolPB>, Closeable {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockLocationFailoverProxyProvider.class);
+  private final SCMClientConfig scmClientConfig;
 
   private Map<String, ProxyInfo<ScmBlockLocationProtocolPB>> scmProxies;
   private Map<String, SCMProxyInfo> scmProxyInfoMap;
@@ -107,9 +108,9 @@ public class SCMBlockLocationFailoverProxyProvider implements
     this.currentProxyIndex = 0;
     currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
 
-    SCMClientConfig config = conf.getObject(SCMClientConfig.class);
-    this.maxRetryCount = config.getRetryCount();
-    this.retryInterval = config.getRetryInterval();
+    scmClientConfig = conf.getObject(SCMClientConfig.class);
+    this.maxRetryCount = scmClientConfig.getRetryCount();
+    this.retryInterval = scmClientConfig.getRetryInterval();
 
     LOG.info("Created block location fail-over proxy with {} nodes: {}",
         scmNodeIds.size(), scmProxyInfoMap.values());
@@ -269,7 +270,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     return RPC.getProtocolProxy(ScmBlockLocationProtocolPB.class, scmVersion,
         scmAddress, ugi, hadoopConf,
         NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut(),
+        (int) scmClientConfig.getRpcTimeOut(),
         connectionRetryPolicy).getProxy();
   }
 

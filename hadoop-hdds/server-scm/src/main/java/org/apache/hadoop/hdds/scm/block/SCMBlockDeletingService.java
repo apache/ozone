@@ -99,11 +99,10 @@ public class SCMBlockDeletingService extends BackgroundService
              NodeManager nodeManager, EventPublisher eventPublisher,
              SCMContext scmContext, SCMServiceManager serviceManager,
              ConfigurationSource conf,
-             ScmBlockDeletingServiceMetrics metrics,
+      ScmConfig scmConfig, ScmBlockDeletingServiceMetrics metrics,
              Clock clock, ReconfigurationHandler reconfigurationHandler) {
     super("SCMBlockDeletingService",
-        conf.getObject(ScmConfig.class)
-            .getBlockDeletionInterval().toMillis(),
+        scmConfig.getBlockDeletionInterval().toMillis(),
         TimeUnit.MILLISECONDS, BLOCK_DELETING_SERVICE_CORE_POOL_SIZE,
         conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
@@ -119,7 +118,7 @@ public class SCMBlockDeletingService extends BackgroundService
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.metrics = metrics;
-    scmConf = conf.getObject(ScmConfig.class);
+    scmConf = scmConfig;
     reconfigurationHandler.register(scmConf);
     blockDeleteLimitSize = scmConf.getBlockDeletionLimit();
     Preconditions.checkArgument(blockDeleteLimitSize > 0,

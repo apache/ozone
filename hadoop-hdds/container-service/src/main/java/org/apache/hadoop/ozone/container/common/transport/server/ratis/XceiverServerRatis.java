@@ -152,6 +152,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private long requestTimeout;
   private boolean shouldDeleteRatisLogDirectory;
   private boolean streamEnable;
+  private final DatanodeRatisServerConfig ratisServerConfig;
 
   private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -171,12 +172,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
     chunkExecutors = createChunkExecutors(conf, threadNamePrefix);
-    nodeFailureTimeoutMs =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getFollowerSlownessTimeout();
+    ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
+    nodeFailureTimeoutMs = ratisServerConfig.getFollowerSlownessTimeout();
     shouldDeleteRatisLogDirectory =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .shouldDeleteRatisLogDirectory();
+        ratisServerConfig.shouldDeleteRatisLogDirectory();
 
     this.server =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -237,13 +236,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RatisHelper.enableNettyStreaming(properties);
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     int dataStreamAsyncRequestThreadPoolSize =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getStreamRequestThreads();
+        ratisServerConfig.getStreamRequestThreads();
     RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
         dataStreamAsyncRequestThreadPoolSize);
-    int dataStreamClientPoolSize =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getClientPoolSize();
+    int dataStreamClientPoolSize = ratisServerConfig.getClientPoolSize();
     RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
         dataStreamClientPoolSize);
   }
@@ -309,7 +305,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Disable the pre vote feature in Ratis
     RaftServerConfigKeys.LeaderElection.setPreVote(properties,
-        conf.getObject(DatanodeRatisServerConfig.class).isPreVoteEnabled());
+        ratisServerConfig.isPreVoteEnabled());
 
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
