@@ -277,7 +277,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   }
 
   public Long getStartTimeByHost(String host) {
-    return (startTimeByHost.get(host) == null? 0L : startTimeByHost.get(host));
+    return (startTimeByHost.get(host) == null ? 0L : startTimeByHost.get(host));
   }
 
   public synchronized void metricRecordOfContainerStateByHost(
