@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -273,7 +272,6 @@ public class TestOmSnapshotManager {
    *     follower/db.snapshots/checkpointState/snap2/s1.sst
    */
   @Test
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH"})
   public void testHardLinkCreation() throws IOException {
 
     // Map of links to files on the leader

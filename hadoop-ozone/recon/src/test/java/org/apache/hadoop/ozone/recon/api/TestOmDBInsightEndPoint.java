@@ -46,11 +46,14 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.ArrayList;
@@ -74,7 +77,8 @@ import static org.mockito.Mockito.when;
  * Unit test for OmDBInsightEndPoint.
  */
 public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
-
+  @TempDir
+  private Path temporaryFolder;
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
@@ -96,14 +100,16 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     return newValue;
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
-        temporaryFolder.newFolder());
+        Files.createDirectory(temporaryFolder.resolve(
+            "JunitOmMetadata")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        temporaryFolder.newFolder());
+        Files.createDirectory(temporaryFolder.resolve(
+            "JunitOmMetadataTest")).toFile());
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))

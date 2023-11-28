@@ -150,7 +150,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
           break;
         }
       } catch (NotLeaderException e) {
-        LOG.debug("Follower cannot close container #{}.", containerId);
+        LOG.info("Follower cannot close container #{}.", containerId);
       } catch (IOException e) {
         LOG.error("Can't close container #{}", containerId, e);
       } finally {

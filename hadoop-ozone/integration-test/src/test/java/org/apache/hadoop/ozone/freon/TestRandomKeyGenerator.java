@@ -128,7 +128,7 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "1",
         "--num-of-keys", "10",
         "--num-of-threads", "10",
-        "--key-size", "10240",
+        "--key-size", "10KB",
         "--factor", "THREE",
         "--type", "RATIS"
     );
@@ -147,7 +147,7 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "1",
         "--num-of-keys", "10",
         "--num-of-threads", "10",
-        "--key-size", "10240",
+        "--key-size", "10KB",
         "--factor", "THREE",
         "--type", "RATIS"
     );
@@ -166,7 +166,7 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "1",
         "--num-of-keys", "1",
         "--num-of-threads", "1",
-        "--key-size", String.valueOf(10L + Integer.MAX_VALUE),
+        "--key-size", "2.01GB",
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"

@@ -42,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -293,6 +294,72 @@ public class TestDatanodeAdminMonitor {
     assertEquals(0, monitor.getTrackedNodeCount());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
         nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  /**
+   * Consider a QUASI_CLOSED container with only UNHEALTHY replicas. If one
+   * of its nodes is decommissioned, the decommissioning should succeed.
+   */
+  @Test
+  public void testQuasiClosedContainerWithAllUnhealthyReplicas()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+
+    DatanodeDetails decommissioningNode =
+        MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(decommissioningNode,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+    ContainerInfo container = ReplicationTestUtil.createContainer(
+        HddsProtos.LifeCycleState.QUASI_CLOSED,
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE));
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicas(container.containerID(),
+            State.UNHEALTHY, 0, 0);
+
+    ContainerReplica decommissioningReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(), 0,
+            DECOMMISSIONING, State.UNHEALTHY, container.getNumberOfKeys(),
+            container.getUsedBytes(), decommissioningNode,
+            decommissioningNode.getUuid());
+    replicas.add(decommissioningReplica);
+    nodeManager.setContainers(decommissioningNode,
+        ImmutableSet.of(container.containerID()));
+
+    Mockito.when(repManager.getContainerReplicaCount(
+            Mockito.eq(container.containerID())))
+        .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, true));
+
+    // start monitoring dn1
+    monitor.startMonitoring(decommissioningNode);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(decommissioningNode).getOperationalState());
+
+    // Running the monitor again causes it to remain DECOMMISSIONING
+    // as nothing has changed.
+    monitor.run();
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(decommissioningNode).getOperationalState());
+
+    // add a copy of the UNHEALTHY replica on a new node, decommissioningNode
+    // should get decommissioned now
+    ContainerReplica copyOfUnhealthyOnNewNode =
+        decommissioningReplica.toBuilder()
+            .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+            .build();
+    replicas.add(copyOfUnhealthyOnNewNode);
+    Mockito.when(repManager.getContainerReplicaCount(
+            Mockito.eq(container.containerID())))
+        .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 3, true));
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        nodeManager.getNodeStatus(decommissioningNode).getOperationalState());
   }
 
   @Test

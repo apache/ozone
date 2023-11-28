@@ -19,6 +19,7 @@ package org.apache.ozone.rocksdiff;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 
@@ -89,17 +90,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
-
-// TODO
-//  8. Handle bootstrapping rocksDB for a new OM follower node
-//      - new node will receive Active object store as well as all existing
-//      rocksDB checkpoints.
-//      - This bootstrapping should also receive the compaction-DAG information
-//  9. Handle rebuilding the DAG for a lagging follower. There are two cases
-//      - receive RATIS transactions to replay. Nothing needs to be done in
-//      these cases.
-//      - Getting the DB sync. This case needs to handle getting the
-//      compaction-DAG information as well.
 
 /**
  * RocksDB checkpoint differ.
@@ -187,6 +177,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private ColumnFamilyHandle compactionLogTableCFHandle;
   private RocksDB activeRocksDB;
+
+  /**
+   * For snapshot diff calculation we only need to track following column
+   * families. Other column families are irrelevant for snapshot diff.
+   */
+  public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_DAG =
+      ImmutableSet.of("keyTable", "directoryTable", "fileTable");
 
   /**
    * This is a package private constructor and should not be used other than
@@ -445,19 +442,42 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
+  @VisibleForTesting
+  boolean shouldSkipCompaction(byte[] columnFamilyBytes,
+                               List<String> inputFiles,
+                               List<String> outputFiles) {
+    String columnFamily = StringUtils.bytes2String(columnFamilyBytes);
+
+    if (!COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(columnFamily)) {
+      LOG.debug("Skipping compaction for columnFamily: {}", columnFamily);
+      return true;
+    }
+
+    if (inputFiles.isEmpty()) {
+      LOG.debug("Compaction input files list is empty");
+      return true;
+    }
+
+    if (new HashSet<>(inputFiles).equals(new HashSet<>(outputFiles))) {
+      LOG.info("Skipped the compaction entry. Compaction input files: " +
+          "{} and output files: {} are same.", inputFiles, outputFiles);
+      return true;
+    }
+
+    return false;
+  }
+
   private AbstractEventListener newCompactionBeginListener() {
     return new AbstractEventListener() {
       @Override
       public void onCompactionBegin(RocksDB db,
                                     CompactionJobInfo compactionJobInfo) {
-        if (compactionJobInfo.inputFiles().size() == 0) {
-          LOG.error("Compaction input files list is empty");
+        if (shouldSkipCompaction(compactionJobInfo.columnFamilyName(),
+            compactionJobInfo.inputFiles(),
+            compactionJobInfo.outputFiles())) {
           return;
         }
 
-        // Note the current compaction listener implementation does not
-        // differentiate which column family each SST store. It is tracking
-        // all SST files.
         synchronized (this) {
           if (closed) {
             return;
@@ -470,10 +490,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           }
         }
 
-        // Create hardlink backups for the SST files that are going
-        // to be deleted after this RDB compaction.
         for (String file : compactionJobInfo.inputFiles()) {
-          LOG.debug("Creating hard link for '{}'", file);
           createLink(Paths.get(sstBackupDir, new File(file).getName()),
               Paths.get(file));
         }
@@ -481,23 +498,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     };
   }
 
+
   private AbstractEventListener newCompactionCompletedListener() {
     return new AbstractEventListener() {
       @Override
       public void onCompactionCompleted(RocksDB db,
-          CompactionJobInfo compactionJobInfo) {
-
-        if (compactionJobInfo.inputFiles().isEmpty()) {
-          LOG.error("Compaction input files list is empty");
-          return;
-        }
-
-        if (new HashSet<>(compactionJobInfo.inputFiles())
-            .equals(new HashSet<>(compactionJobInfo.outputFiles()))) {
-          LOG.info("Skipped the compaction entry. Compaction input files: " +
-                  "{} and output files: {} are same.",
-              compactionJobInfo.inputFiles(),
-              compactionJobInfo.outputFiles());
+                                        CompactionJobInfo compactionJobInfo) {
+        if (shouldSkipCompaction(compactionJobInfo.columnFamilyName(),
+            compactionJobInfo.inputFiles(),
+            compactionJobInfo.outputFiles())) {
           return;
         }
 
@@ -534,14 +543,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
           waitForTarballCreation();
 
-
           // Add the compaction log entry to Compaction log table.
           addToCompactionLogTable(compactionLogEntry);
 
           // Populate the DAG
           populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
               compactionLogEntry.getOutputFileInfoList(),
-              db.getLatestSequenceNumber());
+              compactionLogEntry.getDbSequenceNumber());
         }
       }
     };
@@ -1530,48 +1538,54 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     graph.generateImage(filePath);
   }
 
-  private List<CompactionFileInfo> toFileInfoList(
-      List<String> sstFiles,
-      ManagedOptions options,
-      ManagedReadOptions readOptions
+  private List<CompactionFileInfo> toFileInfoList(List<String> sstFiles,
+                                                  ManagedOptions options,
+                                                  ManagedReadOptions readOptions
   ) {
     if (CollectionUtils.isEmpty(sstFiles)) {
       return Collections.emptyList();
     }
 
-    final int fileNameOffset = sstFiles.get(0).lastIndexOf("/") + 1;
     List<CompactionFileInfo> response = new ArrayList<>();
 
     for (String sstFile : sstFiles) {
-      String fileName = sstFile.substring(fileNameOffset,
-          sstFile.length() - SST_FILE_EXTENSION_LENGTH);
-      CompactionFileInfo.Builder fileInfoBuilder =
-          new CompactionFileInfo.Builder(fileName);
-      SstFileReader fileReader = new SstFileReader(options);
-      try {
-        fileReader.open(sstFile);
-        String columnFamily = StringUtils.bytes2String(
-            fileReader.getTableProperties().getColumnFamilyName());
-        SstFileReaderIterator iterator = fileReader.newIterator(readOptions);
-        iterator.seekToFirst();
-        String startKey = StringUtils.bytes2String(iterator.key());
-        iterator.seekToLast();
-        String endKey = StringUtils.bytes2String(iterator.key());
-        fileInfoBuilder.setStartRange(startKey)
-            .setEndRange(endKey)
-            .setColumnFamily(columnFamily);
-      } catch (RocksDBException rocksDBException) {
-        // Ideally it should not happen. If it does just log the exception.
-        // And let the compaction complete without the exception.
-        // Throwing exception in compaction listener could fail the RocksDB.
-        // In case of exception, compaction node will be missing start key,
-        // end key and column family. And it will continue the traversal as
-        // it was before HDDS-8940.
-        LOG.warn("Failed to read SST file: {}.", sstFile, rocksDBException);
-      }
-      response.add(fileInfoBuilder.build());
+      CompactionFileInfo fileInfo = toFileInfo(sstFile, options, readOptions);
+      response.add(fileInfo);
     }
     return response;
+  }
+
+  private CompactionFileInfo toFileInfo(String sstFile,
+                                        ManagedOptions options,
+                                        ManagedReadOptions readOptions) {
+    final int fileNameOffset = sstFile.lastIndexOf("/") + 1;
+    String fileName = sstFile.substring(fileNameOffset,
+        sstFile.length() - SST_FILE_EXTENSION_LENGTH);
+    CompactionFileInfo.Builder fileInfoBuilder =
+        new CompactionFileInfo.Builder(fileName);
+
+    try (SstFileReader fileReader = new SstFileReader(options)) {
+      fileReader.open(sstFile);
+      String columnFamily = StringUtils.bytes2String(
+          fileReader.getTableProperties().getColumnFamilyName());
+      SstFileReaderIterator iterator = fileReader.newIterator(readOptions);
+      iterator.seekToFirst();
+      String startKey = StringUtils.bytes2String(iterator.key());
+      iterator.seekToLast();
+      String endKey = StringUtils.bytes2String(iterator.key());
+      fileInfoBuilder.setStartRange(startKey)
+          .setEndRange(endKey)
+          .setColumnFamily(columnFamily);
+    } catch (RocksDBException rocksDBException) {
+      // Ideally it should not happen. If it does just log the exception.
+      // And let the compaction complete without the exception.
+      // Throwing exception in compaction listener could fail the RocksDB.
+      // In case of exception, compaction node will be missing start key,
+      // end key and column family. And during diff calculation it will
+      // continue the traversal as it was before HDDS-8940.
+      LOG.warn("Failed to read SST file: {}.", sstFile, rocksDBException);
+    }
+    return fileInfoBuilder.build();
   }
 
   @VisibleForTesting

@@ -37,11 +37,6 @@
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-io</artifactId>
         </dependency>
-      <dependency>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-annotations</artifactId>
-        <scope>compile</scope>
-      </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
@@ -70,6 +65,17 @@
         <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <configuration>
+                    <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
     <profiles>
         <profile>
             <id>cpu-count</id>

@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -26,6 +27,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerUtil;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,9 +56,12 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
    * should be replicated.
    */
   private final PlacementPolicy ratisContainerPlacement;
+  private final ReplicationManager replicationManager;
 
-  public RatisReplicationCheckHandler(PlacementPolicy containerPlacement) {
+  public RatisReplicationCheckHandler(PlacementPolicy containerPlacement,
+      ReplicationManager replicationManager) {
     this.ratisContainerPlacement = containerPlacement;
+    this.replicationManager = replicationManager;
   }
 
   @Override
@@ -190,6 +197,12 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       return replicaCount.toUnderHealthResult();
     }
 
+
+    if (replicaCount.isOverReplicated(false)) {
+      // If the container is over replicated without considering UNHEALTHY
+      // then we know for sure it is over replicated, so mark as such.
+      return replicaCount.toOverHealthResult();
+    }
     /*
     When checking for over replication, consider UNHEALTHY replicas. This means
     that other than checking over replication of healthy replicas (such as 4
@@ -200,9 +213,37 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     RatisContainerReplicaCount consideringUnhealthy =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
             minReplicasForMaintenance, true);
-    boolean isOverReplicated = consideringUnhealthy.isOverReplicated(false);
-    if (isOverReplicated) {
-      return consideringUnhealthy.toOverHealthResult();
+
+    if (consideringUnhealthy.isOverReplicated(false)) {
+      if (container.getState() == HddsProtos.LifeCycleState.CLOSED) {
+        return consideringUnhealthy.toOverHealthResult();
+      } else if (container.getState()
+          == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+        // If the container is quasi-closed and over replicated, we may have a
+        // case where the excess replica is an unhealthy one, but it has a
+        // unique origin and therefore should not be deleted. In this case,
+        // we should not mark the container as over replicated.
+        // We ignore pending deletes, as a container is still over replicated
+        // until the pending delete completes.
+        ContainerReplica toDelete = ReplicationManagerUtil
+            .selectUnhealthyReplicaForDelete(container, replicas, 0,
+                (dnd) -> {
+                  try {
+                    return replicationManager.getNodeStatus(dnd);
+                  } catch (NodeNotFoundException e) {
+                    return null;
+                  }
+                });
+        if (toDelete != null) {
+          // There is at least one unhealthy replica that can be deleted, so
+          // return as over replicated.
+          return consideringUnhealthy.toOverHealthResult();
+        } else {
+          // Even though we have at least 4 replicas with some unhealthy, we
+          // can't delete any of them, so the container is not over replicated.
+          return new ContainerHealthResult.HealthyResult(container);
+        }
+      }
     }
 
     int requiredNodes = container.getReplicationConfig().getRequiredNodes();

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -70,6 +69,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
@@ -99,7 +99,6 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @GET
-  @SuppressFBWarnings
   @SuppressWarnings({"parameternumber", "methodlength"})
   public Response get(
       @PathParam("bucket") String bucketName,
@@ -115,6 +114,8 @@ public class BucketEndpoint extends EndpointBase {
       @Context HttpHeaders hh) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
+
     Iterator<? extends OzoneKey> ozoneKeyIterator;
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
@@ -266,12 +267,15 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(false);
     }
 
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters()));
     int keyCount =
         response.getCommonPrefixes().size() + response.getContents().size();
-    getMetrics().updateGetBucketSuccessStats(startNanos);
+    long opLatencyNs =
+        getMetrics().updateGetBucketSuccessStats(startNanos);
     getMetrics().incListKeyCount(keyCount);
+    perf.appendCount(keyCount);
+    perf.appendOpLatencyNanos(opLatencyNs);
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
+        getAuditParameters(), perf.build()));
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
   }

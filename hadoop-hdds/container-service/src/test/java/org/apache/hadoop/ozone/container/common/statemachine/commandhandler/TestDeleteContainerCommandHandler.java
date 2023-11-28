@@ -24,8 +24,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.ozone.test.TestClock;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
@@ -50,7 +50,7 @@ public class TestDeleteContainerCommandHandler {
   private ContainerController controller;
   private StateContext context;
 
-  @Before
+  @BeforeEach
   public void setup() {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     ozoneContainer = mock(OzoneContainer.class);

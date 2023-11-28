@@ -39,10 +39,8 @@ import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -63,6 +61,10 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -82,7 +84,7 @@ public class TestRatisUnderReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private ReplicationManagerMetrics metrics;
 
-  @Before
+  @BeforeEach
   public void setup() throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
@@ -226,11 +228,11 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
 
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
-    Assert.assertEquals(0, commandsSent.size());
-    Assert.assertEquals(0, metrics.getPartialReplicationTotal());
+    assertEquals(0, commandsSent.size());
+    assertEquals(0, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -244,13 +246,13 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0);
 
-    Assert.assertThrows(InsufficientDatanodesException.class,
+    assertThrows(InsufficientDatanodesException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
     // One command should be sent to the replication manager as we could only
     // fine one node rather than two.
-    Assert.assertEquals(1, commandsSent.size());
-    Assert.assertEquals(1, metrics.getPartialReplicationTotal());
+    assertEquals(1, commandsSent.size());
+    assertEquals(1, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -267,11 +269,11 @@ public class TestRatisUnderReplicationHandler {
         container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
     replicas.add(shouldDelete);
 
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
     // No commands send, as there are only 2 replicas available.
-    Assert.assertEquals(0, commandsSent.size());
+    assertEquals(0, commandsSent.size());
   }
 
   @Test
@@ -285,11 +287,11 @@ public class TestRatisUnderReplicationHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
 
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
     // No commands send, as no CLOSED replicas available.
-    Assert.assertEquals(0, commandsSent.size());
+    assertEquals(0, commandsSent.size());
   }
 
   @Test
@@ -306,13 +308,13 @@ public class TestRatisUnderReplicationHandler {
         container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
     replicas.add(shouldDelete);
 
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    Assert.assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
-    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+    assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
+    assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
         .Type.deleteContainerCommand, cmd.getValue().getType());
   }
 
@@ -334,11 +336,11 @@ public class TestRatisUnderReplicationHandler {
         ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
         shouldDelete.getDatanodeDetails(), 0));
 
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             pending, getUnderReplicatedHealthResult(), 2));
     // No commands sent as we have a pending delete.
-    Assert.assertEquals(0, commandsSent.size());
+    assertEquals(0, commandsSent.size());
   }
 
   @Test
@@ -366,13 +368,13 @@ public class TestRatisUnderReplicationHandler {
         container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
     replicas.add(shouldDelete);
 
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    Assert.assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
-    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+    assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
+    assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
         .Type.deleteContainerCommand, cmd.getValue().getType());
   }
 
@@ -390,6 +392,18 @@ public class TestRatisUnderReplicationHandler {
   }
 
   @Test
+  public void testDecommissionWithAllUnhealthyReplicas()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
+    replicas.addAll(createReplicas(container.containerID(), State.UNHEALTHY,
+        Pair.of(DECOMMISSIONING, 0)));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+  }
+
+  @Test
   public void onlyHealthyReplicasShouldBeReplicatedWhenAvailable()
       throws IOException {
     Set<ContainerReplica> replicas
@@ -402,7 +416,7 @@ public class TestRatisUnderReplicationHandler {
         testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 2);
     commands.forEach(
-        command -> Assert.assertEquals(closedReplica.getDatanodeDetails(),
+        command -> assertEquals(closedReplica.getDatanodeDetails(),
             command.getKey()));
   }
 
@@ -425,7 +439,7 @@ public class TestRatisUnderReplicationHandler {
         testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 1);
     commands.forEach(
-        command -> Assert.assertNotEquals(unhealthyReplica.getDatanodeDetails(),
+        command -> assertNotEquals(unhealthyReplica.getDatanodeDetails(),
             command.getKey()));
   }
 
@@ -503,15 +517,12 @@ public class TestRatisUnderReplicationHandler {
     List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
     List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();
 
-    Assertions.assertTrue(usedNodes.contains(good.getDatanodeDetails()));
-    Assertions.assertTrue(usedNodes.contains(maintenance.getDatanodeDetails()));
-    Assertions.assertTrue(usedNodes.contains(pendingAdd));
-
-    Assertions.assertTrue(excludedNodes.contains(
-        unhealthy.getDatanodeDetails()));
-    Assertions.assertTrue(excludedNodes.contains(
-        decommissioning.getDatanodeDetails()));
-    Assertions.assertTrue(excludedNodes.contains(pendingRemove));
+    assertTrue(usedNodes.contains(good.getDatanodeDetails()));
+    assertTrue(usedNodes.contains(maintenance.getDatanodeDetails()));
+    assertTrue(usedNodes.contains(pendingAdd));
+    assertTrue(excludedNodes.contains(unhealthy.getDatanodeDetails()));
+    assertTrue(excludedNodes.contains(decommissioning.getDatanodeDetails()));
+    assertTrue(excludedNodes.contains(pendingRemove));
   }
 
   @Test
@@ -535,7 +546,7 @@ public class TestRatisUnderReplicationHandler {
         testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 2);
     commands.forEach(
-        command -> Assert.assertNotEquals(
+        command -> assertNotEquals(
             quasiClosedReplica.getDatanodeDetails(),
             command.getKey()));
   }
@@ -557,7 +568,7 @@ public class TestRatisUnderReplicationHandler {
         testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 2);
     commands.forEach(
-        command -> Assert.assertEquals(
+        command -> assertEquals(
             quasiClosedReplica.getDatanodeDetails(),
             command.getKey()));
   }
@@ -580,7 +591,7 @@ public class TestRatisUnderReplicationHandler {
         testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 1);
     commands.forEach(
-        command -> Assert.assertEquals(closedReplica.getDatanodeDetails(),
+        command -> assertEquals(closedReplica.getDatanodeDetails(),
             command.getKey()));
   }
 
@@ -631,7 +642,7 @@ public class TestRatisUnderReplicationHandler {
 
     handler.processAndSendCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
-    Assert.assertEquals(expectNumCommands, commandsSent.size());
+    assertEquals(expectNumCommands, commandsSent.size());
     return commandsSent;
   }
 
