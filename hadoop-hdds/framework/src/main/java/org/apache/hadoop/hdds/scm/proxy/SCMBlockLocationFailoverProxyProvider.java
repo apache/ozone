@@ -58,8 +58,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
       LoggerFactory.getLogger(SCMBlockLocationFailoverProxyProvider.class);
   private final SCMClientConfig scmClientConfig;
 
-  private Map<String, ProxyInfo<ScmBlockLocationProtocolPB>> scmProxies;
-  private Map<String, SCMProxyInfo> scmProxyInfoMap;
+  private final Map<String, ProxyInfo<ScmBlockLocationProtocolPB>> scmProxies;
+  private final Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
   // As SCM Client is shared across threads, performFailOver()
@@ -147,15 +147,15 @@ public class SCMBlockLocationFailoverProxyProvider implements
     nextProxyIndex();
   }
 
-  @VisibleForTesting
-  public synchronized String getCurrentProxySCMNodeId() {
+  private synchronized String getCurrentProxySCMNodeId() {
     return currentProxySCMNodeId;
   }
 
   @Override
   public synchronized ProxyInfo<ScmBlockLocationProtocolPB> getProxy() {
     String currentProxyNodeId = getCurrentProxySCMNodeId();
-    ProxyInfo currentProxyInfo = scmProxies.get(currentProxyNodeId);
+    ProxyInfo<ScmBlockLocationProtocolPB> currentProxyInfo =
+        scmProxies.get(currentProxyNodeId);
     if (currentProxyInfo == null) {
       currentProxyInfo = createSCMProxy(currentProxyNodeId);
     }
@@ -239,8 +239,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
   /**
    * Creates proxy object.
    */
-  private ProxyInfo createSCMProxy(String nodeId) {
-    ProxyInfo proxyInfo;
+  private ProxyInfo<ScmBlockLocationProtocolPB> createSCMProxy(String nodeId) {
+    ProxyInfo<ScmBlockLocationProtocolPB> proxyInfo;
     SCMProxyInfo scmProxyInfo = scmProxyInfoMap.get(nodeId);
     InetSocketAddress address = scmProxyInfo.getAddress();
     try {
@@ -274,8 +274,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
         connectionRetryPolicy).getProxy();
   }
 
-  public RetryPolicy getSCMBlockLocationRetryPolicy(String newLeader) {
-    RetryPolicy retryPolicy = new RetryPolicy() {
+  public RetryPolicy getSCMBlockLocationRetryPolicy() {
+    return new RetryPolicy() {
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
@@ -288,7 +288,6 @@ public class SCMBlockLocationFailoverProxyProvider implements
             getRetryInterval());
       }
     };
-    return retryPolicy;
   }
 
   public synchronized int getCurrentProxyIndex() {

@@ -81,8 +81,7 @@ public class SCMBlockDeletingService extends BackgroundService
   private final SCMContext scmContext;
   private final ScmConfig scmConf;
 
-  private int blockDeleteLimitSize;
-  private ScmBlockDeletingServiceMetrics metrics;
+  private final ScmBlockDeletingServiceMetrics metrics;
 
   /**
    * SCMService related variables.
@@ -119,10 +118,9 @@ public class SCMBlockDeletingService extends BackgroundService
     this.scmContext = scmContext;
     this.metrics = metrics;
     scmConf = scmConfig;
-    reconfigurationHandler.register(scmConf);
-    blockDeleteLimitSize = scmConf.getBlockDeletionLimit();
-    Preconditions.checkArgument(blockDeleteLimitSize > 0,
+    Preconditions.checkArgument(scmConf.getBlockDeletionLimit() > 0,
         "Block deletion limit should be positive.");
+    reconfigurationHandler.register(scmConf);
 
     // register SCMBlockDeletingService to SCMServiceManager
     serviceManager.register(this);

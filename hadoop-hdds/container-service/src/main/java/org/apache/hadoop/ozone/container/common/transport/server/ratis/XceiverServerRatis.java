@@ -136,22 +136,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
-  private ClientId clientId = ClientId.randomId();
+  private final ClientId clientId = ClientId.randomId();
   private final StateContext context;
-  private long nodeFailureTimeoutMs;
+  private final long nodeFailureTimeoutMs;
   private boolean isStarted = false;
-  private DatanodeDetails datanodeDetails;
+  private final DatanodeDetails datanodeDetails;
   private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = ConcurrentHashMap.newKeySet();
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
-  private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
+  private final Map<RaftGroupId, Boolean> groupLeaderMap =
+      new ConcurrentHashMap<>();
   // Timeout used while calling submitRequest directly.
-  private long requestTimeout;
-  private boolean shouldDeleteRatisLogDirectory;
-  private boolean streamEnable;
+  private final long requestTimeout;
+  private final boolean shouldDeleteRatisLogDirectory;
+  private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
 
   private XceiverServerRatis(DatanodeDetails dd,
@@ -311,7 +312,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Collection<String> storageDirPaths =
             HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
     List<File> storageDirs = new ArrayList<>(storageDirPaths.size());
-    storageDirPaths.stream().forEach(d -> storageDirs.add(new File(d)));
+    storageDirPaths.forEach(d -> storageDirs.add(new File(d)));
 
     RaftServerConfigKeys.setStorageDir(properties, storageDirs);
 
@@ -617,16 +618,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    RaftClientReply reply = null;
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
+      RaftClientReply reply;
       try {
         reply = server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
@@ -892,7 +893,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     GroupInfoReply reply = getServer()
         .getGroupInfo(createGroupInfoRequest(pipelineID.getProtobuf()));
     minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
-    return minIndex == null ? -1 : minIndex.longValue();
+    return minIndex == null ? -1 : minIndex;
   }
 
   public void notifyGroupRemove(RaftGroupId gid) {
