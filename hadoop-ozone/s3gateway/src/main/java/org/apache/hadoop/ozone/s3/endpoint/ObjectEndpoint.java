@@ -112,6 +112,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_T
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
@@ -218,16 +219,21 @@ public class ObjectEndpoint extends EndpointBase {
       InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
-
     boolean auditSuccess = true;
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
+
     String copyHeader = null, storageType = null;
     try {
       OzoneVolume volume = getVolume();
       if (uploadID != null && !uploadID.equals("")) {
-        s3GAction = S3GAction.CREATE_MULTIPART_KEY;
+        if (headers.getHeaderString(COPY_SOURCE_HEADER) == null) {
+          s3GAction = S3GAction.CREATE_MULTIPART_KEY;
+        } else {
+          s3GAction = S3GAction.CREATE_MULTIPART_KEY_BY_COPY;
+        }
         // If uploadID is specified, it is a request for upload part
         return createMultipartKey(volume, bucketName, keyPath, length,
-            partNumber, uploadID, body);
+            partNumber, uploadID, body, perf);
       }
 
       copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
@@ -251,7 +257,7 @@ public class ObjectEndpoint extends EndpointBase {
         s3GAction = S3GAction.COPY_OBJECT;
         CopyObjectResponse copyObjectResponse = copyObject(volume,
             copyHeader, bucketName, keyPath, replicationConfig,
-            storageTypeDefault);
+            storageTypeDefault, perf);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
@@ -270,6 +276,9 @@ public class ObjectEndpoint extends EndpointBase {
         s3GAction = S3GAction.CREATE_DIRECTORY;
         getClientProtocol()
             .createDirectory(volume.getName(), bucketName, keyPath);
+        long metadataLatencyNs =
+            getMetrics().updatePutKeyMetadataStats(startNanos);
+        perf.appendMetaLatencyNanos(metadataLatencyNs);
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
@@ -297,17 +306,19 @@ public class ObjectEndpoint extends EndpointBase {
       long putLength;
       String eTag = null;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
-        getMetrics().updatePutKeyMetadataStats(startNanos);
+        perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,
-                customMetadata, (DigestInputStream) body);
+                customMetadata, (DigestInputStream) body, perf);
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
         try (OzoneOutputStream output = getClientProtocol().createKey(
             volume.getName(), bucketName, keyPath, length, replicationConfig,
             customMetadata)) {
-          getMetrics().updatePutKeyMetadataStats(startNanos);
+          long metadataLatencyNs =
+              getMetrics().updatePutKeyMetadataStats(startNanos);
+          perf.appendMetaLatencyNanos(metadataLatencyNs);
           putLength = IOUtils.copyLarge(body, output);
           eTag = DatatypeConverter.printHexBinary(
                   ((DigestInputStream) body).getMessageDigest().digest())
@@ -315,8 +326,8 @@ public class ObjectEndpoint extends EndpointBase {
           output.getMetadata().put(ETAG, eTag);
         }
       }
-
       getMetrics().incPutKeySuccessLength(putLength);
+      perf.appendSizeBytes(putLength);
       return Response.ok()
           .header(ETAG, wrapInQuotes(eTag))
           .status(HttpStatus.SC_OK)
@@ -356,9 +367,10 @@ public class ObjectEndpoint extends EndpointBase {
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
-        getMetrics().updateCreateKeySuccessStats(startNanos);
+        long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
+        perf.appendOpLatencyNanos(opLatencyNs);
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
+            getAuditParameters(), perf.build()));
       }
     }
   }
@@ -372,6 +384,7 @@ public class ObjectEndpoint extends EndpointBase {
    * https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
    * for more details.
    */
+  @SuppressWarnings("checkstyle:MethodLength")
   @GET
   public Response get(
       @PathParam("bucket") String bucketName,
@@ -383,15 +396,17 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_KEY;
-    boolean auditSuccess = true;
-
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
     try {
       if (uploadId != null) {
         // When we have uploadId, this is the request for list Parts.
         s3GAction = S3GAction.LIST_PARTS;
         int partMarker = parsePartNumberMarker(partNumberMarker);
-        return listParts(bucketName, keyPath, uploadId,
-            partMarker, maxParts);
+        Response response = listParts(bucketName, keyPath, uploadId,
+            partMarker, maxParts, perf);
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
+            getAuditParameters(), perf.build()));
+        return response;
       }
 
       OzoneKeyDetails keyDetails = (partNumber != 0) ?
@@ -424,8 +439,12 @@ public class ObjectEndpoint extends EndpointBase {
           try (OzoneInputStream key = keyDetails.getContent()) {
             long readLength = IOUtils.copyLarge(key, dest);
             getMetrics().incGetKeySuccessLength(readLength);
+            perf.appendSizeBytes(readLength);
           }
-          getMetrics().updateGetKeySuccessStats(startNanos);
+          long opLatencyNs =  getMetrics().updateGetKeySuccessStats(startNanos);
+          perf.appendOpLatencyNanos(opLatencyNs);
+          AUDIT.logReadSuccess(buildAuditMessageForSuccess(S3GAction.GET_KEY,
+              getAuditParameters(), perf.build()));
         };
         responseBuilder = Response
             .ok(output)
@@ -444,8 +463,12 @@ public class ObjectEndpoint extends EndpointBase {
             long readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
             getMetrics().incGetKeySuccessLength(readLength);
+            perf.appendSizeBytes(readLength);
           }
-          getMetrics().updateGetKeySuccessStats(startNanos);
+          long opLatencyNs = getMetrics().updateGetKeySuccessStats(startNanos);
+          perf.appendOpLatencyNanos(opLatencyNs);
+          AUDIT.logReadSuccess(buildAuditMessageForSuccess(S3GAction.GET_KEY,
+              getAuditParameters(), perf.build()));
         };
         responseBuilder = Response
             .status(Status.PARTIAL_CONTENT)
@@ -486,10 +509,11 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
-      getMetrics().updateGetKeyMetadataStats(startNanos);
+      long metadataLatencyNs =
+          getMetrics().updateGetKeyMetadataStats(startNanos);
+      perf.appendMetaLatencyNanos(metadataLatencyNs);
       return responseBuilder.build();
     } catch (OMException ex) {
-      auditSuccess = false;
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
@@ -508,17 +532,10 @@ public class ObjectEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
-      auditSuccess = false;
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex)
       );
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters())
-        );
-      }
     }
   }
 
@@ -847,10 +864,10 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  @SuppressWarnings("checkstyle:MethodLength")
+  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
   private Response createMultipartKey(OzoneVolume volume, String bucket,
-                                      String key, long length, int partNumber,
-                                      String uploadID, InputStream body)
+      String key, long length, int partNumber, String uploadID,
+      InputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String copyHeader = null;
@@ -880,16 +897,17 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       if (datastreamEnabled && !enableEC && copyHeader == null) {
-        getMetrics().updatePutKeyMetadataStats(startNanos);
+        perf.appendStreamMode();
         return ObjectEndpointStreaming
             .createMultipartKey(ozoneBucket, key, length, partNumber,
-                uploadID, chunkSize, (DigestInputStream) body);
+                uploadID, chunkSize, (DigestInputStream) body, perf);
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the KeyOutputStream
       // in the OzoneOutputStream and use it to get the
       // OmMultipartCommitUploadPartInfo after OzoneOutputStream is closed.
       KeyOutputStream keyOutputStream = null;
+      long metadataLatencyNs;
       if (copyHeader != null) {
         Pair<String, String> result = parseSourceHeader(copyHeader);
         String sourceBucket = result.getLeft();
@@ -933,7 +951,8 @@ public class ObjectEndpoint extends EndpointBase {
             try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
                 .createMultipartKey(volume.getName(), bucket, key, length,
                     partNumber, uploadID)) {
-              getMetrics().updateCopyKeyMetadataStats(startNanos);
+              metadataLatencyNs =
+                  getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(
                   sourceObject, ozoneOutputStream, 0, length);
               keyOutputStream = ozoneOutputStream.getKeyOutputStream();
@@ -942,19 +961,22 @@ public class ObjectEndpoint extends EndpointBase {
             try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
                 .createMultipartKey(volume.getName(), bucket, key, length,
                     partNumber, uploadID)) {
-              getMetrics().updateCopyKeyMetadataStats(startNanos);
+              metadataLatencyNs =
+                  getMetrics().updateCopyKeyMetadataStats(startNanos);
               copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
               keyOutputStream = ozoneOutputStream.getKeyOutputStream();
             }
           }
           getMetrics().incCopyObjectSuccessLength(copyLength);
+          perf.appendSizeBytes(copyLength);
         }
       } else {
         long putLength;
         try (OzoneOutputStream ozoneOutputStream = getClientProtocol()
             .createMultipartKey(volume.getName(), bucket, key, length,
                 partNumber, uploadID)) {
-          getMetrics().updatePutKeyMetadataStats(startNanos);
+          metadataLatencyNs =
+              getMetrics().updatePutKeyMetadataStats(startNanos);
           putLength = IOUtils.copyLarge(body, ozoneOutputStream);
           ((KeyMetadataAware)ozoneOutputStream.getOutputStream())
               .getMetadata().put(ETAG, DatatypeConverter.printHexBinary(
@@ -964,7 +986,9 @@ public class ObjectEndpoint extends EndpointBase {
               = ozoneOutputStream.getKeyOutputStream();
         }
         getMetrics().incPutKeySuccessLength(putLength);
+        perf.appendSizeBytes(putLength);
       }
+      perf.appendMetaLatencyNanos(metadataLatencyNs);
 
       assert keyOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -1012,7 +1036,8 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws OS3Exception
    */
   private Response listParts(String bucket, String key, String uploadID,
-      int partNumberMarker, int maxParts) throws IOException, OS3Exception {
+      int partNumberMarker, int maxParts, PerformanceStringBuilder perf)
+      throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     ListPartsResponse listPartsResponse = new ListPartsResponse();
     try {
@@ -1055,7 +1080,9 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     }
-    getMetrics().updateListPartsSuccessStats(startNanos);
+    long opLatencyNs = getMetrics().updateListPartsSuccessStats(startNanos);
+    perf.appendCount(listPartsResponse.getPartList().size());
+    perf.appendOpLatencyNanos(opLatencyNs);
     return Response.status(Status.OK).entity(listPartsResponse).build();
   }
 
@@ -1069,33 +1096,40 @@ public class ObjectEndpoint extends EndpointBase {
     this.context = context;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   void copy(OzoneVolume volume, InputStream src, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication,
-            Map<String, String> metadata) throws IOException {
+      Map<String, String> metadata,
+      PerformanceStringBuilder perf, long startNanos)
+      throws IOException {
     long copyLength;
     if (datastreamEnabled && !(replication != null &&
         replication.getReplicationType() == EC) &&
         srcKeyLen > datastreamMinLength) {
+      perf.appendStreamMode();
       copyLength = ObjectEndpointStreaming
           .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
-              chunkSize, replication, metadata, src);
+              chunkSize, replication, metadata, src, perf, startNanos);
     } else {
       try (OzoneOutputStream dest = getClientProtocol()
           .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
               replication, metadata)) {
+        long metadataLatencyNs =
+            getMetrics().updateCopyKeyMetadataStats(startNanos);
+        perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest);
       }
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
+    perf.appendSizeBytes(copyLength);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private CopyObjectResponse copyObject(OzoneVolume volume,
-                                        String copyHeader,
-                                        String destBucket,
-                                        String destkey,
-                                        ReplicationConfig replicationConfig,
-                                        boolean storageTypeDefault)
+      String copyHeader, String destBucket, String destkey,
+      ReplicationConfig replicationConfig, boolean storageTypeDefault,
+      PerformanceStringBuilder perf)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     Pair<String, String> result = parseSourceHeader(copyHeader);
@@ -1138,7 +1172,7 @@ public class ObjectEndpoint extends EndpointBase {
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
         copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig,
-                sourceKeyDetails.getMetadata());
+                sourceKeyDetails.getMetadata(), perf, startNanos);
       }
 
       final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
