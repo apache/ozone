@@ -154,8 +154,9 @@ public final class OzoneFsDelete {
       }
       if (innerDeleteResult != null && innerDeleteResult.isPartiallyDeleted()) {
         out.println(
-            "Path might not have been deleted completely: " + item + (trailing ?
-                OZONE_URI_DELIMITER : ""));
+            "Failed to delete one or more keys in: " + item + (trailing ?
+                OZONE_URI_DELIMITER :
+                "") + ". Please check permission and bucket type.");
       } else {
         out.println("Deleted " + item + (trailing ? OZONE_URI_DELIMITER : ""));
       }
