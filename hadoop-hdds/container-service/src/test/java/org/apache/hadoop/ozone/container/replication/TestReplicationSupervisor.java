@@ -66,9 +66,8 @@ import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
@@ -88,7 +87,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 /**
  * Test the replication supervisor.
  */
-@RunWith(Parameterized.class)
 public class TestReplicationSupervisor {
 
   private static final long CURRENT_TERM = 1;
@@ -108,18 +106,13 @@ public class TestReplicationSupervisor {
 
   private ContainerSet set;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
 
   private StateContext context;
   private TestClock clock;
   private DatanodeDetails datanode;
 
-  public TestReplicationSupervisor(ContainerLayoutVersion layout) {
-    this.layout = layout;
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> layoutVersion() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
@@ -143,8 +136,10 @@ public class TestReplicationSupervisor {
     replicatorRef.set(null);
   }
 
-  @Test
-  public void normal() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void normal(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     // GIVEN
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
@@ -173,8 +168,10 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
-  public void duplicateMessage() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void duplicateMessage(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWithReplicator(
         FakeReplicator::new);
@@ -199,8 +196,10 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
-  public void failureHandling() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void failureHandling(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(
         __ -> throwingReplicator, newDirectExecutorService());
@@ -223,7 +222,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void stalledDownload() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(__ -> noopReplicator,
@@ -253,7 +253,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void slowDownload() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(__ -> slowReplicator,
@@ -281,7 +282,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -326,8 +328,10 @@ public class TestReplicationSupervisor {
         .contains("Container 1 replication was unsuccessful."));
   }
 
-  @Test
-  public void testTaskBeyondDeadline() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testTaskBeyondDeadline(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
 
@@ -358,8 +362,10 @@ public class TestReplicationSupervisor {
 
   }
 
-  @Test
-  public void testDatanodeOutOfService() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testDatanodeOutOfService(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
     datanode.setPersistedOpState(
@@ -382,8 +388,10 @@ public class TestReplicationSupervisor {
     Assertions.assertEquals(1, set.containerCount());
   }
 
-  @Test
-  public void taskWithObsoleteTermIsDropped() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void taskWithObsoleteTermIsDropped(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     final long newTerm = 2;
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
@@ -395,8 +403,11 @@ public class TestReplicationSupervisor {
     Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
   }
 
-  @Test
-  public void testPriorityOrdering() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testPriorityOrdering(ContainerLayoutVersion layout)
+      throws InterruptedException {
+    this.layoutVersion = layout;
     long deadline = clock.millis() + 1000;
     long containerId = 1;
     long term = 1;
@@ -603,7 +614,7 @@ public class TestReplicationSupervisor {
 
       KeyValueContainerData kvcd =
           new KeyValueContainerData(task.getContainerId(),
-              layout, 100L,
+              layoutVersion, 100L,
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);
@@ -654,7 +665,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void poolSizeCanBeIncreased() {
     datanode.setPersistedOpState(IN_SERVICE);
     ReplicationSupervisor subject = ReplicationSupervisor.newBuilder()
@@ -668,7 +680,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void poolSizeCanBeDecreased() {
     datanode.setPersistedOpState(IN_MAINTENANCE);
     ReplicationSupervisor subject = ReplicationSupervisor.newBuilder()
@@ -682,7 +695,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void testMaxQueueSize() {
     List<DatanodeDetails> datanodes = new ArrayList<>();
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -719,7 +733,8 @@ public class TestReplicationSupervisor {
 
     // can schedule more tasks
     scheduleTasks(datanodes, rs);
-    Assertions.assertEquals(2 * maxQueueSize, rs.getTotalInFlightReplications());
+    Assertions.assertEquals(
+        2 * maxQueueSize, rs.getTotalInFlightReplications());
 
     // queue size is restored
     rs.nodeStateUpdated(IN_SERVICE);

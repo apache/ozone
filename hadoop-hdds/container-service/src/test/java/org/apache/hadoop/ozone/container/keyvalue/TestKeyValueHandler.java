@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
@@ -57,21 +59,19 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+
 import org.mockito.Mockito;
+
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.times;
 
@@ -79,31 +79,21 @@ import static org.mockito.Mockito.times;
 /**
  * Unit tests for {@link KeyValueHandler}.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestKeyValueHandler {
 
-  @Rule
-  public final TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
+  @TempDir
+  private Path tempDir;
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
 
-  private final ContainerLayoutVersion layout;
-
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
 
-  public TestKeyValueHandler(ContainerLayoutVersion layout) {
-    this.layout = layout;
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> layoutVersion() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
@@ -262,10 +252,14 @@ public class TestKeyValueHandler {
 
   @Test
   public void testVolumeSetInKeyValueHandler() throws Exception {
-    File path = tempDir.newFolder();
+    File datanodeDir =
+        Files.createDirectory(tempDir.resolve("datanodeDir")).toFile();
+    File metadataDir =
+        Files.createDirectory(tempDir.resolve("metadataDir")).toFile();
+
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
-    conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
+    conf.set(HDDS_DATANODE_DIR_KEY, datanodeDir.getAbsolutePath());
+    conf.set(OZONE_METADATA_DIRS, metadataDir.getAbsolutePath());
     MutableVolumeSet
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -301,7 +295,8 @@ public class TestKeyValueHandler {
       }
     } finally {
       volumeSet.shutdown();
-      FileUtil.fullyDelete(path);
+      FileUtil.fullyDelete(datanodeDir);
+      FileUtil.fullyDelete(metadataDir);
     }
   }
 
@@ -315,12 +310,14 @@ public class TestKeyValueHandler {
   }
 
 
-  @Test
-  public void testCloseInvalidContainer() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
+      throws IOException {
     long containerID = 1234L;
     OzoneConfiguration conf = new OzoneConfiguration();
     KeyValueContainerData kvData = new KeyValueContainerData(containerID,
-        layout,
+        layoutVersion,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
@@ -351,7 +348,7 @@ public class TestKeyValueHandler {
 
   @Test
   public void testDeleteContainer() throws IOException {
-    final String testDir = tempDir.newFolder().getAbsolutePath();
+    final String testDir = tempDir.toString();
     try {
       // Case 1 : Regular container delete
       final long containerID = 1L;

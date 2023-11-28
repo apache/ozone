@@ -60,14 +60,10 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.Assume;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
-
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -110,11 +106,10 @@ import static org.mockito.Mockito.mock;
 /**
  * Class to test KeyValue Container operations.
  */
-@RunWith(Parameterized.class)
 public class TestKeyValueContainer {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -123,7 +118,7 @@ public class TestKeyValueContainer {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layout;
   private String schemaVersion;
   private List<HddsVolume> hddsVolumes;
 
@@ -132,19 +127,18 @@ public class TestKeyValueContainer {
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
-  public TestKeyValueContainer(ContainerTestVersionInfo versionInfo) {
+  private void setVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, CONF);
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> versionInfo() {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @BeforeEach
-  public void setUp() throws Exception {
+  private void init(ContainerTestVersionInfo versionInfo) throws Exception {
+    setVersionInfo(versionInfo);
     CodecBuffer.enableLeakDetection();
 
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
@@ -156,9 +150,9 @@ public class TestKeyValueContainer {
 
     hddsVolumes = new ArrayList<>();
 
-    hddsVolumes.add(new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(CONF).datanodeUuid(datanodeId
-        .toString()).build());
+    hddsVolumes.add(new HddsVolume.Builder(folder.toString())
+        .conf(CONF).datanodeUuid(datanodeId
+            .toString()).build());
     StorageVolumeUtil.checkVolume(hddsVolumes.get(0), scmId, scmId, CONF,
         null, null);
 
@@ -188,8 +182,15 @@ public class TestKeyValueContainer {
     CodecBuffer.assertNoLeaks();
   }
 
-  @Test
-  public void testCreateContainer() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testCreateContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
+    testCreateContainer();
+  }
+
+  private void testCreateContainer() throws StorageContainerException {
     createContainer();
 
     String containerMetaDataPath = keyValueContainerData.getMetadataPath();
@@ -208,8 +209,11 @@ public class TestKeyValueContainer {
   /**
    * Tests repair of containers affected by the bug reported in HDDS-6235.
    */
-  @Test
-  public void testMissingChunksDirCreated() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testMissingChunksDirCreated(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     // Create an empty container and delete its chunks directory.
     createContainer();
     closeContainer();
@@ -225,10 +229,15 @@ public class TestKeyValueContainer {
     Assertions.assertTrue(chunksDir.exists());
   }
 
-  @Test
-  public void testNextVolumeTriedOnWriteFailure() throws Exception {
-    HddsVolume newVolume = new HddsVolume.Builder(
-        folder.newFolder().getAbsolutePath())
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testNextVolumeTriedOnWriteFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    String volumeDirPath =
+        Files.createDirectory(folder.resolve("volumeDir"))
+            .toFile().getAbsolutePath();
+    HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
     StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
     hddsVolumes.add(newVolume);
@@ -237,7 +246,7 @@ public class TestKeyValueContainer {
     // simulating a disk or write failure. The second time it should be ok
 
     final AtomicInteger callCount = new AtomicInteger(0);
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF)  {
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF) {
 
       @Override
       protected void createContainerMetaData(File containerMetaDataPath,
@@ -259,8 +268,11 @@ public class TestKeyValueContainer {
     assertEquals(2, callCount.get());
   }
 
-  @Test
-  public void testEmptyContainerImportExport() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testEmptyContainerImportExport(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     createContainer();
     closeContainer();
 
@@ -270,7 +282,8 @@ public class TestKeyValueContainer {
     checkContainerFilesPresent(data, 0);
 
     //destination path
-    File exportTar = folder.newFile("exported.tar");
+    File exportTar = Files.createFile(
+        folder.resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -290,8 +303,11 @@ public class TestKeyValueContainer {
     checkContainerFilesPresent(data, 0);
   }
 
-  @Test
-  public void testUnhealthyContainerImportExport() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testUnhealthyContainerImportExport(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     createContainer();
     long numberOfKeysToWrite = 12;
     populate(numberOfKeysToWrite);
@@ -301,7 +317,7 @@ public class TestKeyValueContainer {
     keyValueContainer.update(data.getMetadata(), true);
 
     //destination path
-    File exportTar = folder.newFile("exported.tar");
+    File exportTar = Files.createFile(folder.resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -327,8 +343,11 @@ public class TestKeyValueContainer {
     assertEquals(numberOfKeysToWrite, keyValueContainerData.getBlockCount());
   }
 
-  @Test
-  public void testContainerImportExport() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testContainerImportExport(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
     long numberOfKeysToWrite = 12;
@@ -336,7 +355,8 @@ public class TestKeyValueContainer {
     populate(numberOfKeysToWrite);
 
     //destination path
-    File folderToExport = folder.newFile("exported.tar");
+    File folderToExport = Files.createFile(
+        folder.resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -423,13 +443,13 @@ public class TestKeyValueContainer {
   private void checkContainerFilesPresent(KeyValueContainerData data,
       long expectedNumFilesInChunksDir) throws IOException {
     File chunksDir = new File(data.getChunksPath());
-    Assertions.assertTrue(Files.isDirectory(chunksDir.toPath()));
+    assertTrue(Files.isDirectory(chunksDir.toPath()));
     try (Stream<Path> stream = Files.list(chunksDir.toPath())) {
-      Assertions.assertEquals(expectedNumFilesInChunksDir, stream.count());
+      assertEquals(expectedNumFilesInChunksDir, stream.count());
     }
-    Assertions.assertTrue(data.getDbFile().exists());
-    Assertions.assertTrue(KeyValueContainer.getContainerFile(data.getMetadataPath(),
-        data.getContainerID()).exists());
+    assertTrue(data.getDbFile().exists());
+    assertTrue(KeyValueContainer.getContainerFile(
+        data.getMetadataPath(), data.getContainerID()).exists());
   }
 
   /**
@@ -498,8 +518,11 @@ public class TestKeyValueContainer {
         ContainerProtos.ContainerDataProto.State.CLOSED);
   }
 
-  @Test
-  public void concurrentExport() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void concurrentExport(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     createContainer();
     populate(100);
     closeContainer();
@@ -510,8 +533,9 @@ public class TestKeyValueContainer {
     List<Thread> threads = IntStream.range(0, 20)
         .mapToObj(i -> new Thread(() -> {
           try {
-            File file = folder.newFile("concurrent" + i + ".tar");
-            try (OutputStream out = new FileOutputStream(file)) {
+            File file = Files.createFile(
+                folder.resolve("concurrent" + i + ".tar")).toFile();
+            try (OutputStream out = Files.newOutputStream(file.toPath())) {
               keyValueContainer.exportContainerData(out, packer);
             }
           } catch (Exception e) {
@@ -528,8 +552,11 @@ public class TestKeyValueContainer {
     assertNull(failed.get());
   }
 
-  @Test
-  public void testDuplicateContainer() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDuplicateContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     try {
       // Create Container.
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -543,9 +570,11 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testDiskFullExceptionCreateContainer() throws Exception {
-
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDiskFullExceptionCreateContainer(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     Mockito.reset(volumeChoosingPolicy);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
@@ -559,8 +588,11 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testDeleteContainer() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDeleteContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
@@ -587,8 +619,11 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testCloseContainer() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testCloseContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.close();
 
@@ -607,8 +642,11 @@ public class TestKeyValueContainer {
         keyValueContainerData.getState());
   }
 
-  @Test
-  public void testReportOfUnhealthyContainer() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testReportOfUnhealthyContainer(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Assertions.assertNotNull(keyValueContainer.getContainerReport());
     keyValueContainer.markContainerUnhealthy();
@@ -620,8 +658,12 @@ public class TestKeyValueContainer {
     Assertions.assertNotNull(keyValueContainer.getContainerReport());
   }
 
-  @Test
-  public void testUpdateContainer() throws IOException {
+
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Map<String, String> metadata = new HashMap<>();
     metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
@@ -642,8 +684,11 @@ public class TestKeyValueContainer {
 
   }
 
-  @Test
-  public void testUpdateContainerUnsupportedRequest() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testUpdateContainerUnsupportedRequest(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     try {
       closeContainer();
       keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
@@ -660,8 +705,12 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testContainerRocksDB() throws IOException {
+
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testContainerRocksDB(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
@@ -714,15 +763,17 @@ public class TestKeyValueContainer {
         ssdProfile.getColumnFamilyOptions(conf));
   }
 
-
-  @Test
-  public void testDBProfileAffectsDBOptions() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDBProfileAffectsDBOptions(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     DatanodeDBProfile outProfile1;
     try (DBHandle db1 =
-        BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
+             BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
       Assertions.assertTrue(store1 instanceof AbstractDatanodeStore);
       outProfile1 = ((AbstractDatanodeStore) store1).getDbProfile();
@@ -761,8 +812,11 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testKeyValueDataProtoBufMsg() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testKeyValueDataProtoBufMsg(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
     createContainer();
     populate(10);
     closeContainer();
@@ -788,13 +842,18 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testAutoCompactionSmallSstFile() throws IOException {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testAutoCompactionSmallSstFile(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     Assume.assumeTrue(
         isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
-    HddsVolume newVolume = new HddsVolume.Builder(
-        folder.newFolder().getAbsolutePath())
+    String volumeDirPath =
+        Files.createDirectory(folder.resolve("volumeDir")).toFile()
+            .getAbsolutePath();
+    HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
     StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
     List<HddsVolume> volumeList = new ArrayList<>();
@@ -830,7 +889,8 @@ public class TestKeyValueContainer {
         //destination path
         if (volume == newVolume) {
           File folderToExport =
-              folder.newFile(containerId + "_exported.tar.gz");
+              Files.createFile(
+                  folder.resolve(containerId + "_exported.tar.gz")).toFile();
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           //export the container
           try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
@@ -875,7 +935,7 @@ public class TestKeyValueContainer {
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      Assertions.assertTrue(fileMetaDataList2.size() < fileMetaDataList1.size());
+      assertTrue(fileMetaDataList2.size() < fileMetaDataList1.size());
     } catch (Exception e) {
       Fail.fail("TestAutoCompactionSmallSstFile failed");
     } finally {
@@ -888,8 +948,11 @@ public class TestKeyValueContainer {
     }
   }
 
-  @Test
-  public void testIsEmptyContainerStateWhileImport() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testIsEmptyContainerStateWhileImport(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
     long numberOfKeysToWrite = 1;
@@ -897,7 +960,8 @@ public class TestKeyValueContainer {
     populate(numberOfKeysToWrite);
 
     //destination path
-    File folderToExport = folder.newFile("export.tar");
+    File folderToExport = Files.createFile(
+        folder.resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -930,13 +994,15 @@ public class TestKeyValueContainer {
       }
 
       // After import check whether isEmpty flag is false
-      Assertions.assertFalse(container.getContainerData().isEmpty());
+      assertFalse(container.getContainerData().isEmpty());
     }
   }
 
-  @Test
-  public void testIsEmptyContainerStateWhileImportWithoutBlock()
-      throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testIsEmptyContainerStateWhileImportWithoutBlock(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();
     long numberOfKeysToWrite = 1;
@@ -944,7 +1010,8 @@ public class TestKeyValueContainer {
     populateWithoutBlock(keyValueContainer, numberOfKeysToWrite);
 
     //destination path
-    File folderToExport = folder.newFile("export.tar");
+    File folderToExport = Files.createFile(
+        folder.resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -984,8 +1051,11 @@ public class TestKeyValueContainer {
   /**
    * Test import schema V2 replica to V3 enabled HddsVolume.
    */
-  @Test
-  public void testImportV2ReplicaToV3HddsVolume() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testImportV2ReplicaToV3HddsVolume(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     final String testDir = GenericTestUtils.getTempPath(
         TestKeyValueContainer.class.getSimpleName() + "-"
             + UUID.randomUUID());
@@ -999,8 +1069,11 @@ public class TestKeyValueContainer {
   /**
    * Test import schema V3 replica to V3 disabled HddsVolume.
    */
-  @Test
-  public void testImportV3ReplicaToV2HddsVolume() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testImportV3ReplicaToV2HddsVolume(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
     final String testDir = GenericTestUtils.getTempPath(
         TestKeyValueContainer.class.getSimpleName() + "-"
             + UUID.randomUUID());

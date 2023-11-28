@@ -45,16 +45,14 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -70,11 +68,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Test ContainerReader class which loads containers from disks.
  */
-@RunWith(Parameterized.class)
 public class TestContainerReader {
-
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private MutableVolumeSet volumeSet;
   private HddsVolume hddsVolume;
@@ -88,26 +82,17 @@ public class TestContainerReader {
   private int blockCount = 10;
   private long blockLen = 1024;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layout;
   private String schemaVersion;
 
-  public TestContainerReader(ContainerTestVersionInfo versionInfo) {
-    this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+  @TempDir
+  private Path tempDir;
+
+  private void setup(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    File volumeDir =
+        Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @BeforeEach
-  public void setup() throws Exception {
-
-    File volumeDir = tempDir.newFolder();
     volumeSet = Mockito.mock(MutableVolumeSet.class);
     containerSet = new ContainerSet(1000);
 
@@ -124,10 +109,9 @@ public class TestContainerReader {
         .thenReturn(hddsVolume);
 
     for (int i = 0; i < 2; i++) {
-      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
-          layout,
-          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-          datanodeId.toString());
+      KeyValueContainerData keyValueContainerData =
+          new KeyValueContainerData(i, layout, (long) StorageUnit.GB.toBytes(5),
+              UUID.randomUUID().toString(), datanodeId.toString());
 
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
@@ -137,7 +121,7 @@ public class TestContainerReader {
 
       List<Long> blkNames;
       if (i % 2 == 0) {
-        blkNames = addBlocks(keyValueContainer,  true);
+        blkNames = addBlocks(keyValueContainer, true);
         markBlocksForDelete(keyValueContainer, true, blkNames, i);
       } else {
         blkNames = addBlocks(keyValueContainer, false);
@@ -211,17 +195,21 @@ public class TestContainerReader {
 
       if (setMetaData) {
         metadataStore.getStore().getMetadataTable()
-                .put(cData.getBlockCountKey(), (long)blockCount);
+            .put(cData.getBlockCountKey(), (long) blockCount);
         metadataStore.getStore().getMetadataTable()
-                .put(cData.getBytesUsedKey(), blockCount * blockLen);
+            .put(cData.getBytesUsedKey(), blockCount * blockLen);
       }
     }
 
     return blkNames;
   }
 
-  @Test
-  public void testContainerReader() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testContainerReader(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     KeyValueContainerData recoveringContainerData = new KeyValueContainerData(
         10, layout, (long) StorageUnit.GB.toBytes(5),
         UUID.randomUUID().toString(), datanodeId.toString());
@@ -264,12 +252,17 @@ public class TestContainerReader {
     }
   }
 
-  @Test
-  public void testContainerReaderWithLoadException() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testContainerReaderWithLoadException(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
     ContainerSet containerSet1 = new ContainerSet(1000);
-    File volumeDir1 = tempDir.newFolder();
+    File volumeDir1 =
+        Files.createDirectory(tempDir.resolve("volumeDir" + 1)).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
 
     volumeSet1 = Mockito.mock(MutableVolumeSet.class);
@@ -310,13 +303,18 @@ public class TestContainerReader {
     Assertions.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
 
-  @Test
-  public void testMultipleContainerReader() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testMultipleContainerReader(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     final int volumeNum = 10;
     StringBuffer datanodeDirs = new StringBuffer();
     File[] volumeDirs = new File[volumeNum];
     for (int i = 0; i < volumeNum; i++) {
-      volumeDirs[i] = tempDir.newFolder();
+      volumeDirs[i] =
+          Files.createDirectory(tempDir.resolve("volumeDir" + i)).toFile();
       datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(",");
     }
 
@@ -386,8 +384,12 @@ public class TestContainerReader {
     Assertions.assertEquals(0, cache.size());
   }
 
-  @Test
-  public void testMarkedDeletedContainerCleared() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testMarkedDeletedContainerCleared(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     KeyValueContainerData containerData = new KeyValueContainerData(
         101, layout, (long) StorageUnit.GB.toBytes(5),
         UUID.randomUUID().toString(), datanodeId.toString());
@@ -444,5 +446,17 @@ public class TestContainerReader {
           metadataTable.getEstimatedKeyCount());
       return baseSize;
     }
+  }
+
+  private void setLayoutAndSchemaVersion(
+      ContainerTestVersionInfo versionInfo) {
+    layout = versionInfo.getLayout();
+    schemaVersion = versionInfo.getSchemaVersion();
+    conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  private static Iterable<Object[]> versionInfo() {
+    return ContainerTestVersionInfo.versionParameters();
   }
 }
