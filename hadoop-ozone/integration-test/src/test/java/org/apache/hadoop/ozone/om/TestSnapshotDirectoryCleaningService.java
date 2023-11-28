@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryService;
+import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -62,10 +62,10 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Test Snapshot Directory Service.
  */
 @Timeout(300)
-public class TestSnapshotDirectoryService {
+public class TestSnapshotDirectoryCleaningService {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestSnapshotDirectoryService.class);
+      LoggerFactory.getLogger(TestSnapshotDirectoryCleaningService.class);
 
   private static boolean omRatisEnabled = true;
 
@@ -143,7 +143,7 @@ public class TestSnapshotDirectoryService {
         cluster.getOzoneManager().getMetadataManager().getDeletedTable();
     Table<String, SnapshotInfo> snapshotInfoTable =
         cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-    SnapshotDirectoryService snapshotDirectoryService =
+    SnapshotDirectoryCleaningService snapshotDirectoryCleaningService =
         cluster.getOzoneManager().getKeyManager().getSnapshotDirectoryService();
 
     /*    DirTable
@@ -223,8 +223,8 @@ public class TestSnapshotDirectoryService {
     fs.delete(root, true);
     assertTableRowCount(deletedKeyTable, 10);
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snap3");
-    long prevRunCount = snapshotDirectoryService.getRunCount().get();
-    GenericTestUtils.waitFor(() -> snapshotDirectoryService.getRunCount().get()
+    long prevRunCount = snapshotDirectoryCleaningService.getRunCount().get();
+    GenericTestUtils.waitFor(() -> snapshotDirectoryCleaningService.getRunCount().get()
         > prevRunCount + 1, 100, 10000);
 
     Thread.sleep(2000);

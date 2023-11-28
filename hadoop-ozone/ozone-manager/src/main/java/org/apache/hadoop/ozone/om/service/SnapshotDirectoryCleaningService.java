@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -63,16 +62,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 
 /**
  * Snapshot BG Service for deleted directory deep clean and exclusive size
  * calculation for deleted directories.
  */
-public class SnapshotDirectoryService extends AbstractKeyDeletingService {
+public class SnapshotDirectoryCleaningService
+    extends AbstractKeyDeletingService {
   // Use only a single thread for DirDeletion. Multiple threads would read
   // or write to same tables and can send deletion requests for same key
   // multiple times.
@@ -82,12 +82,13 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveSizeMap;
   private final Map<String, Long> exclusiveReplicatedSizeMap;
 
-  public SnapshotDirectoryService(long interval, TimeUnit unit,
-                                  long serviceTimeout,
-                                  OzoneManager ozoneManager,
-                                  ScmBlockLocationProtocol scmClient) {
-    super(SnapshotDirectoryService.class.getSimpleName(), interval, unit,
-        SNAPSHOT_DIR_CORE_POOL_SIZE, serviceTimeout, ozoneManager, scmClient);
+  public SnapshotDirectoryCleaningService(long interval, TimeUnit unit,
+                                          long serviceTimeout,
+                                          OzoneManager ozoneManager,
+                                          ScmBlockLocationProtocol scmClient) {
+    super(SnapshotDirectoryCleaningService.class.getSimpleName(),
+        interval, unit, SNAPSHOT_DIR_CORE_POOL_SIZE, serviceTimeout,
+        ozoneManager, scmClient);
     this.suspended = new AtomicBoolean(false);
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
@@ -120,24 +121,18 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new SnapshotDirectoryService.SnapshotDirTask());
+    queue.add(new SnapshotDirectoryCleaningService.SnapshotDirTask());
     return queue;
   }
 
   private class SnapshotDirTask implements BackgroundTask {
 
     @Override
-    public int getPriority() {
-      return 0;
-    }
-
-    @Override
     public BackgroundTaskResult call() {
-      if (shouldRun()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Running SnapshotDirectoryService");
-        }
+      if (!shouldRun()) {
+        return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
+      LOG.debug("Running SnapshotDirectoryCleaningService");
 
       getRunCount().incrementAndGet();
       OmSnapshotManager omSnapshotManager =
@@ -162,13 +157,13 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
             continue;
           }
 
-          long volumeId = getOzoneManager().getMetadataManager()
+          long volumeId = metadataManager
               .getVolumeId(currSnapInfo.getVolumeName());
           // Get bucketInfo for the snapshot bucket to get bucket layout.
-          String dbBucketKey = getOzoneManager().getMetadataManager()
+          String dbBucketKey = metadataManager
               .getBucketKey(currSnapInfo.getVolumeName(),
                   currSnapInfo.getBucketName());
-          OmBucketInfo bucketInfo = getOzoneManager().getMetadataManager()
+          OmBucketInfo bucketInfo = metadataManager
               .getBucketTable().get(dbBucketKey);
 
           if (bucketInfo == null) {
@@ -222,10 +217,8 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
                 .getKeyTable(bucketInfo.getBucketLayout());
           }
 
-          String dbBucketKeyForDir = getOzoneManager().getMetadataManager()
-              .getBucketKey(Long.toString(volumeId),
-                  Long.toString(bucketInfo.getObjectID())) + OM_KEY_PREFIX;
-
+          String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
+              currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
           try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
                    rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
               currSnapInfo.getVolumeName(),
@@ -248,12 +241,6 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
               while (deletedDirIterator.hasNext()) {
                 Table.KeyValue<String, OmKeyInfo> deletedDirInfo =
                     deletedDirIterator.next();
-                String deletedDirKey = deletedDirInfo.getKey();
-
-                // Exit if it is out of the bucket scope.
-                if (!deletedDirKey.startsWith(dbBucketKeyForDir)) {
-                  break;
-                }
 
                 // For each deleted directory we do an in-memory DFS and
                 // do a deep clean and exclusive size calculation.
@@ -409,7 +396,7 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
         parentInfo.getObjectID(), "");
     List<BlockGroup> blocksForKeyDelete = new ArrayList<>();
 
-    Table fileTable = metadataManager.getFileTable();
+    Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              iterator = fileTable.iterator()) {
       iterator.seek(seekFileInDB);
@@ -496,8 +483,7 @@ public class SnapshotDirectoryService extends AbstractKeyDeletingService {
   /**
    * Stack node data for directory deep clean for snapshot.
    */
-  @SuppressFBWarnings
-  public class StackNode {
+  private static class StackNode {
     private String dirKey;
     private OmDirectoryInfo dirValue;
     private String subDirSeek;

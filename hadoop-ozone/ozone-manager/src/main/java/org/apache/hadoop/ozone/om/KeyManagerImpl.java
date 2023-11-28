@@ -86,7 +86,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryService;
+import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -186,7 +186,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
-  private SnapshotDirectoryService snapshotDirectoryService;
+  private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -306,7 +306,7 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    if (snapshotDirectoryService == null) {
+    if (snapshotDirectoryCleaningService == null) {
       long dirDeleteInterval = configuration.getTimeDuration(
           OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT,
@@ -315,10 +315,10 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT,
           OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
-      snapshotDirectoryService = new SnapshotDirectoryService(dirDeleteInterval,
-          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager,
-          scmClient.getBlockClient());
-      snapshotDirectoryService.start();
+      snapshotDirectoryCleaningService = new SnapshotDirectoryCleaningService(
+          dirDeleteInterval, TimeUnit.MILLISECONDS, serviceTimeout,
+          ozoneManager, scmClient.getBlockClient());
+      snapshotDirectoryCleaningService.start();
     }
 
     if (multipartUploadCleanupService == null) {
@@ -367,9 +367,9 @@ public class KeyManagerImpl implements KeyManager {
       multipartUploadCleanupService.shutdown();
       multipartUploadCleanupService = null;
     }
-    if (snapshotDirectoryService != null) {
-      snapshotDirectoryService.shutdown();
-      snapshotDirectoryService = null;
+    if (snapshotDirectoryCleaningService != null) {
+      snapshotDirectoryCleaningService.shutdown();
+      snapshotDirectoryCleaningService = null;
     }
   }
 
@@ -704,8 +704,8 @@ public class KeyManagerImpl implements KeyManager {
     return snapshotDeletingService;
   }
 
-  public SnapshotDirectoryService getSnapshotDirectoryService() {
-    return snapshotDirectoryService;
+  public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
+    return snapshotDirectoryCleaningService;
   }
 
   public boolean isSstFilteringSvcEnabled() {
