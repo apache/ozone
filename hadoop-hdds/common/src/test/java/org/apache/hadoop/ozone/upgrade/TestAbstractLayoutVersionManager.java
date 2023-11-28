@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockitoAnnotations;
@@ -48,6 +49,11 @@ public class TestAbstractLayoutVersionManager {
   @BeforeEach
   public void setup() {
     MockitoAnnotations.initMocks(this);
+  }
+
+  @AfterEach
+  public void close() {
+    versionManager.close();
   }
 
   @Test
