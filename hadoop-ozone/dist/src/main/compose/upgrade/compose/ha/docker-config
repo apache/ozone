@@ -59,11 +59,6 @@ OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 
-CORE-SITE.XML_dfs.data.transfer.protection=authentication
-CORE-SITE.XML_hadoop.security.authentication=kerberos
-CORE-SITE.XML_hadoop.security.auth_to_local="DEFAULT"
-CORE-SITE.XML_hadoop.security.key.provider.path=kms://http@kms:9600/kms
-
 no_proxy=om1,om2,om3,scm1,scm2,scm3,s3g,kdc,localhost,127.0.0.1
 
 OM_SERVICE_ID=omservice
