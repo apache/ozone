@@ -141,8 +141,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return keyArgs;
   }
 
-  @NotNull
-  protected KeyArgs resolveBucketAndCheckAcls(KeyArgs keyArgs,
+  protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
       OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
       throws IOException {
     KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
@@ -150,6 +149,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
     checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(),
         resolvedArgs.getBucketName(), keyArgs.getKeyName(),
         aclType, OzoneObj.ResourceType.KEY);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckOpenKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType,
+      long clientId)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAclsInOpenKeyTable(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, clientId);
     return resolvedArgs;
   }
 

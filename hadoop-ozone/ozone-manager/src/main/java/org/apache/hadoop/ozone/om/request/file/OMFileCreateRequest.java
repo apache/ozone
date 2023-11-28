@@ -154,9 +154,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
         .map(info -> info.getProtobuf(getOmRequest().getVersion()))
         .collect(Collectors.toList()));
 
+    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, IAccessAuthorizer.ACLType.CREATE);
+
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     CreateFileRequest.Builder newCreateFileRequest =
-        createFileRequest.toBuilder().setKeyArgs(newKeyArgs)
+        createFileRequest.toBuilder().setKeyArgs(resolvedArgs)
             .setClientID(UniqueId.next());
 
     return getOmRequest().toBuilder()
@@ -207,14 +210,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Exception exception = null;
     Result result = null;
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
       // acquire lock
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));

@@ -175,7 +175,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     }
 
     KeyArgs resolvedKeyArgs =
-        resolveBucketAndCheckAcls(newKeyArgs.build(), ozoneManager,
+        resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.CREATE);
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(resolvedKeyArgs)
