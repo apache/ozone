@@ -187,6 +187,41 @@ public class TestNodeDecommissionManager {
   }
 
   @Test
+  public void testStartTimeMetricWhenNodesDecommissioned() throws Exception {
+    List<DatanodeDetails> dns = generateDatanodes();
+
+    // Decommission 2 valid nodes
+    long beforeTime = System.currentTimeMillis();
+    decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
+        dns.get(2).getIpAddress()));
+    long afterTime = System.currentTimeMillis();
+
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+
+    long decomTimeDn1 = decom.getNodeDecommissionMetrics()
+        .getStartTimeByHost(dns.get(1).getHostName());
+    assertTrue(decomTimeDn1 >= beforeTime);
+    assertTrue(decomTimeDn1 <= afterTime);
+
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+
+    long decomTimeDn2 = decom.getNodeDecommissionMetrics()
+        .getStartTimeByHost(dns.get(2).getHostName());
+    assertTrue(decomTimeDn2 >= beforeTime);
+    assertTrue(decomTimeDn2 <= afterTime);
+
+    assertNotEquals(decomTimeDn1, decomTimeDn2);
+
+    // Running the command again should not change the start time metric
+    decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()));
+    long secondDecomTimeDn1 = decom.getNodeDecommissionMetrics()
+        .getStartTimeByHost(dns.get(1).getHostName());
+    assertEquals(decomTimeDn1, secondDecomTimeDn1);
+  }
+
+  @Test
   public void testNodesCanBeDecommissionedAndRecommissionedMixedPorts()
       throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();
