@@ -163,15 +163,12 @@ public class ListIterator {
     }
 
     public HeapEntry next() {
-      try {
-        getNextKey();
-      } catch (Throwable t) {
-        throw new NoSuchElementException();
+      if (hasNext()) {
+        HeapEntry ret = currentKey;
+        currentKey = null;
+        return ret;
       }
-      HeapEntry ret = currentKey;
-      currentKey = null;
-
-      return ret;
+      throw new NoSuchElementException();
     }
 
     public void close() throws IOException {
@@ -273,7 +270,7 @@ public class ListIterator {
    * RawFile  - a2, a4, a6, a8
    *
    * Min Heap is initially composed of {(a1, RawDir), (a2, RawFile)}
-   * THe least element is removed i.e a1 and then next entry from RawDir
+   * The least element is removed i.e a1 and then next entry from RawDir
    * is inserted into minheap resulting in {(a2, RawFile), (a3, RawDir)}
    *
    * This process is repeated till both the lists are exhausted.
