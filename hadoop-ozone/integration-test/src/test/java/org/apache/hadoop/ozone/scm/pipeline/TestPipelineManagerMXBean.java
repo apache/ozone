@@ -26,23 +26,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import javax.management.AttributeNotFoundException;
-import javax.management.InstanceNotFoundException;
-import javax.management.MBeanException;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import javax.management.ReflectionException;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
@@ -71,62 +65,35 @@ public class TestPipelineManagerMXBean {
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
         "Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo");
-    TabularData data =
-        (TabularData) mbs.getAttribute(bean, "PipelineInfo");
-    Map<String, Integer> datanodeInfo = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelineInfo();
-    verifyEquals(data, datanodeInfo, bean);
+    Map<String, Integer> pipelineStateCount = cluster
+        .getStorageContainerManager().getPipelineManager().getPipelineInfo();
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        final TabularData data = (TabularData) mbs.getAttribute(
+            bean, "PipelineInfo");
+        for (String state : pipelineStateCount.keySet()) {
+          final Integer count = pipelineStateCount.get(state);
+          final Integer currentCount = getMetricsCount(data, state);
+          if (currentCount == null || !currentCount.equals(count)) {
+            return false;
+          }
+        }
+        return true;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 500, 3000);
   }
 
-  private void verifyEquals(TabularData actualData,
-                            Map<String, Integer> expectedData, ObjectName bean)
-      throws InterruptedException, TimeoutException {
-    assertNotNull(actualData);
-    assertNotNull(expectedData);
-    for (Object obj : actualData.values()) {
-      assertTrue(obj instanceof CompositeData);
-      CompositeData cds = (CompositeData) obj;
-      assertEquals(2, cds.values().size());
-      Iterator<?> it = cds.values().iterator();
-      String key = it.next().toString();
-      assertTrue(expectedData.containsKey(key));
-      // Wait before all pipelines becomes stable in their respective states.
-      GenericTestUtils.waitFor(() -> {
-        long actualCountForPipelineState =
-            getActualCountForPipelineState(key, bean);
-        return expectedData.remove(key).longValue() ==
-            actualCountForPipelineState;
-      }, 500, 3000);
-    }
-    assertTrue(expectedData.isEmpty());
-  }
-
-  private long getActualCountForPipelineState(String pipelineState,
-                                              ObjectName bean) {
-    TabularData data = null;
-    try {
-      data = (TabularData) mbs.getAttribute(bean, "PipelineInfo");
-    } catch (MBeanException e) {
-      throw new RuntimeException(e);
-    } catch (AttributeNotFoundException e) {
-      throw new RuntimeException(e);
-    } catch (InstanceNotFoundException e) {
-      throw new RuntimeException(e);
-    } catch (ReflectionException e) {
-      throw new RuntimeException(e);
-    }
-    String value = null;
+  private Integer getMetricsCount(TabularData data, String state) {
     for (Object obj : data.values()) {
-      assertTrue(obj instanceof CompositeData);
-      CompositeData cds = (CompositeData) obj;
-      Iterator<?> it = cds.values().iterator();
-      String key = it.next().toString();
-      if (key.equals(pipelineState)) {
-        value = it.next().toString();
-        break;
+      CompositeData cds = assertInstanceOf(CompositeData.class, obj);
+      if (cds.get("key").equals(state)) {
+        return Integer.parseInt(cds.get("value").toString());
       }
     }
-    return Long.parseLong(value);
+    return null;
   }
 
   @AfterEach
