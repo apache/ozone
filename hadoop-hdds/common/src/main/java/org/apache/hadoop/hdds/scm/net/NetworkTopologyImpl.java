@@ -62,7 +62,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
   /** The algorithm to randomize nodes with equal distances. */
   private final Consumer<List<? extends Node>> shuffleOperation;
   /** Lock to coordinate cluster tree access. */
-  private ReadWriteLock netlock = new ReentrantReadWriteLock(true);
+  private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
   public NetworkTopologyImpl(ConfigurationSource conf) {
     schemaManager = NodeSchemaManager.getInstance();
@@ -137,7 +137,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
   @Override
   public void update(Node oldNode, Node newNode) {
     Preconditions.checkArgument(newNode != null, "newNode cannot be null");
-    if (oldNode != null && oldNode instanceof InnerNode) {
+    if (oldNode instanceof InnerNode) {
       throw new IllegalArgumentException(
               "Not allowed to update an inner node: "
                       + oldNode.getNetworkFullPath());
@@ -226,10 +226,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     while (parent != null && parent != clusterTree) {
       parent = parent.getParent();
     }
-    if (parent == clusterTree) {
-      return true;
-    }
-    return false;
+    return parent == clusterTree;
   }
 
   /**
@@ -385,7 +382,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, null, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -426,7 +423,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -461,7 +458,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ancestorGen);
@@ -799,9 +796,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     for (List<N> list : tree.values()) {
       if (list != null) {
         shuffleOperation.accept(list);
-        for (N n : list) {
-          ret.add(n);
-        }
+        ret.addAll(list);
       }
     }
 
