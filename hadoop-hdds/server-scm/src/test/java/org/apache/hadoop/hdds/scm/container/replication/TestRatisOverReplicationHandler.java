@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -253,7 +252,7 @@ public class TestRatisOverReplicationHandler {
         getOverReplicatedHealthResult(), 1);
     Pair<DatanodeDetails, SCMCommand<?>> commandPair
         = commands.iterator().next();
-    Assert.assertEquals(shouldDelete.getDatanodeDetails(),
+    assertEquals(shouldDelete.getDatanodeDetails(),
         commandPair.getKey());
   }
 
@@ -274,7 +273,7 @@ public class TestRatisOverReplicationHandler {
             getOverReplicatedHealthResult(), 1);
     Pair<DatanodeDetails, SCMCommand<?>> commandPair
         = commands.iterator().next();
-    Assert.assertEquals(lowestSequenceIDReplica.getDatanodeDetails(),
+    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(),
         commandPair.getKey());
   }
 
