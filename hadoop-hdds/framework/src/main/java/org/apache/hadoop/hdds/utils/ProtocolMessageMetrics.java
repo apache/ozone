@@ -168,8 +168,4 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
       return description;
     }
   }
-
-  public boolean isQuantileEnable() {
-    return quantileEnable;
-  }
 }
