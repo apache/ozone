@@ -238,7 +238,7 @@ public class TestRatisOverReplicationHandler {
   }
 
   @Test
-  public void testOverReplicatedAllUnhealthyPicksLowestBCSID()
+  public void testOverReplicatedAllUnhealthySameBCSID()
       throws IOException {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0, 0);
@@ -257,7 +257,7 @@ public class TestRatisOverReplicationHandler {
   }
 
   @Test
-  public void testOverReplicatedAllUnhealthySameBCSID()
+  public void testOverReplicatedAllUnhealthyPicksLowestBCSID()
       throws IOException {
     final long sequenceID = 20;
     Set<ContainerReplica> replicas = new HashSet<>();
