@@ -136,8 +136,8 @@ public class TestQuasiClosedContainerHandler {
         .setReadOnly(true)
         .build();
 
-    Assertions.assertTrue(quasiClosedContainerHandler.handle(request));
-    Assertions.assertTrue(quasiClosedContainerHandler.handle(readRequest));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
     Mockito.verify(replicationManager, times(2))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
@@ -240,8 +240,8 @@ public class TestQuasiClosedContainerHandler {
         .setReadOnly(true)
         .build();
 
-    Assertions.assertTrue(quasiClosedContainerHandler.handle(request));
-    Assertions.assertTrue(quasiClosedContainerHandler.handle(readRequest));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
     // verify close command was sent for replicas with sequence ID 1001, that
     // is dnTwo and dnThree
     Mockito.verify(replicationManager, times(1))
