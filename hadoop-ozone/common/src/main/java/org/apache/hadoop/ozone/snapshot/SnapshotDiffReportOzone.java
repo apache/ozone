@@ -110,7 +110,7 @@ public class SnapshotDiffReportOzone
             .append(token);
       }
     } else {
-      str.append("No diff or no more diff for with the request parameters.");
+      str.append("No diff or no more diff for the request parameters.");
     }
     return str.toString();
   }
