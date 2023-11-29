@@ -1429,6 +1429,18 @@ public abstract class TestOmSnapshot {
                 SnapshotDiffReport.DiffType.MODIFY, key3)
         );
     assertEquals(expectedDiffList, diff5.getDiffList());
+
+    SnapshotDiffReportOzone diff12 = store.snapshotDiff(volume, bucket, snap6,
+        snap7, null, 2, forceFullSnapshotDiff, disableNativeDiff)
+        .getSnapshotDiffReport();
+
+    IOException ioException = assertThrows(IOException.class,
+        () -> store.snapshotDiff(volume, bucket, snap6,
+            snap7, "2", 0, forceFullSnapshotDiff, disableNativeDiff));
+    assertThat(ioException.getMessage(), containsString("Index (given: 2) " +
+        "should be a number >= 0 and < totalDiffEntries: 2. Page size " +
+        "(given: 2) should be a positive number > 0."));
+
   }
 
   @Test
