@@ -46,6 +46,8 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,7 +56,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -155,7 +156,7 @@ public class TestCloseContainerEventHandler {
     closeHandler.onMessage(container.containerID(), eventPublisher);
     Mockito.verify(mockLeaseManager, atLeastOnce())
         .acquire(any(), anyLong(), any());
-    Assert.assertTrue(leaseList.size() > 0);
+    assertTrue(leaseList.size() > 0);
     // immediate check if event is published
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
@@ -214,14 +215,14 @@ public class TestCloseContainerEventHandler {
         .map(d -> d.getUuid())
         .collect(Collectors.toSet());
     for (CommandForDatanode c : cmds) {
-      Assert.assertTrue(pipelineDNs.contains(c.getDatanodeId()));
+      assertTrue(pipelineDNs.contains(c.getDatanodeId()));
       pipelineDNs.remove(c.getDatanodeId());
       CloseContainerCommand ccc = (CloseContainerCommand)c.getCommand();
-      Assert.assertEquals(container.getContainerID(), ccc.getContainerID());
-      Assert.assertEquals(pipeline.getId(), ccc.getPipelineID());
-      Assert.assertEquals(forceClose, ccc.getProto().getForce());
+      assertEquals(container.getContainerID(), ccc.getContainerID());
+      assertEquals(pipeline.getId(), ccc.getPipelineID());
+      assertEquals(forceClose, ccc.getProto().getForce());
     }
-    Assert.assertEquals(0, pipelineDNs.size());
+    assertEquals(0, pipelineDNs.size());
   }
 
   private Pipeline createPipeline(ReplicationConfig repConfig, int nodes) {
@@ -249,5 +250,4 @@ public class TestCloseContainerEventHandler {
     builder.setState(HddsProtos.LifeCycleState.OPEN);
     return builder.build();
   }
-
 }

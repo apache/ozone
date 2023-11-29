@@ -76,6 +76,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -1733,7 +1734,6 @@ public class TestOzoneFileSystem {
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
 
-
   @Test
   public void testLoopInLinkBuckets() throws Exception {
     String linksVolume = UUID.randomUUID().toString();
@@ -1805,5 +1805,31 @@ public class TestOzoneFileSystem {
         .setSourceVolume(sourceVolume.getName())
         .setSourceBucket(sourceBucket);
     sourceVolume.createBucket(linkBucket, builder.build());
+  }
+
+  @Test
+  public void testProcessingDetails() throws IOException, InterruptedException {
+    final Logger log = LoggerFactory.getLogger(
+        "org.apache.hadoop.ipc.ProcessingDetails");
+    GenericTestUtils.setLogLevel(log, Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(log);
+    int keySize = 1024;
+    TestDataUtil.createKey(ozoneBucket, "key1", new String(new byte[keySize],
+        UTF_8));
+    logCapturer.stopCapturing();
+    String logContent = logCapturer.getOutput();
+
+    int nonZeroLines = 0;
+    for (String s: logContent.split("\n")) {
+      // The following conditions means write operations from Clients.
+      if (!s.contains("lockexclusiveTime=0") &&
+          s.contains("OzoneManagerProtocol")) {
+        nonZeroLines++;
+      }
+    }
+
+    GenericTestUtils.setLogLevel(log, Level.INFO);
+    Assert.assertNotEquals(nonZeroLines, 0);
   }
 }

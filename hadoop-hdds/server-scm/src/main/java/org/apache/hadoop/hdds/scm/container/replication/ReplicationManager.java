@@ -245,7 +245,7 @@ public class ReplicationManager implements SCMService {
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);
     this.ratisReplicationCheckHandler =
-        new RatisReplicationCheckHandler(ratisContainerPlacement);
+        new RatisReplicationCheckHandler(ratisContainerPlacement, this);
     this.nodeManager = nodeManager;
     this.metrics = ReplicationManagerMetrics.create(this);
 
