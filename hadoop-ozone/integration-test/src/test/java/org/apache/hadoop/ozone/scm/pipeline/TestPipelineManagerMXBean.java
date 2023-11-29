@@ -73,7 +73,7 @@ public class TestPipelineManagerMXBean {
         final TabularData data = (TabularData) mbs.getAttribute(
             bean, "PipelineInfo");
         for (Map.Entry<String, Integer> entry : pipelineStateCount.entrySet()) {
-          final Integer count = pipelineStateCount.get(entry.getKey());
+          final Integer count = entry.getValue();
           final Integer currentCount = getMetricsCount(data, entry.getKey());
           if (currentCount == null || !currentCount.equals(count)) {
             return false;
