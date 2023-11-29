@@ -45,7 +45,6 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -186,7 +185,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
-    assertThrows(CommandTargetOverloadedException.class,
+    Assertions.assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
             Collections.emptyList(), 0, 1, 1, 0));
   }

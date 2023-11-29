@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -43,6 +44,7 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -61,6 +63,11 @@ public class TestSCMBlockProtocolServer {
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private static final int NODE_COUNT = 10;
 
+  private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
+      "edge0", "/rack0",
+      "edge1", "/rack1"
+  );
+
   @BeforeEach
   void setUp(@TempDir File dir) throws Exception {
     config = SCMTestUtils.getConf(dir);
@@ -75,6 +82,7 @@ public class TestSCMBlockProtocolServer {
       nodeMapping.add(dn.getIpAddress() + "=" + rack);
       datanodes.add(dn);
     }
+    EDGE_NODES.forEach((n, r) -> nodeMapping.add(n + "=" + r));
     config.set(StaticMapping.KEY_HADOOP_CONFIGURED_NODE_MAPPING,
         String.join(",", nodeMapping));
 
@@ -113,18 +121,31 @@ public class TestSCMBlockProtocolServer {
       Assertions.assertEquals(dn, sorted.get(0),
           "Source node should be sorted very first");
 
-      for (int i = 1; i < NODE_COUNT / 2; i++) {
-        DatanodeDetails item = sorted.get(i);
-        Assertions.assertEquals(dn.getNetworkLocation(),
-            item.getNetworkLocation(),
-            "Nodes in the same rack should be sorted first");
-      }
-      for (int i = NODE_COUNT / 2; i < NODE_COUNT; i++) {
-        DatanodeDetails item = sorted.get(i);
-        Assertions.assertNotEquals(dn.getNetworkLocation(),
-            item.getNetworkLocation(),
-            "Nodes in the other rack should be sorted last");
-      }
+      assertRackOrder(dn.getNetworkLocation(), sorted);
+    }
+  }
+
+  @Test
+  void sortDatanodesRelativeToNonDatanode() {
+    List<String> datanodes = getNetworkNames();
+
+    for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
+      assertRackOrder(entry.getValue(),
+          server.sortDatanodes(datanodes, entry.getKey()));
+    }
+  }
+
+  private static void assertRackOrder(String rack, List<DatanodeDetails> list) {
+    int size = list.size();
+
+    for (int i = 0; i < size / 2; i++) {
+      Assertions.assertEquals(rack, list.get(i).getNetworkLocation(),
+          "Nodes in the same rack should be sorted first");
+    }
+
+    for (int i = size / 2; i < size; i++) {
+      Assertions.assertNotEquals(rack, list.get(i).getNetworkLocation(),
+          "Nodes in the other rack should be sorted last");
     }
   }
 

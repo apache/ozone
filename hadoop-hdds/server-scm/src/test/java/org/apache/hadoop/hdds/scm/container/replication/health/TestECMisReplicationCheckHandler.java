@@ -34,9 +34,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
@@ -45,13 +44,14 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.HealthState.MIS_REPLICATED;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -63,12 +63,11 @@ public class TestECMisReplicationCheckHandler {
   private ECMisReplicationCheckHandler handler;
   private ECReplicationConfig repConfig;
   private ReplicationQueue repQueue;
-  private int maintenanceRedundancy = 2;
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
   private PlacementPolicy placementPolicy;
 
-  @Before
+  @BeforeEach
   public void setup() {
     placementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(placementPolicy.validateContainerPlacement(
@@ -78,6 +77,7 @@ public class TestECMisReplicationCheckHandler {
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();
+    int maintenanceRedundancy = 2;
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(maintenanceRedundancy)
@@ -142,8 +142,7 @@ public class TestECMisReplicationCheckHandler {
         .build();
 
     ContainerHealthResult result = handler.checkMisReplication(request);
-    Assertions.assertEquals(ContainerHealthResult.HealthState.MIS_REPLICATED,
-        result.getHealthState());
+    assertEquals(MIS_REPLICATED, result.getHealthState());
 
     assertTrue(handler.handle(request));
     assertEquals(1, repQueue.underReplicatedQueueSize());
@@ -192,8 +191,7 @@ public class TestECMisReplicationCheckHandler {
         .build();
 
     ContainerHealthResult result = handler.checkMisReplication(request);
-    Assertions.assertEquals(ContainerHealthResult.HealthState.MIS_REPLICATED,
-        result.getHealthState());
+    assertEquals(MIS_REPLICATED, result.getHealthState());
 
     assertTrue(handler.handle(request));
     assertEquals(0, repQueue.underReplicatedQueueSize());
@@ -248,8 +246,7 @@ public class TestECMisReplicationCheckHandler {
         .build();
 
     ContainerHealthResult result = handler.checkMisReplication(request);
-    Assertions.assertEquals(ContainerHealthResult.HealthState.MIS_REPLICATED,
-        result.getHealthState());
+    assertEquals(MIS_REPLICATED, result.getHealthState());
 
     assertTrue(handler.handle(request));
     assertEquals(0, repQueue.underReplicatedQueueSize());
