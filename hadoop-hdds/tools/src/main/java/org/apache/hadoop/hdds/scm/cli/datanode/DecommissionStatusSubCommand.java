@@ -47,6 +47,11 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       defaultValue = "")
   private String uuid;
 
+  @CommandLine.Option(names = { "--ip" },
+      description = "Show info by datanode ipAddress",
+      defaultValue = "")
+  private String ipAddress;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     List<HddsProtos.Node> decommissioningNodes;
@@ -55,6 +60,15 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
           HddsProtos.QueryScope.CLUSTER, "").stream().filter(p ->
           p.getNodeID().getUuid().equals(uuid)).collect(Collectors.toList());
+      if (decommissioningNodes.isEmpty()) {
+        System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
+        return;
+      }
+    } else if (!Strings.isNullOrEmpty(ipAddress)) {
+      decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
+          HddsProtos.QueryScope.CLUSTER, "").stream().filter(p ->
+          p.getNodeID().getIpAddress().compareToIgnoreCase(ipAddress) == 0)
+          .collect(Collectors.toList());
       if (decommissioningNodes.isEmpty()) {
         System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
         return;
@@ -72,8 +86,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       printDetails(datanode);
     }
   }
-  private void printDetails(DatanodeDetails datanode)
-      throws IOException {
+  private void printDetails(DatanodeDetails datanode) {
     System.out.println("\nDatanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + ")");
