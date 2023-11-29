@@ -101,13 +101,16 @@ public class SnapshotDiffReportOzone
         .append(" and snapshot: ")
         .append(getLaterSnapshotName())
         .append(LINE_SEPARATOR);
-    for (DiffReportEntry entry : getDiffList()) {
-      str.append(entry.toString()).append(LINE_SEPARATOR);
-    }
-    if (StringUtils.isNotEmpty(token)) {
-      str.append("Next token: ")
-          .append(token)
-          .append(LINE_SEPARATOR);
+    if (!getDiffList().isEmpty()) {
+      for (DiffReportEntry entry : getDiffList()) {
+        str.append(entry.toString()).append(LINE_SEPARATOR);
+      }
+      if (StringUtils.isNotEmpty(token)) {
+        str.append("Next token: ")
+            .append(token);
+      }
+    } else {
+      str.append("No diff or no more diff for the request parameters.");
     }
     return str.toString();
   }
