@@ -50,6 +50,7 @@ L='Licen[cs]e' # sometimes misspelled
 
 # filter all allowed licenses; any remaining item indicates a possible problem
 grep '(' ${src} \
+  | grep -v -f <(grep -v -e '^#' -e '^$' "${DIR}"/license.exceptions | cut -f1 -d' ') \
   | ( grep -i -v \
     -e "Apache ${L}" -e "Apache Software ${L}" -e "Apache v2" -e "Apache.2" \
     -e "Bouncy Castle ${L}" \
@@ -57,14 +58,11 @@ grep '(' ${src} \
     -e "(CDDL\>" -e ' CDDL '\
     -e "(EDL\>" -e "Eclipse Distribution ${L}" \
     -e "(EPL\>" -e "Eclipse Public ${L}" \
-    -e "\<Go ${L}" \
     -e "(MIT)" -e "\<MIT ${L}" \
     -e "Modified BSD\>" \
     -e "New BSD ${L}" \
     -e "Public Domain" \
     -e "Revised BSD\>" \
-    -e "org.codehaus.jettison:jettison:" \
-    -e "javax.servlet.jsp:jsp-api:" \
     || true ) \
   | sort -u \
   | tee "${REPORT_FILE}"
