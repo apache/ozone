@@ -220,7 +220,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     When checking for over replication, consider UNHEALTHY replicas. This means
     that other than checking over replication of healthy replicas (such as 4
     CLOSED replicas of a CLOSED container), we're also checking for an excess
-    of UNHEALTHY replicas (such as 3 CLOSED and 1 UNHEALTHY replicas of a
+    of unhealthy replicas (such as 3 CLOSED and 1 UNHEALTHY replicas of a
     CLOSED container, or 3 CLOSED and 1 QUASI_CLOSED with incorrect sequence
     ID for a CLOSED container).
      */
