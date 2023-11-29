@@ -27,6 +27,9 @@
   <description>Apache Ozone Storage Interface</description>
   <name>Apache Ozone Storage Interface</name>
   <packaging>jar</packaging>
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
   <dependencies>
 
     <dependency>
