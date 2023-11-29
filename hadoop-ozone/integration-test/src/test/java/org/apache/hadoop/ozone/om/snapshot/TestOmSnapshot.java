@@ -1430,10 +1430,6 @@ public abstract class TestOmSnapshot {
         );
     assertEquals(expectedDiffList, diff5.getDiffList());
 
-    SnapshotDiffReportOzone diff12 = store.snapshotDiff(volume, bucket, snap6,
-        snap7, null, 2, forceFullSnapshotDiff, disableNativeDiff)
-        .getSnapshotDiffReport();
-
     IOException ioException = assertThrows(IOException.class,
         () -> store.snapshotDiff(volume, bucket, snap6,
             snap7, "2", 0, forceFullSnapshotDiff, disableNativeDiff));
