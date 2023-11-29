@@ -23,6 +23,10 @@
 # When adding a new dependency to Ozone with a license that fails to match:
 # * verify that the license is allowed, ref: https://www.apache.org/legal/resolved.html
 # * tweak the patterns to allow
+#
+# Items for which maven-license-plugin cannot find license (e.g. jettison,
+# jsp-api) are output as "Unknown license".  These dependencies should be
+# filtered explicitly, instead of the generic "Unknown license".
 
 set -euo pipefail
 
@@ -59,8 +63,8 @@ grep '(' ${src} \
     -e "New BSD ${L}" \
     -e "Public Domain" \
     -e "Revised BSD\>" \
-    -e "Unknown ${L}" \
-    -e "w/ CPE\>" -e "with classpath exception" \
+    -e "org.codehaus.jettison:jettison:" \
+    -e "javax.servlet.jsp:jsp-api:" \
     || true ) \
   | sort -u \
   | tee "${REPORT_FILE}"
