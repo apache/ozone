@@ -293,8 +293,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
     for (Map.Entry<DatanodeDetails,
-        CompletableFuture<ContainerCommandResponseProto> >
-        entry : futureHashMap.entrySet()) {
+              CompletableFuture<ContainerCommandResponseProto> >
+              entry : futureHashMap.entrySet()) {
       try {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
       } catch (InterruptedException e) {
