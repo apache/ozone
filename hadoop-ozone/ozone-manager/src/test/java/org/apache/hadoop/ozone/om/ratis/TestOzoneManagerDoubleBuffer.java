@@ -365,7 +365,6 @@ class TestOzoneManagerDoubleBuffer {
       Assertions.assertTrue(cache.get(userPrincipalId1) == null);
     } finally {
       // cleanup metrics
-      doubleBuffer.stopDaemon();
       OzoneManagerDoubleBufferMetrics metrics =
           doubleBuffer.getOzoneManagerDoubleBufferMetrics();
       metrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
