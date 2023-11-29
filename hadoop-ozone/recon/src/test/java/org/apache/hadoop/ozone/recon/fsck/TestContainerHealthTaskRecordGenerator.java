@@ -237,7 +237,7 @@ public class TestContainerHealthTaskRecordGenerator {
         generateReplicas(container, CLOSED, CLOSED, CLOSED);
     Map<String, Map<String, Long>> unhealthyContainerStateStatsMap =
         new HashMap<>();
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
     // HEALTHY container - no records generated.
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
@@ -264,7 +264,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     // Over-replicated - expect 1 over replicated record
     replicas =
@@ -299,7 +299,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     // Under and Mis Replicated - expect 2 records - mis and under replicated
     replicas =
@@ -331,7 +331,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     rec = findRecordForState(records, UnHealthyContainerStates.MIS_REPLICATED);
     assertEquals(UnHealthyContainerStates.MIS_REPLICATED.toString(),
@@ -382,7 +382,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     status =
         new ContainerHealthStatus(emptyContainer, replicas, placementPolicy,
@@ -421,7 +421,7 @@ public class TestContainerHealthTaskRecordGenerator {
   public void testRecordNotGeneratedIfAlreadyExists() {
     Map<String, Map<String, Long>> unhealthyContainerStateStatsMap =
         new HashMap<>();
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
     Set<String> existingRec = new HashSet<>();
 
     // Over-replicated
@@ -452,7 +452,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     // Missing
     replicas.clear();
@@ -479,7 +479,7 @@ public class TestContainerHealthTaskRecordGenerator {
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     // Under and Mis-Replicated
     replicas = generateReplicas(container, CLOSED, CLOSED);
@@ -559,7 +559,7 @@ public class TestContainerHealthTaskRecordGenerator {
     return replicas;
   }
 
-  private void initializeUnhealthyContainerStateCountMap(
+  private void initializeUnhealthyContainerStateStatsMap(
       Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MISSING.toString(), new HashMap<>());

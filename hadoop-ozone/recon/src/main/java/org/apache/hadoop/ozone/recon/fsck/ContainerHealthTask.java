@@ -113,7 +113,7 @@ public class ContainerHealthTask extends ReconScmTask {
     lock.writeLock().lock();
     Map<String, Map<String, Long>> unhealthyContainerStateStatsMap =
         new HashMap<>(Collections.emptyMap());
-    initializeUnhealthyContainerStateCountMap(unhealthyContainerStateStatsMap);
+
     try {
       long start = Time.monotonicNow();
       long currentTime = System.currentTimeMillis();
@@ -123,6 +123,8 @@ public class ContainerHealthTask extends ReconScmTask {
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
       start = Time.monotonicNow();
+      initializeUnhealthyContainerStateStatsMap(
+          unhealthyContainerStateStatsMap);
       final List<ContainerInfo> containers = containerManager.getContainers();
       containers.stream()
           .filter(c -> !processedContainers.contains(c))
@@ -161,7 +163,7 @@ public class ContainerHealthTask extends ReconScmTask {
     });
   }
 
-  private void initializeUnhealthyContainerStateCountMap(
+  private void initializeUnhealthyContainerStateStatsMap(
       Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.MISSING.toString(), new HashMap<>());
