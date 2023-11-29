@@ -821,7 +821,6 @@ public final class OmUtils {
         .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
-    int count = 0;
     for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
@@ -833,7 +832,6 @@ public final class OmUtils {
         omInfo.add(String.valueOf(port));
         omInfo.add(role);
         omInfoList.add(omInfo);
-        count++;
       }
     }
     return omInfoList;
