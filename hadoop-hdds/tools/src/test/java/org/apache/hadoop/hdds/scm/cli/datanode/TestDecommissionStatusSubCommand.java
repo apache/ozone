@@ -141,7 +141,7 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     List<HddsProtos.Node> nodes = getNodeDetails(2);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes.subList(0,1));
+        .thenAnswer(invocation -> nodes.subList(0, 1));
 
     CommandLine decom = new CommandLine(decomCmd);
     decom.parseArgs("host0"); //decommission only host0
@@ -198,7 +198,7 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     List<HddsProtos.Node> nodes = getNodeDetails(2);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes.subList(0,1));
+        .thenAnswer(invocation -> nodes.subList(0, 1));
 
     CommandLine decom = new CommandLine(decomCmd);
     decom.parseArgs("host0"); // decommission only host0
