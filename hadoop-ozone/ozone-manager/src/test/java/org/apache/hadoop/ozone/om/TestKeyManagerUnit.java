@@ -77,6 +77,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import static com.google.common.collect.Sets.newHashSet;
@@ -636,10 +638,10 @@ public class TestKeyManagerUnit {
     verify(containerClient, times(1)).getContainerWithPipelineBatch(anySet());
   }
 
-  @Test
-  public void sortDatanodes() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"anyhost", ""})
+  public void sortDatanodes(String client) throws Exception {
     // GIVEN
-    String client = "anyhost";
     int pipelineCount = 3;
     int keysPerPipeline = 5;
     OmKeyInfo[] keyInfos = new OmKeyInfo[pipelineCount * keysPerPipeline];

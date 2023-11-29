@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.ozone.test.GenericTestUtils;
@@ -43,7 +42,6 @@ public class TestAuthorizerLockImpl {
    * Tests StampedLock behavior.
    */
   @Test
-  @SuppressFBWarnings("IMSE_DONT_CATCH_IMSE")
   public void testStampedLockBehavior() throws InterruptedException {
 
     final AuthorizerLock authorizerLock = new AuthorizerLockImpl();
@@ -55,20 +53,14 @@ public class TestAuthorizerLockImpl {
     authorizerLock.unlockWrite(writeLockStamp);
 
     // Case 1: An incorrect stamp won't be able to unlock, throws IMSE
-    readLockStamp = authorizerLock.tryReadLock(100);
-    try {
-      authorizerLock.unlockRead(readLockStamp - 1L);
-      Assertions.fail("Should have thrown IllegalMonitorStateException");
-    } catch (IllegalMonitorStateException ignored) {
-    }
-    authorizerLock.unlockRead(readLockStamp);
-    writeLockStamp = authorizerLock.tryWriteLock(100);
-    try {
-      authorizerLock.unlockWrite(writeLockStamp - 1L);
-      Assertions.fail("Should have thrown IllegalMonitorStateException");
-    } catch (IllegalMonitorStateException ignored) {
-    }
-    authorizerLock.unlockWrite(writeLockStamp);
+    long stamp2 = authorizerLock.tryReadLock(100);
+    Assertions.assertThrows(IllegalMonitorStateException.class,
+        () -> authorizerLock.unlockRead(stamp2 - 1));
+    authorizerLock.unlockRead(stamp2);
+    long stamp3 = authorizerLock.tryWriteLock(100);
+    Assertions.assertThrows(IllegalMonitorStateException.class,
+        () -> authorizerLock.unlockWrite(stamp3 - 1));
+    authorizerLock.unlockWrite(stamp3);
 
     // Case 2: Read lock is reentrant; Write lock is exclusive
     long readLockStamp1 = authorizerLock.tryReadLock(100);

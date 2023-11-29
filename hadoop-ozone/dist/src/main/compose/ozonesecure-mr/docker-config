@@ -62,84 +62,14 @@ HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/dn.ke
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
-HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
-HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
+
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
 CORE-SITE.XML_hadoop.security.authentication=kerberos
 CORE-SITE.XML_hadoop.security.auth_to_local="DEFAULT"
 CORE-SITE.XML_hadoop.security.key.provider.path=kms://http@kms:9600/kms
 
-#temporary disable authorization as org.apache.hadoop.yarn.server.api.ResourceTrackerPB is not properly annotated to support it
+#temporarily disable authorization as org.apache.hadoop.yarn.server.api.ResourceTrackerPB is not properly annotated to support it
 CORE-SITE.XML_hadoop.security.authorization=false
-HADOOP-POLICY.XML_ozone.om.security.client.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.datanode.container.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.scm.container.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.scm.block.protocol.acl=*
-HADOOP-POLICY.XML_hdds.security.client.scm.certificate.protocol.acl=*
-HADOOP-POLICY.XML_org.apache.hadoop.yarn.server.api.ResourceTracker.acl=*
-
-HDFS-SITE.XML_rpc.metrics.quantile.enable=true
-HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
-
-CORE-SITE.XML_fs.AbstractFileSystem.o3fs.impl=org.apache.hadoop.fs.ozone.OzFs
-CORE-SITE.XML_fs.AbstractFileSystem.ofs.impl=org.apache.hadoop.fs.ozone.RootedOzFs
-CORE-SITE.XML_fs.defaultFS=ofs://om
-
-MAPRED-SITE.XML_mapreduce.framework.name=yarn
-MAPRED-SITE.XML_yarn.app.mapreduce.am.env=HADOOP_MAPRED_HOME=$HADOOP_HOME
-MAPRED-SITE.XML_mapreduce.map.env=HADOOP_MAPRED_HOME=$HADOOP_HOME
-MAPRED-SITE.XML_mapreduce.reduce.env=HADOOP_MAPRED_HOME=$HADOOP_HOME
-MAPRED-SITE.XML_mapreduce.map.memory.mb=2048
-MAPRED-SITE.XML_mapreduce.reduce.memory.mb=2048
-#MAPRED-SITE.XML_mapred.child.java.opts=-Xmx2048
-MAPRED-SITE.XML_mapreduce.application.classpath=/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-@project.version@.jar
-
-YARN-SITE.XML_yarn.app.mapreduce.am.staging-dir=/user
-YARN-SITE.XML_yarn.timeline-service.enabled=true
-YARN-SITE.XML_yarn.timeline-service.generic.application.history.enabled=true
-YARN-SITE.XML_yarn.timeline-service.hostname=jhs
-YARN-SITE.XML_yarn.timeline-service.principal=jhs/jhs@EXAMPLE.COM
-YARN-SITE.XML_yarn.timeline-service.keytab=/etc/security/keytabs/jhs.keytab
-YARN-SITE.XML_yarn.log.server.url=http://jhs:8188/applicationhistory/logs/
-
-YARN-SITE.XML_yarn.nodemanager.principal=nm/nm@EXAMPLE.COM
-YARN-SITE.XML_yarn.nodemanager.keytab=/etc/security/keytabs/nm.keytab
-YARN-SITE.XML_yarn.nodemanager.pmem-check-enabled=false
-YARN-SITE.XML_yarn.nodemanager.delete.debug-delay-sec=600
-YARN-SITE.XML_yarn.nodemanager.vmem-check-enabled=false
-YARN-SITE.XML_yarn.nodemanager.aux-services=mapreduce_shuffle
-YARN-SITE.XML_yarn.nodemanager.disk-health-checker.enable=false
-
-YARN-SITE.XML_yarn.resourcemanager.hostname=rm
-YARN-SITE.XML_yarn.resourcemanager.keytab=/etc/security/keytabs/rm.keytab
-YARN-SITE.XML_yarn.resourcemanager.principal=rm/rm@EXAMPLE.COM
-YARN-SITE.XML_yarn.resourcemanager.system.metrics.publisher.enabled=true
-
-YARN-SITE.XML_yarn.log-aggregation-enable=true
-YARN-SITE.XML_yarn.nodemanager.log-aggregation.roll-monitoring-interval-seconds=3600
-YARN-SITE.XML_yarn.nodemanager.delete.debug-delay-sec=600
-YARN-SITE.XML_yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage=99
-YARN-SITE.XML_yarn.nodemanager.disk-health-checker.enable=false
-
-# Yarn LinuxContainer requires the /opt/hadoop/etc/hadoop to be owned by root and not modifiable by other users,
-# which prevents start.sh from changing the configurations based on docker-config
-# YARN-SITE.XML_yarn.nodemanager.container-executor.class=org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor
-# YARN-SITE.XML_yarn.nodemanager.linux-container-executor.path=/opt/hadoop/bin/container-executor
-# YARN-SITE.XML_yarn.nodemanager.linux-container-executor.group=hadoop
-
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.maximum-applications=10000
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.maximum-am-resource-percent=0.1
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.resource-calculator=org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.queues=default
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.capacity=100
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.user-limit-factor=1
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.maximum-capacity=100
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.state=RUNNING
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.acl_submit_applications=*
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.root.default.acl_administer_queue=*
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.node-locality-delay=40
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings=
-CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings-override.enable=false
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
@@ -148,7 +78,6 @@ OZONE_DATANODE_SECURE_USER=root
 JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 
-HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-@project.version@.jar
 OZONE_CLASSPATH=
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

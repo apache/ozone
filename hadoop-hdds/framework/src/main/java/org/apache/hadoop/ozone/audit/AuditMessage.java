@@ -34,13 +34,14 @@ public final class AuditMessage implements Message {
   private final Throwable throwable;
 
   private AuditMessage(String user, String ip, String op,
-      Map<String, String> params, String ret, Throwable throwable) {
+      Map<String, String> params, String ret, Throwable throwable,
+      String performance) {
     this.user = user;
     this.ip = ip;
     this.op = op;
     this.params = params;
     this.ret = ret;
-    this.message = formMessage(user, ip, op, params, ret);
+    this.message = formMessage(user, ip, op, params, ret, performance);
     this.throwable = throwable;
   }
 
@@ -78,6 +79,7 @@ public final class AuditMessage implements Message {
     private String op;
     private Map<String, String> params;
     private String ret;
+    private String performance;
 
     public Builder setUser(String usr) {
       this.user = usr;
@@ -109,15 +111,23 @@ public final class AuditMessage implements Message {
       return this;
     }
 
+    public Builder setPerformance(String perf) {
+      this.performance = perf;
+      return this;
+    }
+
     public AuditMessage build() {
-      return new AuditMessage(user, ip, op, params, ret, throwable);
+      return new AuditMessage(user, ip, op, params, ret, throwable,
+          performance);
     }
   }
 
   private String formMessage(String userStr, String ipStr, String opStr,
-      Map<String, String> paramsMap, String retStr) {
+      Map<String, String> paramsMap, String retStr,
+      String performanceMap) {
+    String perf = performanceMap != null && !performanceMap.isEmpty()
+        ? " | perf=" + performanceMap : "";
     return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
-        + " " + paramsMap + " | " + "ret=" + retStr;
-
+        + " " + paramsMap + " | ret=" + retStr + perf;
   }
 }
