@@ -45,7 +45,7 @@ public class HadoopFsGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"--path"},
-      description = "Hadoop FS file system path",
+      description = "Hadoop FS file system path. Use full path.",
       defaultValue = "o3fs://bucket1.vol1")
   private String rootPath;
 
@@ -87,6 +87,10 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
     configuration = createOzoneConfiguration();
     uri = URI.create(rootPath);
+    String scheme = uri.getScheme();
+    if (scheme == null) {
+      throw new IllegalArgumentException("--path requires FQDN");
+    }
     String disableCacheName = String.format("fs.%s.impl.disable.cache",
         uri.getScheme());
     print("Disabling FS cache: " + disableCacheName);
