@@ -390,14 +390,18 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   handleExistsAtChange = (e: any) => {
     console.log("handleExistsAtChange", e.key);
-    if (e.key === 'OM') {
-      mismatchPrevKeyList = [0];
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'SCM');
-    }
-    else {
-      mismatchPrevKeyList = [0];
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'OM');
-    }
+    this.setState({
+      pageDisplayCount: 0
+    }, () => {
+      if (e.key === 'OM') {
+        mismatchPrevKeyList = [0];
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'SCM');
+      }
+      else {
+        mismatchPrevKeyList = [0];
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'OM');
+      }
+    })
   };
 
   addfsoNonfsoKeyColumn = () => {
@@ -440,14 +444,19 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   );
 
   handlefsoNonfsoMenuChange = (e: any) => {
-    if (e.key === 'fso') {
-      openPrevKeyList =[""];
-      this.fetchOpenKeys(true, false, this.state.DEFAULT_LIMIT, "");
-    }
-    else {
-      openPrevKeyList = [""];
-      this.fetchOpenKeys(false, true, this.state.DEFAULT_LIMIT, "");
-    }
+    console.log("Non FSO handle", e.key);
+    this.setState({
+      pageDisplayCount: 0
+    }, () => {
+      if (e.key === 'fso') {
+        openPrevKeyList = [""];
+        this.fetchOpenKeys(true, false, this.state.DEFAULT_LIMIT, "");
+      }
+      else {
+        openPrevKeyList = [""];
+        this.fetchOpenKeys(false, true, this.state.DEFAULT_LIMIT, "");
+      }
+    })
   };
 
   componentDidMount(): void {
@@ -872,7 +881,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   itemRender = (_: any, type: string, originalElement: any) => {
     if (type === 'prev') {
-      return <div>{this.state.prevClickable ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<< '} &nbsp;&nbsp;{this.state.pageDisplayCount ? this.state.pageDisplayCount : null}
+      return <div>{this.state.prevClickable && this.state.pageDisplayCount ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<< '} &nbsp;&nbsp;{this.state.pageDisplayCount}
         </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
     }
     if (type === 'next') {
