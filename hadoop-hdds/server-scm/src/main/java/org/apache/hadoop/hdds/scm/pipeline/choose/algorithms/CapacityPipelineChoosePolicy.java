@@ -33,8 +33,19 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The capacity pipeline choose policy that chooses pipeline
- * with relatively more remaining datanode space.
+ * Pipeline choose policy that randomly choose pipeline with relatively
+ * lower utilization.
+ * <p>
+ * The Algorithm is as follows, Pick 2 random pipelines from a given pool of
+ * pipelines and then pick the pipeline which has lower utilization.
+ * This leads to a higher probability of pipelines with lower utilization
+ * to be picked.
+ * <p>
+ * For those wondering why we choose two pipelines randomly and choose the
+ * pipeline with lower utilization. There are links to this original papers in
+ * HDFS-11564.
+ * Also, the same algorithm applies to SCMContainerPlacementCapacity.
+ * <p>
  */
 public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
 
@@ -102,18 +113,15 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
       Deque<SCMNodeMetric> sortedNodes1 = policy.getSortedNodeFromPipeline(p1);
       Deque<SCMNodeMetric> sortedNodes2 = policy.getSortedNodeFromPipeline(p2);
 
-      if (sortedNodes1.isEmpty() || sortedNodes2.isEmpty()) {
-        LOG.warn("Cannot obtain SCMNodeMetric in pipeline {} or {}", p1, p2);
-        return 0;
-      }
+      // Compare the scmUsed weight of the node in the two sorted node stacks
       LOG.debug("Compare scmUsed weight in pipelines, first : {}, second : {}",
           sortedNodes1, sortedNodes2);
-      // Compare the scmUsed of the first node in the two sorted node stacks
-      int result = sortedNodes1.pop().compareTo(sortedNodes2.pop());
-
-      if (result == 0 && !sortedNodes1.isEmpty() && !sortedNodes2.isEmpty()) {
-        // Compare the scmUsed of the second node in the two sorted node stacks
-        LOG.debug("Secondary compare because the first round is the same");
+      int result = 0;
+      int count = 0;
+      while (result == 0 &&
+          !sortedNodes1.isEmpty() && !sortedNodes2.isEmpty()) {
+        count++;
+        LOG.debug("Compare {} round", count);
         result = sortedNodes1.pop().compareTo(sortedNodes2.pop());
       }
       return result;
