@@ -33,6 +33,8 @@ public interface StorageLocationReportMXBean {
 
   long getRemaining();
 
+  long getCommitted();
+
   String getStorageLocation();
 
   String getStorageTypeName();

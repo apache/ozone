@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -25,7 +27,7 @@ import java.util.function.Predicate;
  * Filter for selecting volumes with enough space for a new container.
  * Keeps track of ineligible volumes for logging/debug purposes.
  */
-class AvailableSpaceFilter implements Predicate<HddsVolume> {
+public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   private final long requiredSpace;
   private final Map<HddsVolume, AvailableSpace> fullVolumes =
@@ -42,10 +44,8 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
     long free = vol.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
-    long volumeFreeSpace =
-        VolumeUsage.getMinVolumeFreeSpace(vol.getConf(), volumeCapacity);
-    boolean hasEnoughSpace =
-        available > Math.max(requiredSpace, volumeFreeSpace);
+    boolean hasEnoughSpace = hasVolumeEnoughSpace(volumeCapacity, free,
+        committed, requiredSpace, vol.getConf());
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
@@ -68,6 +68,17 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
   public String toString() {
     return "required space: " + requiredSpace +
         ", volumes: " + fullVolumes;
+  }
+
+  public static boolean hasVolumeEnoughSpace(long volumeCapacity,
+                                             long volumeAvailableSpace,
+                                             long volumeCommittedBytesCount,
+                                             long requiredSpace,
+                                             ConfigurationSource conf) {
+    long volumeFreeSpace =
+        VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
+    return (volumeAvailableSpace - volumeCommittedBytesCount) >
+        Math.max(requiredSpace, volumeFreeSpace);
   }
 
   private static class AvailableSpace {
