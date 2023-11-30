@@ -48,15 +48,11 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.AfterClass;
-import org.junit.After;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.net.URI;
@@ -76,12 +72,17 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests to verify Object store with prefix enabled cases.
  */
+@Timeout(1200)
 public class TestObjectStoreWithFSO {
   private static final Path ROOT =
       new Path(OZONE_URI_DELIMITER);
@@ -95,16 +96,13 @@ public class TestObjectStoreWithFSO {
   private static FileSystem fs;
   private static OzoneClient client;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
-
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -132,7 +130,7 @@ public class TestObjectStoreWithFSO {
     fs = FileSystem.get(conf);
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     deleteRootDir();
   }
@@ -151,8 +149,7 @@ public class TestObjectStoreWithFSO {
     deleteRootRecursively(fileStatuses);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
-      Assert.assertEquals(
-          "Delete root failed!", 0, fileStatuses.length);
+      assertEquals(0, fileStatuses.length, "Delete root failed!");
     }
   }
 
@@ -171,9 +168,9 @@ public class TestObjectStoreWithFSO {
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertTrue(ozoneVolume.getName().equals(volumeName));
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertTrue(ozoneBucket.getName().equals(bucketName));
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
@@ -192,7 +189,7 @@ public class TestObjectStoreWithFSO {
     long clientID = keyOutputStream.getClientID();
 
     OmDirectoryInfo dirPathC = getDirInfo(parent);
-    Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
+    assertNotNull(dirPathC, "Failed to find dir path: a/b/c");
 
     // after file creation
     verifyKeyInOpenFileTable(openFileTable, clientID, file,
@@ -252,8 +249,7 @@ public class TestObjectStoreWithFSO {
 
     // Create a key.
     ozoneBucket.createKey(key, 10).close();
-    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
-        .isBucketEmpty(testVolumeName, testBucketName));
+    assertFalse(cluster.getOzoneManager().getMetadataManager().isBucketEmpty(testVolumeName, testBucketName));
 
     try {
       // Try to delete the bucket while a key is present under it.
@@ -265,7 +261,7 @@ public class TestObjectStoreWithFSO {
 
     // Delete the key (this only deletes the file)
     ozoneBucket.deleteKey(key);
-    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+    assertFalse(cluster.getOzoneManager().getMetadataManager()
         .isBucketEmpty(testVolumeName, testBucketName));
     try {
       // Try to delete the bucket while intermediate dirs are present under it.
@@ -278,7 +274,7 @@ public class TestObjectStoreWithFSO {
 
     // Delete last level of directories.
     ozoneBucket.deleteDirectory(parent, true);
-    Assert.assertFalse(cluster.getOzoneManager().getMetadataManager()
+    assertFalse(cluster.getOzoneManager().getMetadataManager()
         .isBucketEmpty(testVolumeName, testBucketName));
     try {
       // Try to delete the bucket while dirs are present under it.
@@ -291,7 +287,7 @@ public class TestObjectStoreWithFSO {
 
     // Delete all the intermediate directories
     ozoneBucket.deleteDirectory("a/", true);
-    Assert.assertTrue(cluster.getOzoneManager().getMetadataManager()
+    assertTrue(cluster.getOzoneManager().getMetadataManager()
         .isBucketEmpty(testVolumeName, testBucketName));
     ozoneVolume.deleteBucket(testBucketName);
     // Cleanup the Volume.
@@ -306,9 +302,9 @@ public class TestObjectStoreWithFSO {
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertTrue(ozoneVolume.getName().equals(volumeName));
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertTrue(ozoneBucket.getName().equals(bucketName));
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
@@ -324,7 +320,7 @@ public class TestObjectStoreWithFSO {
     long clientID = keyOutputStream.getClientID();
 
     OmDirectoryInfo dirPathC = getDirInfo(parent);
-    Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
+    assertNotNull(dirPathC, "Failed to find dir path: a/b/c");
 
     // after file creation
     verifyKeyInOpenFileTable(openFileTable, clientID, fileName,
@@ -346,7 +342,7 @@ public class TestObjectStoreWithFSO {
     ozoneOutputStream.close();
 
     OzoneKeyDetails keyDetails = ozoneBucket.getKey(key);
-    Assert.assertEquals(key, keyDetails.getName());
+    assertEquals(key, keyDetails.getName());
 
     Table<String, OmKeyInfo> fileTable =
         cluster.getOzoneManager().getMetadataManager()
@@ -400,9 +396,9 @@ public class TestObjectStoreWithFSO {
   public void testListKeysAtDifferentLevels() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertTrue(ozoneVolume.getName().equals(volumeName));
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertTrue(ozoneBucket.getName().equals(bucketName));
 
     String keyc1 = "/a/b1/c1/c1.tx";
     String keyc2 = "/a/b1/c2/c2.tx";
@@ -532,9 +528,9 @@ public class TestObjectStoreWithFSO {
   public void testListKeysWithNotNormalizedPath() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertTrue(ozoneVolume.getName().equals(volumeName));
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertTrue(ozoneBucket.getName().equals(bucketName));
 
     String key1 = "/dir1///dir2/file1/";
     String key2 = "/dir1///dir2/file2/";
@@ -595,7 +591,7 @@ public class TestObjectStoreWithFSO {
       outputKeys.add(ozoneKey.getName());
     }
 
-    Assert.assertEquals(keys, outputKeys);
+    assertEquals(keys, outputKeys);
   }
 
   private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
@@ -625,7 +621,7 @@ public class TestObjectStoreWithFSO {
     ozoneInputStream.close();
 
     String inputString = new String(input, StandardCharsets.UTF_8);
-    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
+    assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
@@ -637,7 +633,7 @@ public class TestObjectStoreWithFSO {
     fsDataInputStream.read(read, 0, length);
     fsDataInputStream.close();
 
-    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
+    assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
   @Test
@@ -655,7 +651,7 @@ public class TestObjectStoreWithFSO {
     String toKeyName = "";
     bucket.renameKey(fromKeyName, toKeyName);
     OzoneKey emptyKeyRename = bucket.getKey(fromKeyName);
-    Assert.assertEquals(fromKeyName, emptyKeyRename.getName());
+    assertEquals(fromKeyName, emptyKeyRename.getName());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
@@ -665,11 +661,11 @@ public class TestObjectStoreWithFSO {
       bucket.getKey(fromKeyName);
       fail("Lookup for old from key name should fail!");
     } catch (OMException ome) {
-      Assert.assertEquals(KEY_NOT_FOUND, ome.getResult());
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
     OzoneKey key = bucket.getKey(toKeyName);
-    Assert.assertEquals(toKeyName, key.getName());
+    assertEquals(toKeyName, key.getName());
   }
 
   @Test
@@ -691,8 +687,8 @@ public class TestObjectStoreWithFSO {
     bucket.renameKey(keyName2, newKeyName2);
 
     // new key should exist
-    Assert.assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
-    Assert.assertEquals(newKeyName2, bucket.getKey(newKeyName2).getName());
+    assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
+    assertEquals(newKeyName2, bucket.getKey(newKeyName2).getName());
 
     // old key should not exist
     assertKeyRenamedEx(bucket, keyName1);
@@ -715,7 +711,7 @@ public class TestObjectStoreWithFSO {
       bucket.renameKey(keyName1, keyName2);
       fail("Should throw exception as destin key already exists!");
     } catch (OMException e) {
-      Assert.assertEquals(KEY_ALREADY_EXISTS, e.getResult());
+      assertEquals(KEY_ALREADY_EXISTS, e.getResult());
     }
   }
 
@@ -732,8 +728,8 @@ public class TestObjectStoreWithFSO {
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volume.createBucket(sampleBucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 2: Bucket layout: OBJECT_STORE
@@ -741,8 +737,8 @@ public class TestObjectStoreWithFSO {
     builder.setBucketLayout(BucketLayout.OBJECT_STORE);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
     // Case 3: Bucket layout: Empty and
     // OM default bucket layout: FILE_SYSTEM_OPTIMIZED
@@ -750,8 +746,8 @@ public class TestObjectStoreWithFSO {
     sampleBucketName = UUID.randomUUID().toString();
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 4: Bucket layout: Empty
@@ -759,8 +755,8 @@ public class TestObjectStoreWithFSO {
     builder = BucketArgs.newBuilder();
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 5: Bucket layout: LEGACY
@@ -768,8 +764,8 @@ public class TestObjectStoreWithFSO {
     builder.setBucketLayout(BucketLayout.LEGACY);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
@@ -778,7 +774,7 @@ public class TestObjectStoreWithFSO {
       bucket.getKey(keyName);
       fail("Should throw KeyNotFound as the key got renamed!");
     } catch (OMException ome) {
-      Assert.assertEquals(KEY_NOT_FOUND, ome.getResult());
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
   }
 
@@ -790,7 +786,7 @@ public class TestObjectStoreWithFSO {
     out.write(keyValue.getBytes(StandardCharsets.UTF_8));
     out.close();
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
   }
 
   private OmDirectoryInfo getDirInfo(String parentKey) throws Exception {
@@ -822,15 +818,14 @@ public class TestObjectStoreWithFSO {
             parentID, fileName);
     OmKeyInfo omKeyInfo = fileTable.get(dbFileKey);
     if (isEmpty) {
-      Assert.assertNull("Table is not empty!", omKeyInfo);
+      assertNull(omKeyInfo, "Table is not empty!");
     } else {
-      Assert.assertNotNull("Table is empty!", omKeyInfo);
+      assertNotNull(omKeyInfo, "Table is empty!");
       // used startsWith because the key format is,
       // <parentID>/fileName/<clientID> and clientID is not visible.
-      Assert.assertEquals("Invalid Key: " + omKeyInfo.getObjectInfo(),
-              omKeyInfo.getKeyName(), fileName);
-      Assert.assertEquals("Invalid Key", parentID,
-              omKeyInfo.getParentObjectID());
+      assertEquals(omKeyInfo.getKeyName(), fileName,
+          "Invalid Key: " + omKeyInfo.getObjectInfo());
+      assertEquals(parentID, omKeyInfo.getParentObjectID(), "Invalid Key");
     }
   }
 
@@ -851,20 +846,19 @@ public class TestObjectStoreWithFSO {
           OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
           return omKeyInfo == null;
         } catch (IOException e) {
-          Assert.fail("DB failure!");
+          fail("DB failure!");
           return false;
         }
 
       }, 1000, 120000);
     } else {
       OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
-      Assert.assertNotNull("Table is empty!", omKeyInfo);
+      assertNotNull(omKeyInfo, "Table is empty!");
       // used startsWith because the key format is,
       // <parentID>/fileName/<clientID> and clientID is not visible.
-      Assert.assertEquals("Invalid Key: " + omKeyInfo.getObjectInfo(),
-              omKeyInfo.getKeyName(), fileName);
-      Assert.assertEquals("Invalid Key", parentID,
-              omKeyInfo.getParentObjectID());
+      assertEquals(omKeyInfo.getKeyName(), fileName,
+          "Invalid Key: " + omKeyInfo.getObjectInfo());
+      assertEquals(parentID, omKeyInfo.getParentObjectID(), "Invalid Key");
     }
   }
 
@@ -875,7 +869,7 @@ public class TestObjectStoreWithFSO {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
