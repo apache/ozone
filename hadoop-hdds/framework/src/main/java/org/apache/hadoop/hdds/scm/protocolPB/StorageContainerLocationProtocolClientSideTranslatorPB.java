@@ -576,8 +576,17 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setTraceID(TracingUtil.exportCurrentSpan())
         .setContainerID(containerID)
         .build();
-    submitRequest(Type.CloseContainer,
-        builder -> builder.setScmCloseContainerRequest(request));
+    StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto
+        response = submitRequest(Type.CloseContainer,
+          builder -> builder.setScmCloseContainerRequest(
+            request)).getScmCloseContainerResponse();
+    if (response.getErrorCode().equals(
+        StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.
+            Error.CONTAINER_ALREADY_CLOSED)) {
+      String errorMessage =
+          String.format("Container %s already closed", containerID);
+      throw new IOException(errorMessage);
+    }
   }
 
   /**

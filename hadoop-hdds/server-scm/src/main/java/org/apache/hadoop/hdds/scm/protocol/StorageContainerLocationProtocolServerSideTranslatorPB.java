@@ -867,7 +867,17 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public SCMCloseContainerResponseProto closeContainer(
       SCMCloseContainerRequestProto request)
       throws IOException {
-    impl.closeContainer(request.getContainerID());
+    try {
+      impl.closeContainer(request.getContainerID());
+    } catch (SCMException exception) {
+      if (exception.getResult()
+          .equals(SCMException.ResultCodes.CONTAINER_ALREADY_CLOSED)) {
+        return SCMCloseContainerResponseProto.newBuilder().setErrorCode(
+                SCMCloseContainerResponseProto.Error.CONTAINER_ALREADY_CLOSED)
+            .build();
+      }
+      throw exception;
+    }
     return SCMCloseContainerResponseProto.newBuilder().build();
   }
 
