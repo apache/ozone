@@ -116,20 +116,19 @@ public class TestGetCommittedBlockLengthAndPutKey {
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     client.sendCommand(putKeyRequest);
     GenericTestUtils.waitFor(() -> {
-      boolean success = true;
       try {
         response[0] = ContainerProtocolCalls
             .getCommittedBlockLength(client, blockID, null);
       } catch (IOException e) {
-        success = false;
-        LOG.error("Ignore the exception till wait: {}", e.getMessage());
+        LOG.debug("Ignore the exception till wait: {}", e.getMessage());
+        return false;
       }
-      return success;
-    }, 1000, 5000);
+      return true;
+    }, 500, 5000);
     // make sure the block ids in the request and response are same.
-    Assertions.assertTrue(
-        BlockID.getFromProtobuf(response[0].getBlockID()).equals(blockID));
-    Assertions.assertTrue(response[0].getBlockLength() == data.length);
+    Assertions.assertEquals(BlockID.getFromProtobuf(response[0].getBlockID()),
+        blockID);
+    Assertions.assertEquals(response[0].getBlockLength(), data.length);
     xceiverClientManager.releaseClient(client, false);
   }
 
