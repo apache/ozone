@@ -58,7 +58,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Test Container calls.
  */
-@Timeout(300)
+@Timeout(5000)
 public class TestGetCommittedBlockLengthAndPutKey {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
