@@ -126,9 +126,9 @@ public class TestGetCommittedBlockLengthAndPutKey {
       return true;
     }, 500, 5000);
     // make sure the block ids in the request and response are same.
-    Assertions.assertEquals(BlockID.getFromProtobuf(response[0].getBlockID()),
-        blockID);
-    Assertions.assertEquals(response[0].getBlockLength(), data.length);
+    Assertions.assertEquals(blockID,
+        BlockID.getFromProtobuf(response[0].getBlockID()));
+    Assertions.assertEquals(data.length, response[0].getBlockLength());
     xceiverClientManager.releaseClient(client, false);
   }
 
