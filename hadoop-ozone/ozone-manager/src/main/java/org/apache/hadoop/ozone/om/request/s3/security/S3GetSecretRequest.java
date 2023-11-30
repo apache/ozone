@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -132,7 +133,7 @@ public class S3GetSecretRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
 
     final GetS3SecretRequest getS3SecretRequest =
             getOmRequest().getGetS3SecretRequest();
@@ -161,6 +162,8 @@ public class S3GetSecretRequest extends OMClientRequest {
                 // Add new entry in this case
                 assignS3SecretValue =
                     new S3SecretValue(accessId, awsSecret.get());
+                // Set the transactionLogIndex to be used for updating.
+                assignS3SecretValue.setTransactionLogIndex(transactionLogIndex);
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId,
                     assignS3SecretValue);
@@ -207,11 +210,11 @@ public class S3GetSecretRequest extends OMClientRequest {
           });
 
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new S3GetSecretResponse(null,
           ozoneManager.getS3SecretManager(),
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

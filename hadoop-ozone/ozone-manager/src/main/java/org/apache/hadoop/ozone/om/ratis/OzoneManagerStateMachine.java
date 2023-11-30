@@ -42,6 +42,8 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -98,6 +100,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
+  private final String threadPrefix;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -118,17 +121,22 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
+    this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
 
-
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
+        .setNameFormat(threadPrefix +
+            "OMStateMachineApplyTransactionThread - %d").build();
     this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
-    this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
+
+    ThreadFactory installSnapshotThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
+    this.installSnapshotExecutor =
+        HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
   }
 
   /**
@@ -464,7 +472,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
-        .setIndexToTerm(this::getTermForIndex)
+        .setIndexToTerm(this::getTermForIndex).setThreadPrefix(threadPrefix)
+        .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
         .build();
@@ -569,8 +578,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private OMResponse runCommand(OMRequest request, long trxLogIndex) {
     try {
-      return handler.handleWriteRequest(request,
-          trxLogIndex).getOMResponse();
+      OMClientResponse omClientResponse =
+          handler.handleWriteRequest(request, trxLogIndex);
+      OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
+      OMResponse omResponse = omClientResponse.getOMResponse();
+      if (omLockDetails != null) {
+        return omResponse.toBuilder()
+            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
+      } else {
+        return omResponse;
+      }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e);
@@ -746,5 +763,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
+  }
+
+  @VisibleForTesting
+  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
+    return ozoneManagerDoubleBuffer;
   }
 }

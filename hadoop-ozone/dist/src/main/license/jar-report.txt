@@ -49,6 +49,7 @@ share/ozone/lib/grpc-netty.jar
 share/ozone/lib/grpc-protobuf.jar
 share/ozone/lib/grpc-protobuf-lite.jar
 share/ozone/lib/grpc-stub.jar
+share/ozone/lib/grpc-util.jar
 share/ozone/lib/gson.jar
 share/ozone/lib/guava-jre.jar
 share/ozone/lib/guice-assistedinject.jar
@@ -239,7 +240,8 @@ share/ozone/lib/ranger-plugins-cred.jar
 share/ozone/lib/ratis-client.jar
 share/ozone/lib/ratis-common.jar
 share/ozone/lib/ratis-grpc.jar
-share/ozone/lib/ratis-metrics.jar
+share/ozone/lib/ratis-metrics-api.jar
+share/ozone/lib/ratis-metrics-dropwizard3.jar
 share/ozone/lib/ratis-netty.jar
 share/ozone/lib/ratis-proto.jar
 share/ozone/lib/ratis-server-api.jar
@@ -272,3 +274,4 @@ share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zookeeper.jar
 share/ozone/lib/zookeeper-jute.jar
 share/ozone/lib/zstd-jni.jar
+share/ozone/lib/java-uuid-generator.jar

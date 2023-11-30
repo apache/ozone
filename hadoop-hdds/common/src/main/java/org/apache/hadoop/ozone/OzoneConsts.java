@@ -25,6 +25,7 @@ import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
@@ -101,6 +102,7 @@ public final class OzoneConsts {
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+  public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
 
 
   public static final String CONTAINER_EXTENSION = ".container";
@@ -486,9 +488,9 @@ public final class OzoneConsts {
 
   // %s to distinguish different certificates
   public static final String SCM_SUB_CA = "scm-sub";
-  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "-%s@";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "@";
   public static final String SCM_ROOT_CA = "scm";
-  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "-%s@";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "@";
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";

@@ -49,16 +49,3 @@ for bucket in encrypted link; do
   ## Exclude virtual-host.robot
   exclude="--exclude virtual-host --exclude no-bucket-type"
 done
-
-execute_robot_test s3g admincli
-
-execute_robot_test s3g omha/om-fetch-key.robot
-
-execute_robot_test s3g omha/om-roles.robot
-
-execute_robot_test s3g omha/om-leader-transfer.robot
-
-execute_robot_test s3g httpfs
-
-export SCM=scm2.org
-execute_robot_test s3g admincli

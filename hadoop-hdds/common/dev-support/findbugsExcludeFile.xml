@@ -23,6 +23,10 @@
     <Bug pattern="DM_EXIT" />
   </Match>
   <Match>
+    <Class name="org.apache.hadoop.ozone.OzoneConsts"/>
+    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.common.ChecksumByteBuffer$CrcIntTable" />
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />

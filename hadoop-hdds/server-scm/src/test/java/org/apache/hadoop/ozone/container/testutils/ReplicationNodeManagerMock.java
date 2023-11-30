@@ -534,4 +534,9 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
   }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
+  }
 }

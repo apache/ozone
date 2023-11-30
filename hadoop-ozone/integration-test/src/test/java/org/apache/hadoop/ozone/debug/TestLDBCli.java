@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.debug;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -41,6 +41,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -68,6 +69,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class TestLDBCli {
   private static final String KEY_TABLE = "keyTable";
   private static final String BLOCK_DATA = "block_data";
+  public static final String PIPELINES = "pipelines";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private OzoneConfiguration conf;
   private DBStore dbStore;
@@ -236,6 +238,28 @@ public class TestLDBCli {
     Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
   }
 
+  @Test
+  void testScanOfPipelinesWhenNoData() throws IOException {
+    // Prepare dummy table
+    prepareTable(PIPELINES, false);
+
+    // Prepare scan args
+    List<String> completeScanArgs = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", PIPELINES));
+
+    int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    // Check exit code. Print stderr if not expected
+    Assertions.assertEquals(0, exitCode, stderr.toString());
+
+    // Check stdout
+    Assertions.assertEquals("{  }\n", stdout.toString());
+
+    // Check stderr
+    Assertions.assertEquals("", stderr.toString());
+  }
+
   /**
    * Converts String input to a Map and compares to the given Map input.
    * @param expected expected result Map
@@ -315,16 +339,19 @@ public class TestLDBCli {
         }
       }
       break;
-
+    case PIPELINES:
+      // Empty table
+      dbStore = DBStoreBuilder.newBuilder(conf).setName("scm.db")
+          .setPath(tempDir.toPath()).addTable(PIPELINES).build();
+      break;
     default:
       throw new IllegalArgumentException("Unsupported table: " + tableName);
     }
   }
 
   private static Map<String, Object> toMap(Object obj) throws IOException {
-    // Have to use the same serializer (Gson) as DBScanner does.
-    // JsonUtils (ObjectMapper) parses object differently.
-    String json = new Gson().toJson(obj);
+    ObjectWriter objectWriter = DBScanner.JsonSerializationHelper.getWriter();
+    String json = objectWriter.writeValueAsString(obj);
     return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 

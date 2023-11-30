@@ -30,59 +30,62 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
-
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
-import java.time.Duration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -94,6 +97,8 @@ import static org.mockito.Mockito.verify;
  */
 @RunWith(Parameterized.class)
 public class TestHddsDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestHddsDispatcher.class);
 
   public static final IncrementalReportSender<Container>
       NO_OP_ICR_SENDER = c -> { };
@@ -123,12 +128,7 @@ public class TestHddsDispatcher {
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = new ContainerSet(1000);
-
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
@@ -195,12 +195,7 @@ public class TestHddsDispatcher {
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = new ContainerSet(1000);
-
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       // create a 50 byte container
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
@@ -325,16 +320,11 @@ public class TestHddsDispatcher {
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
       Assert.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
-      DispatcherContext dispatcherContext =
-          new DispatcherContext.Builder()
-              .setContainer2BCSIDMap(Collections.emptyMap())
-              .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-              .build();
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(HddsDispatcher.LOG);
       // send write chunk request without sending create container
-      response = hddsDispatcher.dispatch(writeChunkRequest, dispatcherContext);
+      response = hddsDispatcher.dispatch(writeChunkRequest, COMMIT_STAGE);
       // container should not be found
       Assert.assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
@@ -453,8 +443,13 @@ public class TestHddsDispatcher {
    * @return HddsDispatcher HddsDispatcher instance.
    * @throws IOException
    */
-  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
+    return createDispatcher(dd, scmId, conf, null);
+  }
+
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+      OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -466,11 +461,7 @@ public class TestHddsDispatcher {
         throw new RuntimeException(e);
       }
     });
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerType containerType : ContainerType.values()) {
@@ -480,8 +471,8 @@ public class TestHddsDispatcher {
               containerSet, volumeSet, metrics, NO_OP_ICR_SENDER));
     }
 
-    HddsDispatcher hddsDispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, context, metrics, null);
+    final HddsDispatcher hddsDispatcher = new HddsDispatcher(conf,
+        containerSet, volumeSet, handlers, context, metrics, tokenVerifier);
     hddsDispatcher.setClusterId(scmId.toString());
     return hddsDispatcher;
   }
@@ -560,4 +551,85 @@ public class TestHddsDispatcher {
         .build();
   }
 
+  @Test
+  public void testValidateToken() throws Exception {
+    final String testDir = GenericTestUtils.getRandomizedTempPath();
+    try {
+      final OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
+
+      final DatanodeDetails dd = randomDatanodeDetails();
+      final UUID scmId = UUID.randomUUID();
+      final AtomicBoolean verified = new AtomicBoolean();
+      final TokenVerifier tokenVerifier = new TokenVerifier() {
+        private void verify() {
+          final boolean previous = verified.getAndSet(true);
+          Assert.assertFalse(previous);
+        }
+
+        @Override
+        public void verify(ContainerCommandRequestProtoOrBuilder cmd,
+            String user, String encodedToken) {
+          verify();
+        }
+
+        @Override
+        public void verify(String user, Token<?> token,
+            ContainerCommandRequestProtoOrBuilder cmd) {
+          verify();
+        }
+      };
+
+      final ContainerCommandRequestProto request = getWriteChunkRequest(
+          dd.getUuidString(), 1L, 1L);
+      final HddsDispatcher dispatcher = createDispatcher(
+          dd, scmId, conf, tokenVerifier);
+
+      final DispatcherContext[] notVerify = {
+          newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA),
+          newContext(Op.READ_STATE_MACHINE_DATA),
+          newContext(Op.APPLY_TRANSACTION),
+          newContext(Op.STREAM_LINK, WriteChunkStage.COMMIT_DATA)
+      };
+      for (DispatcherContext context : notVerify) {
+        LOG.info("notVerify {}", context);
+        Assert.assertFalse(verified.get());
+        dispatcher.dispatch(request, context);
+        Assert.assertFalse(verified.get());
+      }
+
+      final Op[] verify = {
+          Op.NULL,
+          Op.HANDLE_GET_SMALL_FILE,
+          Op.HANDLE_PUT_SMALL_FILE,
+          Op.HANDLE_READ_CHUNK,
+          Op.HANDLE_WRITE_CHUNK,
+          Op.STREAM_INIT,
+      };
+
+      for (Op op : verify) {
+        final DispatcherContext context = newContext(op);
+        Assert.assertFalse(verified.get());
+        dispatcher.dispatch(request, context);
+        Assert.assertTrue(verified.getAndSet(false));
+      }
+    } finally {
+      ContainerMetrics.remove();
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+  static DispatcherContext newContext(Op op) {
+    return newContext(op, WriteChunkStage.COMBINED);
+  }
+
+  static DispatcherContext newContext(Op op, WriteChunkStage stage) {
+    return DispatcherContext.newBuilder(op)
+        .setTerm(1)
+        .setLogIndex(1)
+        .setStage(stage)
+        .setContainer2BCSIDMap(new HashMap<>())
+        .build();
+  }
 }

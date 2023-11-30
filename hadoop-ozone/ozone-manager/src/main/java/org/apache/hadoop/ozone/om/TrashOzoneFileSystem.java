@@ -308,6 +308,9 @@ public class TrashOzoneFileSystem extends FileSystem {
       Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry =
           bucketIterator.next();
       OmBucketInfo omBucketInfo = entry.getValue().getCacheValue();
+      if (omBucketInfo == null) {
+        continue;
+      }
       Path volumePath = new Path(OZONE_URI_DELIMITER,
           omBucketInfo.getVolumeName());
       Path bucketPath = new Path(volumePath, omBucketInfo.getBucketName());

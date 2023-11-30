@@ -265,6 +265,8 @@ public class OMException extends IOException {
     RENAME_OPEN_FILE,
     UNAUTHORIZED,
 
-    S3_SECRET_ALREADY_EXISTS
+    S3_SECRET_ALREADY_EXISTS,
+    
+    INVALID_PATH
   }
 }

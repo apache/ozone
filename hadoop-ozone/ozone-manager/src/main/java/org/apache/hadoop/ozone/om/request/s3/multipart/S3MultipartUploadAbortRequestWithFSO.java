@@ -28,8 +28,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import java.io.IOException;
-
 /**
  * Handles Abort of multipart upload request.
  */
@@ -42,7 +40,7 @@ public class S3MultipartUploadAbortRequestWithFSO
   }
 
   @Override
-  protected OMClientResponse getOmClientResponse(IOException exception,
+  protected OMClientResponse getOmClientResponse(Exception exception,
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponseWithFSO(createErrorOMResponse(

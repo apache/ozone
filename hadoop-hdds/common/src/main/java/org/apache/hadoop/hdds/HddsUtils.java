@@ -834,6 +834,13 @@ public final class HddsUtils {
     return sortedOzoneProps;
   }
 
+  @Nonnull
+  public static String threadNamePrefix(@Nullable String id) {
+    return id != null && !"".equals(id)
+        ? id + "-"
+        : "";
+  }
+
   /**
    * Execute some code and ensure thread name is not changed
    * (workaround for HADOOP-18433).

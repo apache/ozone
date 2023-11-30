@@ -115,31 +115,6 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       return;
     }
 
-    // Wait for the rotation preparation of this SCM to finish. The rotation
-    // preparation is running parallel in rotationManager's executor thread.
-    // If rotation preparation is not finished yet, then the later move
-    // new -> current operation will fail as the new directory may not exist
-    // yet.
-    long st = System.nanoTime();
-    long waitForNanos =
-        rotationManager.getSecurityConfig().getCaAckTimeout().toNanos();
-    String certId = newSubCACertId.get();
-    while (certId == null && (System.nanoTime() - st < waitForNanos)) {
-      try {
-        Thread.sleep(100);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Thread is interrupted");
-      }
-      certId = newSubCACertId.get();
-    }
-    if (certId == null) {
-      String message = "Failed to finish the rotation preparation in " +
-          rotationManager.getSecurityConfig().getCaAckTimeout();
-      LOG.error(message);
-      scm.shutDown(message);
-    }
-
     // switch sub CA key and certs directory on disk
     File currentSubCaDir = new File(secConfig.getLocation(
         scmCertClient.getComponentName()).toString());
@@ -173,6 +148,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
     }
 
     try {
+      String certId = newSubCACertId.get();
       LOG.info("Persistent new scm certificate {}", certId);
       scm.getScmStorageConfig().setScmCertSerialId(certId);
       scm.getScmStorageConfig().persistCurrentState();

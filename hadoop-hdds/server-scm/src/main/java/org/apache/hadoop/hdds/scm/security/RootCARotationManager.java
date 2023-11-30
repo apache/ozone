@@ -71,7 +71,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DIR_NAME_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.ROOT_CERTIFICATE_ID;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
@@ -82,6 +82,9 @@ public class RootCARotationManager extends StatefulService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
+
+  private static final String SERVICE_NAME =
+      RootCARotationManager.class.getSimpleName();
 
   private final StorageContainerManager scm;
   private final OzoneConfiguration ozoneConf;
@@ -99,7 +102,7 @@ public class RootCARotationManager extends StatefulService {
   private final AtomicReference<Long> processStartTime =
       new AtomicReference<>();
   private final AtomicBoolean isPostProcessing = new AtomicBoolean(false);
-  private final String threadName = this.getClass().getSimpleName();
+  private final String threadName;
   private final String newCAComponent = SCM_ROOT_CA_COMPONENT_NAME +
       HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
       HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
@@ -150,6 +153,7 @@ public class RootCARotationManager extends StatefulService {
         .atZone(ZoneId.systemDefault()).toInstant());
     rootCertPollInterval = secConf.getRootCaCertificatePollingInterval();
 
+    threadName = scm.threadNamePrefix() + SERVICE_NAME;
     executorService = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadName)
             .setDaemon(true).build());
@@ -225,10 +229,6 @@ public class RootCARotationManager extends StatefulService {
   @Override
   public String getServiceName() {
     return RootCARotationManager.class.getSimpleName();
-  }
-
-  public SecurityConfig getSecurityConfig() {
-    return secConf;
   }
 
   /**
@@ -390,7 +390,7 @@ public class RootCARotationManager extends StatefulService {
           BigInteger newId = BigInteger.ONE;
           try {
             newId = new BigInteger(String.valueOf(
-                sequenceIdGen.getNextId(ROOT_CERTIFICATE_ID)));
+                sequenceIdGen.getNextId(CERTIFICATE_ID)));
             newRootCAServer =
                 HASecurityUtils.initializeRootCertificateServer(secConf,
                     scm.getCertificateStore(), scmStorageConfig, newId,

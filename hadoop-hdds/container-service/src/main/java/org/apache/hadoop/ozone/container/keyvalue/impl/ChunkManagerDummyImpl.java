@@ -52,9 +52,7 @@ public class ChunkManagerDummyImpl implements ChunkManager {
 
     ContainerData containerData = container.getContainerData();
 
-    if (stage == DispatcherContext.WriteChunkStage.WRITE_DATA
-        || stage == DispatcherContext.WriteChunkStage.COMBINED) {
-
+    if (stage.isWrite()) {
       ChunkUtils.validateBufferSize(info.getLen(), data.remaining());
 
       HddsVolume volume = containerData.getVolume();
@@ -63,8 +61,7 @@ public class ChunkManagerDummyImpl implements ChunkManager {
       volumeIOStats.incWriteBytes(info.getLen());
     }
 
-    if (stage == DispatcherContext.WriteChunkStage.COMMIT_DATA
-        || stage == DispatcherContext.WriteChunkStage.COMBINED) {
+    if (stage.isCommit()) {
       containerData.updateWriteStats(info.getLen(), false);
     }
   }

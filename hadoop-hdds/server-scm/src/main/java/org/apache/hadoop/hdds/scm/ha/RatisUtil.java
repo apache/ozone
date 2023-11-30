@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_PREFIX;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
@@ -73,6 +74,10 @@ public final class RatisUtil {
     setRaftRetryCacheProperties(properties, conf);
     setRaftSnapshotProperties(properties, conf);
     setRaftLeadElectionProperties(properties, conf);
+
+    final String prefix = RaftServerConfigKeys.PREFIX + ".";
+    conf.getPropsMatchPrefixAndTrimPrefix(OZONE_SCM_HA_PREFIX + "." + prefix)
+        .forEach((k, v) -> properties.set(prefix + k, v));
     return properties;
   }
 

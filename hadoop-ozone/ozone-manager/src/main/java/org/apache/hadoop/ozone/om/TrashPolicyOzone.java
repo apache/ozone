@@ -28,6 +28,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -118,8 +119,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   @Override
   public Runnable getEmptier() throws IOException {
-    return new TrashPolicyOzone.Emptier((OzoneConfiguration)configuration,
-        emptierInterval);
+    return new TrashPolicyOzone.Emptier((OzoneConfiguration) configuration,
+        emptierInterval, om.getThreadNamePrefix());
   }
 
   @Override
@@ -265,7 +266,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
     private ThreadPoolExecutor executor;
 
-    Emptier(OzoneConfiguration conf, long emptierInterval) throws IOException {
+    Emptier(OzoneConfiguration conf, long emptierInterval,
+            String threadNamePrefix) throws IOException {
       this.conf = conf;
       this.emptierInterval = emptierInterval;
       if (emptierInterval > deletionInterval || emptierInterval <= 0) {
@@ -282,10 +284,17 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           + (deletionInterval / MSECS_PER_MINUTE)
           + " minutes, Emptier interval = "
           + (this.emptierInterval / MSECS_PER_MINUTE) + " minutes.");
-      executor = new ThreadPoolExecutor(trashEmptierCorePoolSize,
-          trashEmptierCorePoolSize, 1,
-          TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
-          new ThreadPoolExecutor.CallerRunsPolicy());
+      executor = new ThreadPoolExecutor(
+          trashEmptierCorePoolSize,
+          trashEmptierCorePoolSize,
+          1,
+          TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1024),
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix + "TrashEmptier-%d")
+              .build(),
+          new ThreadPoolExecutor.CallerRunsPolicy()
+      );
     }
 
     @Override

@@ -52,9 +52,9 @@ import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
@@ -71,9 +71,9 @@ import java.util.concurrent.CompletableFuture;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /**
@@ -85,7 +85,7 @@ public class TestReplicatedFileChecksumHelper {
   private OzoneVolume volume;
   private RpcClient rpcClient;
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     ConfigurationSource config = new InMemoryConfiguration();
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
@@ -116,7 +116,7 @@ public class TestReplicatedFileChecksumHelper {
     store = client.getObjectStore();
   }
 
-  @After
+  @AfterEach
   public void close() throws IOException {
     client.close();
   }

@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -52,6 +54,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -131,6 +135,16 @@ public class TestOzoneDebugShell {
   }
 
   @Test
+  public void testChunkInfoVerifyPathsAreDifferent() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+    writeKey(volumeName, bucketName, keyName);
+    int exitCode = runChunkInfoAndVerifyPaths(volumeName, bucketName, keyName);
+    Assertions.assertEquals(0, exitCode);
+  }
+
+  @Test
   public void testLdbCliForOzoneSnapshot() throws Exception {
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
@@ -182,13 +196,43 @@ public class TestOzoneDebugShell {
       String keyName) {
     String bucketPath =
         Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
-
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
 
     OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
     int exitCode = ozoneDebugShell.execute(args);
+    return exitCode;
+  }
+
+  private int runChunkInfoAndVerifyPaths(String volumeName, String bucketName,
+      String keyName) throws Exception {
+    String bucketPath =
+        Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String[] args = new String[] {
+        getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
+        "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
+    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
+    int exitCode = 1;
+    try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
+        .SystemOutCapturer()) {
+      exitCode = ozoneDebugShell.execute(args);
+      Set<String> blockFilePaths = new HashSet<>();
+      String output = capture.getOutput();
+      ObjectMapper objectMapper = new ObjectMapper();
+      // Parse the JSON array string into a JsonNode
+      JsonNode jsonNode = objectMapper.readTree(output);
+      JsonNode keyLocations = jsonNode.get("KeyLocations").get(0);
+      for (JsonNode element : keyLocations) {
+        String fileName =
+            element.get("Locations").get("files").get(0).toString();
+        blockFilePaths.add(fileName);
+      }
+      // DN storage directories are set differently for each DN
+      // in MiniOzoneCluster as datanode-0,datanode-1,datanode-2 which is why
+      // we expect 3 paths here in the set.
+      Assertions.assertEquals(3, blockFilePaths.size());
+    }
     return exitCode;
   }
 

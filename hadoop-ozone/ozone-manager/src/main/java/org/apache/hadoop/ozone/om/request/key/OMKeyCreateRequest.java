@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -147,7 +148,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId(),
+              ozoneManager.getOMServiceId(),
               ozoneManager.getMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
@@ -204,7 +205,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
     int numMissingParents = 0;
@@ -217,8 +218,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquireLock = ozoneLockStrategy.acquireWriteLock(omMetadataManager,
-          volumeName, bucketName, keyName);
+      mergeOmLockDetails(
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
+              bucketName, keyName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -331,7 +334,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumKeyAllocateFails();
@@ -342,8 +345,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName,
-            bucketName, keyName);
+        mergeOmLockDetails(ozoneLockStrategy
+            .releaseWriteLock(omMetadataManager, volumeName,
+                bucketName, keyName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -359,7 +366,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   }
 
   protected void logResult(CreateKeyRequest createKeyRequest,
-      OMMetrics omMetrics, IOException exception, Result result,
+      OMMetrics omMetrics, Exception exception, Result result,
        int numMissingParents) {
     switch (result) {
     case SUCCESS:

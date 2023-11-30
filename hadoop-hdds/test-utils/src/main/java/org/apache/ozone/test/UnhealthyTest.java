@@ -18,8 +18,12 @@
 package org.apache.ozone.test;
 
 /**
- * Interface to mark test classes or methods that are unhealthy which
+ * Interface to mark JUnit4 test classes or methods that are unhealthy, which
  * means either they are unstable or inconsistent to run.
+ * These are excluded from CI runs for each commit, but can be run manually or
+ * in scheduled runs.
+ *
+ * Usage: <code>@Category(UnhealthyTest.class) @Unhealthy("HDDS-123")</code>
  */
 public interface UnhealthyTest {
   // category marker

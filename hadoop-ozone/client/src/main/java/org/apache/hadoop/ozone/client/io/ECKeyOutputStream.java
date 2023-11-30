@@ -22,6 +22,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -62,7 +63,8 @@ import org.slf4j.LoggerFactory;
  * ECKeyOutputStream handles the EC writes by writing the data into underlying
  * block output streams chunk by chunk.
  */
-public final class ECKeyOutputStream extends KeyOutputStream {
+public final class ECKeyOutputStream extends KeyOutputStream
+    implements KeyMetadataAware {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private final BlockingQueue<ECChunkBuffers> ecStripeQueue;
@@ -75,6 +77,14 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private final ExecutorService flushExecutor;
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
+
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
 
   private enum StripeWriteStatus {
     SUCCESS,
@@ -153,6 +163,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     flushExecutor.submit(() -> s3CredentialsProvider.set(s3Auth));
     this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
     this.flushCheckpoint = new AtomicLong(0);
+    this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
 
   /**
@@ -510,6 +521,12 @@ public final class ECKeyOutputStream extends KeyOutputStream {
         Preconditions.checkArgument(writeOffset == offset,
             "Expected writeOffset= " + writeOffset
                 + " Expected offset=" + offset);
+        if (atomicKeyCreation) {
+          long expectedSize = blockOutputStreamEntryPool.getDataSize();
+          Preconditions.checkState(expectedSize == offset, String.format(
+              "Expected: %d and actual %d write sizes do not match",
+                  expectedSize, offset));
+        }
         blockOutputStreamEntryPool.commitKey(offset);
       }
     } catch (ExecutionException e) {
@@ -606,6 +623,11 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockOutputStreamEntryPool.getExcludeList();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockOutputStreamEntryPool.getMetadata();
   }
 
   /**

@@ -55,12 +55,12 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -76,6 +76,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.HddsUtils.isReadOnly;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -111,7 +112,6 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 /**
  * Test Container servers when security is enabled.
@@ -177,11 +177,7 @@ public class TestSecureContainerServer {
     conf.set(OZONE_METADATA_DIRS, TEST_DIR);
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerProtos.ContainerType containerType :
@@ -322,11 +318,11 @@ public class TestSecureContainerServer {
       ContainerCommandResponseProto response = client.sendCommand(request);
       assertNotEquals(response.getResult(), ContainerProtos.Result.SUCCESS);
       String msg = response.getMessage();
-      assertTrue(msg, msg.contains("token verification failed"));
+      assertTrue(msg, msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()));
     } else {
-      assertRootCauseMessage("token verification failed",
-          Assert.assertThrows(IOException.class, () ->
-              client.sendCommand(request)));
+      final Throwable t = Assert.assertThrows(Throwable.class,
+          () -> client.sendCommand(request));
+      assertRootCauseMessage(BLOCK_TOKEN_VERIFICATION_FAILED.name(), t);
     }
   }
 

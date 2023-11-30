@@ -124,7 +124,7 @@ public class TestSecureOzoneManager {
     // Case 1: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail when SCM is not running.
     SecurityConfig securityConfig = new SecurityConfig(conf);
-    CertificateClient client =
+    OMCertificateClient client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
@@ -135,11 +135,11 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getCertificate());
     client.close();
 
-    // Case 2: If key pair already exist than response should be RECOVER.
+    // Case 2: If key pair already exist than response should be GETCERT.
     client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
-    Assert.assertEquals(CertificateClient.InitResponse.RECOVER, client.init());
+    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
@@ -151,9 +151,9 @@ public class TestSecureOzoneManager {
             securityConfig, null, omStorage, omInfo, "", null, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
-    Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
+    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNull(client.getPublicKey());
+    Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
     client.close();
 
@@ -162,7 +162,6 @@ public class TestSecureOzoneManager {
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", null, null, null);
     KeyCodec keyCodec = new KeyCodec(securityConfig, COMPONENT);
-    keyCodec.writePublicKey(publicKey);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPrivateKeyFileName()).toFile());
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());

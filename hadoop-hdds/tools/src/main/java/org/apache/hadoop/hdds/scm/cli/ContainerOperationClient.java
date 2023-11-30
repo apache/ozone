@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
@@ -363,6 +364,25 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
+  public Map<DatanodeDetails, ReadContainerResponseProto>
+      readContainerFromAllNodes(long containerID, Pipeline pipeline)
+      throws IOException, InterruptedException {
+    XceiverClientManager clientManager = getXceiverClientManager();
+    String encodedToken = getEncodedContainerToken(containerID);
+    XceiverClientSpi client = null;
+    try {
+      client = clientManager.acquireClientForReadData(pipeline);
+      Map<DatanodeDetails, ReadContainerResponseProto> responses =
+          ContainerProtocolCalls.readContainerFromAllNodes(client, containerID,
+              encodedToken);
+      return responses;
+    } finally {
+      if (client != null) {
+        clientManager.releaseClient(client, false);
+      }
+    }
+  }
+
   @Override
   public ContainerDataProto readContainer(long containerID) throws IOException {
     ContainerWithPipeline info = getContainerWithPipeline(containerID);
@@ -499,8 +519,8 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
-    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+      String address, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(address,
         uuid, ClientVersion.CURRENT_VERSION);
   }
 

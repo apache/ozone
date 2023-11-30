@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -182,7 +183,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     String volumeKey = metadataManager.getVolumeKey(volumeName);
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false;
     boolean acquiredVolumeLock = false;
     OMClientResponse omClientResponse = null;
@@ -195,10 +196,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
             volumeName, bucketName, null);
       }
 
-      acquiredVolumeLock =
-          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock = metadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(
+          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+
+      mergeOmLockDetails(metadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs =
           metadataManager.getVolumeTable().getReadCopy(volumeKey);
@@ -245,7 +249,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
           omBucketInfo, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -253,11 +257,16 @@ public class OMBucketCreateRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+                bucketName));
       }
       if (acquiredVolumeLock) {
-        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

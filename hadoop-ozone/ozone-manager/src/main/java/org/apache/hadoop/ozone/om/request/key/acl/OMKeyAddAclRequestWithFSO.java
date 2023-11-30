@@ -99,7 +99,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   }
 
   @Override void onComplete(Result result, boolean operationResult,
-      IOException exception, long trxnLogIndex, AuditLogger auditLogger,
+      Exception exception, long trxnLogIndex, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:

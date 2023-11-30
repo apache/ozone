@@ -55,8 +55,9 @@ public final class OzoneConfigKeys {
    * When set to true, allocate a random free port for ozone container,
    * so that a mini cluster is able to launch multiple containers on a node.
    *
-   * When set to false (default), container port is fixed as specified by
-   * DFS_CONTAINER_IPC_PORT_DEFAULT.
+   * When set to false (default), the container port will be specified as
+   * {@link #DFS_CONTAINER_IPC_PORT} and the default value will be specified
+   * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
    */
   public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
       "dfs.container.ipc.random.port";
@@ -182,6 +183,10 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
   public static final String OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY
       = "ozone.grpc.metrics.percentiles.intervals";
+
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
+      "ozone.client.ec.grpc.write.timeout";
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
 
   /**
    * Ozone administrator users delimited by comma.
@@ -347,6 +352,10 @@ public final class OzoneConfigKeys {
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY
+      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY;
+  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT
+      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
   public static final String

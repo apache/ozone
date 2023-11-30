@@ -89,7 +89,7 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     super(SnapshotDiffCleanupService.class.getSimpleName(),
         interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DIFF_CLEANUP_CORE_POOL_SIZE,
-        serviceTimeout);
+        serviceTimeout, ozoneManager.getThreadNamePrefix());
     this.suspended = new AtomicBoolean(false);
     this.runCount = new AtomicLong(0);
     this.successRunCount = new AtomicLong(0);

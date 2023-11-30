@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -91,7 +92,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final KeyManager manager;
-  private final int keyLimitPerTask;
+  private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicBoolean suspended;
   private final Map<String, Long> exclusiveSizeMap;
@@ -108,6 +109,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.manager = manager;
     this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+    Preconditions.checkArgument(keyLimitPerTask >= 0,
+        OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     this.deletedKeyCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.exclusiveSizeMap = new HashMap<>();
@@ -156,6 +159,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     suspended.set(false);
   }
 
+  public int getKeyLimitPerTask() {
+    return keyLimitPerTask;
+  }
+
+  public void setKeyLimitPerTask(int keyLimitPerTask) {
+    this.keyLimitPerTask = keyLimitPerTask;
+  }
+
   /**
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
@@ -175,7 +186,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // Check if this is the Leader OM. If not leader, no need to execute this
       // task.
       if (shouldRun()) {
-        getRunCount().incrementAndGet();
+        final long run = getRunCount().incrementAndGet();
+        LOG.debug("Running KeyDeletingService {}", run);
 
         // Acquire active DB deletedTable write lock because of the
         // deletedTable read-write here to avoid interleaving with
@@ -192,7 +204,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  from if the above would be done inside getPendingDeletionKeys().
 
           PendingKeysDeletion pendingKeysDeletion = manager
-              .getPendingDeletionKeys(keyLimitPerTask);
+              .getPendingDeletionKeys(getKeyLimitPerTask());
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
               .getKeyBlocksList();
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {

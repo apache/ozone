@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -74,7 +74,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
                     ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
 
     long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
@@ -92,33 +92,35 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     OmKeyInfo omKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
-    Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
-    Assert.assertNotNull("Key Location is null!",
-        omKeyInfo.getLatestVersionLocations());
-    Assert.assertTrue("isMultipartKey is false!",
-        omKeyInfo.getLatestVersionLocations().isMultipartKey());
-    Assert.assertEquals("FileName mismatches!", fileName,
-            omKeyInfo.getKeyName());
-    Assert.assertEquals("ParentId mismatches!", parentID,
-            omKeyInfo.getParentObjectID());
+    Assertions.assertNotNull(omKeyInfo, "Failed to find the fileInfo");
+    Assertions.assertNotNull(omKeyInfo.getLatestVersionLocations(),
+        "Key Location is null!");
+    Assertions.assertTrue(
+        omKeyInfo.getLatestVersionLocations().isMultipartKey(),
+        "isMultipartKey is false!");
+    Assertions.assertEquals(fileName, omKeyInfo.getKeyName(),
+        "FileName mismatches!");
+    Assertions.assertEquals(parentID, omKeyInfo.getParentObjectID(),
+        "ParentId mismatches!");
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartFileKey);
-    Assert.assertNotNull("Failed to find the multipartFileInfo",
-            omMultipartKeyInfo);
-    Assert.assertEquals("ParentId mismatches!", parentID,
-            omMultipartKeyInfo.getParentID());
+    Assertions.assertNotNull(omMultipartKeyInfo,
+        "Failed to find the multipartFileInfo");
+    Assertions.assertEquals(parentID,
+            omMultipartKeyInfo.getParentID(),
+        "ParentId mismatches!");
 
-    Assert.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID(),
         omMultipartKeyInfo
             .getUploadID());
 
-    Assert.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getModificationTime(),
         omKeyInfo
         .getModificationTime());
-    Assert.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getModificationTime(),
         omKeyInfo
             .getCreationTime());
@@ -131,16 +133,17 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     long parentID = bucketId;
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, dirName);
       OmDirectoryInfo omDirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
-      Assert.assertNotNull("Invalid directory!", omDirInfo);
-      Assert.assertEquals("Invalid directory!", dirName, omDirInfo.getName());
-      Assert.assertEquals("Invalid dir path!",
-              parentID + "/" + dirName, omDirInfo.getPath());
+      Assertions.assertNotNull(omDirInfo, "Invalid directory!");
+      Assertions.assertEquals(dirName, omDirInfo.getName(),
+          "Invalid directory!");
+      Assertions.assertEquals(parentID + "/" + dirName, omDirInfo.getPath(),
+          "Invalid dir path!");
       parentID = omDirInfo.getObjectID();
     }
     return parentID;
@@ -182,7 +185,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
         .get(bucketKey).getAcls();
-    Assert.assertEquals(acls, bucketAcls);
+    Assertions.assertEquals(acls, bucketAcls);
 
     // create dir with acls inherited from parent DEFAULT acls
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
@@ -209,7 +212,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     verifyKeyInheritAcls(dirs, omKeyInfo, volumeId, bucketId, bucketAcls);
@@ -230,7 +233,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
-      String dbKey = "";
+      String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           parentID, dirName);
@@ -239,8 +242,8 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
 
       System.out.println("  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
-      Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
-          expectedInheritAcls, omDirAcls);
+      Assertions.assertEquals(expectedInheritAcls, omDirAcls,
+          "Failed to inherit parent DEFAULT acls!");
 
       parentID = omDirInfo.getObjectID();
       expectedInheritAcls = omDirAcls;
@@ -249,14 +252,14 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
       if (indx == dirs.size() - 1) {
         // verify file acls
-        Assert.assertEquals(fileInfo.getParentObjectID(),
+        Assertions.assertEquals(fileInfo.getParentObjectID(),
             omDirInfo.getObjectID());
         List<OzoneAcl> fileAcls = fileInfo.getAcls();
         System.out.println("  file acls : " + fileInfo + " ==> " + fileAcls);
-        Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
-            expectedInheritAcls.stream()
+        Assertions.assertEquals(expectedInheritAcls.stream()
                 .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
-                .collect(Collectors.toList()), fileAcls);
+                .collect(Collectors.toList()), fileAcls,
+            "Failed to inherit parent DEFAULT acls!");
       }
     }
   }

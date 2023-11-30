@@ -78,6 +78,7 @@ public class RDBStore implements DBStore {
   // number in request to avoid increase in heap memory.
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
+  private final String threadNamePrefix;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
@@ -86,9 +87,10 @@ public class RDBStore implements DBStore {
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
-                  ConfigurationSource configuration)
+                  ConfigurationSource configuration, String threadNamePrefix)
 
       throws IOException {
+    this.threadNamePrefix = threadNamePrefix;
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
@@ -287,7 +289,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <K, V> Table<K, V> getTable(String name,
+  public <K, V> TypedTable<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType);
@@ -298,7 +300,7 @@ public class RDBStore implements DBStore {
       Class<K> keyType, Class<V> valueType,
       TableCache.CacheType cacheType) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType, cacheType);
+        valueType, cacheType, threadNamePrefix);
   }
 
   @Override

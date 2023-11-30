@@ -46,9 +46,12 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
@@ -73,9 +76,11 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -86,6 +91,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -100,6 +106,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -107,6 +114,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -185,7 +193,7 @@ public class TestOzoneFileSystem {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    if (!bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+    if (!bucketLayout.equals(FILE_SYSTEM_OPTIMIZED)) {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
     }
@@ -378,6 +386,8 @@ public class TestOzoneFileSystem {
 
   @Test
   public void testCreateWithInvalidPaths() throws Exception {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     // Test for path with ..
     Path parent = new Path("../../../../../d1/d2/");
     Path file1 = new Path(parent, "key1");
@@ -401,6 +411,8 @@ public class TestOzoneFileSystem {
 
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     assertEquals(
         FileSystem.getFileSystemClass(OzoneConsts.OZONE_URI_SCHEME, null),
         OzoneFileSystem.class);
@@ -619,6 +631,8 @@ public class TestOzoneFileSystem {
 
   @Test
   public void testListStatusWithIntermediateDir() throws Exception {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     String keyName = "object-dir/object-name";
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -720,6 +734,8 @@ public class TestOzoneFileSystem {
    */
   @Test
   public void testListStatusOnLargeDirectory() throws Exception {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
@@ -952,65 +968,10 @@ public class TestOzoneFileSystem {
     }
   }
 
-  /**
-   * Tests listStatusIterator operation on root directory with different
-   * numbers of numDir.
-   */
   @Test
   public void testListStatusIteratorOnPageSize() throws Exception {
-    int[] pageSize = {
-        1, LISTING_PAGE_SIZE, LISTING_PAGE_SIZE + 1,
-        LISTING_PAGE_SIZE - 1, LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2,
-        LISTING_PAGE_SIZE + LISTING_PAGE_SIZE
-    };
-    for (int numDir : pageSize) {
-      int range = numDir / LISTING_PAGE_SIZE;
-      switch (range) {
-      case 0:
-        listStatusIterator(numDir);
-        break;
-      case 1:
-        listStatusIterator(numDir);
-        break;
-      case 2:
-        listStatusIterator(numDir);
-        break;
-      default:
-        listStatusIterator(numDir);
-      }
-    }
-  }
-
-  private void listStatusIterator(int numDirs) throws IOException {
-    Path root = new Path("/" + volumeName + "/" + bucketName);
-    Set<String> paths = new TreeSet<>();
-    try {
-      for (int i = 0; i < numDirs; i++) {
-        Path p = new Path(root, String.valueOf(i));
-        fs.mkdirs(p);
-        paths.add(p.getName());
-      }
-
-      RemoteIterator<FileStatus> iterator = o3fs.listStatusIterator(root);
-      int iCount = 0;
-      if (iterator != null) {
-        while (iterator.hasNext()) {
-          FileStatus fileStatus = iterator.next();
-          iCount++;
-          Assert.assertTrue(paths.contains(fileStatus.getPath().getName()));
-        }
-      }
-      Assert.assertEquals(
-          "Total directories listed do not match the existing directories",
-          numDirs, iCount);
-
-    } finally {
-      // Cleanup
-      for (int i = 0; i < numDirs; i++) {
-        Path p = new Path(root, String.valueOf(i));
-        fs.delete(p, true);
-      }
-    }
+    OzoneFileSystemTests.listStatusIteratorOnPageSize(cluster.getConf(),
+        "/" + volumeName + "/" + bucketName);
   }
 
   /**
@@ -1469,6 +1430,8 @@ public class TestOzoneFileSystem {
   @Test
   public void testGetDirectoryModificationTime()
       throws IOException, InterruptedException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     Path mdir1 = new Path("/mdir1");
     Path mdir11 = new Path(mdir1, "mdir11");
     Path mdir111 = new Path(mdir11, "mdir111");
@@ -1769,5 +1732,104 @@ public class TestOzoneFileSystem {
     fileStatus = fs.getFileStatus(path);
     // verify that mtime is NOT updated as expected.
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  @Test
+  public void testLoopInLinkBuckets() throws Exception {
+    String linksVolume = UUID.randomUUID().toString();
+
+    ObjectStore store = client.getObjectStore();
+
+    // Create volume
+    store.createVolume(linksVolume);
+    OzoneVolume volume = store.getVolume(linksVolume);
+
+    String linkBucket1Name = UUID.randomUUID().toString();
+    String linkBucket2Name = UUID.randomUUID().toString();
+    String linkBucket3Name = UUID.randomUUID().toString();
+
+    // case-1: Create a loop in the link buckets
+    createLinkBucket(volume, linkBucket1Name, linkBucket2Name);
+    createLinkBucket(volume, linkBucket2Name, linkBucket3Name);
+    createLinkBucket(volume, linkBucket3Name, linkBucket1Name);
+
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, linkBucket1Name, linksVolume);
+
+    try {
+      FileSystem.get(URI.create(rootPath), cluster.getConf());
+      Assert.fail("Should throw Exception due to loop in Link Buckets");
+    } catch (OMException oe) {
+      // Expected exception
+      Assert.assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+          oe.getResult());
+    } finally {
+      volume.deleteBucket(linkBucket1Name);
+      volume.deleteBucket(linkBucket2Name);
+      volume.deleteBucket(linkBucket3Name);
+    }
+
+    // case-2: Dangling link bucket
+    String danglingLinkBucketName = UUID.randomUUID().toString();
+    String sourceBucketName = UUID.randomUUID().toString();
+
+    // danglingLinkBucket is a dangling link over a source bucket that doesn't
+    // exist.
+    createLinkBucket(volume, sourceBucketName, danglingLinkBucketName);
+
+    String rootPath2 = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, danglingLinkBucketName, linksVolume);
+
+    try {
+      FileSystem.get(URI.create(rootPath2), cluster.getConf());
+    } catch (OMException oe) {
+      // Expected exception
+      Assert.fail("Should not throw Exception and show orphan buckets");
+    } finally {
+      volume.deleteBucket(danglingLinkBucketName);
+    }
+  }
+
+  /**
+   * Helper method to create Link Buckets.
+   *
+   * @param sourceVolume Name of source volume for Link Bucket.
+   * @param sourceBucket Name of source bucket for Link Bucket.
+   * @param linkBucket   Name of Link Bucket
+   * @throws IOException
+   */
+  private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
+                                String linkBucket) throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setBucketLayout(BucketLayout.DEFAULT)
+        .setSourceVolume(sourceVolume.getName())
+        .setSourceBucket(sourceBucket);
+    sourceVolume.createBucket(linkBucket, builder.build());
+  }
+
+  @Test
+  public void testProcessingDetails() throws IOException, InterruptedException {
+    final Logger log = LoggerFactory.getLogger(
+        "org.apache.hadoop.ipc.ProcessingDetails");
+    GenericTestUtils.setLogLevel(log, Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(log);
+    int keySize = 1024;
+    TestDataUtil.createKey(ozoneBucket, "key1", new String(new byte[keySize],
+        UTF_8));
+    logCapturer.stopCapturing();
+    String logContent = logCapturer.getOutput();
+
+    int nonZeroLines = 0;
+    for (String s: logContent.split("\n")) {
+      // The following conditions means write operations from Clients.
+      if (!s.contains("lockexclusiveTime=0") &&
+          s.contains("OzoneManagerProtocol")) {
+        nonZeroLines++;
+      }
+    }
+
+    GenericTestUtils.setLogLevel(log, Level.INFO);
+    Assert.assertNotEquals(nonZeroLines, 0);
   }
 }
