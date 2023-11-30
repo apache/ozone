@@ -52,13 +52,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test Container calls.
  */
-@Timeout(5000)
+@Timeout(300)
 public class TestGetCommittedBlockLengthAndPutKey {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
@@ -91,8 +92,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
   @Test
   public void tesGetCommittedBlockLength() throws Exception {
-    final ContainerProtos.GetCommittedBlockLengthResponseProto[] response =
-        new ContainerProtos.GetCommittedBlockLengthResponseProto[1];
+    final AtomicReference<ContainerProtos.GetCommittedBlockLengthResponseProto>
+        response = new AtomicReference<>();
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(SCMTestUtils.getReplicationType(ozoneConfig),
             HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
@@ -117,8 +118,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
     client.sendCommand(putKeyRequest);
     GenericTestUtils.waitFor(() -> {
       try {
-        response[0] = ContainerProtocolCalls
-            .getCommittedBlockLength(client, blockID, null);
+        response.set(ContainerProtocolCalls
+            .getCommittedBlockLength(client, blockID, null));
       } catch (IOException e) {
         LOG.debug("Ignore the exception till wait: {}", e.getMessage());
         return false;
@@ -127,8 +128,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
     }, 500, 5000);
     // make sure the block ids in the request and response are same.
     Assertions.assertEquals(blockID,
-        BlockID.getFromProtobuf(response[0].getBlockID()));
-    Assertions.assertEquals(data.length, response[0].getBlockLength());
+        BlockID.getFromProtobuf(response.get().getBlockID()));
+    Assertions.assertEquals(data.length, response.get().getBlockLength());
     xceiverClientManager.releaseClient(client, false);
   }
 
