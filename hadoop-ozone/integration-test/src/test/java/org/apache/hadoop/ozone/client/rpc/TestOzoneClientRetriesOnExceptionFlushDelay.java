@@ -106,8 +106,8 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
+        .setNumDatanodes(5)
+        .setTotalPipelineNumLimit(3)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
