@@ -41,6 +41,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
  * replicas, then it's called over replicated and 1 UNHEALTHY replica must be
  * deleted. On the other hand, if it has only 2 UNHEALTHY replicas, it's
  * under replicated and 1 more replica should be created.
+ * </p>
  */
 public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
   public static final Logger LOG = LoggerFactory.getLogger(
