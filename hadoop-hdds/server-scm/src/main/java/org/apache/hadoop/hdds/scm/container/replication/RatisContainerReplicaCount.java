@@ -559,15 +559,13 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * A container is safely over replicated if:
    * 1. It is over replicated.
    * 2. Has at least replication factor number of matching replicas.
-   * 3. # matching replicas - replication factor >= pending deletes.
    */
   public boolean isSafelyOverReplicated() {
     if (!isOverReplicated(true)) {
       return false;
     }
 
-    return getMatchingReplicaCount() >= repFactor &&
-        getMatchingReplicaCount() - repFactor >= inFlightDel;
+    return getMatchingReplicaCount() >= repFactor;
   }
 
   /**
