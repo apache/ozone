@@ -313,7 +313,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
       }
     }
-
     return responseProtoHashMap;
   }
 
