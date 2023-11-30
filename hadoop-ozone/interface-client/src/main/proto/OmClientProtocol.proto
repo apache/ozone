@@ -1600,7 +1600,7 @@ message MultipartUploadCompleteResponse {
 message Part {
     required uint32 partNumber = 1;
     optional string partName = 2;
-    required string eTag = 3;
+    optional string eTag = 3;
 }
 
 message MultipartUploadAbortRequest {
@@ -1673,7 +1673,7 @@ message PartInfo {
     required string partName = 2;
     required uint64 modificationTime = 3;
     required uint64 size = 4;
-    required string eTag = 5;
+    optional string eTag = 5;
 }
 
 /**
