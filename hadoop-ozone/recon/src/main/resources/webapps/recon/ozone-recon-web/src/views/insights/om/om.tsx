@@ -305,7 +305,8 @@ interface IOmdbInsightsState {
   nextClickable: boolean;
   includeFso: boolean;
   includeNonFso: boolean;
-  prevClickable: boolean
+  prevClickable: boolean;
+  pageDisplayCount: number;
 }
 
 let cancelMismatchedEndpointSignal: AbortController;
@@ -337,7 +338,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       nextClickable: true,
       includeFso: true,
       includeNonFso: false,
-      prevClickable: false
+      prevClickable: false,
+      pageDisplayCount: 0
     };
   }
 
@@ -798,6 +800,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       includeFso: true,
       includeNonFso: false,
       DEFAULT_LIMIT: 10,
+      pageDisplayCount: 0
 
     }, () => {
       if (activeKey === '2') {
@@ -818,26 +821,30 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     // to fetch previous call stored all prevkey in array and fetching in respective tabs
     if (this.state.activeTab === '2') {
         this.setState({
-          prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-2]
+          prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen) - 2],
+          pageDisplayCount : this.state.pageDisplayCount - 1
         }, () => {
           this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT,this.state.prevKeyOpen);
         })
     } else if (this.state.activeTab === '3') {
       this.setState({
-        prevKeyDeletePending: keysPendingPrevList[keysPendingPrevList.indexOf(this.state.prevKeyDeletePending)-2]
+        prevKeyDeletePending: keysPendingPrevList[keysPendingPrevList.indexOf(this.state.prevKeyDeletePending) - 2],
+        pageDisplayCount : this.state.pageDisplayCount- 1
       }, () => {
         this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
       })
     } else if (this.state.activeTab === '4') {
       this.setState({
-        prevKeyDeleted: deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted)-2]
+        prevKeyDeleted: deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted) - 2],
+        pageDisplayCount : this.state.pageDisplayCount- 1
       }, () => {
         this.fetchDeletedKeys(this.state.DEFAULT_LIMIT,this.state.prevKeyDeleted);
       })
     }
       else {
         this.setState({
-          prevKeyMismatch: mismatchPrevKeyList[mismatchPrevKeyList.indexOf(this.state.prevKeyMismatch)-2]
+          prevKeyMismatch: mismatchPrevKeyList[mismatchPrevKeyList.indexOf(this.state.prevKeyMismatch) - 2],
+          pageDisplayCount : this.state.pageDisplayCount- 1
         }, () => {
           this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
         })
@@ -846,6 +853,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   fetchNextRecords = () => {
     // To Call API for Page Level for each page fetch next records
+    // First Increment Count and then call respective API
+    this.setState({
+      pageDisplayCount : this.state.pageDisplayCount + 1
+    }, () => {
     if (this.state.activeTab === '2') {
       this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
     } else if (this.state.activeTab === '3') {
@@ -856,14 +867,16 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     else {
       this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
     }
+  })
   };
 
   itemRender = (_: any, type: string, originalElement: any) => {
     if (type === 'prev') {
-      return <div>{this.state.prevClickable ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<<  '}</Link>: <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
+      return <div>{this.state.prevClickable ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<< '} &nbsp;&nbsp;{this.state.pageDisplayCount ? this.state.pageDisplayCount : null}
+        </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
     }
     if (type === 'next') {
-      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {'  >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
+      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {'   >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
     }
     return originalElement;
   };
