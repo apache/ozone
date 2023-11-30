@@ -22,8 +22,11 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests the S3Utils APIs.
@@ -43,7 +46,7 @@ public class TestS3Utils {
         .resolveS3ClientSideReplicationConfig(S3StorageType.STANDARD.name(),
             null, ecReplicationConfig);
     // Bucket default is EC.
-    Assert.assertEquals(ecReplicationConfig, replicationConfig);
+    assertEquals(ecReplicationConfig, replicationConfig);
   }
 
   /**
@@ -56,7 +59,7 @@ public class TestS3Utils {
         .resolveS3ClientSideReplicationConfig(S3StorageType.STANDARD.name(),
             null, null);
     // Passed replication is 3 - Ozone mapped replication is ratis THREE
-    Assert.assertEquals(ratis3ReplicationConfig, replicationConfig);
+    assertEquals(ratis3ReplicationConfig, replicationConfig);
   }
 
   /**
@@ -70,7 +73,7 @@ public class TestS3Utils {
         S3Utils.resolveS3ClientSideReplicationConfig("", null, null);
     // client configured value also null.
     // This API caller should leave the decision to server.
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -84,7 +87,7 @@ public class TestS3Utils {
         .resolveS3ClientSideReplicationConfig(null, null,
             ratis3ReplicationConfig);
     // Configured client config also null.
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -99,7 +102,7 @@ public class TestS3Utils {
             S3StorageType.REDUCED_REDUNDANCY.name(), null,
             ratis3ReplicationConfig);
     // Passed value is replication one - Ozone mapped value is ratis ONE
-    Assert.assertEquals(ratis1ReplicationConfig, replicationConfig);
+    assertEquals(ratis1ReplicationConfig, replicationConfig);
   }
 
   /**
@@ -113,7 +116,7 @@ public class TestS3Utils {
         .resolveS3ClientSideReplicationConfig(S3StorageType.STANDARD.name(),
             ratis3ReplicationConfig, ecReplicationConfig);
     // Bucket default is EC
-    Assert.assertEquals(ecReplicationConfig, replicationConfig);
+    assertEquals(ecReplicationConfig, replicationConfig);
   }
 
   /**
@@ -127,17 +130,18 @@ public class TestS3Utils {
         .resolveS3ClientSideReplicationConfig(null, ratis3ReplicationConfig,
             ratis1ReplicationConfig);
     // Configured value is ratis THREE
-    Assert.assertEquals(ratis3ReplicationConfig, replicationConfig);
+    assertEquals(ratis3ReplicationConfig, replicationConfig);
   }
 
   /**
    * When bucket default is non-EC and client side passed value also not valid
    * but configured value is valid, we would just return configured value.
    */
-  @Test(expected = OS3Exception.class)
+  @Test
   public void testResolveRepConfWhenUserPassedIsInvalid() throws OS3Exception {
-    S3Utils.resolveS3ClientSideReplicationConfig("INVALID",
-        ratis3ReplicationConfig, ratis1ReplicationConfig);
+    assertThrows(OS3Exception.class, () -> S3Utils.
+        resolveS3ClientSideReplicationConfig(
+            "INVALID", ratis3ReplicationConfig, ratis1ReplicationConfig));
   }
 
 }

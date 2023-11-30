@@ -26,8 +26,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -69,9 +69,9 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       String toKey = parentDir.concat("/newKey" + i);
       key = omMetadataManager.getOzoneKey(volumeName, bucketName, key);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKey);
-      Assert.assertFalse(
+      Assertions.assertFalse(
           omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertTrue(
+      Assertions.assertTrue(
           omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
   }
@@ -101,9 +101,9 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       key = omMetadataManager.getOzoneKey(volumeName, bucketName, key);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKey);
       // As omResponse has error, it is a no-op. So, no changes should happen.
-      Assert.assertTrue(
+      Assertions.assertTrue(
           omMetadataManager.getKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertFalse(
+      Assertions.assertFalse(
           omMetadataManager.getKeyTable(getBucketLayout()).isExist(toKey));
     }
 

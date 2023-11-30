@@ -695,6 +695,21 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  default SnapshotInfo getSnapshotInfo(String volumeName,
+                                       String bucketName,
+                                       String snapshotName) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Create an image of the current compaction log DAG in the OM.
    * @param fileNamePrefix  file name prefix of the image file.
    * @param graphType       type of node name to use in the graph image.

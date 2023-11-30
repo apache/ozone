@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -48,11 +49,10 @@ import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -89,8 +89,8 @@ import static org.mockito.Mockito.when;
  */
 @SuppressWarnings("visibilitymodifier")
 public class TestOMKeyRequest {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   protected OzoneManager ozoneManager;
   protected KeyManager keyManager;
@@ -126,15 +126,15 @@ public class TestOMKeyRequest {
       });
 
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ozoneManager = Mockito.mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
@@ -261,13 +261,13 @@ public class TestOMKeyRequest {
    */
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
                                                boolean doAssert)
-          throws Exception {
+      throws Exception {
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-            key, id);
+        key, id);
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (doAssert) {
-      Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
+      Assertions.assertNotNull(omKeyInfo, "Failed to find key in OpenKeyTable");
     }
     return omKeyInfo;
   }
@@ -276,7 +276,7 @@ public class TestOMKeyRequest {
     return BucketLayout.DEFAULT;
   }
 
-  @After
+  @AfterEach
   public void stop() {
     omMetrics.unRegister();
     Mockito.framework().clearInlineMocks();

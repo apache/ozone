@@ -817,14 +817,11 @@ public class TestKeyManagerImpl {
 
     OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyName(), keyName);
-    List<OmKeyLocationInfo> keyLocations =
-        key.getLatestVersionLocations().getLocationList();
-    DatanodeDetails leader =
-        keyLocations.get(0).getPipeline().getFirstNode();
-    DatanodeDetails follower1 =
-        keyLocations.get(0).getPipeline().getNodes().get(1);
-    DatanodeDetails follower2 =
-        keyLocations.get(0).getPipeline().getNodes().get(2);
+    Pipeline keyPipeline =
+        key.getLatestVersionLocations().getLocationList().get(0).getPipeline();
+    DatanodeDetails leader = keyPipeline.getFirstNode();
+    DatanodeDetails follower1 = keyPipeline.getNodes().get(1);
+    DatanodeDetails follower2 = keyPipeline.getNodes().get(2);
     assertNotEquals(leader, follower1);
     assertNotEquals(follower1, follower2);
 
@@ -849,8 +846,9 @@ public class TestKeyManagerImpl {
     // lookup key, random node as client
     OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertEquals(leader, key4.getLatestVersionLocations()
-        .getLocationList().get(0).getPipeline().getClosestNode());
+    assertTrue(
+        keyPipeline.getNodes().containsAll(key4.getLatestVersionLocations()
+            .getLocationList().get(0).getPipeline().getNodesInOrder()));
   }
 
   @NotNull

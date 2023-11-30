@@ -52,18 +52,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.reflections.Reflections;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,14 +72,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 
 /**
  * The test checks whether all {@link OMClientResponse} have defined the
@@ -87,7 +88,7 @@ import static org.mockito.Mockito.when;
  * For certain requests it check whether it is properly defined not just the
  * fact that it is defined.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class TestCleanupTableInfo {
   private static final String TEST_VOLUME_NAME = "testVol";
   private static final String TEST_BUCKET_NAME = "testBucket";
@@ -97,8 +98,8 @@ public class TestCleanupTableInfo {
   public static final String OM_RESPONSE_PACKAGE =
       "org.apache.hadoop.ozone.om.response";
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   @Mock
   private OMMetrics omMetrics;
@@ -106,6 +107,7 @@ public class TestCleanupTableInfo {
   @Mock
   private OzoneManagerDoubleBufferHelper dbh;
 
+  @Mock
   private OzoneManager om;
 
   /**
@@ -117,13 +119,11 @@ public class TestCleanupTableInfo {
    *  - disables ACLs
    *  - provides an audit logger
    *
-   * @return the mocked Ozone Manager
    * @throws IOException should not happen but declared in mocked methods
    */
-  @Before
+  @BeforeEach
   public void setupOzoneManagerMock()
       throws IOException {
-    om = mock(OzoneManager.class);
     OMMetadataManager metaMgr = createOMMetadataManagerSpy();
     when(om.getMetrics()).thenReturn(omMetrics);
     when(om.getMetadataManager()).thenReturn(metaMgr);
@@ -153,21 +153,22 @@ public class TestCleanupTableInfo {
     // OMEchoRPCWriteResponse does not need CleanupTable.
     subTypes.remove(OMEchoRPCWriteResponse.class);
     subTypes.forEach(aClass -> {
-      Assert.assertTrue(aClass + " does not have annotation of" +
-              " CleanupTableInfo",
-          aClass.isAnnotationPresent(CleanupTableInfo.class));
+      Assertions.assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
+          aClass + " does not have annotation of" +
+              " CleanupTableInfo");
       CleanupTableInfo annotation =
           aClass.getAnnotation(CleanupTableInfo.class);
       String[] cleanupTables = annotation.cleanupTables();
       boolean cleanupAll = annotation.cleanupAll();
       if (cleanupTables.length >= 1) {
-        Assert.assertTrue(
+        Assertions.assertTrue(
             Arrays.stream(cleanupTables).allMatch(tables::contains)
         );
       } else {
         assertTrue(cleanupAll);
       }
     });
+    reset(om);
   }
 
 
@@ -223,13 +224,10 @@ public class TestCleanupTableInfo {
     List<String> cleanup = Arrays.asList(ann.cleanupTables());
     for (String tableName : om.getMetadataManager().listTableNames()) {
       if (!cleanup.contains(tableName)) {
-        assertEquals(
-            "Cache item count of table " + tableName,
-            cacheItemCount.get(tableName).intValue(),
+        assertEquals(cacheItemCount.get(tableName).intValue(),
             Iterators.size(
                 om.getMetadataManager().getTable(tableName).cacheIterator()
-            )
-        );
+            ), "Cache item count of table " + tableName);
       }
     }
   }
@@ -280,9 +278,9 @@ public class TestCleanupTableInfo {
    */
   private OMMetadataManager createOMMetadataManagerSpy() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
+    File newFolder = folder.toFile();
     if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+      Assertions.assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
     return spy(new OmMetadataManagerImpl(conf, null));

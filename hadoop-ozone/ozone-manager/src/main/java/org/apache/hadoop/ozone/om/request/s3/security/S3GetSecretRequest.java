@@ -162,6 +162,8 @@ public class S3GetSecretRequest extends OMClientRequest {
                 // Add new entry in this case
                 assignS3SecretValue =
                     new S3SecretValue(accessId, awsSecret.get());
+                // Set the transactionLogIndex to be used for updating.
+                assignS3SecretValue.setTransactionLogIndex(transactionLogIndex);
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId,
                     assignS3SecretValue);

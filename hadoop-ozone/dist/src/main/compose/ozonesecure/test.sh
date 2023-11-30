@@ -54,3 +54,6 @@ docker-compose up -d --scale datanode=2
 execute_robot_test scm -v container:1 -v count:2 replication/wait.robot
 docker-compose up -d --scale datanode=3
 execute_robot_test scm -v container:1 -v count:3 replication/wait.robot
+
+#test public key and certificate recovery
+source "$COMPOSE_DIR/public-key-cert-recovery-test.sh"

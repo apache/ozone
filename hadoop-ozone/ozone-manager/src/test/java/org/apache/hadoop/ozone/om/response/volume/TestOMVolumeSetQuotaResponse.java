@@ -31,39 +31,39 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests OMVolumeCreateResponse.
  */
 public class TestOMVolumeSetQuotaResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -95,15 +95,15 @@ public class TestOMVolumeSetQuotaResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getVolumeTable()));
 
     Table.KeyValue<String, OmVolumeArgs> keyValue =
         omMetadataManager.getVolumeTable().iterator().next();
 
-    Assert.assertEquals(omMetadataManager.getVolumeKey(volumeName),
+    Assertions.assertEquals(omMetadataManager.getVolumeKey(volumeName),
         keyValue.getKey());
-    Assert.assertEquals(omVolumeArgs, keyValue.getValue());
+    Assertions.assertEquals(omVolumeArgs, keyValue.getValue());
 
   }
 
@@ -123,8 +123,8 @@ public class TestOMVolumeSetQuotaResponse {
     try {
       omVolumeSetQuotaResponse.checkAndUpdateDB(omMetadataManager,
           batchOperation);
-      Assert.assertTrue(omMetadataManager.countRowsInTable(
-          omMetadataManager.getVolumeTable()) == 0);
+      Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+          omMetadataManager.getVolumeTable()));
     } catch (IOException ex) {
       fail("testAddToDBBatchFailure failed");
     }

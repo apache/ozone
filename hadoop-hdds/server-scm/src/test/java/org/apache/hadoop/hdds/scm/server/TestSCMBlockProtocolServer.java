@@ -18,15 +18,19 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 
@@ -40,9 +44,13 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -55,21 +63,39 @@ public class TestSCMBlockProtocolServer {
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private static final int NODE_COUNT = 10;
 
+  private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
+      "edge0", "/rack0",
+      "edge1", "/rack1"
+  );
+
   @BeforeEach
   void setUp(@TempDir File dir) throws Exception {
     config = SCMTestUtils.getConf(dir);
+    config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+        StaticMapping.class.getName());
+    List<DatanodeDetails> datanodes = new ArrayList<>(NODE_COUNT);
+    List<String> nodeMapping = new ArrayList<>(NODE_COUNT);
+    for (int i = 0; i < NODE_COUNT; i++) {
+      DatanodeDetails dn = randomDatanodeDetails();
+      final String rack = "/rack" + (i % 2);
+      nodeMapping.add(dn.getHostName() + "=" + rack);
+      nodeMapping.add(dn.getIpAddress() + "=" + rack);
+      datanodes.add(dn);
+    }
+    EDGE_NODES.forEach((n, r) -> nodeMapping.add(n + "=" + r));
+    config.set(StaticMapping.KEY_HADOOP_CONFIGURED_NODE_MAPPING,
+        String.join(",", nodeMapping));
+
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+
     scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
     // add nodes to scm node manager
     nodeManager = scm.getScmNodeManager();
-    for (int i = 0; i < NODE_COUNT; i++) {
-      nodeManager.register(randomDatanodeDetails(), null, null);
-
-    }
+    datanodes.forEach(dn -> nodeManager.register(dn, null, null));
     server = scm.getBlockProtocolServer();
     service = new ScmBlockLocationProtocolServerSideTranslatorPB(server, scm,
         Mockito.mock(ProtocolMessageMetrics.class));
@@ -84,14 +110,52 @@ public class TestSCMBlockProtocolServer {
   }
 
   @Test
+  void sortDatanodesRelativeToDatanode() {
+    List<String> nodes = getNetworkNames();
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      Assertions.assertEquals(ROOT_LEVEL + 2, dn.getLevel());
+
+      List<DatanodeDetails> sorted =
+          server.sortDatanodes(nodes, nodeAddress(dn));
+
+      Assertions.assertEquals(dn, sorted.get(0),
+          "Source node should be sorted very first");
+
+      assertRackOrder(dn.getNetworkLocation(), sorted);
+    }
+  }
+
+  @Test
+  void sortDatanodesRelativeToNonDatanode() {
+    List<String> datanodes = getNetworkNames();
+
+    for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
+      assertRackOrder(entry.getValue(),
+          server.sortDatanodes(datanodes, entry.getKey()));
+    }
+  }
+
+  private static void assertRackOrder(String rack, List<DatanodeDetails> list) {
+    int size = list.size();
+
+    for (int i = 0; i < size / 2; i++) {
+      Assertions.assertEquals(rack, list.get(i).getNetworkLocation(),
+          "Nodes in the same rack should be sorted first");
+    }
+
+    for (int i = size / 2; i < size; i++) {
+      Assertions.assertNotEquals(rack, list.get(i).getNetworkLocation(),
+          "Nodes in the other rack should be sorted last");
+    }
+  }
+
+  @Test
   public void testSortDatanodes() throws Exception {
-    List<String> nodes = new ArrayList();
-    nodeManager.getAllNodes().stream().forEach(
-        node -> nodes.add(node.getNetworkName()));
+    List<String> nodes = getNetworkNames();
 
     // sort normal datanodes
     String client;
-    client = nodes.get(0);
+    client = nodeManager.getAllNodes().get(0).getIpAddress();
     List<DatanodeDetails> datanodeDetails =
         server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
@@ -116,6 +180,7 @@ public class TestSCMBlockProtocolServer {
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
+    client = nodeManager.getAllNodes().get(0).getIpAddress();
     ScmBlockLocationProtocolProtos.SortDatanodesRequestProto request =
         ScmBlockLocationProtocolProtos.SortDatanodesRequestProto
             .newBuilder()
@@ -144,5 +209,18 @@ public class TestSCMBlockProtocolServer {
     Assertions.assertTrue(resp.getNodeList().size() == 0);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
+  }
+
+  private List<String> getNetworkNames() {
+    return nodeManager.getAllNodes().stream()
+        .map(NodeImpl::getNetworkName)
+        .collect(Collectors.toList());
+  }
+
+  private String nodeAddress(DatanodeDetails dn) {
+    boolean useHostname = config.getBoolean(
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    return useHostname ? dn.getHostName() : dn.getIpAddress();
   }
 }

@@ -25,6 +25,7 @@
   <artifactId>ozone-recon</artifactId>
   <properties>
     <pnpm.version>7.33.6</pnpm.version>
+    <allow.junit4>false</allow.junit4>
   </properties>
   <build>
     <resources>
@@ -301,8 +302,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -374,11 +375,6 @@
     <dependency>
       <groupId>javax.activation</groupId>
       <artifactId>activation</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.javassist</groupId>

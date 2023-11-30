@@ -120,8 +120,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   public void start(OzoneConfiguration config)
       throws IOException {
     if (this.store == null) {
-
-      File metaDir = HAUtils.getMetaDir(new SCMDBDefinition(), configuration);
+      SCMDBDefinition scmdbDefinition = new SCMDBDefinition();
+      File metaDir = HAUtils.getMetaDir(scmdbDefinition, configuration);
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence
       // the OM process should be terminated.
@@ -137,8 +137,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
         ExitUtils.terminate(1, errorMsg, LOG);
       }
 
-
-      this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
+      this.store = DBStoreBuilder.createDBStore(config, scmdbDefinition);
 
       deletedBlocksTable =
           DELETED_BLOCKS.getTable(this.store);

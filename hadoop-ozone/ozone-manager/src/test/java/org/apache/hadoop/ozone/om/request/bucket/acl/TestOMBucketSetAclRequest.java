@@ -26,8 +26,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.UUID;
@@ -52,13 +52,13 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
         new OMBucketSetAclRequest(originalRequest);
     OMRequest preExecuteRequest = omBucketSetAclRequest
         .preExecute(ozoneManager);
-    Assert.assertNotEquals(originalRequest, preExecuteRequest);
+    Assertions.assertNotEquals(originalRequest, preExecuteRequest);
 
     long newModTime = preExecuteRequest.getSetAclRequest()
         .getModificationTime();
     // When preExecute() of setting acl,
     // the new modification time is greater than origin one.
-    Assert.assertTrue(newModTime > originModTime);
+    Assertions.assertTrue(newModTime > originModTime);
   }
 
   @Test
@@ -85,8 +85,8 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
         .validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getSetAclResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getSetAclResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -94,9 +94,9 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
         .get(bucketKey).getAcls();
 
     // Acls are added to acl list.
-    Assert.assertEquals(acls.size(), bucketAclList.size());
-    Assert.assertEquals(userAcl, bucketAclList.get(0));
-    Assert.assertEquals(groupAcl, bucketAclList.get(1));
+    Assertions.assertEquals(acls.size(), bucketAclList.size());
+    Assertions.assertEquals(userAcl, bucketAclList.get(0));
+    Assertions.assertEquals(groupAcl, bucketAclList.get(1));
 
   }
 
@@ -117,9 +117,9 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
         .validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getSetAclResponse());
+    Assertions.assertNotNull(omResponse.getSetAclResponse());
     // The bucket is not created.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omResponse.getStatus());
   }
 }

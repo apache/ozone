@@ -19,16 +19,16 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -41,18 +41,17 @@ import com.google.inject.Singleton;
  */
 public class TestReconDBProvider {
 
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private Injector injector;
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
-    tempFolder.create();
     injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
-        File dbDir = tempFolder.getRoot();
+        File dbDir = temporaryFolder.toFile();
         OzoneConfiguration configuration = new OzoneConfiguration();
         configuration.set(OZONE_RECON_DB_DIR, dbDir.getAbsolutePath());
         bind(OzoneConfiguration.class).toInstance(configuration);
