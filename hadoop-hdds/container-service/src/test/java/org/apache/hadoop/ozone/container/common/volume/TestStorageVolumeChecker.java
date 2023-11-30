@@ -39,27 +39,20 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
-import org.junit.Rule;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.rules.TemporaryFolder;
-import org.junit.jupiter.api.Test;
-import org.junit.rules.TestName;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
@@ -83,63 +76,49 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link StorageVolumeChecker}.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestStorageVolumeChecker {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);
 
   private static final int NUM_VOLUMES = 2;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public TestName testName = new TestName();
-
-  @Rule
-  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(30));
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   /**
    * When null, the check call should throw an exception.
    */
-  private final VolumeCheckResult expectedVolumeHealth;
+  private VolumeCheckResult expectedVolumeHealth;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
 
-  public TestStorageVolumeChecker(VolumeCheckResult result,
+  private void initTest(VolumeCheckResult result,
       ContainerLayoutVersion layout) {
     this.expectedVolumeHealth = result;
-    this.layout = layout;
+    this.layoutVersion = layout;
+    setup();
   }
 
-  @BeforeEach
-  public void setup() throws IOException {
+  private void setup() {
     conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
-        .getAbsolutePath());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
-  }
-
-  @AfterEach
-  public void cleanup() throws IOException {
-    FileUtils.deleteDirectory(folder.getRoot());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
   }
 
   /**
    * Run each test case for each possible value of {@link VolumeCheckResult}.
    * Including "null" for 'throw exception'.
    */
-  @Parameters
-  public static Collection<Object[]> data() {
-    List<Object[]> values = new ArrayList<>();
+  private static List<Arguments> provideTestData() {
+    List<Arguments> values = new ArrayList<>();
     for (ContainerLayoutVersion layout : ContainerLayoutVersion.values()) {
       for (VolumeCheckResult result : VolumeCheckResult.values()) {
-        values.add(new Object[]{result, layout});
+        values.add(Arguments.of(result, layout));
       }
-      values.add(new Object[]{null, layout});
+      values.add(Arguments.of(null, layout));
     }
     return values;
   }
@@ -151,9 +130,13 @@ public class TestStorageVolumeChecker {
    *
    * @throws Exception
    */
-  @Test
-  public void testCheckOneVolume() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  @ParameterizedTest
+  @MethodSource("provideTestData")
+  public void testCheckOneVolume(
+      VolumeCheckResult checkResult, ContainerLayoutVersion layout,
+      TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
         new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
@@ -193,9 +176,12 @@ public class TestStorageVolumeChecker {
    *
    * @throws Exception
    */
-  @Test
-  public void testCheckAllVolumes() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  @ParameterizedTest
+  @MethodSource("provideTestData")
+  public void testCheckAllVolumes(VolumeCheckResult checkResult,
+      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
@@ -228,9 +214,12 @@ public class TestStorageVolumeChecker {
    *
    * @throws Exception
    */
-  @Test
-  public void testVolumeDeletion() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  @ParameterizedTest
+  @MethodSource("provideTestData")
+  public void testVolumeDeletion(VolumeCheckResult checkResult,
+      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
@@ -247,7 +236,7 @@ public class TestStorageVolumeChecker {
     StorageVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
     volumeChecker.setDelegateChecker(new DummyChecker());
     File volParentDir =
-        new File(folder.getRoot(), UUID.randomUUID().toString());
+        new File(folder.toString(), UUID.randomUUID().toString());
     volumeSet.addVolume(volParentDir.getPath());
     File volRootDir = new File(volParentDir, "hdds");
 

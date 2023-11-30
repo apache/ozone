@@ -43,15 +43,13 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 /**
  * The class for testing container deletion choosing policy.
  */
-@RunWith(Parameterized.class)
 public class TestContainerDeletionChoosingPolicy {
   private String path;
   private OzoneContainer ozoneContainer;
@@ -62,14 +60,13 @@ public class TestContainerDeletionChoosingPolicy {
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
   private static final int SERVICE_INTERVAL_IN_MILLISECONDS = 1000;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
 
-  public TestContainerDeletionChoosingPolicy(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  public void setLayoutVersion(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> layoutVersion() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
@@ -80,8 +77,11 @@ public class TestContainerDeletionChoosingPolicy {
         .getTempPath(TestContainerDeletionChoosingPolicy.class.getSimpleName());
   }
 
-  @Test
-  public void testRandomChoosingPolicy() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testRandomChoosingPolicy(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     File containerDir = new File(path);
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));
@@ -133,7 +133,7 @@ public class TestContainerDeletionChoosingPolicy {
       boolean hasShuffled = false;
       for (int i = 0; i < result1.size(); i++) {
         if (result1.get(i).getContainerData().getContainerID() != result2.get(i)
-                .getContainerData().getContainerID()) {
+            .getContainerData().getContainerID()) {
           return;
         }
       }
@@ -142,8 +142,11 @@ public class TestContainerDeletionChoosingPolicy {
 
   }
 
-  @Test
-  public void testTopNOrderedChoosingPolicy() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testTopNOrderedChoosingPolicy(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     File containerDir = new File(path);
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));

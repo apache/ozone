@@ -32,14 +32,9 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Dele
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
-import org.junit.jupiter.api.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -74,35 +69,32 @@ import static org.mockito.Mockito.when;
 /**
  * Test cases for TestDeleteBlocksCommandHandler.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestDeleteBlocksCommandHandler {
-
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private OzoneConfiguration conf;
   private ContainerLayoutVersion layout;
   private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private DeleteBlocksCommandHandler handler;
-  private final String schemaVersion;
+  private String schemaVersion;
   private HddsVolume volume1;
   private BlockDeletingServiceMetrics blockDeleteMetrics;
 
-  public TestDeleteBlocksCommandHandler(ContainerTestVersionInfo versionInfo) {
+  private void prepareTest(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    setup();
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> versionInfo() {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @BeforeEach
-  public void setup() throws Exception {
+  private void setup() throws Exception {
     conf = new OzoneConfiguration();
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     ozoneContainer = Mockito.mock(OzoneContainer.class);
@@ -144,9 +136,11 @@ public class TestDeleteBlocksCommandHandler {
     BlockDeletingServiceMetrics.unRegister();
   }
 
-  @Test
-  public void testDeleteBlocksCommandHandler()
-      throws IOException {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDeleteBlocksCommandHandler(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    prepareTest(versionInfo);
     Assertions.assertTrue(containerSet.containerCount() > 0);
     Container<?> container = containerSet.getContainerIterator(volume1).next();
     DeletedBlocksTransaction transaction = createDeletedBlocksTransaction(1,
@@ -169,9 +163,11 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
-  @Test
-  public void testDeleteBlocksCommandHandlerWithTimeoutFailed()
-      throws IOException {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDeleteBlocksCommandHandlerWithTimeoutFailed(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    prepareTest(versionInfo);
     Assertions.assertTrue(containerSet.containerCount() >= 2);
     Iterator<Container<?>> iterator =
         containerSet.getContainerIterator(volume1);
@@ -216,9 +212,11 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
-  @Test
-  public void testDeleteBlocksCommandHandlerSuccessfulAfterFirstTimeout()
-      throws IOException {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDeleteBlocksCommandHandlerSuccessfulAfterFirstTimeout(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    prepareTest(versionInfo);
     Assertions.assertTrue(containerSet.containerCount() > 0);
     Container<?> lockedContainer =
         containerSet.getContainerIterator(volume1).next();
@@ -265,8 +263,11 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
-  @Test
-  public void testDeleteCmdWorkerInterval() {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testDeleteCmdWorkerInterval(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    prepareTest(versionInfo);
     OzoneConfiguration tmpConf = new OzoneConfiguration();
     tmpConf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL, 3,
         TimeUnit.SECONDS);
@@ -275,7 +276,7 @@ public class TestDeleteBlocksCommandHandler {
         tmpConf.getObject(DatanodeConfiguration.class);
     DeleteBlocksCommandHandler commandHandler =
         spy(new DeleteBlocksCommandHandler(
-        container, tmpConf, dnConf, "test"));
+            container, tmpConf, dnConf, "test"));
 
     Assertions.assertEquals(tmpConf.getTimeDuration(
         BLOCK_DELETE_COMMAND_WORKER_INTERVAL,

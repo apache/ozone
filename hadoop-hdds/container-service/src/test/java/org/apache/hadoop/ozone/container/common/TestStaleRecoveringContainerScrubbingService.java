@@ -37,16 +37,15 @@ import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleR
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
-import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -68,17 +67,16 @@ import static org.mockito.Mockito.mock;
 /**
  * Tests to stale recovering container scrubbing service.
  */
-@RunWith(Parameterized.class)
 public class TestStaleRecoveringContainerScrubbingService {
 
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
+  @TempDir
+  private Path tempDir;
   private String datanodeUuid;
   private OzoneConfiguration conf;
   private HddsVolume hddsVolume;
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
   private String clusterID;
   private int containerIdNum = 0;
   private MutableVolumeSet volumeSet;
@@ -86,22 +84,22 @@ public class TestStaleRecoveringContainerScrubbingService {
   private final TestClock testClock =
       new TestClock(Instant.now(), ZoneOffset.UTC);
 
-  public TestStaleRecoveringContainerScrubbingService(
-      ContainerTestVersionInfo versionInfo) {
+  private void initVersionInfo(ContainerTestVersionInfo versionInfo)
+      throws IOException {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    init();
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> versionInfo() {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @BeforeEach
-  public void init() throws IOException {
-    File volumeDir = tempDir.newFolder();
+  private void init() throws IOException {
+    File volumeDir =
+        Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, volumeDir.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
@@ -150,9 +148,11 @@ public class TestStaleRecoveringContainerScrubbingService {
     return createdIds;
   }
 
-  @Test
-  public void testScrubbingStaleRecoveringContainers()
-      throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testScrubbingStaleRecoveringContainers(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initVersionInfo(versionInfo);
     ContainerSet containerSet = new ContainerSet(10);
     containerSet.setClock(testClock);
     StaleRecoveringContainerScrubbingService srcss =
@@ -162,7 +162,7 @@ public class TestStaleRecoveringContainerScrubbingService {
             containerSet);
     testClock.fastForward(1000L);
     Map<Long, ContainerProtos.ContainerDataProto.State> containerStateMap =
-            new HashMap<>();
+        new HashMap<>();
     containerStateMap.putAll(createTestContainers(containerSet, 5, CLOSED)
             .stream().collect(Collectors.toMap(i -> i, i -> CLOSED)));
 
