@@ -161,6 +161,22 @@ public class AuditLogger {
     }
 
     /**
+     * Appends pre-operation operation latency in milliseconds.
+     * @param millis Latency in nanoseconds.
+     */
+    public void appendPreOpLatencyMs(long millis) {
+      append("preOpLatencyMs", TimeUnit.NANOSECONDS.toMillis(millis));
+    }
+
+    /**
+     * Appends whole operation latency in milliseconds.
+     * @param millis Latency in milliseconds.
+     */
+    public void appendOpLatencyMs(long millis) {
+      append("opLatencyMs", millis);
+    }
+
+    /**
      * Appends the size in bytes.
      * @param bytes Size in bytes.
      */

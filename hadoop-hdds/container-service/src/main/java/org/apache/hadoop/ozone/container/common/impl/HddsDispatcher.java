@@ -70,13 +70,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
@@ -200,7 +200,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditAction action = getAuditAction(msg.getCmdType());
     EventType eventType = getEventType(msg);
     Map<String, String> params = getAuditParams(msg);
-    Map<String, String> perf = new HashMap<>();
+    PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
@@ -331,8 +331,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
       return ContainerUtils.logAndReturnError(LOG, ex, msg);
     }
-    perf.put("preOpLatencyMS",
-        String.valueOf(Time.monotonicNow() - startTime));
+    perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
     responseProto = handler.handle(msg, container, dispatcherContext);
     long oPLatencyMS = Time.monotonicNow() - startTime;
     if (responseProto != null) {
@@ -409,7 +408,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
-      performanceAudit(action, params, perf, oPLatencyMS);
+      perf.appendOpLatencyMs(oPLatencyMS);
+      performanceAudit(action, params, perf);
 
       return responseProto;
     } else {
@@ -698,17 +698,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   private void performanceAudit(AuditAction action, Map<String, String> params,
-      Map<String, String> performance, long opLatencyMs) {
-    if (isExceedThreshold(opLatencyMs)) {
-      performance.put("opLatencyMs", String.valueOf(opLatencyMs));
-      AuditMessage msg =
-          buildAuditMessageForPerformance(action, params, performance);
-      AUDIT.logPerformance(msg);
-    }
+      PerformanceStringBuilder performance) {
+    AuditMessage msg =
+        buildAuditMessageForPerformance(action, params, performance.build());
+    AUDIT.logPerformance(msg);
   }
 
   public AuditMessage buildAuditMessageForPerformance(AuditAction op,
-      Map<String, String> auditMap, Map<String, String> performance) {
+      Map<String, String> auditMap, String performance) {
     return new AuditMessage.Builder()
         .setUser(null)
         .atIp(null)
@@ -913,6 +910,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         auditParams.put("blockData",
             BlockData.getFromProtoBuf(msg.getPutSmallFile()
                 .getBlock().getBlockData()).toString());
+        auditParams.put("blockDataSize",
+            String.valueOf(msg.getReadChunk().getChunkData().getLen()));
       } catch (IOException ex) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Encountered error parsing BlockData from protobuf: "
@@ -925,6 +924,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       auditParams.put("blockData",
           BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock().getBlockID())
               .toString());
+      auditParams.put("blockDataSize",
+          String.valueOf(msg.getReadChunk().getChunkData().getLen()));
       return auditParams;
 
     case CloseContainer:
