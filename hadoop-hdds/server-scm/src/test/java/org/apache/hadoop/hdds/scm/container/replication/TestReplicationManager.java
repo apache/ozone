@@ -511,6 +511,17 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testHealthyContainerStatus() throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+
+    boolean result = replicationManager.checkContainerStatus(
+        container, repReport);
+    assertEquals(false, result);
+  }
+
+  @Test
   public void testUnderReplicatedContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
@@ -522,6 +533,20 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  @Test
+  public void testUnderReplicatedContainerStatus()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+
+    boolean result = replicationManager.checkContainerStatus(
+        container, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(true, result);
   }
 
   /**
