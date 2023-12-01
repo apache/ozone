@@ -85,7 +85,7 @@ abstract class AbstractTestECKeyOutputStream {
   /**
    * Create a MiniDFSCluster for testing.
    */
-  protected static void init(boolean zerocopyEnabled) throws Exception {
+  protected static void init(boolean zeroCopyEnabled) throws Exception {
     chunkSize = 1024 * 1024;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
@@ -115,7 +115,7 @@ abstract class AbstractTestECKeyOutputStream {
     conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
         TimeUnit.SECONDS);
     conf.setBoolean(OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED,
-        zerocopyEnabled);
+        zeroCopyEnabled);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)

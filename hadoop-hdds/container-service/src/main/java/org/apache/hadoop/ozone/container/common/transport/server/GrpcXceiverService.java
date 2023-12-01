@@ -61,7 +61,7 @@ public class GrpcXceiverService extends
    * zerocopy is enabled.
    * @return  service definition.
    */
-  public ServerServiceDefinition bindServiceWithZerocopy() {
+  public ServerServiceDefinition bindServiceWithZeroCopy() {
     ServerServiceDefinition orig = super.bindService();
     if (!zeroCopyEnabled) {
       LOG.info("Zerocopy is not enabled.");

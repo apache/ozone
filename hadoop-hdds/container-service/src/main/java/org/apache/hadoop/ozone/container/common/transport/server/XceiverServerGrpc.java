@@ -148,7 +148,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .channelType(channelType)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
-            xceiverService.bindServiceWithZerocopy(),
+            xceiverService.bindServiceWithZeroCopy(),
             new GrpcServerInterceptor()));
 
     SecurityConfig secConf = new SecurityConfig(conf);
