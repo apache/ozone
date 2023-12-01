@@ -235,7 +235,8 @@ public class TestContainerHealthTaskRecordGenerator {
   public void testCorrectRecordsGenerated() {
     Set<ContainerReplica> replicas =
         generateReplicas(container, CLOSED, CLOSED, CLOSED);
-    Map<String, Map<String, Long>> unhealthyContainerStateStatsMap =
+    Map<UnHealthyContainerStates, Map<String, Long>>
+        unhealthyContainerStateStatsMap =
         new HashMap<>();
     initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
     // HEALTHY container - no records generated.
@@ -248,19 +249,19 @@ public class TestContainerHealthTaskRecordGenerator {
                 unhealthyContainerStateStatsMap);
     assertEquals(0, records.size());
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -283,19 +284,19 @@ public class TestContainerHealthTaskRecordGenerator {
     assertEquals(5, rec.getActualReplicaCount().intValue());
     assertEquals(-2, rec.getReplicaDelta().intValue());
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -315,19 +316,19 @@ public class TestContainerHealthTaskRecordGenerator {
             unhealthyContainerStateStatsMap);
     assertEquals(2, records.size());
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -363,22 +364,22 @@ public class TestContainerHealthTaskRecordGenerator {
             unhealthyContainerStateStatsMap);
     assertEquals(1, records.size());
     rec = records.get(0);
-    assertEquals(UnHealthyContainerStates.MISSING.toString(),
+    assertEquals(UnHealthyContainerStates.MISSING,
         rec.getContainerState());
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -400,26 +401,27 @@ public class TestContainerHealthTaskRecordGenerator {
     assertEquals(3, rec.getReplicaDelta().intValue());
 
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     unhealthyContainerStateStatsMap.clear();
   }
 
   @Test
   public void testRecordNotGeneratedIfAlreadyExists() {
-    Map<String, Map<String, Long>> unhealthyContainerStateStatsMap =
+    Map<UnHealthyContainerStates, Map<String, Long>>
+        unhealthyContainerStateStatsMap =
         new HashMap<>();
     initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
     Set<String> existingRec = new HashSet<>();
@@ -436,19 +438,19 @@ public class TestContainerHealthTaskRecordGenerator {
                 unhealthyContainerStateStatsMap);
     assertEquals(1, records.size());
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-        UnHealthyContainerStates.MISSING.toString())
+        UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -463,19 +465,19 @@ public class TestContainerHealthTaskRecordGenerator {
             unhealthyContainerStateStatsMap);
     assertEquals(1, records.size());
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -493,19 +495,19 @@ public class TestContainerHealthTaskRecordGenerator {
             unhealthyContainerStateStatsMap);
     assertEquals(2, records.size());
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MISSING.toString())
+            UnHealthyContainerStates.MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.EMPTY_MISSING.toString())
+            UnHealthyContainerStates.EMPTY_MISSING)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())
+            UnHealthyContainerStates.OVER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.UNDER_REPLICATED.toString())
+            UnHealthyContainerStates.UNDER_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())
+            UnHealthyContainerStates.MIS_REPLICATED)
         .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -560,29 +562,32 @@ public class TestContainerHealthTaskRecordGenerator {
   }
 
   private void initializeUnhealthyContainerStateStatsMap(
-      Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.MISSING.toString(), new HashMap<>());
+        UnHealthyContainerStates.MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.EMPTY_MISSING.toString(), new HashMap<>());
+        UnHealthyContainerStates.EMPTY_MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.UNDER_REPLICATED.toString(), new HashMap<>());
+        UnHealthyContainerStates.UNDER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.OVER_REPLICATED.toString(), new HashMap<>());
+        UnHealthyContainerStates.OVER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.MIS_REPLICATED.toString(), new HashMap<>());
+        UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
   }
 
   private void logUnhealthyContainerStats(
-      Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
     // EMPTY, and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
     unhealthyContainerStateStatsMap.entrySet().forEach(stateEntry -> {
-      String unhealthyContainerState = stateEntry.getKey();
+      UnHealthyContainerStates unhealthyContainerState = stateEntry.getKey();
       Map<String, Long> containerStateStatsMap = stateEntry.getValue();
-      StringBuilder logMsgBuilder = new StringBuilder(unhealthyContainerState);
+      StringBuilder logMsgBuilder =
+          new StringBuilder(unhealthyContainerState.toString());
       logMsgBuilder.append(" Container State Stats: \n\t");
       containerStateStatsMap.entrySet().forEach(statsEntry -> {
         logMsgBuilder.append(statsEntry.getKey());
