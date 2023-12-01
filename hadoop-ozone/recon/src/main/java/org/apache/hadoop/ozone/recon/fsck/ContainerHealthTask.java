@@ -118,7 +118,8 @@ public class ContainerHealthTask extends ReconScmTask {
     // <MISSING, <TOTAL_USED_BYTES, 2048>>,
     // <EMPTY_MISSING, <CONTAINER_COUNT, 10>>, <EMPTY_MISSING, <TOTAL_KEYS, 2>>,
     // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
-    Map<String, Map<String, Long>> unhealthyContainerStateStatsMap;
+    Map<UnHealthyContainerStates, Map<String, Long>>
+        unhealthyContainerStateStatsMap;
     try {
       unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
       initializeUnhealthyContainerStateStatsMap(
@@ -148,15 +149,17 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   private void logUnhealthyContainerStats(
-      Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
     // EMPTY, and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
     unhealthyContainerStateStatsMap.entrySet().forEach(stateEntry -> {
-      String unhealthyContainerState = stateEntry.getKey();
+      UnHealthyContainerStates unhealthyContainerState = stateEntry.getKey();
       Map<String, Long> containerStateStatsMap = stateEntry.getValue();
-      StringBuilder logMsgBuilder = new StringBuilder(unhealthyContainerState);
+      StringBuilder logMsgBuilder =
+          new StringBuilder(unhealthyContainerState.toString());
       logMsgBuilder.append(" **Container State Stats:** \n\t");
       containerStateStatsMap.entrySet().forEach(statsEntry -> {
         logMsgBuilder.append(statsEntry.getKey());
@@ -169,17 +172,18 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   private void initializeUnhealthyContainerStateStatsMap(
-      Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.MISSING.toString(), new HashMap<>());
+        UnHealthyContainerStates.MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.EMPTY_MISSING.toString(), new HashMap<>());
+        UnHealthyContainerStates.EMPTY_MISSING, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.UNDER_REPLICATED.toString(), new HashMap<>());
+        UnHealthyContainerStates.UNDER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.OVER_REPLICATED.toString(), new HashMap<>());
+        UnHealthyContainerStates.OVER_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.MIS_REPLICATED.toString(), new HashMap<>());
+        UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -196,7 +200,8 @@ public class ContainerHealthTask extends ReconScmTask {
       ContainerHealthStatus container,
       Set<String> existingRecords,
       long currentTime,
-      Map<String, Map<String, Long>> unhealthyContainerStateCountMap) {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateCountMap) {
     containerHealthSchemaManager.insertUnhealthyContainerRecords(
         ContainerHealthRecords.generateUnhealthyRecords(
             container, existingRecords, currentTime,
@@ -220,7 +225,8 @@ public class ContainerHealthTask extends ReconScmTask {
    * @return Count of records processed
    */
   private long processExistingDBRecords(long currentTime,
-                                        Map<String, Map<String, Long>>
+                                        Map<UnHealthyContainerStates,
+                                            Map<String, Long>>
                                             unhealthyContainerStateCountMap) {
     long recordCount = 0;
     try (Cursor<UnhealthyContainersRecord> cursor =
@@ -272,8 +278,9 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   private void processContainer(ContainerInfo container, long currentTime,
-                                Map<String, Map<String, Long>>
-                                    unhealthyContainerStateStatsMap) {
+                                Map<UnHealthyContainerStates,
+                                    Map<String, Long>>
+                                      unhealthyContainerStateStatsMap) {
     try {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(container.containerID());
@@ -372,7 +379,8 @@ public class ContainerHealthTask extends ReconScmTask {
 
     public static List<UnhealthyContainers> generateUnhealthyRecords(
         ContainerHealthStatus container, long time,
-        Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+        Map<UnHealthyContainerStates, Map<String, Long>>
+            unhealthyContainerStateStatsMap) {
       return generateUnhealthyRecords(container, new HashSet<>(), time,
           unhealthyContainerStateStatsMap);
     }
@@ -388,7 +396,8 @@ public class ContainerHealthTask extends ReconScmTask {
     public static List<UnhealthyContainers> generateUnhealthyRecords(
         ContainerHealthStatus container, Set<String> recordForStateExists,
         long time,
-        Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+        Map<UnHealthyContainerStates, Map<String, Long>>
+            unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
       if (container.isHealthy() || container.isDeleted()) {
         return records;
@@ -553,7 +562,8 @@ public class ContainerHealthTask extends ReconScmTask {
   private static void populateContainerStats(
       ContainerHealthStatus container,
       String unhealthyState,
-      Map<String, Map<String, Long>> unhealthyContainerStateStatsMap) {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
     if (unhealthyContainerStateStatsMap.containsKey(unhealthyState)) {
       Map<String, Long> containerStatsMap =
           unhealthyContainerStateStatsMap.get(unhealthyState);
