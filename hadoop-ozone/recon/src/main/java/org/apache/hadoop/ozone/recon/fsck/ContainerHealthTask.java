@@ -391,11 +391,11 @@ public class ContainerHealthTask extends ReconScmTask {
           && !recordForStateExists.contains(
           UnHealthyContainerStates.MISSING.toString())) {
         if (!container.isEmpty()) {
-          LOG.info("Container is missing but not empty, mapped with {} " +
-                  "number of keys and having {} usedBytes in SCM metadata. " +
-                  "For all OM keys mapped to this container, pls check the " +
-                  "missing container page in Recon which shows all the keys " +
-                  "and their metadata.", container.getNumKeys(),
+          LOG.info("Non-empty container {} is missing. It has {} " +
+                  "keys and {} bytes used according to SCM metadata. " +
+                  "Please visit Recon's missing container page for a list of " +
+                  "keys (and their metadata) mapped to this container.",
+              container.getContainerID(), container.getNumKeys(),
               container.getContainer().getUsedBytes());
           records.add(
               recordForState(container, UnHealthyContainerStates.MISSING,

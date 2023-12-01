@@ -182,18 +182,36 @@ public class TestReconTasks {
     IOUtils.closeQuietly(client);
   }
 
+  /**
+   * This test verifies the count of MISSING and EMPTY_MISSING containers.
+   * Following steps being followed in a single DN cluster.
+   *    --- Allocate a container in SCM.
+   *    --- Client writes the chunk and put block to only DN successfully.
+   *    --- Shuts down the only DN.
+   *    --- Since container to key mapping doesn't have any key mapped to
+   *        container, missing container will be marked EMPTY_MISSING.
+   *    --- Add a key mapping entry to key container mapping table for the
+   *        container added.
+   *    --- Now container will no longer be marked as EMPTY_MISSING and just
+   *        as MISSING.
+   *    --- Restart the only DN in cluster.
+   *    --- Now container no longer will be marked as MISSING.
+   *
+   * @throws Exception
+   */
   @Test
   public void testEmptyMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
             cluster.getReconServer().getReconStorageContainerManager();
-
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        cluster.getReconServer().getReconContainerMetadataManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
     // Make sure Recon's pipeline state is initialized.
-    LambdaTestUtils.await(60000, 5000,
+    LambdaTestUtils.await(60000, 1000,
         () -> (reconPipelineManager.getPipelines().size() >= 1));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
@@ -216,27 +234,55 @@ public class TestReconTasks {
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
-    LambdaTestUtils.await(120000, 6000, () -> {
-      List<UnhealthyContainers> allMissingContainers =
+    LambdaTestUtils.await(25000, 1000, () -> {
+      List<UnhealthyContainers> allEmptyMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
+                  0, 1000);
+      return (allEmptyMissingContainers.size() == 1);
+    });
+
+    // Now add a container to key mapping count as 3. This data is used to
+    // identify if container is empty in terms of keys mapped to container.
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      reconContainerMetadataManager
+          .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 3L);
+      reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+    }
+
+    // Verify again and now container is not empty missing but just missing.
+    LambdaTestUtils.await(25000, 1000, () -> {
+      List<UnhealthyContainers> allMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
                   0, 1000);
       return (allMissingContainers.size() == 1);
     });
 
-    // Restart the Datanode to make sure we remove the missing container.
-    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
-    LambdaTestUtils.await(120000, 6000, () -> {
-      List<UnhealthyContainers> allMissingContainers =
+    LambdaTestUtils.await(25000, 1000, () -> {
+      List<UnhealthyContainers> allEmptyMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getUnhealthyContainers(
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
                   0, 1000);
+      return (allEmptyMissingContainers.isEmpty());
+    });
+
+    // Now restart the cluster and verify the container is no longer missing.
+    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
+    LambdaTestUtils.await(25000, 1000, () -> {
+      List<UnhealthyContainers> allMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
       return (allMissingContainers.isEmpty());
     });
+
     IOUtils.closeQuietly(client);
   }
 }
