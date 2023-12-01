@@ -122,14 +122,6 @@ public class TestCleanupTableInfo {
     OMMetadataManager metaMgr = createOMMetadataManagerSpy();
     when(om.getMetrics()).thenReturn(omMetrics);
     when(om.getMetadataManager()).thenReturn(metaMgr);
-    when(om.resolveBucketLink(any(KeyArgs.class), any(OMClientRequest.class)))
-        .thenAnswer(
-            invocationOnMock -> new ResolvedBucket(
-                TEST_VOLUME_NAME, TEST_BUCKET_NAME,
-                TEST_VOLUME_NAME, TEST_BUCKET_NAME,
-                "owner", BucketLayout.DEFAULT)
-        );
-    when(om.getAclsEnabled()).thenReturn(false);
     when(om.getAuditLogger()).thenReturn(mock(AuditLogger.class));
     when(om.getDefaultReplicationConfig()).thenReturn(ReplicationConfig
         .getDefault(new OzoneConfiguration()));

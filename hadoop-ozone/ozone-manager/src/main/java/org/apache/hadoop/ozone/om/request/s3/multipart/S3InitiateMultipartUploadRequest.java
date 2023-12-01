@@ -98,8 +98,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(keyArgs, ozoneManager,
-        ACLType.CREATE);
+    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE);
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setInitiateMultiPartUploadRequest(
