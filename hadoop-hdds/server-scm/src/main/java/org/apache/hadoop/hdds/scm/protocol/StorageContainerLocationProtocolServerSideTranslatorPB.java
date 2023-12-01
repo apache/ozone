@@ -878,7 +878,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       }
       throw exception;
     }
-    return SCMCloseContainerResponseProto.newBuilder().build();
+    return SCMCloseContainerResponseProto.newBuilder()
+        .setErrorCode(SCMCloseContainerResponseProto.Error.OK).build();
   }
 
   public PipelineResponseProto allocatePipeline(
