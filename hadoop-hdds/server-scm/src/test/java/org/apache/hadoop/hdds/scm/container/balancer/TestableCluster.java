@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -31,7 +32,6 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,8 +48,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
  * 2. Nodes in the cluster have utilization values determined by generateUtilization method.
  */
 public final class TestableCluster {
-  private static final int DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER = 15;
-
   static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
   private static final Logger LOG = LoggerFactory.getLogger(TestableCluster.class);
   private final int nodeCount;
@@ -95,10 +93,6 @@ public final class TestableCluster {
   @Override
   public String toString() {
     return "cluster of " + nodeCount + " nodes";
-  }
-
-  public boolean isSmall() {
-    return nodeCount < DATANODE_COUNT_LIMIT_FOR_SMALL_CLUSTER;
   }
 
   @Nonnull Map<DatanodeUsageInfo, Set<ContainerID>> getDatanodeToContainersMap() {

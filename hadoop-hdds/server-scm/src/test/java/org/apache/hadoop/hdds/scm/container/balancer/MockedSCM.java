@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -42,10 +43,8 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.mockito.Mockito;
 
-import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
@@ -64,7 +63,6 @@ import static org.mockito.Mockito.when;
  * Provides an access to {@link TestableCluster} and to necessary mocked instances
  */
 public final class MockedSCM {
-  public static final long STORAGE_UNIT = OzoneConsts.GB;
   private final StorageContainerManager scm;
   private final TestableCluster cluster;
   private final ContainerBalancerConfiguration balancerCfg;
@@ -76,22 +74,20 @@ public final class MockedSCM {
 
   private MockedPlacementPolicies mockedPlacementPolicies;
 
-  private MockedSCM(@Nonnull TestableCluster testableCluster) {
+  public MockedSCM(@Nonnull TestableCluster testableCluster, ContainerBalancerConfiguration balancerConfiguration) {
     scm = mock(StorageContainerManager.class);
     ozoneCfg = new OzoneConfiguration();
     cluster = testableCluster;
     mockNodeManager = new MockNodeManager(cluster.getDatanodeToContainersMap());
 
     // these configs will usually be specified in each test
-    balancerCfg = ozoneCfg.getObject(ContainerBalancerConfiguration.class);
-    balancerCfg.setThreshold(10);
-    balancerCfg.setIterations(1);
-    if (cluster.isSmall()) {
-      balancerCfg.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    }
-    balancerCfg.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerCfg.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+    balancerCfg = balancerConfiguration;
     ozoneCfg.setFromObject(balancerCfg);
+    try {
+      doMock();
+    } catch (IOException | NodeNotFoundException | TimeoutException e) {
+      throw new RuntimeException("Can't initialize TestOzoneHDDS: ", e);
+    }
   }
 
   /**
@@ -121,17 +117,6 @@ public final class MockedSCM {
     when(scm.getClusterMap()).thenReturn(null);
     when(scm.getEventQueue()).thenReturn(mock(EventPublisher.class));
     when(scm.getStatefulServiceStateManager()).thenReturn(stateManager);
-  }
-
-  public static @Nonnull MockedSCM getMockedSCM(int datanodeCount) {
-    TestableCluster cluster = new TestableCluster(datanodeCount, STORAGE_UNIT);
-    MockedSCM mockedSCM = new MockedSCM(cluster);
-    try {
-      mockedSCM.doMock();
-    } catch (IOException | NodeNotFoundException | TimeoutException e) {
-      throw new RuntimeException("Can't initialize TestOzoneHDDS: ", e);
-    }
-    return mockedSCM;
   }
 
   @Override
