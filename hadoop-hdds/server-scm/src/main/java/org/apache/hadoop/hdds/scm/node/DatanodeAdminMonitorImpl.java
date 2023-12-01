@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -92,7 +93,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
   // The number of containers for each of under replicated and unhealthy
   // that will be logged in detail each time a node is checked.
-  private static final int CONTAINER_DETAILS_LOGGING_LIMIT = 5;
+  private final int containerDetailsLoggingLimit;
 
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
@@ -103,7 +104,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
-
+    containerDetailsLoggingLimit = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT,
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT_DEFAULT);
     containerStateByHost = new HashMap<>();
   }
 
@@ -364,7 +367,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (LOG.isDebugEnabled()) {
             underReplicatedIDs.add(cid);
           }
-          if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
+          if (underReplicated < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}",
                 cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
@@ -389,7 +392,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (LOG.isDebugEnabled()) {
             unhealthyIDs.add(cid);
           }
-          if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
+          if (unhealthy < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Unhealthy Container {} {}; {}",
                 cid, replicaSet, replicaDetails(replicaSet.getReplicas()));

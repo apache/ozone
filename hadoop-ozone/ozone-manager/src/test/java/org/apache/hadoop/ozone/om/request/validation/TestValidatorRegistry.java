@@ -16,9 +16,9 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.reflections.util.ClasspathHelper;
 
 import java.lang.reflect.Method;
@@ -40,8 +40,8 @@ import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.Ge
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Validator registry tests.
@@ -58,12 +58,12 @@ public class TestValidatorRegistry {
   private static final String PACKAGE_WO_VALIDATORS =
       "org.apache.hadoop.hdds.annotation";
 
-  @Before
+  @BeforeEach
   public void setup() {
     startValidatorTest();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     finishValidatorTest();
   }

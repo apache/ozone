@@ -18,14 +18,11 @@
 
 package org.apache.hadoop.hdds.ratis;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Class to test {@link ServerNotLeaderException} parsing. **/
-
-@SuppressFBWarnings("NM_CLASS_NOT_EXCEPTION")
-public class TestServerNotLeaderException {
+class TestServerNotLeaderExceptionMessageParsing {
   @Test
   public void testServerNotLeaderException() {
 

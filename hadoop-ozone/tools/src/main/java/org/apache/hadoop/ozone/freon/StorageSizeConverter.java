@@ -14,5 +14,25 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.container.testutils;
-// Helper classes for ozone and container tests.
+package org.apache.hadoop.ozone.freon;
+
+import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import picocli.CommandLine.ITypeConverter;
+
+/**
+ * A Picocli custom converter for parsing command line string values into
+ * StorageSize objects.
+ */
+
+public class StorageSizeConverter implements ITypeConverter<StorageSize> {
+
+  public static final String STORAGE_SIZE_DESCRIPTION = "You can specify the " +
+      "size using data units like 'GB', 'MB', 'KB', etc. Size is in base 2 " +
+      "binary.";
+
+  @Override
+  public StorageSize convert(String value) {
+    return StorageSize.parse(value, StorageUnit.BYTES);
+  }
+}
