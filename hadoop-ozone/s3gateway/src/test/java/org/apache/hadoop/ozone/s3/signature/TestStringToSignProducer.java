@@ -35,13 +35,13 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 import org.apache.kerby.util.Hex;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -110,13 +110,11 @@ public class TestStringToSignProducer {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
 
-    Assert.assertEquals(
-        "String to sign is invalid",
-        "AWS4-HMAC-SHA256\n"
+    assertEquals("AWS4-HMAC-SHA256\n"
             + DATETIME + "\n"
             + "20181009/us-east-1/s3/aws4_request\n"
             + Hex.encode(md.digest()).toLowerCase(),
-        signatureBase);
+        signatureBase, "String to sign is invalid");
   }
 
   private ContainerRequestContext setupContext(
@@ -210,7 +208,7 @@ public class TestStringToSignProducer {
       actualResult = e.getCode();
     }
 
-    Assert.assertEquals(expectedResult, actualResult);
+    assertEquals(expectedResult, actualResult);
   }
 
   private static Stream<Arguments> testValidateCanonicalHeadersInput() {
@@ -269,6 +267,6 @@ public class TestStringToSignProducer {
       actualResult = e.getCode();
     }
 
-    Assert.assertEquals(expectedResult, actualResult);
+    assertEquals(expectedResult, actualResult);
   }
 }

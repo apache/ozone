@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -41,16 +41,19 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.snapshot.TestOmSnapshot;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,24 +80,28 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-
-import org.junit.jupiter.api.Timeout;
-
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * OmSnapshot file system tests.
+ * Abstract class for OmSnapshot file system tests.
  */
 @Timeout(120)
 public abstract class TestOmSnapshotFileSystem {
+  protected static final String VOLUME_NAME =
+      "volume" + RandomStringUtils.randomNumeric(5);
+  protected static final String BUCKET_NAME_FSO =
+      "bucket-fso-" + RandomStringUtils.randomNumeric(5);
+  protected static final String BUCKET_NAME_LEGACY =
+      "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
+
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static ObjectStore objectStore;
@@ -102,9 +109,6 @@ public abstract class TestOmSnapshotFileSystem {
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager ozoneManager;
   private static String keyPrefix;
-  private static String volumeName;
-  private static String bucketNameFso;
-  private static String bucketNameLegacy;
   private final String bucketName;
   private FileSystem fs;
   private OzoneFileSystem o3fs;
@@ -114,26 +118,6 @@ public abstract class TestOmSnapshotFileSystem {
 
   public TestOmSnapshotFileSystem(String bucketName) {
     this.bucketName = bucketName;
-  }
-
-  /**
-   * OmSnapshot file system tests for FSO.
-   */
-  public static class TestOmSnapshotFileSystemFso
-      extends TestOmSnapshotFileSystem {
-    TestOmSnapshotFileSystemFso() {
-      super(bucketNameFso);
-    }
-  }
-
-  /**
-   * OmSnapshot file system tests for Legacy.
-   */
-  public static class TestOmSnapshotFileSystemLegacy
-      extends TestOmSnapshotFileSystem {
-    TestOmSnapshotFileSystemLegacy() {
-      super(bucketNameLegacy);
-    }
   }
 
   @BeforeAll
@@ -152,17 +136,13 @@ public abstract class TestOmSnapshotFileSystem {
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster.getOzoneManager();
 
-    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    bucketNameFso = "bucket-fso-" + RandomStringUtils.randomNumeric(5);
-    bucketNameLegacy = "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
-
-    TestDataUtil.createVolume(client, volumeName);
-    TestDataUtil.createBucket(client, volumeName,
+    TestDataUtil.createVolume(client, VOLUME_NAME);
+    TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(FILE_SYSTEM_OPTIMIZED).build(),
-        bucketNameFso);
-    TestDataUtil.createBucket(client, volumeName,
+        BUCKET_NAME_FSO);
+    TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(LEGACY).build(),
-        bucketNameLegacy);
+        BUCKET_NAME_LEGACY);
 
     // stop the deletion services so that keys can still be read
     KeyManagerImpl keyManager = (KeyManagerImpl) ozoneManager.getKeyManager();
@@ -172,7 +152,7 @@ public abstract class TestOmSnapshotFileSystem {
   @BeforeEach
   public void setupFsClient() throws IOException {
     String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
+        OzoneConsts.OZONE_URI_SCHEME, bucketName, VOLUME_NAME);
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
@@ -224,44 +204,25 @@ public abstract class TestOmSnapshotFileSystem {
   @Test
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
   public void testListKeysAtDifferentLevels() throws Exception {
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertEquals(ozoneVolume.getName(), volumeName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(VOLUME_NAME);
+    assertEquals(ozoneVolume.getName(), VOLUME_NAME);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     assertEquals(ozoneBucket.getName(), bucketName);
 
-    String keyc1 = "/a/b1/c1/c1.tx";
-    String keyc2 = "/a/b1/c2/c2.tx";
-
-    String keyd13 = "/a/b2/d1/d11.tx";
-    String keyd21 = "/a/b2/d2/d21.tx";
-    String keyd22 = "/a/b2/d2/d22.tx";
-    String keyd31 = "/a/b2/d3/d31.tx";
-
-    String keye11 = "/a/b3/e1/e11.tx";
-    String keye21 = "/a/b3/e2/e21.tx";
-    String keye31 = "/a/b3/e3/e31.tx";
-
-    LinkedList<String> keys = new LinkedList<>();
-    keys.add(keyc1);
-    keys.add(keyc2);
-
-    keys.add(keyd13);
-    keys.add(keyd21);
-    keys.add(keyd22);
-    keys.add(keyd31);
-
-    keys.add(keye11);
-    keys.add(keye21);
-    keys.add(keye31);
-
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+    List<String> keys = Arrays.asList(
+        "/a/b1/c1/c1.tx",
+        "/a/b1/c2/c2.tx",
+        "/a/b2/d1/d11.tx",
+        "/a/b2/d2/d21.tx",
+        "/a/b2/d2/d22.tx",
+        "/a/b2/d3/d31.tx",
+        "/a/b3/e1/e11.tx",
+        "/a/b3/e2/e21.tx",
+        "/a/b3/e3/e31.tx");
 
     createKeys(ozoneBucket, keys);
-
-
-    setKeyPrefix(createSnapshot().substring(1));
+    String snapshotName = UUID.randomUUID().toString();
+    setKeyPrefix(createSnapshot(snapshotName).substring(1));
 
     // Delete the active fs so that we don't inadvertently read it
     deleteRootDir();
@@ -270,15 +231,13 @@ public abstract class TestOmSnapshotFileSystem {
         ozoneBucket.listKeys(keyPrefix, null);
     verifyFullTreeStructure(ozoneKeyIterator);
 
-    ozoneKeyIterator =
-        ozoneBucket.listKeys(keyPrefix + "a/", null);
+    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/", null);
     verifyFullTreeStructure(ozoneKeyIterator);
 
     LinkedList<String> expectedKeys;
 
     // Intermediate level keyPrefix - 2nd level
-    ozoneKeyIterator =
-        ozoneBucket.listKeys(keyPrefix + "a///b2///", null);
+    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/b2/", null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/");
     expectedKeys.add("a/b2/d1/");
@@ -291,27 +250,46 @@ public abstract class TestOmSnapshotFileSystem {
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Intermediate level keyPrefix - 3rd level
-    ozoneKeyIterator =
-        ozoneBucket.listKeys(keyPrefix + "a/b2/d1", null);
+    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/b2/d1", null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d1/");
     expectedKeys.add("a/b2/d1/d11.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Boundary of a level
-    ozoneKeyIterator =
-        ozoneBucket.listKeys(keyPrefix + "a/b2/d2",
-            keyPrefix + "a/b2/d2/d21.tx");
+    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/b2/d2",
+        keyPrefix + "a/b2/d2/d21.tx");
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d2/d22.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Boundary case - last node in the depth-first-traversal
-    ozoneKeyIterator =
-        ozoneBucket.listKeys(keyPrefix + "a/b3/e3",
-            keyPrefix + "a/b3/e3/e31.tx");
+    ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/b3/e3",
+        keyPrefix + "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
     checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    deleteSnapshot(snapshotName);
+    String expectedMessage = String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName);
+    OMException exception = assertThrows(OMException.class,
+        () -> ozoneBucket.listKeys(keyPrefix + "a/", null));
+    assertEquals(expectedMessage, exception.getMessage());
+    exception = assertThrows(OMException.class,
+        () -> ozoneBucket.listKeys(keyPrefix + "a/b2/", null));
+    assertEquals(expectedMessage, exception.getMessage());
+    exception = assertThrows(OMException.class,
+        () -> ozoneBucket.listKeys(keyPrefix + "a/b2/d1", null));
+    assertEquals(expectedMessage, exception.getMessage());
+    exception = assertThrows(OMException.class,
+        () -> ozoneBucket.listKeys(keyPrefix + "a/b2/d2",
+            keyPrefix + "a/b2/d2/d21.tx"));
+    assertEquals(expectedMessage, exception.getMessage());
+    exception = assertThrows(OMException.class,
+        () -> ozoneBucket.listKeys(keyPrefix + "a/b3/e3",
+            keyPrefix + "a/b3/e3/e31.tx"));
+    assertEquals(expectedMessage, exception.getMessage());
   }
 
   private void verifyFullTreeStructure(Iterator<? extends OzoneKey> keyItr) {
@@ -386,7 +364,7 @@ public abstract class TestOmSnapshotFileSystem {
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-        bucketName, volumeName);
+        bucketName, VOLUME_NAME);
     OzoneFileSystem o3fsNew = (OzoneFileSystem) FileSystem
         .get(new URI(rootPath), conf);
     FSDataInputStream fsDataInputStream = o3fsNew.open(new Path(key));
@@ -444,30 +422,22 @@ public abstract class TestOmSnapshotFileSystem {
 
     // Can't access keys in snapshot anymore with FS API. Should throw exception
     final String errorMsg1 = "no longer active";
-    FileNotFoundException exception = assertThrows(
-        FileNotFoundException.class,
-        () -> o3fs.listStatus(snapshotRoot)
-    );
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> o3fs.listStatus(snapshotRoot));
     assertTrue(exception.getMessage().contains(errorMsg1));
-    exception = assertThrows(
-        FileNotFoundException.class,
-        () -> o3fs.listStatus(snapshotParent)
-    );
+    exception = assertThrows(FileNotFoundException.class,
+        () -> o3fs.listStatus(snapshotParent));
     assertTrue(exception.getMessage().contains(errorMsg1));
 
     // Note: Different error message due to inconsistent FNFE client-side
     //  handling in BasicOzoneClientAdapterImpl#getFileStatus
     // TODO: Reconciliation?
     final String errorMsg2 = "No such file or directory";
-    exception = assertThrows(
-        FileNotFoundException.class,
-        () -> o3fs.getFileStatus(snapshotKey1)
-    );
+    exception = assertThrows(FileNotFoundException.class,
+        () -> o3fs.getFileStatus(snapshotKey1));
     assertTrue(exception.getMessage().contains(errorMsg2));
-    exception = assertThrows(
-        FileNotFoundException.class,
-        () -> o3fs.getFileStatus(snapshotKey2)
-    );
+    exception = assertThrows(FileNotFoundException.class,
+        () -> o3fs.getFileStatus(snapshotKey2));
     assertTrue(exception.getMessage().contains(errorMsg2));
   }
 
@@ -479,40 +449,64 @@ public abstract class TestOmSnapshotFileSystem {
     Path file1 = new Path(parent, "key1");
     Path file2 = new Path(parent, "key2");
 
-    String snapshotKeyPrefix = createSnapshot();
-    Path snapshotRoot = new Path(snapshotKeyPrefix + root);
-    FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
+    String snapshotName1 = UUID.randomUUID().toString();
+    String snapshotKeyPrefix1 = createSnapshot(snapshotName1);
+    Path snapshotRoot1 = new Path(snapshotKeyPrefix1 + root);
+    FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot1);
     assertEquals(0, fileStatuses.length, "Should be empty");
 
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
 
-    snapshotKeyPrefix = createSnapshot();
-    snapshotRoot = new Path(snapshotKeyPrefix + root);
-    Path snapshotParent = new Path(snapshotKeyPrefix + parent);
-    fileStatuses = o3fs.listStatus(snapshotRoot);
+    String snapshotName2 = UUID.randomUUID().toString();
+    String snapshotKeyPrefix2 = createSnapshot(snapshotName2);
+    Path snapshotRoot2 = new Path(snapshotKeyPrefix2 + root);
+    Path snapshotParent2 = new Path(snapshotKeyPrefix2 + parent);
+    fileStatuses = o3fs.listStatus(snapshotRoot2);
     assertEquals(1, fileStatuses.length,
         "Should have created parent");
     assertEquals(fileStatuses[0].getPath().toUri().getPath(),
-        snapshotParent.toString(), "Parent path doesn't match");
+        snapshotParent2.toString(), "Parent path doesn't match");
 
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
-    fileStatuses = o3fs.listStatus(snapshotParent);
+    fileStatuses = o3fs.listStatus(snapshotParent2);
     assertEquals(2, fileStatuses.length,
         "FileStatus did not return all children of the directory");
-
     // ListStatus should return only the immediate children of a directory.
     Path file3 = new Path(parent, "dir1/key3");
     Path file4 = new Path(parent, "dir1/key4");
     ContractTestUtils.touch(fs, file3);
     ContractTestUtils.touch(fs, file4);
-    snapshotKeyPrefix = createSnapshot();
-    snapshotParent = new Path(snapshotKeyPrefix + parent);
+
+    String snapshotName3 = UUID.randomUUID().toString();
+    String snapshotKeyPrefix3 = createSnapshot(snapshotName3);
+    Path snapshotParent3 = new Path(snapshotKeyPrefix3 + parent);
     deleteRootDir();
-    fileStatuses = o3fs.listStatus(snapshotParent);
+    fileStatuses = o3fs.listStatus(snapshotParent3);
     assertEquals(3, fileStatuses.length,
         "FileStatus did not return all children of the directory");
+
+    deleteSnapshot(snapshotName1);
+    FileNotFoundException exception1 = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotRoot1));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName1), exception1.getMessage());
+
+    deleteSnapshot(snapshotName2);
+    FileNotFoundException exception2 = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotRoot2));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName2), exception2.getMessage());
+
+    deleteSnapshot(snapshotName3);
+    FileNotFoundException exception3 = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotParent3));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName3), exception3.getMessage());
   }
 
   @Test
@@ -533,13 +527,21 @@ public abstract class TestOmSnapshotFileSystem {
       }
     }, 1000, 120000);
 
-    String snapshotKeyPrefix = createSnapshot();
+    String snapshotName = UUID.randomUUID().toString();
+    String snapshotKeyPrefix = createSnapshot(snapshotName);
     deleteRootDir();
     Path snapshotParent = new Path(snapshotKeyPrefix + parent);
     FileStatus[] fileStatuses = fs.listStatus(snapshotParent);
 
     // the number of immediate children of root is 1
     assertEquals(1, fileStatuses.length);
+
+    deleteSnapshot(snapshotName);
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotParent));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   @Test
@@ -560,7 +562,8 @@ public abstract class TestOmSnapshotFileSystem {
       }
     }, 1000, 120000);
 
-    String snapshotKeyPrefix = createSnapshot();
+    String snapshotName = UUID.randomUUID().toString();
+    String snapshotKeyPrefix = createSnapshot(snapshotName);
     Path snapshotParent = new Path(snapshotKeyPrefix + parent);
     Path dirInSnapshot = new Path(snapshotKeyPrefix + parent + dir);
     Path keyInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
@@ -568,7 +571,13 @@ public abstract class TestOmSnapshotFileSystem {
     assertEquals(1, fs.listStatus(snapshotParent).length);
     assertFalse(fs.getFileStatus(dirInSnapshot).isFile());
     assertTrue(fs.getFileStatus(keyInSnapshot).isFile());
-    deleteRootDir();
+
+    deleteSnapshot(snapshotName);
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotParent));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   @Test
@@ -592,7 +601,8 @@ public abstract class TestOmSnapshotFileSystem {
       }
     }, 1000, 120000);
 
-    String snapshotKeyPrefix = createSnapshot();
+    String snapshotName = UUID.randomUUID().toString();
+    String snapshotKeyPrefix = createSnapshot(snapshotName);
     Path fileInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
 
     try (FSDataInputStream inputStream = fs.open(fileInSnapshot)) {
@@ -602,13 +612,19 @@ public abstract class TestOmSnapshotFileSystem {
       System.arraycopy(buffer.array(), 0, readBytes, 0, strBytes.length);
       assertArrayEquals(strBytes, readBytes);
     } catch (Exception e) {
-      fail("Failed to read file, Exception : " + e.toString());
+      fail("Failed to read file, Exception : " + e);
     }
-    deleteRootDir();
+
+    deleteSnapshot(snapshotName);
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.open(fileInSnapshot));
+    assertEquals(String.format("FILE_NOT_FOUND: Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   private void createAndCommitKey(String keyName) throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(VOLUME_NAME)
         .setBucketName(bucketName).setKeyName(keyName)
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -634,7 +650,8 @@ public abstract class TestOmSnapshotFileSystem {
     // ListStatus on root should return dir1 (even though /dir1 key does not
     // exist) and dir2 only. dir12 is not an immediate child of root and
     // hence should not be listed.
-    String snapshotKeyPrefix = createSnapshot();
+    String snapshotName = UUID.randomUUID().toString();
+    String snapshotKeyPrefix = createSnapshot(snapshotName);
     deleteRootDir();
     Path snapshotRoot = new Path(snapshotKeyPrefix + root);
     FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
@@ -646,6 +663,13 @@ public abstract class TestOmSnapshotFileSystem {
     String fileStatus2 = fileStatuses[1].getPath().toUri().getPath();
     assertNotEquals(fileStatus1, dir12.toString());
     assertNotEquals(fileStatus2, dir12.toString());
+
+    deleteSnapshot(snapshotName);
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotRoot));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   /**
@@ -655,7 +679,6 @@ public abstract class TestOmSnapshotFileSystem {
   // based on TestOzoneFileSystem:testListStatusOnLargeDirectory
   public void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/");
-    deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
     for (int i = 0; i < numDirs; i++) {
@@ -664,7 +687,8 @@ public abstract class TestOmSnapshotFileSystem {
       paths.add(p.getName());
     }
 
-    String snapshotKeyPrefix = createSnapshot();
+    String snapshotName = UUID.randomUUID().toString();
+    String snapshotKeyPrefix = createSnapshot(snapshotName);
     deleteRootDir();
     Path snapshotRoot = new Path(snapshotKeyPrefix + root);
     FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
@@ -690,30 +714,31 @@ public abstract class TestOmSnapshotFileSystem {
         LOG.info("actualPathList: {}", actualPathList);
       }
     }
-    assertEquals(
-        numDirs, fileStatuses.length,
+    assertEquals(numDirs, fileStatuses.length,
         "Total directories listed do not match the existing directories");
 
     for (int i = 0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
     }
-  }
 
-  private String createSnapshot()
-      throws IOException, InterruptedException, TimeoutException {
-    return createSnapshot(UUID.randomUUID().toString());
+    deleteSnapshot(snapshotName);
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
+        () -> fs.listStatus(snapshotRoot));
+    assertEquals(String.format("Unable to load snapshot. " +
+            "Snapshot with table key '/%s/%s/%s' is no longer active",
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   private String createSnapshot(String snapshotName)
       throws IOException, InterruptedException, TimeoutException {
 
     // create snapshot
-    writeClient.createSnapshot(volumeName, bucketName, snapshotName);
+    writeClient.createSnapshot(VOLUME_NAME, bucketName, snapshotName);
 
     // wait till the snapshot directory exists
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
+        .get(SnapshotInfo.getTableKey(VOLUME_NAME, bucketName, snapshotName));
     String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
         OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
@@ -723,6 +748,6 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   private void deleteSnapshot(String snapshotName) throws IOException {
-    writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+    writeClient.deleteSnapshot(VOLUME_NAME, bucketName, snapshotName);
   }
 }

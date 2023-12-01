@@ -30,10 +30,11 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -75,11 +76,9 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.rocksdb.WriteBatch;
@@ -89,33 +88,33 @@ import org.rocksdb.WriteBatch;
  */
 public class TestOzoneManagerServiceProviderImpl {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
   private OzoneConfiguration configuration;
   private OzoneManagerProtocol ozoneManagerProtocol;
   private CommonUtils commonUtils;
 
-  @Before
-  public void setUp() throws Exception {
+  @BeforeEach
+  public void setUp(@TempDir File dirReconSnapDB, @TempDir File dirReconDB)
+      throws Exception {
     configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
-        temporaryFolder.newFolder().getAbsolutePath());
+        dirReconSnapDB.getAbsolutePath());
     configuration.set(OZONE_RECON_DB_DIR,
-        temporaryFolder.newFolder().getAbsolutePath());
+        dirReconDB.getAbsolutePath());
     configuration.set("ozone.om.address", "localhost:9862");
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
     commonUtils = new CommonUtils();
   }
 
   @Test
-  public void testUpdateReconOmDBWithNewSnapshot() throws Exception {
+  public void testUpdateReconOmDBWithNewSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     OMMetadataManager omMetadataManager =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirOmMetadata);
     ReconOMMetadataManager reconOMMetadataManager =
         getTestReconOmMetadataManager(omMetadataManager,
-            temporaryFolder.newFolder());
+            dirReconMetadata);
 
     writeDataToOm(omMetadataManager, "key_one");
     writeDataToOm(omMetadataManager, "key_two");
@@ -139,9 +138,9 @@ public class TestOzoneManagerServiceProviderImpl {
             reconOMMetadataManager, reconTaskController, reconUtilsMock,
             ozoneManagerProtocol);
 
-    Assert.assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+    assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one"));
-    Assert.assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+    assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
 
     assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
@@ -153,12 +152,13 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testReconOmDBCloseAndOpenNewSnapshotDb() throws Exception {
+  public void testReconOmDBCloseAndOpenNewSnapshotDb(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
     OMMetadataManager omMetadataManager =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirOmMetadata);
     ReconOMMetadataManager reconOMMetadataManager =
-        getTestReconOmMetadataManager(omMetadataManager,
-            temporaryFolder.newFolder());
+        getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
 
     writeDataToOm(omMetadataManager, "key_one");
     writeDataToOm(omMetadataManager, "key_two");
@@ -197,66 +197,58 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testGetOzoneManagerDBSnapshot() throws Exception {
+  public void testGetOzoneManagerDBSnapshot(@TempDir File dirReconMetadata)
+      throws Exception {
 
-    File reconOmSnapshotDbDir = temporaryFolder.newFolder();
-
-    File checkpointDir = Paths.get(reconOmSnapshotDbDir.getAbsolutePath(),
+    File checkpointDir = Paths.get(dirReconMetadata.getAbsolutePath(),
         "testGetOzoneManagerDBSnapshot").toFile();
     checkpointDir.mkdir();
 
     File file1 = Paths.get(checkpointDir.getAbsolutePath(), "file1")
         .toFile();
     String str = "File1 Contents";
-    BufferedWriter writer = null;
-    try {
-      writer = new BufferedWriter(new OutputStreamWriter(
-          new FileOutputStream(file1), UTF_8));
-      writer.write(str);
-    } finally {
-      if (writer != null) {
-        writer.close();
-      }
+
+    try (BufferedWriter writer1 = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file1), UTF_8))) {
+      writer1.write(str);
     }
 
     File file2 = Paths.get(checkpointDir.getAbsolutePath(), "file2")
         .toFile();
     str = "File2 Contents";
-    try {
-      writer = new BufferedWriter(new OutputStreamWriter(
-          new FileOutputStream(file2), UTF_8));
+    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+        new FileOutputStream(file2), UTF_8))) {
       writer.write(str);
-    } finally {
-      writer.close();
     }
 
     //Create test tar file.
     File tarFile = createTarFile(checkpointDir.toPath());
-    InputStream fileInputStream = new FileInputStream(tarFile);
-    ReconUtils reconUtilsMock = getMockReconUtils();
-    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock);
-    when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
-    ReconOMMetadataManager reconOMMetadataManager =
-        mock(ReconOMMetadataManager.class);
-    ReconTaskController reconTaskController = getMockTaskController();
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol);
+    try (InputStream fileInputStream = new FileInputStream(tarFile)) {
+      ReconUtils reconUtilsMock = getMockReconUtils();
+      HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+      when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
+      when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+          .thenReturn(httpURLConnectionMock);
+      when(reconUtilsMock.getReconNodeDetails(
+          any(OzoneConfiguration.class))).thenReturn(
+          commonUtils.getReconNodeDetails());
+      ReconOMMetadataManager reconOMMetadataManager =
+          mock(ReconOMMetadataManager.class);
+      ReconTaskController reconTaskController = getMockTaskController();
+      OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+          new OzoneManagerServiceProviderImpl(configuration,
+              reconOMMetadataManager, reconTaskController, reconUtilsMock,
+              ozoneManagerProtocol);
 
-    DBCheckpoint checkpoint = ozoneManagerServiceProvider
-        .getOzoneManagerDBSnapshot();
-    assertNotNull(checkpoint);
-    assertTrue(checkpoint.getCheckpointLocation().toFile().isDirectory());
+      DBCheckpoint checkpoint = ozoneManagerServiceProvider
+          .getOzoneManagerDBSnapshot();
+      assertNotNull(checkpoint);
+      assertTrue(checkpoint.getCheckpointLocation().toFile().isDirectory());
 
-    File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
-    assertNotNull(files);
-    assertEquals(2, files.length);
+      File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
+      assertNotNull(files);
+      assertEquals(2, files.length);
+    }
   }
 
 
@@ -265,12 +257,14 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testGetAndApplyDeltaUpdatesFromOM() throws Exception {
+  public void testGetAndApplyDeltaUpdatesFromOM(
+      @TempDir File dirSrcOmMetadata, @TempDir File dirOmMetadata,
+      @TempDir File dirReconMetadata) throws Exception {
 
     // Writing 2 Keys into a source OM DB and collecting it in a
     // DBUpdatesWrapper.
     OMMetadataManager sourceOMMetadataMgr =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirSrcOmMetadata);
     writeDataToOm(sourceOMMetadataMgr, "key_one");
     writeDataToOm(sourceOMMetadataMgr, "key_two");
 
@@ -288,12 +282,11 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // OM Service Provider's Metadata Manager.
     OMMetadataManager omMetadataManager =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirOmMetadata);
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            getTestReconOmMetadataManager(omMetadataManager,
-                temporaryFolder.newFolder()),
+            getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClient(dbUpdatesWrapper));
 
@@ -326,12 +319,14 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testGetAndApplyDeltaUpdatesFromOMWithLimit() throws Exception {
+  public void testGetAndApplyDeltaUpdatesFromOMWithLimit(
+      @TempDir File dirSrcOmMetadata, @TempDir File dirOmMetadata,
+      @TempDir File dirReconMetadata) throws Exception {
 
     // Writing 2 Keys into a source OM DB and collecting it in a
     // DBUpdatesWrapper.
     OMMetadataManager sourceOMMetadataMgr =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirSrcOmMetadata);
     writeDataToOm(sourceOMMetadataMgr, "key_one");
     writeDataToOm(sourceOMMetadataMgr, "key_two");
 
@@ -352,7 +347,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // OM Service Provider's Metadata Manager.
     OMMetadataManager omMetadataManager =
-        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirOmMetadata);
 
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
@@ -360,16 +355,15 @@ public class TestOzoneManagerServiceProviderImpl {
     withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LOOP_LIMIT, 3);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(withLimitConfiguration,
-            getTestReconOmMetadataManager(omMetadataManager,
-                temporaryFolder.newFolder()),
+            getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClientWith4Updates(dbUpdatesWrapper[0],
                 dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]));
 
-    assertEquals(true, dbUpdatesWrapper[0].isDBUpdateSuccess());
-    assertEquals(true, dbUpdatesWrapper[1].isDBUpdateSuccess());
-    assertEquals(true, dbUpdatesWrapper[2].isDBUpdateSuccess());
-    assertEquals(true, dbUpdatesWrapper[3].isDBUpdateSuccess());
+    assertTrue(dbUpdatesWrapper[0].isDBUpdateSuccess());
+    assertTrue(dbUpdatesWrapper[1].isDBUpdateSuccess());
+    assertTrue(dbUpdatesWrapper[2].isDBUpdateSuccess());
+    assertTrue(dbUpdatesWrapper[3].isDBUpdateSuccess());
 
     OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
@@ -400,12 +394,13 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testSyncDataFromOMFullSnapshot() throws Exception {
+  public void testSyncDataFromOMFullSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     // Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
-        initializeEmptyOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeEmptyOmMetadataManager(dirOmMetadata), dirReconMetadata);
     ReconTaskStatusDao reconTaskStatusDaoMock =
         mock(ReconTaskStatusDao.class);
     doNothing().when(reconTaskStatusDaoMock)
@@ -438,12 +433,13 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testSyncDataFromOMDeltaUpdates() throws Exception {
+  public void testSyncDataFromOMDeltaUpdates(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
     ReconTaskStatusDao reconTaskStatusDaoMock =
         mock(ReconTaskStatusDao.class);
     doNothing().when(reconTaskStatusDaoMock)
@@ -478,12 +474,13 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testSyncDataFromOMFullSnapshotForSNNFE() throws Exception {
+  public void testSyncDataFromOMFullSnapshotForSNNFE(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
+      throws Exception {
 
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
     ReconTaskStatusDao reconTaskStatusDaoMock =
         mock(ReconTaskStatusDao.class);
     doNothing().when(reconTaskStatusDaoMock)

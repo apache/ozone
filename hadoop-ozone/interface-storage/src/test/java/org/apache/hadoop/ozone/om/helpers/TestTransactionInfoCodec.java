@@ -21,12 +21,12 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test {@link TransactionInfo#getCodec()}.
@@ -48,7 +48,7 @@ public class TestTransactionInfoCodec
     TransactionInfo convertedTransactionInfo =
         codec.fromPersistedFormat(codec.toPersistedFormat(transactionInfo));
 
-    Assert.assertEquals(transactionInfo, convertedTransactionInfo);
+    assertEquals(transactionInfo, convertedTransactionInfo);
   }
 
   @Test
