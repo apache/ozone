@@ -94,14 +94,10 @@ public class ContainerKeyScanner implements Callable<Void>,
   private Set<Long> containerIds;
 
   private static Map<String, OmDirectoryInfo> directoryTable;
+  private static boolean isDirTableLoaded = false;
 
   @Override
   public Void call() throws Exception {
-    long start = System.currentTimeMillis();
-    directoryTable = getDirectoryTableData(parent.getDbPath());
-    long end = System.currentTimeMillis();
-    out().println("directoryTable loaded in " + (end - start) + " ms.");
-
     ContainerKeyInfoWrapper containerKeyInfoWrapper =
         scanDBForContainerKeys(parent.getDbPath());
 
@@ -249,10 +245,10 @@ public class ContainerKeyScanner implements Callable<Void>,
 
       keysProcessed +=
           processTable(dbDefinition, columnFamilyHandles, db,
-              containerKeyInfos, FILE_TABLE, dbPath);
+              containerKeyInfos, FILE_TABLE);
       keysProcessed +=
           processTable(dbDefinition, columnFamilyHandles, db,
-              containerKeyInfos, KEY_TABLE, dbPath);
+              containerKeyInfos, KEY_TABLE);
     }
     return new ContainerKeyInfoWrapper(keysProcessed, containerKeyInfos);
   }
@@ -261,7 +257,7 @@ public class ContainerKeyScanner implements Callable<Void>,
                             List<ColumnFamilyHandle> columnFamilyHandles,
                             ManagedRocksDB db,
                             List<ContainerKeyInfo> containerKeyInfos,
-                            String tableName, String dbPath)
+                            String tableName)
       throws IOException {
     long keysProcessed = 0;
     DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
@@ -310,6 +306,16 @@ public class ContainerKeyScanner implements Callable<Void>,
                 // Generate asbolute key path for FSO keys
                 StringBuilder keyName = new StringBuilder();
                 if (tableName.equals(FILE_TABLE)) {
+                  // Load directory table only after the first fso key is found
+                  // to reduce necessary load if there are not fso keys
+                  if (!isDirTableLoaded) {
+                    long start = System.currentTimeMillis();
+                    directoryTable = getDirectoryTableData(parent.getDbPath());
+                    long end = System.currentTimeMillis();
+                    out().println(
+                        "directoryTable loaded in " + (end - start) + " ms.");
+                    isDirTableLoaded = true;
+                  }
                   keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
                 }
                 keyName.append(value.getKeyName());
@@ -326,6 +332,8 @@ public class ContainerKeyScanner implements Callable<Void>,
         keysProcessed++;
       }
       return keysProcessed;
+    } catch (RocksDBException e) {
+      throw new RuntimeException(e);
     }
   }
 
