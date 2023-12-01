@@ -259,7 +259,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
           // Deep clean only on active snapshot. Deleted Snapshots will be
           // cleaned up by SnapshotDeletingService.
-          if (currSnapInfo.getSnapshotStatus() != (SNAPSHOT_ACTIVE) ||
+          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getDeepClean()) {
             continue;
           }

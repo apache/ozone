@@ -306,7 +306,8 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    if (snapshotDirectoryCleaningService == null) {
+    if (snapshotDirectoryCleaningService == null &&
+        ozoneManager.isFilesystemSnapshotEnabled()) {
       long dirDeleteInterval = configuration.getTimeDuration(
           OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT,

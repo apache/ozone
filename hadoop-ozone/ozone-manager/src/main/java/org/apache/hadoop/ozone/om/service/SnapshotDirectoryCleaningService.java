@@ -177,11 +177,6 @@ public class SnapshotDirectoryCleaningService
               currSnapInfo, snapChainManager, omSnapshotManager);
           SnapshotInfo previousToPrevSnapshot = null;
 
-          if (previousSnapshot != null) {
-            previousToPrevSnapshot = getPreviousActiveSnapshot(
-                previousSnapshot, snapChainManager, omSnapshotManager);
-          }
-
           Table<String, OmKeyInfo> previousKeyTable = null;
           Table<String, String> prevRenamedTable = null;
           ReferenceCounted<IOmMetadataReader, SnapshotCache>
@@ -191,7 +186,7 @@ public class SnapshotDirectoryCleaningService
             rcPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
                 previousSnapshot.getVolumeName(),
                 previousSnapshot.getBucketName(),
-                getSnapshotPrefix(previousSnapshot.getName()), true);
+                getSnapshotPrefix(previousSnapshot.getName()), false);
             OmSnapshot omPreviousSnapshot = (OmSnapshot)
                 rcPrevOmSnapshot.get();
 
@@ -199,6 +194,8 @@ public class SnapshotDirectoryCleaningService
                 .getKeyTable(bucketInfo.getBucketLayout());
             prevRenamedTable = omPreviousSnapshot
                 .getMetadataManager().getSnapshotRenamedTable();
+            previousToPrevSnapshot = getPreviousActiveSnapshot(
+                previousSnapshot, snapChainManager, omSnapshotManager);
           }
 
           Table<String, OmKeyInfo> previousToPrevKeyTable = null;
@@ -208,7 +205,7 @@ public class SnapshotDirectoryCleaningService
             rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
                 previousToPrevSnapshot.getVolumeName(),
                 previousToPrevSnapshot.getBucketName(),
-                getSnapshotPrefix(previousToPrevSnapshot.getName()), true);
+                getSnapshotPrefix(previousToPrevSnapshot.getName()), false);
             OmSnapshot omPreviousToPrevSnapshot = (OmSnapshot)
                 rcPrevToPrevOmSnapshot.get();
 
@@ -224,7 +221,7 @@ public class SnapshotDirectoryCleaningService
               currSnapInfo.getVolumeName(),
               currSnapInfo.getBucketName(),
               getSnapshotPrefix(currSnapInfo.getName()),
-              true)) {
+              false)) {
 
             OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
             Table<String, OmKeyInfo> snapDeletedDirTable =
@@ -398,8 +395,7 @@ public class SnapshotDirectoryCleaningService
 
     Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             iterator = fileTable.iterator()) {
-      iterator.seek(seekFileInDB);
+             iterator = fileTable.iterator(seekFileInDB)) {
 
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
