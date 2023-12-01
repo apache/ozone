@@ -28,8 +28,11 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeChecker;
 import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeManager;
 import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeUtils;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -39,10 +42,8 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
 
@@ -77,14 +78,19 @@ public class UpgradeSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    final UpgradeChecker upgradeChecker = new UpgradeChecker();
-
     OzoneConfiguration configuration = getConfiguration();
+    // Verify admin privilege
+    OzoneAdmins admins = OzoneAdmins.getOzoneAdmins("", configuration);
+    if (!admins.isAdmin(UserGroupInformation.getCurrentUser())) {
+      out().println("It requires ozone administrator privilege. Current user" +
+          " is " + UserGroupInformation.getCurrentUser() + ".");
+      return null;
+    }
 
-    Pair<Boolean, String> pair =
-        upgradeChecker.checkDatanodeNotStarted();
-    final boolean dnNotStarted = pair.getKey();
-    if (!dnNotStarted) {
+    final UpgradeChecker upgradeChecker = new UpgradeChecker();
+    Pair<Boolean, String> pair = upgradeChecker.checkDatanodeRunning();
+    final boolean isRunning = pair.getKey();
+    if (isRunning) {
       out().println(pair.getValue());
       return null;
     }
@@ -92,21 +98,21 @@ public class UpgradeSubcommand implements Callable<Void> {
     DatanodeDetails dnDetail =
         UpgradeUtils.getDatanodeDetails(configuration);
 
-    Pair<HDDSLayoutFeature, HDDSLayoutFeature> layoutVersion =
-        upgradeChecker.getLayoutVersion(dnDetail, configuration);
-    final HDDSLayoutFeature softwareLayoutVersion = layoutVersion.getLeft();
-    final HDDSLayoutFeature metadataLayoutVersion = layoutVersion.getRight();
+    Pair<HDDSLayoutFeature, HDDSLayoutFeature> layoutFeature =
+        upgradeChecker.getLayoutFeature(dnDetail, configuration);
+    final HDDSLayoutFeature softwareLayoutFeature = layoutFeature.getLeft();
+    final HDDSLayoutFeature metadataLayoutFeature = layoutFeature.getRight();
     final int needLayoutVersion =
         HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion();
 
-    if (metadataLayoutVersion.layoutVersion() < needLayoutVersion ||
-        softwareLayoutVersion.layoutVersion() < needLayoutVersion) {
+    if (metadataLayoutFeature.layoutVersion() < needLayoutVersion ||
+        softwareLayoutFeature.layoutVersion() < needLayoutVersion) {
       out().println(String.format(
           "Please upgrade your software version, no less than %s," +
               " current metadata layout version is %s," +
               " software layout version is %s",
           HDDSLayoutFeature.DATANODE_SCHEMA_V3.name(),
-          metadataLayoutVersion.name(), softwareLayoutVersion.name()));
+          metadataLayoutFeature.name(), softwareLayoutFeature.name()));
       return null;
     }
 
@@ -114,7 +120,17 @@ public class UpgradeSubcommand implements Callable<Void> {
       File volumeDir = new File(volume);
       if (!volumeDir.exists() || !volumeDir.isDirectory()) {
         out().println(
-            String.format("volume path: %s is not a directory", volume));
+            String.format("Volume path %s is not a directory or doesn't exist",
+                volume));
+        return null;
+      }
+      File hddsRootDir = new File(volume + "/" + HddsVolume.HDDS_VOLUME_DIR);
+      File versionFile = new File(volume + "/" + HddsVolume.HDDS_VOLUME_DIR +
+          "/" + Storage.STORAGE_FILE_VERSION);
+      if (!hddsRootDir.exists() || !hddsRootDir.isDirectory() ||
+          !versionFile.exists() || !versionFile.isFile()) {
+        out().println(
+            String.format("Volume path %s is not a valid data volume", volume));
         return null;
       }
       configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volume);
@@ -133,29 +149,27 @@ public class UpgradeSubcommand implements Callable<Void> {
     List<HddsVolume> allVolume =
         upgradeChecker.getAllVolume(dnDetail, configuration);
 
-    final List<File> volumeDBPaths = upgradeChecker.getVolumeDBPath(allVolume);
-    if (volumeDBPaths.isEmpty()) {
-      out().println("No schema V3 volume db store exists, need finalize " +
-          "datanode first.");
-      return null;
-    }
-
     Iterator<HddsVolume> volumeIterator = allVolume.iterator();
     while (volumeIterator.hasNext()) {
       HddsVolume hddsVolume = volumeIterator.next();
-      if (UpgradeChecker.checkAlreadyMigrate(hddsVolume)) {
+      if (UpgradeChecker.isAlreadyUpgraded(hddsVolume)) {
         out().println("Volume " + hddsVolume.getVolumeRootDir() +
-            " it's already upgraded, skip it.");
+            " is already upgraded, skip it.");
         volumeIterator.remove();
       }
+    }
+
+    if (allVolume.isEmpty()) {
+      out().println("There is no more volume to upgrade. Exit.");
+      return null;
     }
 
     if (!yes) {
       Scanner scanner = new Scanner(new InputStreamReader(
           System.in, StandardCharsets.UTF_8));
       System.out.println(
-          "The volume db store, will be automatically backup," +
-              " should you continue to upgrade?");
+          "All volume db stores will be automatically backup," +
+              " should we continue the upgrade ? [yes|no] : ");
       boolean confirm = scanner.next().trim().equals("yes");
       scanner.close();
       if (!confirm) {
@@ -163,22 +177,9 @@ public class UpgradeSubcommand implements Callable<Void> {
       }
     }
 
-    final Map<File, Exception> backupExceptions =
-        upgradeChecker.dbBackup(volumeDBPaths);
-
-    if (!backupExceptions.isEmpty()) {
-      final String backupFailDbPath = Arrays.toString(
-          backupExceptions.keySet().stream().map(File::getAbsolutePath)
-              .distinct().toArray());
-
-      out().println("Db store path: " + backupFailDbPath +
-          " backup fail, please check.");
-      return null;
-    }
-
     // do upgrade
     final UpgradeManager upgradeManager = new UpgradeManager();
-    upgradeManager.run(configuration);
+    upgradeManager.run(configuration, allVolume);
     return null;
   }
 

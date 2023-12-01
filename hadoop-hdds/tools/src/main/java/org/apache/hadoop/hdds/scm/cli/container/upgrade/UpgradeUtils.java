@@ -65,7 +65,7 @@ public final class UpgradeUtils {
     return new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
   }
 
-  public static File getVolumeMigrateFile(HddsVolume volume) {
+  public static File getVolumeUpgradeCompleteFile(HddsVolume volume) {
     return new File(volume.getHddsRootDir(),
         UpgradeTask.UPGRADE_COMPLETE_FILE_NAME);
   }

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container.upgrade;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -32,15 +30,9 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 
 /**
  * This is the handler that process container upgrade checker.
@@ -48,40 +40,40 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 public class UpgradeChecker {
 
   /*
-   * Verify that the datanode is in the shutdown state.
+   * Verify that the datanode is in the shutdown state or running.
    */
-  public Pair<Boolean, String> checkDatanodeNotStarted() {
+  public Pair<Boolean, String> checkDatanodeRunning() {
     String command =
         "ps aux | grep org.apache.hadoop.ozone.HddsDatanodeService " +
             "| grep -v grep";
     try {
-      Process exec = Runtime.getRuntime().exec(command);
+      Process exec = Runtime.getRuntime().exec(new String[]{"/bin/bash", "-c",
+          command});
       boolean notTimeout = exec.waitFor(10, TimeUnit.SECONDS);
       if (!notTimeout) {
-        return Pair.of(false,
-            String.format("Execution of the %s command timeout", command));
+        return Pair.of(true,
+            String.format("Execution of the command '%s' timeout", command));
       }
-      if (exec.exitValue() != 1) {
-        return Pair.of(false,
-            String.format("Return code of the command %s was %d", command,
-                exec.exitValue()));
+      if (exec.exitValue() == 0) {
+        return Pair.of(true, "HddsDatanodeService is running." +
+            " This upgrade command requires datanode to be off and in" +
+            " the IN_MAINTENANCE mode. Please put the datanode in" +
+            " the desired state first, then try this command later again.");
+      } else if (exec.exitValue() == 1){
+        return Pair.of(false, "HddsDatanodeService is not running.");
       } else {
-        final boolean dnStarted =
-            IOUtils.toString(exec.getInputStream(), StandardCharsets.UTF_8)
-                .contains("proc_datanode");
-        if (dnStarted) {
-          return Pair.of(false,
-              "This command needs to be executed with datanode turned off.");
-        }
+        return Pair.of(true,
+            String.format("Return code of the command '%s' is %d", command,
+                exec.exitValue()));
       }
     } catch (IOException | InterruptedException e) {
-      return Pair.of(false,
-          String.format("Run the command %s has error", command));
+      return Pair.of(true,
+          String.format("Run command '%s' has error '%s'",
+              command, e.getMessage()));
     }
-    return Pair.of(true, "");
   }
 
-  public Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutVersion(
+  public Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
       DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
     DatanodeLayoutStorage layoutStorage =
         new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
@@ -111,44 +103,9 @@ public class UpgradeChecker {
     return StorageVolumeUtil.getHddsVolumesList(dataVolumeSet.getVolumesList());
   }
 
-  public List<File> getVolumeDBPath(List<HddsVolume> hddsVolumes) {
-    List<File> dbPaths = new ArrayList<>();
-
-    for (HddsVolume storageVolume : hddsVolumes) {
-      File clusterIdDir =
-          new File(storageVolume.getStorageDir(), storageVolume.getClusterID());
-      File storageIdDir =
-          new File(clusterIdDir, storageVolume.getStorageID());
-      final File containerDBPath =
-          new File(storageIdDir, CONTAINER_DB_NAME);
-
-      if (containerDBPath.exists() && containerDBPath.isDirectory()) {
-        dbPaths.add(containerDBPath);
-      }
-    }
-
-    return dbPaths;
-  }
-
-  public Map<File, Exception> dbBackup(List<File> dbPaths) {
-    Map<File, Exception> failDBDir = new ConcurrentHashMap<>();
-    for (File dbPath : dbPaths) {
-      try {
-        final File backup = new File(dbPath.getParentFile(),
-            dbPath.getName() + "-" + UUID.randomUUID() + ".bak");
-        if (backup.exists() || backup.mkdir()) {
-          FileUtils.copyDirectory(dbPath, backup, true);
-        }
-      } catch (IOException e) {
-        failDBDir.put(dbPath, e);
-      }
-    }
-    return failDBDir;
-  }
-
-  public static boolean checkAlreadyMigrate(HddsVolume hddsVolume) {
-    final File migrateFile = UpgradeUtils.getVolumeMigrateFile(hddsVolume);
+  public static boolean isAlreadyUpgraded(HddsVolume hddsVolume) {
+    final File migrateFile =
+        UpgradeUtils.getVolumeUpgradeCompleteFile(hddsVolume);
     return migrateFile.exists();
   }
-
 }

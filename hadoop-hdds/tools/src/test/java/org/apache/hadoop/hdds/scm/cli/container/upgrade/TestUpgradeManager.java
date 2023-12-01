@@ -158,9 +158,9 @@ public class TestUpgradeManager {
     shutdownAllVolume();
 
     final UpgradeManager upgradeManager = new UpgradeManager();
-    upgradeManager.initVolumeStoreMap(volumeSet, CONF);
     final List<UpgradeManager.Result> results =
-        upgradeManager.upgradeAll(volumeSet, CONF);
+        upgradeManager.run(CONF,
+            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
 
     checkV3MetaData(keyValueContainerBlockDataMap, results, upgradeManager);
   }
@@ -268,8 +268,7 @@ public class TestUpgradeManager {
 
   private void checkV3MetaData(Map<KeyValueContainerData,
       Map<String, BlockData>> blockDataMap, List<UpgradeManager.Result> results,
-                               UpgradeManager upgradeManager)
-      throws IOException {
+      UpgradeManager upgradeManager) throws IOException {
     Map<Long, UpgradeTask.UpgradeContainerResult> resultMap = new HashMap<>();
 
     for (UpgradeManager.Result result : results) {
