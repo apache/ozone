@@ -87,6 +87,15 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 5, 1);
   }
 
@@ -109,6 +118,15 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 3, 1);
   }
 
@@ -166,6 +184,28 @@ public class TestEmptyContainerHandler {
         .build();
 
     assertAndVerify(request, false, 0, 0);
+  }
+
+  /**
+   * This test exists to verify that the definition of an empty container is
+   * 0 key count. Number of used bytes are not considered.
+   */
+  @Test
+  public void testEmptyContainerWithNoReplicas()
+      throws IOException {
+    long keyCount = 0L;
+    long bytesUsed = 0L;
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, CLOSED, keyCount, bytesUsed);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(Collections.emptySet())
+        .build();
+
+    assertAndVerify(request, true, 0, 1);
   }
 
   /**

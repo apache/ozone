@@ -23,9 +23,9 @@ import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.fs.Path;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -47,7 +47,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   protected String toKeyName;
   protected String dbToKey;
 
-  @Before
+  @BeforeEach
   public void createParentKey() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
@@ -76,17 +76,17 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omKeyRenameResponse.getOMResponse().getStatus());
 
     // Original key should be deleted, toKey should exist.
-    Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+    Assertions.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
         .get(dbFromKey));
 
     OmKeyInfo toKeyInfo =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
 
-    Assert.assertNotNull(toKeyInfo);
+    Assertions.assertNotNull(toKeyInfo);
 
     KeyArgs keyArgs = modifiedOmRequest.getRenameKeyRequest().getKeyArgs();
 
@@ -112,7 +112,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -128,7 +128,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -147,7 +147,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -171,7 +171,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -195,7 +195,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -214,9 +214,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     // Will not be equal, as UserInfo will be set and modification time is
     // set in KeyArgs.
-    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    Assertions.assertNotEquals(originalOmRequest, modifiedOmRequest);
 
-    Assert.assertTrue(modifiedOmRequest.getRenameKeyRequest()
+    Assertions.assertTrue(modifiedOmRequest.getRenameKeyRequest()
         .getKeyArgs().getModificationTime() > 0);
 
     return modifiedOmRequest;
@@ -265,6 +265,6 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     // For new key modification time should be updated.
     OmKeyInfo toKeyInfo =
         omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
-    Assert.assertEquals(except, toKeyInfo.getModificationTime());
+    Assertions.assertEquals(except, toKeyInfo.getModificationTime());
   }
 }

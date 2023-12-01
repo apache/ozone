@@ -156,7 +156,7 @@ public class TestStorageVolumeChecker {
     LOG.info("Executing {}", testName.getMethodName());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
@@ -200,7 +200,7 @@ public class TestStorageVolumeChecker {
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
 
     Set<? extends StorageVolume> failedVolumes =

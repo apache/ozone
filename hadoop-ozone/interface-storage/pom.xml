@@ -27,6 +27,9 @@
   <description>Apache Ozone Storage Interface</description>
   <name>Apache Ozone Storage Interface</name>
   <packaging>jar</packaging>
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
   <dependencies>
 
     <dependency>
@@ -64,12 +67,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
 

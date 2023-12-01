@@ -69,6 +69,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -100,7 +101,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final Map<String, SchemaHandler> schemaHandlers;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
-      ConfigurationSource conf, DatanodeConfiguration dnConf) {
+      ConfigurationSource conf, DatanodeConfiguration dnConf,
+      String threadNamePrefix) {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
@@ -111,12 +113,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
     schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
 
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix +
+            "DeleteBlocksCommandHandlerThread-%d")
+        .build();
     this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-        dnConf.getBlockDeleteThreads(), new ThreadFactoryBuilder()
-            .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
+        dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
-    handlerThread = new Daemon(new DeleteCmdWorker());
+    long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
+    handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
   }
 
@@ -216,6 +222,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   public final class DeleteCmdWorker implements Runnable {
 
+    private long intervalInMs;
+
+    public DeleteCmdWorker(long interval) {
+      this.intervalInMs = interval;
+    }
+
+    @VisibleForTesting
+    public long getInterval() {
+      return this.intervalInMs;
+    }
+
     @Override
     public void run() {
       while (true) {
@@ -229,7 +246,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
 
         try {
-          Thread.sleep(2000);
+          Thread.sleep(this.intervalInMs);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
@@ -326,11 +343,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
-      LOG.info("Start to delete container blocks, TXIDs={}, "
+      LOG.info("Summary of deleting container blocks, numOfTransactions={}, "
               + "numOfContainers={}, numOfBlocks={}",
-          summary.getTxIDSummary(),
+          summary.getNumOfTxs(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Start to delete container blocks, TXIDs={}",
+            summary.getTxIDSummary());
+      }
       blockDeleteMetrics.incrReceivedContainerCount(
           summary.getNumOfContainers());
       blockDeleteMetrics.incrReceivedRetryTransactionCount(

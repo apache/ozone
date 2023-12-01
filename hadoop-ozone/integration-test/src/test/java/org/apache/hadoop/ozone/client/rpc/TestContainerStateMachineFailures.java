@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -74,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
@@ -83,7 +85,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 import org.apache.ratis.protocol.RaftGroupId;
@@ -135,8 +136,9 @@ public class TestContainerStateMachineFailures {
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1,
-        TimeUnit.SECONDS);
+    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
@@ -479,7 +481,7 @@ public class TestContainerStateMachineFailures {
     }
     
     // when remove pipeline, group dir including snapshot will be deleted
-    LambdaTestUtils.await(5000, 500,
+    LambdaTestUtils.await(10000, 500,
         () -> (!snapshot.getPath().toFile().exists()));
   }
 
@@ -518,6 +520,8 @@ public class TestContainerStateMachineFailures {
     stateMachine.takeSnapshot();
     Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
     Assert.assertNotNull(snapshot);
+    long markIndex1 = StatemachineImplTestUtil.findLatestSnapshot(storage)
+        .getIndex();
     long containerID = omKeyLocationInfo.getContainerID();
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
             .getContainerWithPipeline(containerID).getPipeline();
@@ -549,6 +553,18 @@ public class TestContainerStateMachineFailures {
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
+    // This is just an attempt to wait for an asynchronous call from Ratis API
+    // to updateIncreasingly to finish as part of flaky test issue "HDDS-6115"
+    // This doesn't solve the problem completely but reduce the failure ratio.
+    GenericTestUtils.waitFor((() -> {
+      try {
+        return markIndex1 != StatemachineImplTestUtil
+            .findLatestSnapshot(storage).getIndex();
+      } catch (IOException e) {
+        // No action needed. The test case is going to fail at assertion.
+        return true;
+      }
+    }), 1000, 30000);
     final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
     Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
   }

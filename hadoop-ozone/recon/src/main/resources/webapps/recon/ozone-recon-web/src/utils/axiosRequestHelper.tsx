@@ -21,14 +21,15 @@ import axios, { AxiosResponse } from "axios";
 export const AxiosGetHelper = (
   url: string,
   controller: AbortController,
-  message: string = ""
+  message: string = "",
+  params: any = {},
 ): { "request": Promise<AxiosResponse<any, any>>, "controller": AbortController } => {
 
   controller && controller.abort(message);
   controller = new AbortController(); // generate new AbortController for the upcoming request
 
   return {
-    request: axios.get(url, { signal: controller.signal }),
+    request: axios.get(url, { signal: controller.signal, params: params }),
     controller: controller
   }
 }

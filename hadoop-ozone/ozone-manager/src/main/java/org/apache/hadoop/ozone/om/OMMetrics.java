@@ -73,6 +73,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSnapshotDeletes;
   private @Metric MutableCounterLong numSnapshotLists;
   private @Metric MutableCounterLong numSnapshotDiffJobs;
+  private @Metric MutableCounterLong numSnapshotInfos;
 
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
@@ -134,6 +135,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSnapshotDeleteFails;
   private @Metric MutableCounterLong numSnapshotListFails;
   private @Metric MutableCounterLong numSnapshotDiffJobFails;
+  private @Metric MutableCounterLong numSnapshotInfoFails;
 
   private @Metric MutableCounterLong numSnapshotActive;
   private @Metric MutableCounterLong numSnapshotDeleted;
@@ -473,6 +475,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotLists.incr();
   }
 
+  public void incNumSnapshotInfos() {
+    numSnapshotInfos.incr();
+  }
+
   public void incNumSnapshotDiffJobs() {
     numSnapshotDiffJobs.incr();
   }
@@ -485,6 +491,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotDiffJobFails.incr();
   }
 
+  public void incNumSnapshotInfoFails() {
+    numSnapshotInfoFails.incr();
+  }
   public void setNumSnapshotActive(long num) {
     long currVal = numSnapshotActive.value();
     numSnapshotActive.incr(num - currVal);

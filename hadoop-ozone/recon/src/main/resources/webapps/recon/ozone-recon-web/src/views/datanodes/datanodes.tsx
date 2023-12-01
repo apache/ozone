@@ -454,6 +454,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             pagination={paginationConfig}
             rowKey='hostname'
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+            locale={{filterTitle: ""}}
           />
         </div>
       </div>

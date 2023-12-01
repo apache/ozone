@@ -42,9 +42,7 @@ import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
@@ -183,9 +181,7 @@ public abstract class TestOzoneManagerHA {
 
     conf.setFromObject(omHAConfig);
 
-    /**
-     * config for key deleting service.
-     */
+    // config for key deleting service.
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
 
@@ -200,25 +196,6 @@ public abstract class TestOzoneManagerHA {
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
-  }
-
-  /**
-   * After restarting OMs we need to wait
-   * for a leader to be elected and ready.
-   */
-  @BeforeEach
-  protected void setup() throws Exception {
-    waitForLeaderToBeReady();
-  }
-
-  /**
-   * Reset cluster between tests.
-   */
-  @AfterEach
-  public void resetCluster() throws Exception {
-    if (cluster != null) {
-      cluster.restartOzoneManager();
-    }
   }
 
   /**

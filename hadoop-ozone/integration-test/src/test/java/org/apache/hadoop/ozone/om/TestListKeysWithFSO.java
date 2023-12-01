@@ -412,6 +412,71 @@ public class TestListKeysWithFSO {
     checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
   }
 
+  @Test
+  public void testShallowListKeys() throws Exception {
+    List<String> expectedKeys;
+
+    // case-1: startKey not reaches last key
+    String keyPrefix = "a1/b1/";
+    String startKey = "a1/b1/c12/c2.tx";
+    // a1/b1/c12/
+    // a1/b1/c1222.tx
+    // a1/b1/c1333.tx
+    // a1/b1/c1444.tx
+    // a1/b1/c1555.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-2: startKey reaches last key
+    keyPrefix = "a1/b1/";
+    startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    // a1/b1/c1333.tx
+    // a1/b1/c1444.tx
+    // a1/b1/c1555.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-3: keyPrefix non-exist and startKey not reaches last key
+    keyPrefix = "a1/b";
+    startKey = "a1/b1/c1444.tx";
+    // a1/b1/
+    // a1/b2/
+    // a1/b3/
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-4: keyPrefix non-exist and startKey reaches last key
+    keyPrefix = "a1/b";
+    startKey = "a1/b1/c1555.tx";
+    // a1/b2/
+    // a1/b3/
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-5: keyPrefix corresponds to multiple existing keys.
+    keyPrefix = "a1/b1/c12";
+    startKey = "";
+    // a1/b1/c12/
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // case-6: keyPrefix corresponds to multiple existing keys and
+    // startKey reaches last key
+    keyPrefix = "a1/b1/c12";
+    startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    expectedKeys =
+        getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+  }
+
   /**
    * Verify listKeys at different levels.
    *
@@ -485,9 +550,10 @@ public class TestListKeysWithFSO {
 
 
   private static List<String> getExpectedKeyList(String keyPrefix,
-      String startKey, OzoneBucket legacyBucket) throws Exception {
+      String startKey, OzoneBucket legacyBucket, boolean shallow)
+      throws Exception {
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        legacyBucket.listKeys(keyPrefix, startKey);
+        legacyBucket.listKeys(keyPrefix, startKey, shallow);
 
     List<String> keys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
@@ -497,11 +563,23 @@ public class TestListKeysWithFSO {
     return keys;
   }
 
+  private static List<String> getExpectedKeyList(String keyPrefix,
+      String startKey, OzoneBucket legacyBucket)
+      throws Exception {
+    return getExpectedKeyList(keyPrefix, startKey, legacyBucket, false);
+  }
+
+  private static List<String> getExpectedKeyShallowList(String keyPrefix,
+      String startKey, OzoneBucket legacyBucket) throws Exception {
+    return getExpectedKeyList(keyPrefix, startKey, legacyBucket, true);
+  }
+
   private void checkKeyList(String keyPrefix, String startKey,
-      List<String> keys, OzoneBucket fsoBucket) throws Exception {
+      List<String> keys, OzoneBucket fsoBucket, boolean shallow)
+      throws Exception {
 
     Iterator<? extends OzoneKey> ozoneKeyIterator =
-        fsoBucket.listKeys(keyPrefix, startKey);
+        fsoBucket.listKeys(keyPrefix, startKey, shallow);
     ReplicationConfig expectedReplication =
         Optional.ofNullable(fsoBucket.getReplicationConfig())
             .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
@@ -521,6 +599,16 @@ public class TestListKeysWithFSO {
     System.out.println("END:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
     Assert.assertEquals(keys, outputKeysList);
+  }
+
+  private void checkKeyList(String keyPrefix, String startKey,
+      List<String> keys, OzoneBucket fsoBucket) throws Exception {
+    checkKeyList(keyPrefix, startKey, keys, fsoBucket, false);
+  }
+
+  private void checkKeyShallowList(String keyPrefix, String startKey,
+      List<String> keys, OzoneBucket fsoBucket) throws Exception {
+    checkKeyList(keyPrefix, startKey, keys, fsoBucket, true);
   }
 
   private static void createKeys(OzoneBucket ozoneBucket, List<String> keys)

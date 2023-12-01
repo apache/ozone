@@ -142,7 +142,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneBlockTokenSecretManager secretManager,
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String omID, OMMetrics omMetrics)
+      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics)
       throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
@@ -154,7 +154,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
+          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
               excludeList);
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
@@ -469,8 +469,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmBucketInfo bucketInfo = null;
     if (ozoneManager.getKmsProvider() != null) {
       try {
-        acquireLock = omMetadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volumeName, bucketName));
+        acquireLock = getOmLockDetails().isLockAcquired();
 
         bucketInfo = omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName,
@@ -489,8 +490,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock().releaseReadLock(
-              BUCKET_LOCK, volumeName, bucketName);
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
+              BUCKET_LOCK, volumeName, bucketName));
         }
       }
 
@@ -525,8 +526,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     if (ozoneManager.getKmsProvider() != null) {
-      acquireLock = omMetadataManager.getLock().acquireReadLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
@@ -548,8 +550,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock()
-              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
+          mergeOmLockDetails(omMetadataManager.getLock()
+              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
         }
       }
     }

@@ -34,29 +34,25 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 
 import com.google.common.collect.Maps;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.Mockito;
 
 /**
  * Tests Handler interface.
  */
+@Timeout(300)
 public class TestHandler {
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private OzoneConfiguration conf;
   private HddsDispatcher dispatcher;
   private ContainerSet containerSet;
   private VolumeSet volumeSet;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     this.conf = new OzoneConfiguration();
     this.containerSet = Mockito.mock(ContainerSet.class);
@@ -79,7 +75,7 @@ public class TestHandler {
         conf, containerSet, volumeSet, handlers, null, metrics, null);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     ContainerMetrics.remove();
   }
@@ -89,8 +85,8 @@ public class TestHandler {
     Handler kvHandler = dispatcher.getHandler(
         ContainerProtos.ContainerType.KeyValueContainer);
 
-    Assert.assertTrue("getHandlerForContainerType returned incorrect handler",
-        (kvHandler instanceof KeyValueHandler));
+    Assertions.assertTrue((kvHandler instanceof KeyValueHandler),
+        "getHandlerForContainerType returned incorrect handler");
   }
 
   @Test
@@ -100,11 +96,11 @@ public class TestHandler {
     ContainerProtos.ContainerType invalidContainerType =
         ContainerProtos.ContainerType.forNumber(2);
 
-    Assert.assertEquals("New ContainerType detected. Not an invalid " +
-        "containerType", invalidContainerType, null);
+    Assertions.assertNull(invalidContainerType,
+        "New ContainerType detected. Not an invalid containerType");
 
     Handler dispatcherHandler = dispatcher.getHandler(invalidContainerType);
-    Assert.assertEquals("Get Handler for Invalid ContainerType should " +
-        "return null.", dispatcherHandler, null);
+    Assertions.assertNull(dispatcherHandler,
+        "Get Handler for Invalid ContainerType should return null.");
   }
 }

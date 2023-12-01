@@ -17,11 +17,12 @@
 package org.apache.hadoop.ozone.security.acl;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 
@@ -46,15 +47,15 @@ public class TestOzoneObjInfo {
     assertEquals(objInfo.getVolumeName(), volume);
 
     objInfo = getBuilder(null, null, null).build();
-    assertEquals(objInfo.getVolumeName(), null);
+    assertNull(objInfo.getVolumeName());
 
     objInfo = getBuilder(volume, null, null).build();
     assertEquals(objInfo.getVolumeName(), volume);
   }
 
   private OzoneObjInfo.Builder getBuilder(String withVolume,
-      String withBucket,
-      String withKey) {
+                                          String withBucket,
+                                          String withKey) {
     return OzoneObjInfo.Builder.newBuilder()
         .setResType(ResourceType.VOLUME)
         .setStoreType(STORE)
@@ -69,7 +70,7 @@ public class TestOzoneObjInfo {
     assertEquals(objInfo.getBucketName(), bucket);
 
     objInfo = getBuilder(volume, null, null).build();
-    assertEquals(objInfo.getBucketName(), null);
+    assertNull(objInfo.getBucketName());
 
     objInfo = getBuilder(null, bucket, null).build();
     assertEquals(objInfo.getBucketName(), bucket);
@@ -81,10 +82,10 @@ public class TestOzoneObjInfo {
     assertEquals(objInfo.getKeyName(), key);
 
     objInfo = getBuilder(volume, null, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
 
     objInfo = getBuilder(null, bucket, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
 
     objInfo = getBuilder(null, null, key).build();
     assertEquals(objInfo.getKeyName(), key);
@@ -105,9 +106,9 @@ public class TestOzoneObjInfo {
     objInfo = OzoneObjInfo.fromProtobuf(protoObj);
     assertEquals(objInfo.getKeyName(), key);
     objInfo = getBuilder(volume, null, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
     objInfo = getBuilder(null, bucket, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
     objInfo = getBuilder(null, null, key).build();
     assertEquals(objInfo.getKeyName(), key);
 
@@ -124,9 +125,9 @@ public class TestOzoneObjInfo {
     objInfo = OzoneObjInfo.fromProtobuf(protoObj);
     assertEquals(objInfo.getKeyName(), key);
     objInfo = getBuilder(volume, null, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
     objInfo = getBuilder(null, bucket, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
     objInfo = getBuilder(null, null, key).build();
     assertEquals(objInfo.getKeyName(), key);
 
@@ -143,9 +144,9 @@ public class TestOzoneObjInfo {
     objInfo = OzoneObjInfo.fromProtobuf(protoObj);
     assertEquals(objInfo.getKeyName(), key);
     objInfo = getBuilder(volume, null, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
     objInfo = getBuilder(null, bucket, null).build();
-    assertEquals(objInfo.getKeyName(), null);
+    assertNull(objInfo.getKeyName());
     objInfo = getBuilder(null, null, key).build();
     assertEquals(objInfo.getKeyName(), key);
   }
