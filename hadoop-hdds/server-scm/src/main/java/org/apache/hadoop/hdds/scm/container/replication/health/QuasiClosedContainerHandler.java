@@ -82,7 +82,7 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK,
           containerInfo.containerID());
     }
-    // Always return false, even if commands were sent. That was, under and
+    // Always return false, even if commands were sent. That way, under and
     // over replication handlers can to check for other issues in the container.
     return false;
   }

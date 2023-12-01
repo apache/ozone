@@ -994,6 +994,7 @@ public class ReplicationManager implements SCMService {
    */
   public boolean checkContainerStatus(ContainerInfo containerInfo,
       ReplicationManagerReport report) throws ContainerNotFoundException {
+    report.increment(containerInfo.getState());
     return processContainer(containerInfo, nullReplicationQueue, report, true);
   }
 
