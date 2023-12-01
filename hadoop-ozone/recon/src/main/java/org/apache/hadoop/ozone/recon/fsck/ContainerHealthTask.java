@@ -111,6 +111,13 @@ public class ContainerHealthTask extends ReconScmTask {
 
   public void triggerContainerHealthCheck() {
     lock.writeLock().lock();
+    // Map contains all UNHEALTHY STATES as keys and value is another map
+    // with 3 keys (CONTAINER_COUNT, TOTAL_KEYS, TOTAL_USED_BYTES) and value
+    // is count for each of these 3 stats.
+    // E.g. <MISSING, <CONTAINER_COUNT, 1>>, <MISSING, <TOTAL_KEYS, 10>>,
+    // <MISSING, <TOTAL_USED_BYTES, 2048>>,
+    // <EMPTY_MISSING, <CONTAINER_COUNT, 10>>, <EMPTY_MISSING, <TOTAL_KEYS, 2>>,
+    // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
     Map<String, Map<String, Long>> unhealthyContainerStateStatsMap;
     try {
       unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
@@ -150,7 +157,7 @@ public class ContainerHealthTask extends ReconScmTask {
       String unhealthyContainerState = stateEntry.getKey();
       Map<String, Long> containerStateStatsMap = stateEntry.getValue();
       StringBuilder logMsgBuilder = new StringBuilder(unhealthyContainerState);
-      logMsgBuilder.append(" Container State Stats: \n\t");
+      logMsgBuilder.append(" **Container State Stats:** \n\t");
       containerStateStatsMap.entrySet().forEach(statsEntry -> {
         logMsgBuilder.append(statsEntry.getKey());
         logMsgBuilder.append(" -> ");
@@ -404,6 +411,11 @@ public class ContainerHealthTask extends ReconScmTask {
               UnHealthyContainerStates.MISSING.toString(),
               unhealthyContainerStateStatsMap);
         } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Empty container {} is missing. Kindly check the " +
+                "consolidated container stats per UNHEALTHY state logged as " +
+                "starting with **Container State Stats:**");
+          }
           records.add(
               recordForState(container, UnHealthyContainerStates.EMPTY_MISSING,
                   time));

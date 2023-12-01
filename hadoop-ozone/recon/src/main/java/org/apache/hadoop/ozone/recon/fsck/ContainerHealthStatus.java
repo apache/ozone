@@ -49,7 +49,8 @@ public class ContainerHealthStatus {
   ContainerHealthStatus(ContainerInfo container,
                         Set<ContainerReplica> healthyReplicas,
                         PlacementPolicy placementPolicy,
-      ReconContainerMetadataManager reconContainerMetadataManager) {
+                        ReconContainerMetadataManager
+                            reconContainerMetadataManager) {
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
@@ -61,7 +62,7 @@ public class ContainerHealthStatus {
     this.replicaDelta = repFactor - this.healthyReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
     this.numReplicas = healthyReplicas.size();
-    this.numKeys = getNumOfKeysMappedToContainer(container.getContainerID());
+    this.numKeys = getContainerKeyCount(container.getContainerID());
   }
 
   public long getContainerID() {
@@ -137,7 +138,7 @@ public class ContainerHealthStatus {
     return policy.validateContainerPlacement(dns, repFactor);
   }
 
-  private long getNumOfKeysMappedToContainer(long containerID) {
+  private long getContainerKeyCount(long containerID) {
     try {
       return reconContainerMetadataManager.getKeyCountForContainer(
           containerID);
