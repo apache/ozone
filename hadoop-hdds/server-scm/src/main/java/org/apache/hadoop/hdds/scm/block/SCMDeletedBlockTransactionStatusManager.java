@@ -297,6 +297,16 @@ public class SCMDeletedBlockTransactionStatusManager
           removeScmCommand(dnId, scmCmdId);
           changed = true;
         }
+        if (oldStatus == TO_BE_SENT) {
+          // SCM receives a reply to an unsent transaction,
+          // which should not normally occur.
+          LOG.error("Received {} status for a command marked TO_BE_SENT. " +
+                  "This indicates a potential issue in command handling. " +
+                  "SCM Command ID: {}, Datanode ID: {}, Current Status: {}",
+              newStatus, scmCmdId, dnId, oldStatus);
+          removeScmCommand(dnId, scmCmdId);
+          changed = true;
+        }
         break;
       default:
         LOG.error("Can not update to Unknown new Status: {}", newStatus);
