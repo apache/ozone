@@ -78,7 +78,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         omBucketCreateRequest.getOmRequest());
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("volume2", "test2"));
-    assertEquals("Number of bucket crosses limit 1", omException.getMessage());
+    assertEquals("Cannot create more than 1 buckets", omException.getMessage());
   }
 
   @Test

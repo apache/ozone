@@ -4246,7 +4246,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.max.bucket</name>
+    <name>ozone.om.max.buckets</name>
     <value>100000</value>
     <tag>OZONE, OM</tag>
     <description>

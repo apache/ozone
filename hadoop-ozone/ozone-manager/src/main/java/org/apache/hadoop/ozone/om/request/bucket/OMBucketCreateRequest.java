@@ -156,8 +156,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     long nrOfBuckets = ozoneManager.getMetadataManager().getBucketTable()
         .getEstimatedKeyCount();
     if (nrOfBuckets >= maxBucket) {
-      throw new OMException("Number of bucket crosses limit " +
-          maxBucket,
+      throw new OMException("Cannot create more than " + maxBucket
+          + " buckets",
           ResultCodes.TOO_MANY_BUCKETS);
     }
   }

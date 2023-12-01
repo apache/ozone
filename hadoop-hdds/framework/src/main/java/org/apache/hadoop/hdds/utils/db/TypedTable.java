@@ -441,7 +441,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public long getEstimatedKeyCount() throws IOException {
-    if (cache instanceof FullTableCache) {
+    if (cache.getCacheType() == CacheType.FULL_CACHE) {
       return cache.size();
     }
     return rawTable.getEstimatedKeyCount();

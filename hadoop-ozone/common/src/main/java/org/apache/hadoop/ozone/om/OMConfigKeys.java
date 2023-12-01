@@ -588,6 +588,6 @@ public final class OMConfigKeys {
       = true;
 
   public static final String OZONE_OM_MAX_BUCKET =
-      "ozone.om.max.bucket";
+      "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
 }
