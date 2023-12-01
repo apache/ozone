@@ -113,7 +113,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <testsThreadCount>4</testsThreadCount>
 
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
-    <commons-cli.version>1.2</commons-cli.version>
+    <commons-cli.version>1.6.0</commons-cli.version>
     <commons-codec.version>1.15</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.21</commons-compress.version>
@@ -160,7 +160,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.34</jersey2.version>
+    <jersey2.version>2.41</jersey2.version>
 
     <!-- jackson versions -->
     <jackson1.version>1.9.13</jackson1.version>
@@ -283,7 +283,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <license-maven-plugin.version>2.3.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
-    <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
+    <native-maven-plugin.version>1.0-alpha-11</native-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.1.2</maven-checkstyle-plugin.version>
     <maven-site-plugin.version>3.9.1</maven-site-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>

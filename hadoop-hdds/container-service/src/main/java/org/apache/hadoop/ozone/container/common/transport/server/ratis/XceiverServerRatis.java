@@ -103,6 +103,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.RaftServerRpc;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 import org.apache.ratis.util.TraditionalBinaryPrefix;
@@ -135,22 +136,24 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
-  private ClientId clientId = ClientId.randomId();
+  private final ClientId clientId = ClientId.randomId();
   private final StateContext context;
-  private long nodeFailureTimeoutMs;
+  private final long nodeFailureTimeoutMs;
   private boolean isStarted = false;
-  private DatanodeDetails datanodeDetails;
+  private final DatanodeDetails datanodeDetails;
   private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = ConcurrentHashMap.newKeySet();
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
-  private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
+  private final Map<RaftGroupId, Boolean> groupLeaderMap =
+      new ConcurrentHashMap<>();
   // Timeout used while calling submitRequest directly.
-  private long requestTimeout;
-  private boolean shouldDeleteRatisLogDirectory;
-  private boolean streamEnable;
+  private final long requestTimeout;
+  private final boolean shouldDeleteRatisLogDirectory;
+  private final boolean streamEnable;
+  private final DatanodeRatisServerConfig ratisServerConfig;
 
   private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -159,6 +162,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
+    ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     assignPorts();
     this.streamEnable = conf.getBoolean(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
@@ -170,12 +174,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
     chunkExecutors = createChunkExecutors(conf, threadNamePrefix);
-    nodeFailureTimeoutMs =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getFollowerSlownessTimeout();
+    nodeFailureTimeoutMs = ratisServerConfig.getFollowerSlownessTimeout();
     shouldDeleteRatisLogDirectory =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .shouldDeleteRatisLogDirectory();
+        ratisServerConfig.shouldDeleteRatisLogDirectory();
 
     this.server =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -236,13 +237,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RatisHelper.enableNettyStreaming(properties);
     NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
     int dataStreamAsyncRequestThreadPoolSize =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getStreamRequestThreads();
+        ratisServerConfig.getStreamRequestThreads();
     RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
         dataStreamAsyncRequestThreadPoolSize);
-    int dataStreamClientPoolSize =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getClientPoolSize();
+    int dataStreamClientPoolSize = ratisServerConfig.getClientPoolSize();
     RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
         dataStreamClientPoolSize);
   }
@@ -308,13 +306,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Disable the pre vote feature in Ratis
     RaftServerConfigKeys.LeaderElection.setPreVote(properties,
-        conf.getObject(DatanodeRatisServerConfig.class).isPreVoteEnabled());
+        ratisServerConfig.isPreVoteEnabled());
 
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
             HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
     List<File> storageDirs = new ArrayList<>(storageDirPaths.size());
-    storageDirPaths.stream().forEach(d -> storageDirs.add(new File(d)));
+    storageDirPaths.forEach(d -> storageDirs.add(new File(d)));
 
     RaftServerConfigKeys.setStorageDir(properties, storageDirs);
 
@@ -455,8 +453,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
+    final long raftSegmentBufferSize = (long) conf.getStorageSize(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setWriteBufferSize(properties,
-            SizeInBytes.valueOf(raftSegmentSize));
+            SizeInBytes.valueOf(raftSegmentBufferSize));
+    Preconditions.assertTrue(raftSegmentBufferSize <= raftSegmentSize,
+        () -> "raftSegmentBufferSize = " + raftSegmentBufferSize
+            + " > raftSegmentSize = " + raftSegmentSize);
   }
 
   private RpcType setRpcType(RaftProperties properties) {
@@ -613,16 +618,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    RaftClientReply reply = null;
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
+      RaftClientReply reply;
       try {
         reply = server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
@@ -888,7 +893,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     GroupInfoReply reply = getServer()
         .getGroupInfo(createGroupInfoRequest(pipelineID.getProtobuf()));
     minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
-    return minIndex == null ? -1 : minIndex.longValue();
+    return minIndex == null ? -1 : minIndex;
   }
 
   public void notifyGroupRemove(RaftGroupId gid) {

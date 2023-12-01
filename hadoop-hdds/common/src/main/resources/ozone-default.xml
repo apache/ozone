@@ -314,18 +314,26 @@
   </property>
   <property>
     <name>dfs.container.ratis.segment.size</name>
-    <value>1MB</value>
+    <value>64MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment used by Apache Ratis on datanodes.
-      (1 MB by default)
+    <description>The size of the raft segment file used
+      by Apache Ratis on datanodes. (64 MB by default)
+    </description>
+  </property>
+  <property>
+    <name>dfs.container.ratis.segment.buffer.size</name>
+    <value>2MB</value>
+    <tag>OZONE, RATIS, PERFORMANCE</tag>
+    <description>The size of the raft segment buffer used
+      by Apache Ratis on datanodes. (2 MB by default)
     </description>
   </property>
   <property>
     <name>dfs.container.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on datanodes.(16 KB by default)
+    <description>The pre-allocated file size for raft segment used
+      by Apache Ratis on datanodes. (4 MB by default)
     </description>
   </property>
   <property>
@@ -3208,6 +3216,17 @@
       nodes added to the admin workflow or removed from it. The progress
       of decommissioning and entering maintenance nodes is also checked to see
       if they have completed.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.admin.monitor.logging.limit</name>
+    <value>1000</value>
+    <tag>SCM</tag>
+    <description>
+      When a node is checked for decommission or maintenance, this setting
+      controls how many degraded containers are logged on each pass. The limit
+      is applied separately for each type of container, ie under-replicated and
+      unhealthy will each have their own limit.
     </description>
   </property>
   <property>

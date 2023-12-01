@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 
 import java.util.Objects;
 
@@ -29,7 +29,7 @@ import java.util.Objects;
  */
 public class S3SecretValue {
   private static final Codec<S3SecretValue> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.S3Secret.class),
+      Proto2Codec.get(S3Secret.getDefaultInstance()),
       S3SecretValue::fromProtobuf,
       S3SecretValue::getProtobuf);
 
@@ -91,13 +91,12 @@ public class S3SecretValue {
     this.transactionLogIndex = transactionLogIndex;
   }
 
-  public static S3SecretValue fromProtobuf(
-      OzoneManagerProtocolProtos.S3Secret s3Secret) {
+  public static S3SecretValue fromProtobuf(S3Secret s3Secret) {
     return new S3SecretValue(s3Secret.getKerberosID(), s3Secret.getAwsSecret());
   }
 
-  public OzoneManagerProtocolProtos.S3Secret getProtobuf() {
-    return OzoneManagerProtocolProtos.S3Secret.newBuilder()
+  public S3Secret getProtobuf() {
+    return S3Secret.newBuilder()
         .setAwsSecret(this.awsSecret)
         .setKerberosID(this.kerberosID)
         .build();

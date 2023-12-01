@@ -368,9 +368,9 @@ public final class S3GatewayMetrics implements MetricsSource {
   // INC and UPDATE
   // BucketEndpoint
 
-  public void updateGetBucketSuccessStats(long startNanos) {
+  public long updateGetBucketSuccessStats(long startNanos) {
     getBucketSuccess.incr();
-    getBucketSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(getBucketSuccessLatencyNs, startNanos);
   }
 
   public void updateGetBucketFailureStats(long startNanos) {
@@ -453,10 +453,9 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   // ObjectEndpoint
 
-  public void updateCreateMultipartKeySuccessStats(long startNanos) {
+  public long updateCreateMultipartKeySuccessStats(long startNanos) {
     createMultipartKeySuccess.incr();
-    createMultipartKeySuccessLatencyNs.add(
-        Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(createMultipartKeySuccessLatencyNs, startNanos);
   }
 
   public void updateCreateMultipartKeyFailureStats(long startNanos) {
@@ -465,9 +464,9 @@ public final class S3GatewayMetrics implements MetricsSource {
         Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateCopyObjectSuccessStats(long startNanos) {
+  public long updateCopyObjectSuccessStats(long startNanos) {
     copyObjectSuccess.incr();
-    copyObjectSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(copyObjectSuccessLatencyNs, startNanos);
   }
 
   public void updateCopyObjectFailureStats(long startNanos) {
@@ -475,9 +474,9 @@ public final class S3GatewayMetrics implements MetricsSource {
     copyObjectFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateCreateKeySuccessStats(long startNanos) {
+  public long updateCreateKeySuccessStats(long startNanos) {
     createKeySuccess.incr();
-    createKeySuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(createKeySuccessLatencyNs, startNanos);
   }
 
   public void updateCreateKeyFailureStats(long startNanos) {
@@ -485,9 +484,9 @@ public final class S3GatewayMetrics implements MetricsSource {
     createKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateListPartsSuccessStats(long startNanos) {
+  public long updateListPartsSuccessStats(long startNanos) {
     listPartsSuccess.incr();
-    listPartsSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(listPartsSuccessLatencyNs, startNanos);
   }
 
   public void updateListPartsFailureStats(long startNanos) {
@@ -495,9 +494,9 @@ public final class S3GatewayMetrics implements MetricsSource {
     listPartsFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateGetKeySuccessStats(long startNanos) {
+  public long updateGetKeySuccessStats(long startNanos) {
     getKeySuccess.incr();
-    getKeySuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+    return updateAndGetStats(getKeySuccessLatencyNs, startNanos);
   }
 
   public void updateGetKeyFailureStats(long startNanos) {
@@ -561,16 +560,16 @@ public final class S3GatewayMetrics implements MetricsSource {
     deleteKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateGetKeyMetadataStats(long startNanos) {
-    getKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  public long updateGetKeyMetadataStats(long startNanos) {
+    return updateAndGetStats(getKeyMetadataLatencyNs, startNanos);
   }
 
-  public void updateCopyKeyMetadataStats(long startNanos) {
-    copyKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  public long updateCopyKeyMetadataStats(long startNanos) {
+    return updateAndGetStats(copyKeyMetadataLatencyNs, startNanos);
   }
 
-  public void updatePutKeyMetadataStats(long startNanos) {
-    putKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  public long updatePutKeyMetadataStats(long startNanos) {
+    return updateAndGetStats(putKeyMetadataLatencyNs, startNanos);
   }
 
   public void incCopyObjectSuccessLength(long bytes) {
@@ -724,6 +723,12 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   public long getListS3BucketsFailure() {
     return listS3BucketsFailure.value();
+  }
+
+  private long updateAndGetStats(MutableRate metric, long startNanos) {
+    long value = Time.monotonicNowNanos() - startNanos;
+    metric.add(value);
+    return value;
   }
 
   public static synchronized S3GatewayMetrics getMetrics() {

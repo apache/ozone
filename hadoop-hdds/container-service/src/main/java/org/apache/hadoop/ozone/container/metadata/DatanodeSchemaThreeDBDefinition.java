@@ -90,7 +90,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           FixedLengthStringCodec.get(),
           DeletedBlocksTransaction.class,
-          Proto2Codec.get(DeletedBlocksTransaction.class));
+          Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   private static String separator = "";
 

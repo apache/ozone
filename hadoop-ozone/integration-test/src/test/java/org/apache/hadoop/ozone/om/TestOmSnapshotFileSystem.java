@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.snapshot.TestOmSnapshot;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -90,10 +91,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * OmSnapshot file system tests.
+ * Abstract class for OmSnapshot file system tests.
  */
 @Timeout(120)
 public abstract class TestOmSnapshotFileSystem {
+  protected static final String VOLUME_NAME =
+      "volume" + RandomStringUtils.randomNumeric(5);
+  protected static final String BUCKET_NAME_FSO =
+      "bucket-fso-" + RandomStringUtils.randomNumeric(5);
+  protected static final String BUCKET_NAME_LEGACY =
+      "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
+
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static ObjectStore objectStore;
@@ -101,9 +109,6 @@ public abstract class TestOmSnapshotFileSystem {
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager ozoneManager;
   private static String keyPrefix;
-  private static String volumeName;
-  private static String bucketNameFso;
-  private static String bucketNameLegacy;
   private final String bucketName;
   private FileSystem fs;
   private OzoneFileSystem o3fs;
@@ -113,26 +118,6 @@ public abstract class TestOmSnapshotFileSystem {
 
   public TestOmSnapshotFileSystem(String bucketName) {
     this.bucketName = bucketName;
-  }
-
-  /**
-   * OmSnapshot file system tests for FSO.
-   */
-  public static class TestOmSnapshotFileSystemFso
-      extends TestOmSnapshotFileSystem {
-    TestOmSnapshotFileSystemFso() {
-      super(bucketNameFso);
-    }
-  }
-
-  /**
-   * OmSnapshot file system tests for Legacy.
-   */
-  public static class TestOmSnapshotFileSystemLegacy
-      extends TestOmSnapshotFileSystem {
-    TestOmSnapshotFileSystemLegacy() {
-      super(bucketNameLegacy);
-    }
   }
 
   @BeforeAll
@@ -151,17 +136,13 @@ public abstract class TestOmSnapshotFileSystem {
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster.getOzoneManager();
 
-    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    bucketNameFso = "bucket-fso-" + RandomStringUtils.randomNumeric(5);
-    bucketNameLegacy = "bucket-legacy-" + RandomStringUtils.randomNumeric(5);
-
-    TestDataUtil.createVolume(client, volumeName);
-    TestDataUtil.createBucket(client, volumeName,
+    TestDataUtil.createVolume(client, VOLUME_NAME);
+    TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(FILE_SYSTEM_OPTIMIZED).build(),
-        bucketNameFso);
-    TestDataUtil.createBucket(client, volumeName,
+        BUCKET_NAME_FSO);
+    TestDataUtil.createBucket(client, VOLUME_NAME,
         new BucketArgs.Builder().setBucketLayout(LEGACY).build(),
-        bucketNameLegacy);
+        BUCKET_NAME_LEGACY);
 
     // stop the deletion services so that keys can still be read
     KeyManagerImpl keyManager = (KeyManagerImpl) ozoneManager.getKeyManager();
@@ -171,7 +152,7 @@ public abstract class TestOmSnapshotFileSystem {
   @BeforeEach
   public void setupFsClient() throws IOException {
     String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
+        OzoneConsts.OZONE_URI_SCHEME, bucketName, VOLUME_NAME);
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
@@ -223,8 +204,8 @@ public abstract class TestOmSnapshotFileSystem {
   @Test
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
   public void testListKeysAtDifferentLevels() throws Exception {
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertEquals(ozoneVolume.getName(), volumeName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(VOLUME_NAME);
+    assertEquals(ozoneVolume.getName(), VOLUME_NAME);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     assertEquals(ozoneBucket.getName(), bucketName);
 
@@ -291,7 +272,7 @@ public abstract class TestOmSnapshotFileSystem {
     deleteSnapshot(snapshotName);
     String expectedMessage = String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName);
+        VOLUME_NAME, bucketName, snapshotName);
     OMException exception = assertThrows(OMException.class,
         () -> ozoneBucket.listKeys(keyPrefix + "a/", null));
     assertEquals(expectedMessage, exception.getMessage());
@@ -383,7 +364,7 @@ public abstract class TestOmSnapshotFileSystem {
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-        bucketName, volumeName);
+        bucketName, VOLUME_NAME);
     OzoneFileSystem o3fsNew = (OzoneFileSystem) FileSystem
         .get(new URI(rootPath), conf);
     FSDataInputStream fsDataInputStream = o3fsNew.open(new Path(key));
@@ -511,21 +492,21 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot1));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName1), exception1.getMessage());
+        VOLUME_NAME, bucketName, snapshotName1), exception1.getMessage());
 
     deleteSnapshot(snapshotName2);
     FileNotFoundException exception2 = assertThrows(FileNotFoundException.class,
         () -> fs.listStatus(snapshotRoot2));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName2), exception2.getMessage());
+        VOLUME_NAME, bucketName, snapshotName2), exception2.getMessage());
 
     deleteSnapshot(snapshotName3);
     FileNotFoundException exception3 = assertThrows(FileNotFoundException.class,
         () -> fs.listStatus(snapshotParent3));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName3), exception3.getMessage());
+        VOLUME_NAME, bucketName, snapshotName3), exception3.getMessage());
   }
 
   @Test
@@ -560,7 +541,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotParent));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   @Test
@@ -596,7 +577,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotParent));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   @Test
@@ -639,11 +620,11 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.open(fileInSnapshot));
     assertEquals(String.format("FILE_NOT_FOUND: Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   private void createAndCommitKey(String keyName) throws IOException {
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(VOLUME_NAME)
         .setBucketName(bucketName).setKeyName(keyName)
         .setAcls(Collections.emptyList())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -688,7 +669,7 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   /**
@@ -745,19 +726,19 @@ public abstract class TestOmSnapshotFileSystem {
         () -> fs.listStatus(snapshotRoot));
     assertEquals(String.format("Unable to load snapshot. " +
             "Snapshot with table key '/%s/%s/%s' is no longer active",
-        volumeName, bucketName, snapshotName), exception.getMessage());
+        VOLUME_NAME, bucketName, snapshotName), exception.getMessage());
   }
 
   private String createSnapshot(String snapshotName)
       throws IOException, InterruptedException, TimeoutException {
 
     // create snapshot
-    writeClient.createSnapshot(volumeName, bucketName, snapshotName);
+    writeClient.createSnapshot(VOLUME_NAME, bucketName, snapshotName);
 
     // wait till the snapshot directory exists
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
+        .get(SnapshotInfo.getTableKey(VOLUME_NAME, bucketName, snapshotName));
     String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
         OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
@@ -767,6 +748,6 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   private void deleteSnapshot(String snapshotName) throws IOException {
-    writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+    writeClient.deleteSnapshot(VOLUME_NAME, bucketName, snapshotName);
   }
 }
