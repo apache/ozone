@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.debug;
 import com.google.common.collect.Sets;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -62,7 +61,7 @@ import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
 
 /**
  * Parser for a list of container IDs, to scan for keys.
@@ -177,7 +176,6 @@ public class ContainerKeyScanner implements Callable<Void>,
     return spec.commandLine().getOut();
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public Map<Long, Path> getAbsolutePathForObjectIDs(
       long bucketId, String prefix, Optional<Set<Long>> dirObjIds) {
     // Root of a bucket would always have the
@@ -188,7 +186,7 @@ public class ContainerKeyScanner implements Callable<Void>,
     Set<Long> objIds = Sets.newHashSet(dirObjIds.get());
     Map<Long, Path> objectIdPathMap = new HashMap<>();
     Queue<Pair<Long, Path>> objectIdPathVals = new LinkedList<>();
-    Pair<Long, Path> root = Pair.of(bucketId, Paths.get(OZONE_URI_DELIMITER));
+    Pair<Long, Path> root = Pair.of(bucketId, ROOT_PATH);
     objectIdPathVals.add(root);
     addToPathMap(root, objIds, objectIdPathMap);
 
