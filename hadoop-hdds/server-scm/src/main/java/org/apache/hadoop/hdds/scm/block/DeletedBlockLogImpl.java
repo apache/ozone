@@ -373,8 +373,6 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
               }
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
-              getSCMDeletedBlockTransactionStatusManager().
-                  recordTransactionCommitted(txn.getTxID());
             }
           } catch (ContainerNotFoundException ex) {
             LOG.warn("Container: " + id + " was not found for the transaction: "

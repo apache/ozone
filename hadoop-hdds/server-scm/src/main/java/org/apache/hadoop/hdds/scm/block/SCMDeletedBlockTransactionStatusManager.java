@@ -139,7 +139,7 @@ public class SCMDeletedBlockTransactionStatusManager
       //   - The command was sent and received by the DN,
       //     and is waiting to be executed.
       //   - The Command sent and being executed by DN
-      SENT,
+      SENT
     }
 
     protected static final class CmdStatusData {
@@ -419,11 +419,8 @@ public class SCMDeletedBlockTransactionStatusManager
     scmDeleteBlocksCommandStatusManager.recordScmCommand(
         SCMDeleteBlocksCommandStatusManager
             .createScmCmdStatusData(dnId, scmCmdId, dnTxSet));
-  }
-
-  public void recordTransactionCommitted(long txId) {
-    transactionToDNsCommitMap
-        .putIfAbsent(txId, new LinkedHashSet<>());
+    dnTxSet.forEach(txId -> transactionToDNsCommitMap
+        .putIfAbsent(txId, new LinkedHashSet<>()));
   }
 
   public void clear() {
