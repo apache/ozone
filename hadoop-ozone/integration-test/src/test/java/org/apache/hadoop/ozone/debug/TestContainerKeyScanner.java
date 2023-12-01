@@ -150,7 +150,7 @@ public class TestContainerKeyScanner {
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
 
-    Assertions.assertEquals(KEYS_FOUND_OUTPUT, stdout.toString());
+    Assertions.assertTrue(stdout.toString().contains(KEYS_FOUND_OUTPUT));
 
     Assertions.assertTrue(stderr.toString().isEmpty());
   }
@@ -172,7 +172,7 @@ public class TestContainerKeyScanner {
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
 
-    Assertions.assertEquals(KEYS_NOT_FOUND_OUTPUT, stdout.toString());
+    Assertions.assertTrue(stdout.toString().contains(KEYS_NOT_FOUND_OUTPUT));
 
     Assertions.assertTrue(stderr.toString().isEmpty());
   }

@@ -97,14 +97,24 @@ public class ContainerKeyScanner implements Callable<Void>,
 
   @Override
   public Void call() throws Exception {
+    long start = System.currentTimeMillis();
     directoryTable = getDirectoryTableData(parent.getDbPath());
+    long end = System.currentTimeMillis();
+    out().println("directoryTable loaded in " + (end - start) + " ms.");
 
     ContainerKeyInfoWrapper containerKeyInfoWrapper =
         scanDBForContainerKeys(parent.getDbPath());
 
     printOutput(containerKeyInfoWrapper);
 
+    closeStdChannels();
+
     return null;
+  }
+
+  private void closeStdChannels() {
+    out().close();
+    err().close();
   }
 
   private Map<String, OmDirectoryInfo> getDirectoryTableData(String dbPath)
@@ -171,12 +181,9 @@ public class ContainerKeyScanner implements Callable<Void>,
     return spec.commandLine().getOut();
   }
 
-  // TODO optimize this method to use single objectId instead of a set
-  //  and to return pair of objectId and path instead of a map.
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public Map<Long, Path> getAbsolutePathForObjectIDs(
-      long bucketId, String prefix, Optional<Set<Long>> dirObjIds)
-      throws IOException, RocksDBException {
+      long bucketId, String prefix, Optional<Set<Long>> dirObjIds) {
     // Root of a bucket would always have the
     // key as /volumeId/bucketId/bucketId/
     if (!dirObjIds.isPresent() || dirObjIds.get().isEmpty()) {
@@ -255,7 +262,7 @@ public class ContainerKeyScanner implements Callable<Void>,
                             ManagedRocksDB db,
                             List<ContainerKeyInfo> containerKeyInfos,
                             String tableName, String dbPath)
-      throws IOException, RocksDBException {
+      throws IOException {
     long keysProcessed = 0;
     DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
         dbDefinition.getColumnFamily(tableName);
@@ -303,8 +310,7 @@ public class ContainerKeyScanner implements Callable<Void>,
                 // Generate asbolute key path for FSO keys
                 StringBuilder keyName = new StringBuilder();
                 if (tableName.equals(FILE_TABLE)) {
-                  keyName.append(
-                      getFsoKeyPrefix(dbPath, volumeId, bucketId, value));
+                  keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
                 }
                 keyName.append(value.getKeyName());
                 containerKeyInfos.add(
@@ -331,9 +337,8 @@ public class ContainerKeyScanner implements Callable<Void>,
     return path;
   }
 
-  private String getFsoKeyPrefix(String dbPath, long volumeId, long bucketId,
-                                 OmKeyInfo value)
-      throws IOException, RocksDBException {
+  private String getFsoKeyPrefix(long volumeId, long bucketId,
+                                 OmKeyInfo value) {
     String prefix =
         OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId +
             OM_KEY_PREFIX;
@@ -380,12 +385,9 @@ public class ContainerKeyScanner implements Callable<Void>,
     List<ContainerKeyInfo> containerKeyInfos =
         containerKeyInfoWrapper.getContainerKeyInfos();
     if (containerKeyInfos.isEmpty()) {
-      try (PrintWriter out = out()) {
-        out.println("No keys were found for container IDs: " +
-            containerIds);
-        out.println(
-            "Keys processed: " + containerKeyInfoWrapper.getKeysProcessed());
-      }
+      out().println("No keys were found for container IDs: " + containerIds);
+      out().println(
+          "Keys processed: " + containerKeyInfoWrapper.getKeysProcessed());
       return;
     }
 
@@ -406,9 +408,8 @@ public class ContainerKeyScanner implements Callable<Void>,
     String prettyJson = gson.toJson(
         new ContainerKeyInfoResponse(containerKeyInfoWrapper.getKeysProcessed(),
             infoMap));
-    try (PrintWriter out = out()) {
-      out.println(prettyJson);
-    }
+
+    out().println(prettyJson);
   }
 
 }
