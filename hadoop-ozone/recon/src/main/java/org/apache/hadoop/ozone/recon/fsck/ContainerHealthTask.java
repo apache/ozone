@@ -416,8 +416,7 @@ public class ContainerHealthTask extends ReconScmTask {
           records.add(
               recordForState(container, UnHealthyContainerStates.MISSING,
                   time));
-          populateContainerStats(container,
-              UnHealthyContainerStates.MISSING.toString(),
+          populateContainerStats(container, UnHealthyContainerStates.MISSING,
               unhealthyContainerStateStatsMap);
         } else {
           if (LOG.isDebugEnabled()) {
@@ -429,7 +428,7 @@ public class ContainerHealthTask extends ReconScmTask {
               recordForState(container, UnHealthyContainerStates.EMPTY_MISSING,
                   time));
           populateContainerStats(container,
-              UnHealthyContainerStates.EMPTY_MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING,
               unhealthyContainerStateStatsMap);
         }
         // A container cannot have any other records if it is missing so return
@@ -442,7 +441,7 @@ public class ContainerHealthTask extends ReconScmTask {
         records.add(recordForState(
             container, UnHealthyContainerStates.UNDER_REPLICATED, time));
         populateContainerStats(container,
-            UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+            UnHealthyContainerStates.UNDER_REPLICATED,
             unhealthyContainerStateStatsMap);
       }
 
@@ -452,7 +451,7 @@ public class ContainerHealthTask extends ReconScmTask {
         records.add(recordForState(
             container, UnHealthyContainerStates.OVER_REPLICATED, time));
         populateContainerStats(container,
-            UnHealthyContainerStates.OVER_REPLICATED.toString(),
+            UnHealthyContainerStates.OVER_REPLICATED,
             unhealthyContainerStateStatsMap);
       }
 
@@ -462,7 +461,7 @@ public class ContainerHealthTask extends ReconScmTask {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
         populateContainerStats(container,
-            UnHealthyContainerStates.MIS_REPLICATED.toString(),
+            UnHealthyContainerStates.MIS_REPLICATED,
             unhealthyContainerStateStatsMap);
       }
 
@@ -561,7 +560,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private static void populateContainerStats(
       ContainerHealthStatus container,
-      String unhealthyState,
+      UnHealthyContainerStates unhealthyState,
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
     if (unhealthyContainerStateStatsMap.containsKey(unhealthyState)) {

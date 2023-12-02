@@ -364,7 +364,7 @@ public class TestContainerHealthTaskRecordGenerator {
             unhealthyContainerStateStatsMap);
     assertEquals(1, records.size());
     rec = records.get(0);
-    assertEquals(UnHealthyContainerStates.MISSING,
+    assertEquals(UnHealthyContainerStates.MISSING.toString(),
         rec.getContainerState());
     assertEquals(1, unhealthyContainerStateStatsMap.get(
             UnHealthyContainerStates.MISSING)
