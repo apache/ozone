@@ -34,18 +34,14 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  */
 public class ManagedSSTDumpTool {
 
-  static {
-    NativeLibraryLoader.getInstance()
-        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
-  }
-
   private int bufferCapacity;
   private ExecutorService executorService;
 
   public ManagedSSTDumpTool(ExecutorService executorService,
                             int bufferCapacity)
       throws NativeLibraryNotLoadedException {
-    if (!NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
+    if (!NativeLibraryLoader.getInstance()
+        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
       throw new NativeLibraryNotLoadedException(
           ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }

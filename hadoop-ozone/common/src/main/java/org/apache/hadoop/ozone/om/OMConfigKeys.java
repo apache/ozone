@@ -33,6 +33,11 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.sst_dumptool.pool.size";
   public static final int
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+
+  public static final String OZONE_OM_SNAPSHOT_NATIVE_LIB_ENABLED_DIFF =
+      "ozone.om.snapshot.native.lib.enabled.diff";
+  public static final boolean OZONE_OM_SNAPSHOT_NATIVE_LIB_ENABLED_DIFF_DEFAULT
+      = true;
   public static final String
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
       "ozone.om.snapshot.sst_dumptool.buffer.size";

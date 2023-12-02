@@ -289,28 +289,31 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
-    try {
-      int threadPoolSize = conf.getInt(
-              OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
-              OMConfigKeys
-                  .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
-      int bufferSize = (int) conf.getStorageSize(
-          OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
-          OMConfigKeys
-              .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
-              StorageUnit.BYTES);
-      this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
-              threadPoolSize, 60, TimeUnit.SECONDS,
-              new SynchronousQueue<>(), new ThreadFactoryBuilder()
-          .setNameFormat(ozoneManager.getThreadNamePrefix() +
-              "snapshot-diff-manager-sst-dump-tool-TID-%d")
-              .build(),
-              new ThreadPoolExecutor.DiscardPolicy()));
-      return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecService.get(),
-          bufferSize));
-    } catch (NativeLibraryNotLoadedException e) {
-      this.sstDumpToolExecService.ifPresent(exec ->
-          closeExecutorService(exec, "SstDumpToolExecutor"));
+    if (conf.getBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_NATIVE_LIB_ENABLED_DIFF,
+        OMConfigKeys.OZONE_OM_SNAPSHOT_NATIVE_LIB_ENABLED_DIFF_DEFAULT)) {
+      try {
+        int threadPoolSize = conf.getInt(
+                OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
+                OMConfigKeys
+                    .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
+        int bufferSize = (int) conf.getStorageSize(
+            OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
+            OMConfigKeys
+                .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
+                StorageUnit.BYTES);
+        this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
+                threadPoolSize, 60, TimeUnit.SECONDS,
+                new SynchronousQueue<>(), new ThreadFactoryBuilder()
+            .setNameFormat(ozoneManager.getThreadNamePrefix() +
+                "snapshot-diff-manager-sst-dump-tool-TID-%d")
+                .build(),
+                new ThreadPoolExecutor.DiscardPolicy()));
+        return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecService.get(),
+            bufferSize));
+      } catch (NativeLibraryNotLoadedException e) {
+        this.sstDumpToolExecService.ifPresent(exec ->
+            closeExecutorService(exec, "SstDumpToolExecutor"));
+      }
     }
     return Optional.empty();
   }
