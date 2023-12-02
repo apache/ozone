@@ -725,7 +725,7 @@ public final class S3GatewayMetrics implements MetricsSource {
     return listS3BucketsFailure.value();
   }
 
-  private long updateAndGetStats(MutableRate metric, long startNanos) {
+  private long updateAndGetStats(PerformanceMetrics metric, long startNanos) {
     long value = Time.monotonicNowNanos() - startNanos;
     metric.add(value);
     return value;
