@@ -16,16 +16,23 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.freon.containergenerator.GeneratorDatanode;
 import org.apache.hadoop.ozone.freon.containergenerator.GeneratorOm;
 import org.apache.hadoop.ozone.freon.containergenerator.GeneratorScm;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,9 +118,31 @@ public class Freon extends GenericCli {
     }
   }
 
+  private void setHttpBaseDir()
+      throws IOException {
+    if (StringUtils.isEmpty(conf.get(
+        OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
+      //Setting ozone.http.basedir to cwd if not set so that server setup
+      // doesn't fail.
+      File tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+          "ozone_freon_tmp_base_dir").toFile();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          FileUtils.deleteDirectory(tmpMetaDir);
+        } catch (IOException e) {
+          LOG.error("Failed to cleanup temporary Freon Metadir {}",
+              tmpMetaDir.getAbsolutePath(), e);
+        }
+      }, 0);
+      conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+          tmpMetaDir.getAbsolutePath());
+    }
+  }
+
   public void startHttpServer() {
     if (httpServer) {
       try {
+        setHttpBaseDir();
         freonHttpServer = new FreonHttpServer(conf);
         freonHttpServer.start();
       } catch (IOException e) {
