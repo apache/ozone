@@ -323,6 +323,13 @@ public class TestDeletedBlockLog {
           transactions.getDatanodeTransactionMap().get(dn.getUuid()))
           .orElseGet(LinkedList::new));
     }
+    // Simulated transactions are sent
+    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+        transactions.getDatanodeTransactionMap().entrySet()) {
+      DeleteBlocksCommand command = new DeleteBlocksCommand(entry.getValue());
+      recordScmCommandToStatusManager(entry.getKey(), command);
+      sendSCMDeleteBlocksCommand(entry.getKey(), command);
+    }
     return txns;
   }
 
@@ -439,6 +446,9 @@ public class TestDeletedBlockLog {
     }
 
     // Increment for the reset transactions.
+    // Lets the SCM delete the transaction and wait for the DN reply
+    // to timeout, thus allowing the transaction to resend the
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
     incrementCount(txIDs);
     blocks = getAllTransactions();
     for (DeletedBlocksTransaction block : blocks) {
@@ -450,6 +460,7 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testCommitTransactions() throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
     addTransactions(generateData(50), true);
     mockContainerHealthResult(true);
     List<DeletedBlocksTransaction> blocks =
@@ -466,6 +477,12 @@ public class TestDeletedBlockLog {
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
+    blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);
+    // SCM will not repeat a transaction until it has timed out.
+    Assertions.assertEquals(0, blocks.size());
+    // Lets the SCM delete the transaction and wait for the DN reply
+    // to timeout, thus allowing the transaction to resend the
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
     blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);
     // only uncommitted dn have transactions
     Assertions.assertEquals(30, blocks.size());
@@ -566,6 +583,7 @@ public class TestDeletedBlockLog {
     // - If the DN reports the command status as PENDING;
     addTransactions(generateData(10), true);
     int blockLimit = 2 * BLOCKS_PER_TXN * THREE;
+    mockContainerHealthResult(true);
 
     // If the command has not been sent
     DatanodeDeletedBlockTransactions transactions1 =
@@ -611,6 +629,7 @@ public class TestDeletedBlockLog {
     deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
     addTransactions(generateData(10), true);
     int blockLimit = 2 * BLOCKS_PER_TXN * THREE;
+    mockContainerHealthResult(true);
 
     // - DN does not refresh the PENDING state for more than a period of time;
     DatanodeDeletedBlockTransactions transactions =
@@ -670,9 +689,7 @@ public class TestDeletedBlockLog {
     // For the first 30 txn, deletedBlockLog only has the txn from dn1 and dn2
     // For the rest txn, txn will be got from all dns.
     // Committed txn will be: 1-40. 1-40. 31-40
-    commitTransactions(deletedBlockLog.getTransactions(
-        30 * BLOCKS_PER_TXN * THREE,
-        dnList.stream().collect(Collectors.toSet())));
+    commitTransactions(getTransactions(30 * BLOCKS_PER_TXN * THREE));
 
     // The rest txn shall be: 41-50. 41-50. 41-50
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
@@ -764,6 +781,7 @@ public class TestDeletedBlockLog {
   @Test
   public void testDeletedBlockTransactions()
       throws IOException, TimeoutException {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
     mockContainerHealthResult(true);
     int txNum = 10;
     List<DeletedBlocksTransaction> blocks;
@@ -796,9 +814,21 @@ public class TestDeletedBlockLog {
     // add two transactions for same container
     containerID = blocks.get(0).getContainerID();
     Map<Long, List<Long>> deletedBlocksMap = new HashMap<>();
-    deletedBlocksMap.put(containerID, new LinkedList<>());
+    Random random = new Random();
+    long localId = random.nextLong();
+    deletedBlocksMap.put(containerID, new LinkedList<>(
+        Collections.singletonList(localId)));
     addTransactions(deletedBlocksMap, true);
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
+    // Only newly added Blocks will be sent, as previously sent transactions
+    // that have not yet timed out will not be sent.
+    Assertions.assertEquals(1, blocks.size());
+    Assertions.assertEquals(1, blocks.get(0).getLocalIDCount());
+    Assertions.assertEquals(blocks.get(0).getLocalID(0), localId);
 
+    // Lets the SCM delete the transaction and wait for the DN reply
+    // to timeout, thus allowing the transaction to resend the
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
     // get should return two transactions for the same container
     blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
     Assertions.assertEquals(2, blocks.size());
