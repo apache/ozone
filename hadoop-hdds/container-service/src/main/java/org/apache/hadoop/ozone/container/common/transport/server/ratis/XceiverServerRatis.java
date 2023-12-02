@@ -259,41 +259,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final long raftSegmentPreallocatedSize =
         setRaftSegmentPreallocatedSize(properties);
 
-    TimeUnit timeUnit;
-    long duration;
-
-    // set the configs enable and set the stateMachineData sync timeout
-    RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
+    // setup ratis stream if datastream is enabled
     if (streamEnable) {
       setUpRatisStream(properties);
     }
 
-    timeUnit = OzoneConfigKeys.
-        DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
-    duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
-            .getDuration(), timeUnit);
-    final TimeDuration dataSyncTimeout =
-        TimeDuration.valueOf(duration, timeUnit);
-    RaftServerConfigKeys.Log.StateMachineData
-        .setSyncTimeout(properties, dataSyncTimeout);
-    // typically a pipeline close will be initiated after a node failure
-    // timeout from Ratis in case a follower does not respond.
-    // By this time, all the writeStateMachine calls should be stopped
-    // and IOs should fail.
-    // Even if the leader is not able to complete write calls within
-    // the timeout seconds, it should just fail the operation and trigger
-    // pipeline close. failing the writeStateMachine call with limited retries
-    // will ensure even the leader initiates a pipeline close if its not
-    // able to complete write in the timeout configured.
-
-    // NOTE : the default value for the retry count in ratis is -1,
-    // which means retry indefinitely.
-    RaftServerConfigKeys.Log.StateMachineData
-            .setSyncTimeoutRetry(properties, (int) nodeFailureTimeoutMs /
-                    dataSyncTimeout.toIntExact(TimeUnit.MILLISECONDS));
+    // Set Ratis State Machine Data configurations
+    setStateMachineDataConfigurations(properties);
 
     // set timeout for a retry cache entry
     setTimeoutForRetryCache(properties);
@@ -352,17 +324,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         properties, logQueueNumElements);
     RaftServerConfigKeys.Log.setQueueByteLimit(properties,
         SizeInBytes.valueOf(logQueueByteLimit));
-
-    int numSyncRetries = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT);
-    RaftServerConfigKeys.Log.StateMachineData.setSyncTimeoutRetry(properties,
-        numSyncRetries);
-
-    // Enable the StateMachineCaching
-    RaftServerConfigKeys.Log.StateMachineData.setCachingEnabled(
-        properties, true);
 
     RaftServerConfigKeys.Log.Appender.setInstallSnapshotEnabled(properties,
         false);
@@ -462,6 +423,62 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Preconditions.assertTrue(raftSegmentBufferSize <= raftSegmentSize,
         () -> "raftSegmentBufferSize = " + raftSegmentBufferSize
             + " > raftSegmentSize = " + raftSegmentSize);
+  }
+
+  private void setStateMachineDataConfigurations(RaftProperties properties) {
+    // set the configs enable and set the stateMachineData sync timeout
+    RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
+
+    TimeUnit timeUnit = OzoneConfigKeys.
+        DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
+    long duration = conf.getTimeDuration(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
+            .getDuration(), timeUnit);
+    final TimeDuration dataSyncTimeout =
+        TimeDuration.valueOf(duration, timeUnit);
+    RaftServerConfigKeys.Log.StateMachineData
+        .setSyncTimeout(properties, dataSyncTimeout);
+    // typically a pipeline close will be initiated after a node failure
+    // timeout from Ratis in case a follower does not respond.
+    // By this time, all the writeStateMachine calls should be stopped
+    // and IOs should fail.
+    // Even if the leader is not able to complete write calls within
+    // the timeout seconds, it should just fail the operation and trigger
+    // pipeline close. failing the writeStateMachine call with limited retries
+    // will ensure even the leader initiates a pipeline close if its not
+    // able to complete write in the timeout configured.
+
+    // NOTE : the default value for the retry count in ratis is -1,
+    // which means retry indefinitely.
+    int syncTimeoutRetryDefault = (int) nodeFailureTimeoutMs /
+        dataSyncTimeout.toIntExact(TimeUnit.MILLISECONDS);
+    int numSyncRetries = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
+        syncTimeoutRetryDefault);
+    RaftServerConfigKeys.Log.StateMachineData.setSyncTimeoutRetry(properties,
+        numSyncRetries);
+
+    // Enable the StateMachineCaching
+    // By enabling caching, the state machine data (e.g. write chunk data)
+    // will not be cached in Ratis log cache. The caching
+    // responsibility is deferred to the StateMachine implementation itself.
+    // ContainerStateMachine contains stateMachineDataCache that stores
+    // write chunk data for each log entry index.
+    //
+    // Note that in Ratis, the state machine data is never stored as
+    // part of the persisted Raft log entry. This means that the state
+    // machine data (in this case, the write chunk data) is only stored in the
+    // stateMachineDataCache until it's persisted in datanode storage
+    // (See ContainerStateMachine#writeStateMachineData)
+    //
+    // This requires ContainerStateMachine to implements additional mechanisms
+    // such as returning the state machine data in StateMachine#read to
+    // read back the state machine data that will be sent to the Ratis
+    // followers.
+    RaftServerConfigKeys.Log.StateMachineData.setCachingEnabled(
+        properties, true);
   }
 
   private RpcType setRpcType(RaftProperties properties) {
