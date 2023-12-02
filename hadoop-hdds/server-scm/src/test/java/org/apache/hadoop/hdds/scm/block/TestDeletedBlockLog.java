@@ -291,16 +291,6 @@ public class TestDeletedBlockLog {
         .collect(Collectors.toList()));
   }
 
-  private void commitTransactions(DatanodeDeletedBlockTransactions
-      transactions) {
-    transactions.getDatanodeTransactionMap().forEach((uuid,
-        deletedBlocksTransactions) ->
-        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-        .commitTransactions(deletedBlocksTransactions.stream()
-            .map(this::createDeleteBlockTransactionResult)
-            .collect(Collectors.toList()), uuid));
-  }
-
   private DeleteBlockTransactionResult createDeleteBlockTransactionResult(
       DeletedBlocksTransaction transaction) {
     return DeleteBlockTransactionResult.newBuilder()
