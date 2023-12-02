@@ -321,14 +321,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.segment.buffer.size</name>
-    <value>2MB</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment buffer used
-      by Apache Ratis on datanodes. (2 MB by default)
-    </description>
-  </property>
-  <property>
     <name>dfs.container.ratis.segment.preallocated.size</name>
     <value>4MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>

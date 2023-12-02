@@ -103,7 +103,6 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.RaftServerRpc;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
-import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 import org.apache.ratis.util.TraditionalBinaryPrefix;
@@ -111,6 +110,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
@@ -428,40 +434,40 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    int logAppenderQueueNumElements = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
-        OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
-    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-        OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-        StorageUnit.BYTES);
-    RaftServerConfigKeys.Log.Appender
-        .setBufferElementLimit(properties, logAppenderQueueNumElements);
-    RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties,
-        SizeInBytes.valueOf(logAppenderQueueByteLimit));
     RaftServerConfigKeys.Log.setPreallocatedSize(properties,
         SizeInBytes.valueOf(raftSegmentPreallocatedSize));
     return raftSegmentPreallocatedSize;
   }
 
   private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
-    final long raftSegmentSize = (long) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
+    final int logAppenderQueueNumElements = conf.getInt(
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
+    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
+
+    final long raftSegmentSize = (long) conf.getStorageSize(
+        DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
+        DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    final long raftSegmentBufferSize = logAppenderQueueByteLimit + 8;
+
+    assertTrue(raftSegmentBufferSize <= raftSegmentSize,
+        () -> DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT + " = "
+            + logAppenderQueueByteLimit
+            + " must be <= (" + DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY + " - 8"
+            + " = " + (raftSegmentSize - 8) + ")");
+
+    RaftServerConfigKeys.Log.Appender.setBufferElementLimit(properties,
+        logAppenderQueueNumElements);
+    RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties,
+        SizeInBytes.valueOf(logAppenderQueueByteLimit));
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
-    final long raftSegmentBufferSize = (long) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setWriteBufferSize(properties,
-            SizeInBytes.valueOf(raftSegmentBufferSize));
-    Preconditions.assertTrue(raftSegmentBufferSize <= raftSegmentSize,
-        () -> "raftSegmentBufferSize = " + raftSegmentBufferSize
-            + " > raftSegmentSize = " + raftSegmentSize);
+        SizeInBytes.valueOf(raftSegmentBufferSize));
   }
 
   private RpcType setRpcType(RaftProperties properties) {
