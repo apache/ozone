@@ -27,7 +27,7 @@ import java.util.function.Supplier;
  * Defines audit message structure.
  */
 public final class AuditMessage implements Message {
-  private final Supplier<String> messageSupplier;
+  private final transient Supplier<String> messageSupplier;
   private final String op;
   private final Throwable throwable;
 
