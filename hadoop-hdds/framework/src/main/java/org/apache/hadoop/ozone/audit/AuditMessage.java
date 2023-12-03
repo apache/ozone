@@ -27,6 +27,9 @@ import java.util.function.Supplier;
  * Defines audit message structure.
  */
 public final class AuditMessage implements Message {
+
+  private static final long serialVersionUID = 1L;
+
   private final transient Supplier<String> messageSupplier;
   private final String op;
   private final Throwable throwable;
