@@ -97,6 +97,14 @@
     </description>
   </property>
   <property>
+    <name>dfs.container.ratis.statemachinedata.sync.retries</name>
+    <value>-1</value>
+    <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
+    <description>Number of times the WriteStateMachineData op will be tried
+      before failing, if this value is -1, then this retries indefinitely.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.log.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
