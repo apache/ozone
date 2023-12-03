@@ -183,13 +183,13 @@ public class TestDatanodeConfiguration {
 
     final DatanodeRatisServerConfig ratisConf = conf.getObject(
         DatanodeRatisServerConfig.class);
-    Assertions.assertEquals(1, ratisConf.getLogAppenderWaitTimeMin(),
+    Assertions.assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
-    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
-    ratisConf.setLogAppenderWaitTimeMin(0);
-    conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ZERO, conf);
+    ratisConf.setLogAppenderWaitTimeMin(1);
+    conf.setFromObject(ratisConf);
+    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
   }
 
   static void assertWaitTimeMin(TimeDuration expected,
