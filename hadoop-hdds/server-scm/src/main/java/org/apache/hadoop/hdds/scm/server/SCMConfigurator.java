@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -36,6 +37,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority
     .CertificateServer;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
+
+import java.time.Clock;
 
 /**
  * This class acts as an SCM builder Class. This class is important for us
@@ -77,6 +80,7 @@ public final class SCMConfigurator {
   private NetworkTopology networkTopology;
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
+  private Clock clock;
   private WritableContainerFactory writableContainerFactory;
   private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
       finalizationExecutor;
@@ -161,7 +165,6 @@ public final class SCMConfigurator {
   public void setNetworkTopology(NetworkTopology networkTopology) {
     this.networkTopology = networkTopology;
   }
-
   /**
    * Allows user to specify a custom version of SCMHAManager to be
    * used with this SCM.
@@ -179,6 +182,10 @@ public final class SCMConfigurator {
   public void setScmContext(SCMContext scmContext) {
     this.scmContext = scmContext;
   }
+
+  /**
+   * Allows user to set the clock to be used with SCM
+   */
 
   /**
    * Allows user to set the WritableContainerFactory to be used with this SCM.
@@ -210,9 +217,13 @@ public final class SCMConfigurator {
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
+  public void setClock(Clock clock) {
+    this.clock = clock;
+  }
   public NodeManager getScmNodeManager() {
     return scmNodeManager;
   }
+  public Clock getClock() {return clock; }
 
   /**
    * Get Pipeline Manager.

@@ -632,9 +632,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @SuppressWarnings("methodLength")
   private void initializeSystemManagers(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
-    // Use SystemClock when data is persisted
-    // and used again after system restarts.
-    systemClock = Clock.system(ZoneOffset.UTC);
+    if (configurator.getClock() != null) {
+      systemClock = configurator.getClock();
+    } else {
+      // Use SystemClock when data is persisted
+      // and used again after system restarts.
+      systemClock = Clock.system(ZoneOffset.UTC);
+    }
 
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();

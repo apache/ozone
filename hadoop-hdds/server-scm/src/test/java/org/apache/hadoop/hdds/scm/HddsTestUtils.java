@@ -86,6 +86,7 @@ import org.apache.hadoop.security.authentication.client
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -619,6 +620,16 @@ public final class HddsTestUtils {
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+    return getScm(conf, configurator);
+  }
+  public static StorageContainerManager getScm(OzoneConfiguration conf, Clock clock)
+          throws IOException, AuthenticationException {
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
+    if(clock != null) {
+      configurator.setClock(clock);
+    }
     return getScm(conf, configurator);
   }
 
