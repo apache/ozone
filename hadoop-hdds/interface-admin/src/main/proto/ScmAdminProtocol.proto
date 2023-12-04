@@ -302,11 +302,11 @@ message SCMCloseContainerRequestProto {
 }
 
 message SCMCloseContainerResponseProto {
-  enum Error {
+  enum Status {
     OK = 1;
     CONTAINER_ALREADY_CLOSED = 2;
   }
-  required Error errorCode = 1;
+  optional Status status = 1;
 }
 
 /*

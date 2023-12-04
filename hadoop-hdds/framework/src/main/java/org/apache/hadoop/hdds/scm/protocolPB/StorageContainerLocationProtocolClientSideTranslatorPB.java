@@ -86,6 +86,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
@@ -124,6 +125,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -576,13 +578,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setTraceID(TracingUtil.exportCurrentSpan())
         .setContainerID(containerID)
         .build();
-    StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto
-        response = submitRequest(Type.CloseContainer,
+    SCMCloseContainerResponseProto response = submitRequest(Type.CloseContainer,
           builder -> builder.setScmCloseContainerRequest(
             request)).getScmCloseContainerResponse();
-    if (response.getErrorCode().equals(
-        StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.
-            Error.CONTAINER_ALREADY_CLOSED)) {
+    if (response.hasStatus() && response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSED)) {
       String errorMessage =
           String.format("Container %s already closed", containerID);
       throw new IOException(errorMessage);

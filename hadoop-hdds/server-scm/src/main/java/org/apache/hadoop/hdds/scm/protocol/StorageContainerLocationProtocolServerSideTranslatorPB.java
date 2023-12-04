@@ -872,14 +872,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     } catch (SCMException exception) {
       if (exception.getResult()
           .equals(SCMException.ResultCodes.CONTAINER_ALREADY_CLOSED)) {
-        return SCMCloseContainerResponseProto.newBuilder().setErrorCode(
-                SCMCloseContainerResponseProto.Error.CONTAINER_ALREADY_CLOSED)
+        return SCMCloseContainerResponseProto.newBuilder().setStatus(
+            SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED)
             .build();
       }
       throw exception;
     }
-    return SCMCloseContainerResponseProto.newBuilder()
-        .setErrorCode(SCMCloseContainerResponseProto.Error.OK).build();
+    return SCMCloseContainerResponseProto.newBuilder().build();
   }
 
   public PipelineResponseProto allocatePipeline(
