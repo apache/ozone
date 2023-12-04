@@ -27,9 +27,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <description>Apache Ozone Integration Tests</description>
   <name>Apache Ozone Integration Tests</name>
   <packaging>jar</packaging>
-  <properties>
-<!--    <allow.junit4>false</allow.junit4>-->
-  </properties>
+
   <dependencies>
 
     <dependency>
@@ -119,6 +117,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
