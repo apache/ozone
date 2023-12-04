@@ -249,7 +249,8 @@ public class TestObjectStoreWithFSO {
 
     // Create a key.
     ozoneBucket.createKey(key, 10).close();
-    assertFalse(cluster.getOzoneManager().getMetadataManager().isBucketEmpty(testVolumeName, testBucketName));
+    assertFalse(cluster.getOzoneManager().getMetadataManager().isBucketEmpty(
+        testVolumeName, testBucketName));
 
     try {
       // Try to delete the bucket while a key is present under it.
