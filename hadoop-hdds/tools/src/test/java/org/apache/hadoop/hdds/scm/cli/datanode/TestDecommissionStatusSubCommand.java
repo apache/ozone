@@ -55,12 +55,11 @@ public class TestDecommissionStatusSubCommand {
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
   private DecommissionStatusSubCommand cmd;
-  private DecommissionSubCommand decomCmd;
+  private List<HddsProtos.Node> nodes = getNodeDetails(2);
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new DecommissionStatusSubCommand();
-    decomCmd = new DecommissionSubCommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
@@ -75,13 +74,9 @@ public class TestDecommissionStatusSubCommand {
   public void testSuccessWhenDecommissionStatus() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> getNodeDetails(2));
+        .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
 
-    CommandLine c = new CommandLine(decomCmd);
-    c.parseArgs("host0", "host1"); // decommission 2 nodes
-    decomCmd.execute(scmClient);
     cmd.execute(scmClient);
-
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
             "DECOMMISSIONING\\s-\\s2\\snode\\(s\\)\n");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -108,23 +103,25 @@ public class TestDecommissionStatusSubCommand {
         "DECOMMISSIONING\\s-\\s0\\snode\\(s\\)\n");
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+
+    // no host details are shown
+    p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+    p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
   }
 
   @Test
   public void testIdOptionDecommissionStatusSuccess() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    List<HddsProtos.Node> nodes = getNodeDetails(2);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes);
+        .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
 
-    CommandLine decom = new CommandLine(decomCmd);
-    decom.parseArgs("host0", "host1"); // decommission 2 nodes
-    decomCmd.execute(scmClient);
-    UUID uuid = DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())
-        .getUuid();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--id", uuid.toString());
-    cmd.execute(scmClient);
+    c.parseArgs("--id", nodes.get(0).getNodeID().getUuid());
+    cmd.execute(scmClient); // check status of host0
 
     Pattern p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -139,30 +136,23 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIdOptionDecommissionStatusFail() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    List<HddsProtos.Node> nodes = getNodeDetails(2);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes.subList(0, 1));
+        .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
 
-    CommandLine decom = new CommandLine(decomCmd);
-    decom.parseArgs("host0"); //decommission only host0
-    decomCmd.execute(scmClient);
-
-    UUID uuid = DatanodeDetails.getFromProtoBuf(nodes.get(1)
-        .getNodeID()).getUuid();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--id", uuid.toString()); //check status for host1
-    cmd.execute(scmClient);
+    c.parseArgs("--id", nodes.get(1).getNodeID().getUuid());
+    cmd.execute(scmClient); // check status of host1
 
     Pattern p = Pattern.compile("Datanode:\\s(.*)\\sis\\snot\\sin" +
             "\\sDECOMMISSIONING", Pattern.MULTILINE);
     Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
+    // no host details are shown
     p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
-
-    p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -170,18 +160,12 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIpOptionDecommissionStatusSuccess() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    List<HddsProtos.Node> nodes = getNodeDetails(2);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes);
+        .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
 
-    CommandLine decom = new CommandLine(decomCmd);
-    decom.parseArgs("host0", "host1"); // decommission 2 nodes
-    decomCmd.execute(scmClient);
-    String ip = DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())
-        .getIpAddress();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--ip", ip);
-    cmd.execute(scmClient);
+    c.parseArgs("--ip", nodes.get(1).getNodeID().getIpAddress());
+    cmd.execute(scmClient); // check status of host1
 
     Pattern p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -196,19 +180,12 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIpOptionDecommissionStatusFail() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    List<HddsProtos.Node> nodes = getNodeDetails(2);
     Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes.subList(0, 1));
+        .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
 
-    CommandLine decom = new CommandLine(decomCmd);
-    decom.parseArgs("host0"); // decommission only host0
-    decomCmd.execute(scmClient);
-
-    String ip = DatanodeDetails.getFromProtoBuf(nodes.get(1)
-        .getNodeID()).getIpAddress();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--ip", ip); // check status for host1
-    cmd.execute(scmClient);
+    c.parseArgs("--ip", nodes.get(1).getNodeID().getIpAddress());
+    cmd.execute(scmClient); // check status of host1
 
     Pattern p = Pattern.compile("Datanode:\\s(.*)\\sis\\snot\\sin" +
         "\\sDECOMMISSIONING", Pattern.MULTILINE);
@@ -219,7 +196,7 @@ public class TestDecommissionStatusSubCommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
 
-    p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -241,7 +218,7 @@ public class TestDecommissionStatusSubCommand {
 
       HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();
       builder.addNodeOperationalStates(
-          HddsProtos.NodeOperationalState.IN_SERVICE);
+          HddsProtos.NodeOperationalState.DECOMMISSIONING);
       builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       builder.setNodeID(dnd.build());
       nodes.add(builder.build());

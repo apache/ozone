@@ -28,6 +28,7 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 
@@ -55,27 +56,25 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     List<HddsProtos.Node> decommissioningNodes;
-
+    Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
+        null, HddsProtos.QueryScope.CLUSTER, "").stream();
     if (!Strings.isNullOrEmpty(uuid)) {
-      decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
-          HddsProtos.QueryScope.CLUSTER, "").stream().filter(p ->
-          p.getNodeID().getUuid().equals(uuid)).collect(Collectors.toList());
+      decommissioningNodes = allNodes.filter(p -> p.getNodeID().getUuid()
+          .equals(uuid)).collect(Collectors.toList());
       if (decommissioningNodes.isEmpty()) {
         System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
         return;
       }
     } else if (!Strings.isNullOrEmpty(ipAddress)) {
-      decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
-          HddsProtos.QueryScope.CLUSTER, "").stream().filter(p ->
-          p.getNodeID().getIpAddress().compareToIgnoreCase(ipAddress) == 0)
-          .collect(Collectors.toList());
+      decommissioningNodes = allNodes.filter(p -> p.getNodeID().getIpAddress()
+          .compareToIgnoreCase(ipAddress) == 0).collect(Collectors.toList());
       if (decommissioningNodes.isEmpty()) {
-        System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
+        System.err.println("Datanode: " + ipAddress + " is not in " +
+            "DECOMMISSIONING");
         return;
       }
     } else {
-      decommissioningNodes = scmClient.queryNode(DECOMMISSIONING, null,
-          HddsProtos.QueryScope.CLUSTER, "");
+      decommissioningNodes = allNodes.collect(Collectors.toList());
       System.out.println("\nDecommission Status: DECOMMISSIONING - " +
           decommissioningNodes.size() + " node(s)");
     }
