@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -165,6 +164,7 @@ public final class SCMConfigurator {
   public void setNetworkTopology(NetworkTopology networkTopology) {
     this.networkTopology = networkTopology;
   }
+
   /**
    * Allows user to specify a custom version of SCMHAManager to be
    * used with this SCM.
@@ -182,10 +182,6 @@ public final class SCMConfigurator {
   public void setScmContext(SCMContext scmContext) {
     this.scmContext = scmContext;
   }
-
-  /**
-   * Allows user to set the clock to be used with SCM
-   */
 
   /**
    * Allows user to set the WritableContainerFactory to be used with this SCM.
@@ -214,16 +210,26 @@ public final class SCMConfigurator {
   }
 
   /**
-   * Gets SCM Node Manager.
-   * @return Node Manager.
+   * Allows user to specify clock
+   * @param clock - clock
    */
   public void setClock(Clock clock) {
     this.clock = clock;
   }
+
+  /**
+   * Get the clock
+   * @return clock
+   */
+  public Clock getClock() { return clock; }
+
+  /**
+   * Gets SCM Node Manager.
+   * @return Node Manager.
+   */
   public NodeManager getScmNodeManager() {
     return scmNodeManager;
   }
-  public Clock getClock() {return clock; }
 
   /**
    * Get Pipeline Manager.
