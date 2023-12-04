@@ -445,6 +445,7 @@ public abstract class SCMCommonPlacementPolicy implements
       }
     }
     List<Integer> currentRackCount = new ArrayList<>(dns.stream()
+        .filter(d -> !(d.isDecommissioned()))
         .map(this::getPlacementGroup)
         .filter(Objects::nonNull)
         .collect(Collectors.groupingBy(
