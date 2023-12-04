@@ -721,8 +721,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .build();
     if (context != null) {
       context.addPipelineActionIfAbsent(action);
-      // need to trigger pipeline close immediately to prevent user using
-      // the failed pipeline
+      // need to trigger pipeline close immediately to prevent SCM to allocate
+      // blocks on the failed pipeline
       context.getParent().triggerHeartbeat();
     }
     LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
