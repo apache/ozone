@@ -818,9 +818,9 @@ public final class OmUtils {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
-            .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
-            .sorted(Comparator.comparing(ServiceInfo::getHostname))
-            .collect(Collectors.toList());
+        .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
+        .sorted(Comparator.comparing(ServiceInfo::getHostname))
+        .collect(Collectors.toList());
     for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
