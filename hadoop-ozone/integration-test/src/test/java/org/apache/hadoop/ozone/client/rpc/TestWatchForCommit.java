@@ -156,7 +156,8 @@ public class TestWatchForCommit {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
-    pipelineManager = (PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager();
+    pipelineManager = (PipelineManagerImpl) cluster.getStorageContainerManager()
+        .getPipelineManager();
   }
 
 
