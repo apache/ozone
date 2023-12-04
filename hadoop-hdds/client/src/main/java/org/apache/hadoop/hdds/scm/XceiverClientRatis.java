@@ -287,7 +287,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);
     } catch (Exception e) {
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
-      Throwable t = HddsClientUtils.containsException(e, GroupMismatchException.class);
+      Throwable t =
+          HddsClientUtils.containsException(e, GroupMismatchException.class);
       if (t != null) {
         throw e;
       }
