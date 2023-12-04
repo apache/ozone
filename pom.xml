@@ -149,7 +149,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jacoco.version>0.8.5</jacoco.version>
     <javassist.version>3.21.0-GA</javassist.version>
     <javax-activation.version>1.1.1</javax-activation.version>
-    <jaxb-api.version>2.3.0</jaxb-api.version>
+    <jaxb-api.version>2.3.1</jaxb-api.version>
     <jaxb-runtime.version>2.3.0.1</jaxb-runtime.version>
     <jsch.version>0.1.54</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
