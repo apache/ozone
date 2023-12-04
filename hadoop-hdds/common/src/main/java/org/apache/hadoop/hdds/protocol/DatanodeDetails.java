@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
@@ -69,7 +70,7 @@ public class DatanodeDetails extends NodeImpl implements
       LoggerFactory.getLogger(DatanodeDetails.class);
 
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.ExtendedDatanodeDetailsProto.class),
+      Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
       DatanodeDetails::getExtendedProtoBufMessage);
 
@@ -392,7 +393,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return DatanodeDetails
    */
   public static DatanodeDetails getFromProtoBuf(
-      HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
+      ExtendedDatanodeDetailsProto extendedDetailsProto) {
     DatanodeDetails.Builder builder;
     if (extendedDetailsProto.hasDatanodeDetails()) {
       builder = newBuilder(extendedDetailsProto.getDatanodeDetails());
@@ -480,12 +481,12 @@ public class DatanodeDetails extends NodeImpl implements
 
   /**
    * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
-   * @return HddsProtos.ExtendedDatanodeDetailsProto
+   * @return ExtendedDatanodeDetailsProto
    */
   @JsonIgnore
-  public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
-    HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
-        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+  public ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
+    final ExtendedDatanodeDetailsProto.Builder extendedBuilder
+        = ExtendedDatanodeDetailsProto.newBuilder()
             .setDatanodeDetails(getProtoBufMessage());
 
     if (!Strings.isNullOrEmpty(getVersion())) {

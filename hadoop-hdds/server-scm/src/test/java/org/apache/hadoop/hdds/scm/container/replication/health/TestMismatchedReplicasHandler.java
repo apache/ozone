@@ -128,9 +128,18 @@ public class TestMismatchedReplicasHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
     // this handler always returns false so other handlers can fix issues
     // such as under replication
     Assertions.assertFalse(handler.handle(request));
+    Assertions.assertFalse(handler.handle(readRequest));
 
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
@@ -207,10 +216,18 @@ public class TestMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
     Assertions.assertFalse(handler.handle(request));
+    Assertions.assertFalse(handler.handle(readRequest));
 
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
@@ -254,10 +271,18 @@ public class TestMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
     Assertions.assertFalse(handler.handle(request));
+    Assertions.assertFalse(handler.handle(readRequest));
 
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
@@ -296,10 +321,18 @@ public class TestMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
     Assertions.assertFalse(handler.handle(request));
+    Assertions.assertFalse(handler.handle(readRequest));
 
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(
