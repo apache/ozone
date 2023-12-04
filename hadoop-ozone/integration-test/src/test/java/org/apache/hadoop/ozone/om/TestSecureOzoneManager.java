@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -76,7 +76,7 @@ public class TestSecureOzoneManager {
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -97,7 +97,7 @@ public class TestSecureOzoneManager {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
