@@ -31,8 +31,8 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -75,7 +75,7 @@ public class TestListKeysWithFSO {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -124,7 +124,7 @@ public class TestListKeysWithFSO {
     initFSNameSpace();
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardownClass() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
