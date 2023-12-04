@@ -59,7 +59,7 @@ public class UpgradeChecker {
             " This upgrade command requires datanode to be off and in" +
             " the IN_MAINTENANCE mode. Please put the datanode in" +
             " the desired state first, then try this command later again.");
-      } else if (exec.exitValue() == 1){
+      } else if (exec.exitValue() == 1) {
         return Pair.of(false, "HddsDatanodeService is not running.");
       } else {
         return Pair.of(true,

@@ -138,7 +138,9 @@ public class UpgradeTask {
       if (completeFile.exists()) {
         result.fail(new Exception("Upgrade complete file already exists " +
             completeFile.getAbsolutePath() + ", skip upgrade."));
-        lockFile.delete();
+        if (!lockFile.delete()) {
+          LOG.warn("Failed to delete upgrade lock file {}.", lockFile);
+        }
         return result;
       }
 
@@ -195,15 +197,13 @@ public class UpgradeTask {
         try {
           UpgradeUtils.createFile(file);
         } catch (IOException ioe) {
-          LOG.warn("Failed to create upgrade complete file {} on volume {}.",
-              file, hddsRootDir, ioe);
+          LOG.warn("Failed to create upgrade complete file {}.", file, ioe);
         }
       }
       if (lockFile.exists()) {
         boolean deleted = lockFile.delete();
         if (!deleted) {
-          LOG.warn("Failed to delete upgrade lock file {} on volume {}.", file,
-              hddsRootDir);
+          LOG.warn("Failed to delete upgrade lock file {}.", file);
         }
       }
     });
