@@ -202,7 +202,7 @@ public class TestDecommissionStatusSubCommand {
 
 
   private List<HddsProtos.Node> getNodeDetails(int n) {
-    List<HddsProtos.Node> nodes = new ArrayList<>();
+    List<HddsProtos.Node> nodesList = new ArrayList<>();
 
     for (int i = 0; i < n; i++) {
       HddsProtos.DatanodeDetailsProto.Builder dnd =
@@ -220,9 +220,9 @@ public class TestDecommissionStatusSubCommand {
           HddsProtos.NodeOperationalState.DECOMMISSIONING);
       builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       builder.setNodeID(dnd.build());
-      nodes.add(builder.build());
+      nodesList.add(builder.build());
     }
-    return nodes;
+    return nodesList;
   }
 
 }
