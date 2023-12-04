@@ -148,7 +148,8 @@ public class SCMNodeManager implements NodeManager {
       SCMContext scmContext,
       Clock clock,
       HDDSLayoutVersionManager layoutVersionManager) {
-    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,clock,
+    this(conf, scmStorageConfig, eventPublisher, networkTopology,
+            scmContext, clock,
         layoutVersionManager, hostname -> null);
   }
   public SCMNodeManager(
@@ -162,7 +163,7 @@ public class SCMNodeManager implements NodeManager {
       Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext,clock);
+        layoutVersionManager, scmContext, clock);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;

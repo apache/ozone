@@ -98,7 +98,8 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, testClock);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable,
+            versionManager, testClock);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());
@@ -185,7 +186,8 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, testClock);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable,
+            versionManager, testClock);
 
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -220,7 +222,8 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, testClock);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable,
+            versionManager, testClock);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());

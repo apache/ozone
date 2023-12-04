@@ -728,7 +728,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
-          clusterMap, scmContext, systemClock,scmLayoutVersionManager,
+          clusterMap, scmContext, systemClock, scmLayoutVersionManager,
           this::resolveNodeLocation);
     }
 

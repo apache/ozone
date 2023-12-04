@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -141,7 +140,8 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), testClock, versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(),
+            testClock, versionManager);
 
     try (ReconPipelineManager reconPipelineManager =
              ReconPipelineManager.newReconPipelineManager(
@@ -195,7 +195,8 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), testClock, versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(),
+            testClock, versionManager);
 
     ReconPipelineManager reconPipelineManager =
         ReconPipelineManager.newReconPipelineManager(
