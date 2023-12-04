@@ -129,7 +129,7 @@ public class TestIncrementalContainerReportHandler {
         .thenReturn(maxLayoutVersion());
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
-            scmContext, versionManager, testClock);
+            scmContext, testClock, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestIncrementalContainerReportHandler.class.getSimpleName()

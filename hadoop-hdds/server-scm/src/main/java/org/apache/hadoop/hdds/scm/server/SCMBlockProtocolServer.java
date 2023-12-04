@@ -24,6 +24,7 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -40,7 +41,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -67,6 +70,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -338,39 +342,62 @@ public class SCMBlockProtocolServer implements
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) {
     boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put("client", clientMachine);
+    auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
-      Node client = null;
-      List<DatanodeDetails> possibleClients =
-          nodeManager.getNodesByAddress(clientMachine);
-      if (possibleClients.size() > 0) {
-        client = possibleClients.get(0);
+      Node client = getDatanode(clientMachine);
+      // not datanode
+      if (client == null) {
+        client = getOtherNode(clientMachine);
       }
-      List<Node> nodeList = new ArrayList();
-      nodes.stream().forEach(uuid -> {
+      List<DatanodeDetails> nodeList = new ArrayList<>();
+      nodes.forEach(uuid -> {
         DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
         if (node != null) {
           nodeList.add(node);
         }
       });
-      List<? extends Node> sortedNodeList = scm.getClusterMap()
-          .sortByDistanceCost(client, nodeList, nodes.size());
-      List<DatanodeDetails> ret = new ArrayList<>();
-      sortedNodeList.stream().forEach(node -> ret.add((DatanodeDetails)node));
-      return ret;
+      return scm.getClusterMap()
+          .sortByDistanceCost(client, nodeList, nodeList.size());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, null, ex)
+          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, auditMap, ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, null)
+            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, auditMap)
         );
       }
     }
+  }
+
+  private Node getDatanode(String clientMachine) {
+    List<DatanodeDetails> datanodes = scm.getScmNodeManager()
+        .getNodesByAddress(clientMachine);
+    return !datanodes.isEmpty() ? datanodes.get(0) : null;
+  }
+
+  private Node getOtherNode(String clientMachine) {
+    try {
+      String clientLocation = scm.resolveNodeLocation(clientMachine);
+      if (clientLocation != null) {
+        Node rack = scm.getClusterMap().getNode(clientLocation);
+        if (rack instanceof InnerNode) {
+          return new NodeImpl(clientMachine, clientLocation,
+              (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Could not resolve client {}: {}",
+          clientMachine, e.getMessage());
+    }
+    return null;
   }
 
   @Override

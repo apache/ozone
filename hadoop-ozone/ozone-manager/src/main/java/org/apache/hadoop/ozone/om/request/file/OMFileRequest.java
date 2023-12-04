@@ -621,7 +621,7 @@ public final class OMFileRequest {
   }
 
   /**
-   * Gets OmKeyInfo if exists for the given key name in the DB.
+   * Gets OmKeyInfo if exists and validate bucket and volume.
    *
    * @param omMetadataMgr metadata manager
    * @param volumeName    volume name
@@ -637,8 +637,34 @@ public final class OMFileRequest {
       String volumeName, String bucketName, String keyName,
       long scmBlockSize, ReplicationConfig defaultReplication
   ) throws IOException {
+    return getOMKeyInfoIfExists(omMetadataMgr, volumeName, bucketName, keyName,
+        scmBlockSize, defaultReplication, true);
+  }
 
-    OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
+
+  /**
+   * Gets OmKeyInfo if exists for the given key name in the DB.
+   *
+   * @param omMetadataMgr metadata manager
+   * @param volumeName    volume name
+   * @param bucketName    bucket name
+   * @param keyName       key name
+   * @param scmBlockSize  scm block size
+   * @param validateBucketAndVolume true if the volume/bucket needs validating.
+   * @return OzoneFileStatus
+   * @throws IOException DB failure
+   */
+  @Nullable
+  public static OzoneFileStatus getOMKeyInfoIfExists(
+      OMMetadataManager omMetadataMgr,
+      String volumeName, String bucketName, String keyName,
+      long scmBlockSize, ReplicationConfig defaultReplication,
+      boolean validateBucketAndVolume
+  ) throws IOException {
+
+    if (validateBucketAndVolume) {
+      OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
+    }
 
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();

@@ -80,7 +80,8 @@ public class TestSCMNodeMetrics {
         .thenReturn(maxLayoutVersion());
     nodeManager = new SCMNodeManager(source, config, publisher,
         new NetworkTopologyImpl(source), SCMContext.emptyContext(),
-            versionManager, testClock);
+            testClock,
+            versionManager);
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")

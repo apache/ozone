@@ -364,6 +364,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder
             .setPrintCompactionLogDagResponse(printCompactionLogDagResponse);
         break;
+      case GetSnapshotInfo:
+        OzoneManagerProtocolProtos.SnapshotInfoResponse snapshotInfoResponse =
+            getSnapshotInfo(request.getSnapshotInfoRequest());
+        responseBuilder.setSnapshotInfoResponse(snapshotInfoResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -1411,6 +1416,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         PayloadUtils.generatePayloadBytes(req.getPayloadSizeResp());
     builder.setPayload(ByteString.copyFrom(payloadBytes));
     return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private OzoneManagerProtocolProtos.SnapshotInfoResponse getSnapshotInfo(
+      OzoneManagerProtocolProtos.SnapshotInfoRequest request)
+      throws IOException {
+    SnapshotInfo snapshotInfo = impl.getSnapshotInfo(request.getVolumeName(),
+        request.getBucketName(), request.getSnapshotName());
+
+    return OzoneManagerProtocolProtos.SnapshotInfoResponse.newBuilder()
+        .setSnapshotInfo(snapshotInfo.getProtobuf()).build();
   }
 
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)

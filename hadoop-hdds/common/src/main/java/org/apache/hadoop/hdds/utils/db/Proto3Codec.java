@@ -41,25 +41,16 @@ public final class Proto3Codec<M extends MessageLite>
   /**
    * @return the {@link Codec} for the given class.
    */
-  public static <T extends MessageLite> Codec<T> get(Class<T> clazz) {
-    final Codec<?> codec = CODECS.computeIfAbsent(clazz, Proto3Codec::new);
+  public static <T extends MessageLite> Codec<T> get(T t) {
+    final Codec<?> codec = CODECS.computeIfAbsent(t.getClass(),
+        key -> new Proto3Codec<>(t));
     return (Codec<T>) codec;
-  }
-
-  private static <T extends MessageLite> Parser<T> getParser(Class<T> clazz) {
-    final String name = "PARSER";
-    try {
-      return (Parser<T>) clazz.getField(name).get(null);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Failed to get " + name + " field from " + clazz, e);
-    }
   }
 
   private final Parser<M> parser;
 
-  private Proto3Codec(Class<M> clazz) {
-    this.parser = getParser(clazz);
+  private Proto3Codec(M m) {
+    this.parser = (Parser<M>) m.getParserForType();
   }
 
   @Override

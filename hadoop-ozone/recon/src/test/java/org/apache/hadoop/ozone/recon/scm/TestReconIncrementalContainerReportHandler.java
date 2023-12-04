@@ -96,8 +96,7 @@ public class TestReconIncrementalContainerReportHandler
         .thenReturn(maxLayoutVersion());
 
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager,
-            testClock);
+        eventQueue, clusterMap, SCMContext.emptyContext(), testClock, versionManager);
 
     nodeManager.register(datanodeDetails, null, null);
 

@@ -16,88 +16,35 @@
  */
 package org.apache.hadoop.ozone.client.rpc.read;
 
-import java.io.IOException;
 import java.time.Duration;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
-/**
- * Common tests for Ozone's {@code InputStream} implementations.
- */
-@RunWith(Parameterized.class)
-public abstract class TestInputStreamBase {
+// TODO remove this class, set config as default in integration tests
+abstract class TestInputStreamBase {
 
-  private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf = new OzoneConfiguration();
-  private OzoneClient client;
-  private ObjectStore objectStore;
+  static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
+  static final int FLUSH_SIZE = 2 * CHUNK_SIZE;       // 2MB
+  static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
+  static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
+  static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
-  private String volumeName;
-  private String bucketName;
-  private String keyString;
+  protected static MiniOzoneCluster newCluster(
+      ContainerLayoutVersion containerLayout) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-  private ContainerLayoutVersion containerLayout;
-  private static final Random RAND = new Random();
-
-  protected static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
-  protected static final int FLUSH_SIZE = 2 * CHUNK_SIZE;       // 2MB
-  protected static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;   // 4MB
-  protected static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
-  protected static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
-  public TestInputStreamBase(ContainerLayoutVersion layout) {
-    this.containerLayout = layout;
-  }
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * @throws IOException
-   */
-  @Before
-  public void init() throws Exception {
     OzoneClientConfig config = new OzoneClientConfig();
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
     conf.setFromObject(config);
@@ -116,7 +63,7 @@ public abstract class TestInputStreamBase {
     repConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
 
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    return MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(5)
         .setBlockSize(BLOCK_SIZE)
@@ -125,99 +72,10 @@ public abstract class TestInputStreamBase {
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .build();
-    cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getRpcClient(conf);
-    objectStore = client.getObjectStore();
-
-    volumeName = UUID.randomUUID().toString();
-    bucketName = UUID.randomUUID().toString();
-    keyString = UUID.randomUUID().toString();
-
-    objectStore.createVolume(volumeName);
-    objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @After
-  public void shutdown() {
-    IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
-  MiniOzoneCluster getCluster() {
-    return cluster;
-  }
-
-  String getVolumeName() {
-    return volumeName;
-  }
-
-  String getBucketName() {
-    return bucketName;
-  }
-
-  KeyInputStream getKeyInputStream(String keyName) throws IOException {
-    return (KeyInputStream) objectStore
-        .getVolume(volumeName)
-        .getBucket(bucketName)
-        .readKey(keyName).getInputStream();
-  }
-
-  String getNewKeyName() {
+  static String getNewKeyName() {
     return UUID.randomUUID().toString();
   }
 
-  byte[] writeKey(String keyName, int dataLength) throws Exception {
-    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
-    return writeKey(keyName, repConfig, dataLength);
-  }
-
-  byte[] writeKey(String keyName, ReplicationConfig repConfig, int dataLength)
-      throws Exception {
-    OzoneOutputStream key = TestHelper.createKey(keyName,
-        repConfig, 0, objectStore, volumeName, bucketName);
-
-    byte[] inputData = ContainerTestHelper.getFixedLengthString(
-        keyString, dataLength).getBytes(UTF_8);
-    key.write(inputData);
-    key.close();
-
-    return inputData;
-  }
-
-  byte[] writeRandomBytes(String keyName, int dataLength)
-      throws Exception {
-    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
-    return writeRandomBytes(keyName, repConfig, dataLength);
-  }
-
-  byte[] writeRandomBytes(String keyName, ReplicationConfig repConfig,
-      int dataLength)
-      throws Exception {
-    OzoneOutputStream key = TestHelper.createKey(keyName,
-        repConfig, 0, objectStore, volumeName, bucketName);
-
-    byte[] inputData = new byte[dataLength];
-    RAND.nextBytes(inputData);
-    key.write(inputData);
-    key.close();
-
-    return inputData;
-  }
-
-  void validateData(byte[] inputData, int offset, byte[] readData) {
-    int readDataLen = readData.length;
-    byte[] expectedData = new byte[readDataLen];
-    System.arraycopy(inputData, (int) offset, expectedData, 0, readDataLen);
-
-    for (int i = 0; i < readDataLen; i++) {
-      Assert.assertEquals("Read data at does not match the input data at " +
-              "position " + (offset + i), expectedData[i], readData[i]);
-    }
-  }
 }

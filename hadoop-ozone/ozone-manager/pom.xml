@@ -28,6 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone Manager Server</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
+
   <dependencies>
 
     <dependency>
@@ -101,11 +105,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.Slice;
 
+import javax.annotation.Nullable;
+
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 
 /**
@@ -27,6 +29,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.fo
  */
 public class ManagedSlice extends Slice {
 
+  @Nullable
   private final StackTraceElement[] elements;
 
   public ManagedSlice(byte[] var1) {
@@ -43,12 +46,9 @@ public class ManagedSlice extends Slice {
   protected void finalize() throws Throwable {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (isOwningHandle()) {
-      ManagedRocksObjectUtils.reportLeak(this, getStackTrace());
+      ManagedRocksObjectUtils.reportLeak(this, formatStackTrace(elements));
     }
     super.finalize();
   }
 
-  private String getStackTrace() {
-    return formatStackTrace(elements);
-  }
 }

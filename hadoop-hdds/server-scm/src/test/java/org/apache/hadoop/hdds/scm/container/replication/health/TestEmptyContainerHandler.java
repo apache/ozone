@@ -87,6 +87,15 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 5, 1);
   }
 
@@ -109,6 +118,15 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 3, 1);
   }
 

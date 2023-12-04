@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -570,11 +569,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       final int index,
       final int pageSize
   ) throws IOException {
-    if (index < 0 || pageSize <= 0) {
-      throw new IllegalArgumentException(String.format(
-          "Index should be a number >= 0. Given index %d. Page size " +
-              "should be a positive number > 0. Given page size is %d",
-          index, pageSize));
+    if (index < 0 || index > snapDiffJob.getTotalDiffEntries()
+        || pageSize <= 0) {
+      throw new IOException(String.format(
+          "Index (given: %d) should be a number >= 0 and < totalDiffEntries: " +
+              "%d. Page size (given: %d) should be a positive number > 0.",
+          index, snapDiffJob.getTotalDiffEntries(), pageSize));
     }
 
     OFSPath path = getSnapshotRootPath(volumeName, bucketName);
@@ -962,7 +962,7 @@ public class SnapshotDiffManager implements AutoCloseable {
               newParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   toSnapshot.getMetadataManager().getDirectoryTable())
-                  .getAbsolutePathForObjectIDs(newParentIds));
+                  .getAbsolutePathForObjectIDs(newParentIds, true));
             }
             return null;
           },
@@ -1246,23 +1246,28 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   private String resolveBucketRelativePath(boolean isFSOBucket,
-      final Optional<Map<Long, Path>> parentIdMap, byte[] keyVal)
+      final Optional<Map<Long, Path>> parentIdMap, byte[] keyVal,
+      boolean skipUnresolvedObjIds)
       throws IOException {
     String key = codecRegistry.asObject(keyVal, String.class);
     if (isFSOBucket) {
       String[] splitKey = key.split(OM_KEY_PREFIX, 2);
       Long parentId = Long.valueOf(splitKey[0]);
       if (parentIdMap.map(m -> !m.containsKey(parentId)).orElse(true)) {
-        throw new IllegalStateException(String.format(
-            "Cannot resolve path for key: %s with parent Id: %d", key,
-            parentId));
+        if (skipUnresolvedObjIds) {
+          return null;
+        } else {
+          throw new IllegalStateException(String.format(
+              "Cannot resolve path for key: %s with parent Id: %d", key,
+              parentId));
+        }
+
       }
       return parentIdMap.map(m -> m.get(parentId).resolve(splitKey[1]))
           .get().toString().substring(1);
     }
-    return Paths.get(OzoneConsts.OZONE_URI_DELIMITER).resolve(key).toString()
+    return OzoneConsts.ROOT_PATH.resolve(key).toString()
         .substring(1);
   }
 
@@ -1350,47 +1355,56 @@ public class SnapshotDiffManager implements AutoCloseable {
                 "Old and new key name both are null");
           } else if (oldKeyName == null) { // Key Created.
             String key = resolveBucketRelativePath(isFSOBucket,
-                newParentIdPathMap, newKeyName);
-            DiffReportEntry entry =
-                SnapshotDiffReportOzone.getDiffReportEntry(CREATE, key);
-            createDiffs.add(codecRegistry.asRawData(entry));
+                newParentIdPathMap, newKeyName, true);
+            if (key != null) {
+              DiffReportEntry entry =
+                  SnapshotDiffReportOzone.getDiffReportEntry(CREATE, key);
+              createDiffs.add(codecRegistry.asRawData(entry));
+            }
           } else if (newKeyName == null) { // Key Deleted.
             String key = resolveBucketRelativePath(isFSOBucket,
-                oldParentIdPathMap, oldKeyName);
+                oldParentIdPathMap, oldKeyName, false);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(DELETE, key);
             deleteDiffs.add(codecRegistry.asRawData(entry));
           } else if (isDirectoryObject &&
               Arrays.equals(oldKeyName, newKeyName)) {
             String key = resolveBucketRelativePath(isFSOBucket,
-                newParentIdPathMap, newKeyName);
-            DiffReportEntry entry =
-                SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, key);
-            modifyDiffs.add(codecRegistry.asRawData(entry));
+                newParentIdPathMap, newKeyName, true);
+            if (key != null) {
+              DiffReportEntry entry =
+                  SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, key);
+              modifyDiffs.add(codecRegistry.asRawData(entry));
+            }
           } else {
             String keyPrefix = getTablePrefix(tablePrefix,
                 (isDirectoryObject ? fsDirTable : fsTable).getName());
             String oldKey = resolveBucketRelativePath(isFSOBucket,
-                oldParentIdPathMap, oldKeyName);
-            // Check if block location is same or not. If it is not same,
-            // key must have been overridden as well.
-            boolean isObjectModified = isObjectModified(
-                keyPrefix + codecRegistry.asObject(oldKeyName, String.class),
-                keyPrefix + codecRegistry.asObject(newKeyName, String.class),
-                isDirectoryObject ? fsDirTable : fsTable,
-                isDirectoryObject ? tsDirTable : tsTable);
-            if (isObjectModified) {
-              // Here, oldKey name is returned as modified. Modified key name is
-              // based on base snapshot (from snapshot).
-              modifyDiffs.add(codecRegistry.asRawData(
-                  SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, oldKey)));
-            }
-            if (!isObjectModified || !Arrays.equals(oldKeyName, newKeyName)) {
-              String newKey = resolveBucketRelativePath(isFSOBucket,
-                  newParentIdPathMap, newKeyName);
-              renameDiffs.add(codecRegistry.asRawData(
-                  SnapshotDiffReportOzone.getDiffReportEntry(RENAME, oldKey,
-                      newKey)));
+                oldParentIdPathMap, oldKeyName, false);
+            String newKey = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName, true);
+            if (newKey == null) {
+              deleteDiffs.add(codecRegistry.asRawData(SnapshotDiffReportOzone
+                  .getDiffReportEntry(DELETE, oldKey)));
+            } else {
+              // Check if block location is same or not. If it is not same,
+              // key must have been overridden as well.
+              boolean isObjectModified = isObjectModified(
+                  keyPrefix + codecRegistry.asObject(oldKeyName, String.class),
+                  keyPrefix + codecRegistry.asObject(newKeyName, String.class),
+                  isDirectoryObject ? fsDirTable : fsTable,
+                  isDirectoryObject ? tsDirTable : tsTable);
+              if (isObjectModified) {
+                // Here, oldKey name is returned as modified. Modified key name
+                // is based on base snapshot (from snapshot).
+                modifyDiffs.add(codecRegistry.asRawData(SnapshotDiffReportOzone
+                    .getDiffReportEntry(MODIFY, oldKey)));
+              }
+              if (!isObjectModified || !Arrays.equals(oldKeyName, newKeyName)) {
+                renameDiffs.add(codecRegistry.asRawData(
+                    SnapshotDiffReportOzone.getDiffReportEntry(RENAME, oldKey,
+                        newKey)));
+              }
             }
           }
 

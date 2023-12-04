@@ -36,6 +36,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -310,13 +311,13 @@ public final class ContainerUtils {
   }
 
   public static String getContainerTarName(long containerId) {
-    return "container-" + containerId + ".tar";
+    return "container-" + containerId + "-" + UUID.randomUUID() + ".tar";
   }
 
   public static long retrieveContainerIdFromTarName(String tarName)
       throws IOException {
     assert tarName != null;
-    Pattern pattern = Pattern.compile("container-(\\d+).tar");
+    Pattern pattern = Pattern.compile("container-(\\d+)-.*\\.tar");
     // Now create matcher object.
     Matcher m = pattern.matcher(tarName);
 

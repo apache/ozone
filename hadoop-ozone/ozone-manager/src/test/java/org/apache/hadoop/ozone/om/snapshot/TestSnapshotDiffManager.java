@@ -21,7 +21,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -632,8 +631,6 @@ public class TestSnapshotDiffManager {
    * In the case of reading tombstones old Snapshot Persistent map should have
    * object Ids in the range 50-100 & should be empty otherwise
    */
-  @SuppressFBWarnings({"DLS_DEAD_LOCAL_STORE",
-      "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"})
   @ParameterizedTest
   @CsvSource({"false," + OmMetadataManagerImpl.DIRECTORY_TABLE,
       "true," + OmMetadataManagerImpl.DIRECTORY_TABLE,
@@ -896,7 +893,7 @@ public class TestSnapshotDiffManager {
    * objectId Map of diff keys to be checked with their corresponding key names.
    */
   @ParameterizedTest
-  @CsvSource({"0,10,1000", "1,10,8", "1000,1000,10", "-1,1000,10000",
+  @CsvSource({"0,10,1000", "1,10,8", "10,1000,10", "-1,1000,10000",
       "1,0,1000", "1,-1,1000"})
   public void testCreatePageResponse(int startIdx,
                                      int pageSize,
@@ -936,7 +933,7 @@ public class TestSnapshotDiffManager {
         codecRegistry.asRawData(snapshotDiffJob2));
 
     if (pageSize <= 0 || startIdx < 0) {
-      Assertions.assertThrows(IllegalArgumentException.class,
+      Assertions.assertThrows(IOException.class,
           () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts", startIdx, pageSize));
       return;

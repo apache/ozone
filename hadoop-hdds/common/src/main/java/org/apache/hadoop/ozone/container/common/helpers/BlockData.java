@@ -36,7 +36,7 @@ import java.util.ArrayList;
  */
 public class BlockData {
   private static final Codec<BlockData> CODEC = new DelegatedCodec<>(
-      Proto3Codec.get(ContainerProtos.BlockData.class),
+      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance()),
       BlockData::getFromProtoBuf,
       BlockData::getProtoBufMessage);
 

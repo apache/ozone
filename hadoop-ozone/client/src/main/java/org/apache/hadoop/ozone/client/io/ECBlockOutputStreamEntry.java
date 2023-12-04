@@ -91,16 +91,17 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   @Override
   void checkStream() throws IOException {
     if (!isInitialized()) {
-      blockOutputStreams =
+      final ECBlockOutputStream[] streams =
           new ECBlockOutputStream[replicationConfig.getRequiredNodes()];
       for (int i = currentStreamIdx; i < replicationConfig
           .getRequiredNodes(); i++) {
         List<DatanodeDetails> nodes = getPipeline().getNodes();
-        blockOutputStreams[i] =
+        streams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
                 getBufferPool(), getConf(), getToken(), getClientMetrics());
       }
+      blockOutputStreams = streams;
     }
   }
 

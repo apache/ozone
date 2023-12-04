@@ -156,7 +156,7 @@ public class TestContainerPlacement {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     SCMNodeManager scmNodeManager = new SCMNodeManager(config, storageConfig,
-        eventQueue, null, SCMContext.emptyContext(), versionManager, testClock);
+        eventQueue, null, SCMContext.emptyContext(), testClock, versionManager);
     return scmNodeManager;
   }
 

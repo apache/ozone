@@ -79,7 +79,7 @@ public class TestNodeReportHandler implements EventPublisher {
         .thenReturn(maxLayoutVersion());
     nodeManager =
         new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
-            SCMContext.emptyContext(), versionManager, testClock);
+            SCMContext.emptyContext(), testClock, versionManager);
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 

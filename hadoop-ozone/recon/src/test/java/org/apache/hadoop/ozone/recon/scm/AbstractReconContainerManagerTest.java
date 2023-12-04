@@ -106,7 +106,7 @@ public class AbstractReconContainerManagerTest {
     when(layoutVersionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, scmContext, layoutVersionManager, testClock);
+        eventQueue, clusterMap, scmContext, testClock, layoutVersionManager);
     pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf,
         nodeManager,

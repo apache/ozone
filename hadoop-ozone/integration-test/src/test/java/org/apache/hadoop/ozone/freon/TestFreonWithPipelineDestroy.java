@@ -108,7 +108,7 @@ public class TestFreonWithPipelineDestroy {
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
         "--num-of-keys", "1",
-        "--key-size", "20971520",
+        "--key-size", "20MB",
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"

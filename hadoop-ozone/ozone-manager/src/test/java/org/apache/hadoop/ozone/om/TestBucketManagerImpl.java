@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -43,44 +44,40 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.Assert;
-import org.junit.After;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
+
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static java.util.Collections.singletonMap;
 
 /**
- * Tests BucketManagerImpl, mocks OMMetadataManager for testing.
+ * This class tests the Bucket Manager Implementation using Mockito.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class TestBucketManagerImpl {
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OmTestManagers omTestManagers;
   private OzoneManagerProtocol writeClient;
-  private OzoneManager om;
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
-    om = omTestManagers.getOzoneManager();
+    OzoneManager om = omTestManagers.getOzoneManager();
     om.stop();
   }
 
   private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
+    File newFolder = folder.toFile();
     if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+      Assertions.assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
     return conf;
@@ -104,10 +101,9 @@ public class TestBucketManagerImpl {
 
   @Test
   public void testCreateBucketWithoutVolume() throws Exception {
-    thrown.expectMessage("Volume doesn't exist");
     OzoneConfiguration conf = createNewTestPath();
     omTestManagers = new OmTestManagers(conf);
-    try {
+    OMException omEx = Assertions.assertThrows(OMException.class, () -> {
       writeClient = omTestManagers.getWriteClient();
 
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
@@ -115,11 +111,10 @@ public class TestBucketManagerImpl {
           .setBucketName("bucket-one")
           .build();
       writeClient.createBucket(bucketInfo);
-    } catch (OMException omEx) {
-      Assert.assertEquals(ResultCodes.VOLUME_NOT_FOUND,
+    });
+    Assertions.assertEquals(ResultCodes.VOLUME_NOT_FOUND,
           omEx.getResult());
-      throw omEx;
-    }
+    Assertions.assertEquals("Volume doesn't exist", omEx.getMessage());
   }
 
   @Test
@@ -144,14 +139,14 @@ public class TestBucketManagerImpl {
             BucketEncryptionKeyInfo.Builder().setKeyName("key1").build())
         .build();
     writeClient.createBucket(bucketInfo);
-    Assert.assertNotNull(bucketManager.getBucketInfo("sample-vol",
+    Assertions.assertNotNull(bucketManager.getBucketInfo("sample-vol",
         "bucket-one"));
 
     OmBucketInfo bucketInfoRead =
         bucketManager.getBucketInfo("sample-vol", "bucket-one");
 
-    Assert.assertTrue(bucketInfoRead.getEncryptionKeyInfo().getKeyName()
-        .equals(bucketInfo.getEncryptionKeyInfo().getKeyName()));
+    Assertions.assertEquals(bucketInfoRead.getEncryptionKeyInfo().getKeyName(),
+        bucketInfo.getEncryptionKeyInfo().getKeyName());
   }
 
 
@@ -165,43 +160,37 @@ public class TestBucketManagerImpl {
         .setBucketName("bucket-one")
         .build();
     writeClient.createBucket(bucketInfo);
-    Assert.assertNotNull(bucketManager.getBucketInfo("sample-vol",
+    Assertions.assertNotNull(bucketManager.getBucketInfo("sample-vol",
         "bucket-one"));
   }
 
   @Test
   public void testCreateAlreadyExistingBucket() throws Exception {
-    thrown.expectMessage("Bucket already exist");
     createSampleVol();
 
-    try {
+    OMException omEx = Assertions.assertThrows(OMException.class, () -> {
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sample-vol")
           .setBucketName("bucket-one")
           .build();
       writeClient.createBucket(bucketInfo);
       writeClient.createBucket(bucketInfo);
-    } catch (OMException omEx) {
-      Assert.assertEquals(ResultCodes.BUCKET_ALREADY_EXISTS,
+    });
+    Assertions.assertEquals(ResultCodes.BUCKET_ALREADY_EXISTS,
           omEx.getResult());
-      throw omEx;
-    }
+    Assertions.assertEquals("Bucket already exist", omEx.getMessage());
   }
 
   @Test
   public void testGetBucketInfoForInvalidBucket() throws Exception {
-    thrown.expectMessage("Bucket not found");
-
     createSampleVol();
-    try {
-
+    OMException exception = Assertions.assertThrows(OMException.class, () -> {
       BucketManager bucketManager = omTestManagers.getBucketManager();
       bucketManager.getBucketInfo("sample-vol", "bucket-one");
-    } catch (OMException omEx) {
-      Assert.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
-          omEx.getResult());
-      throw omEx;
-    }
+    });
+    Assertions.assertTrue(exception.getMessage().contains("Bucket not found"));
+    Assertions.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
+        exception.getResult());
   }
 
   @Test
@@ -218,11 +207,11 @@ public class TestBucketManagerImpl {
     // Check exception thrown when volume does not exist
     try {
       bucketManager.getBucketInfo(volumeName, bucketName);
-      Assert.fail("Should have thrown OMException");
+      Assertions.fail("Should have thrown OMException");
     } catch (OMException omEx) {
-      Assert.assertEquals("getBucketInfo() should have thrown " +
-              "VOLUME_NOT_FOUND as the parent volume is not created!",
-          ResultCodes.VOLUME_NOT_FOUND, omEx.getResult());
+      Assertions.assertEquals(ResultCodes.VOLUME_NOT_FOUND, omEx.getResult(),
+          "getBucketInfo() should have thrown " +
+              "VOLUME_NOT_FOUND as the parent volume is not created!");
     }
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
@@ -244,17 +233,18 @@ public class TestBucketManagerImpl {
     // Check exception thrown when bucket does not exist
     try {
       bucketManager.getBucketInfo(volumeName, "bucketNotExist");
-      Assert.fail("Should have thrown OMException");
+      Assertions.fail("Should have thrown OMException");
     } catch (OMException omEx) {
-      Assert.assertEquals("getBucketInfo() should have thrown " +
-              "BUCKET_NOT_FOUND as the parent volume exists but bucket " +
-              "doesn't!", ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+      Assertions.assertEquals(
+          ResultCodes.BUCKET_NOT_FOUND, omEx.getResult(),
+          "getBucketInfo() should have thrown BUCKET_NOT_FOUND " +
+              "as the parent volume exists but bucket doesn't!");
     }
     OmBucketInfo result = bucketManager.getBucketInfo(volumeName, bucketName);
-    Assert.assertEquals(volumeName, result.getVolumeName());
-    Assert.assertEquals(bucketName, result.getBucketName());
-    Assert.assertEquals(StorageType.DISK, result.getStorageType());
-    Assert.assertFalse(result.getIsVersionEnabled());
+    Assertions.assertEquals(volumeName, result.getVolumeName());
+    Assertions.assertEquals(bucketName, result.getBucketName());
+    Assertions.assertEquals(StorageType.DISK, result.getStorageType());
+    Assertions.assertFalse(result.getIsVersionEnabled());
   }
 
   private void createBucket(OMMetadataManager metadataManager,
@@ -276,7 +266,7 @@ public class TestBucketManagerImpl {
     createBucket(metaMgr, bucketInfo);
     OmBucketInfo result = bucketManager.getBucketInfo(
         "sample-vol", "bucket-one");
-    Assert.assertEquals(StorageType.DISK,
+    Assertions.assertEquals(StorageType.DISK,
         result.getStorageType());
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setVolumeName("sample-vol")
@@ -286,7 +276,7 @@ public class TestBucketManagerImpl {
     writeClient.setBucketProperty(bucketArgs);
     OmBucketInfo updatedResult = bucketManager.getBucketInfo(
         "sample-vol", "bucket-one");
-    Assert.assertEquals(StorageType.SSD,
+    Assertions.assertEquals(StorageType.SSD,
         updatedResult.getStorageType());
   }
 
@@ -303,7 +293,7 @@ public class TestBucketManagerImpl {
     writeClient.createBucket(bucketInfo);
     OmBucketInfo result = bucketManager.getBucketInfo(
         "sample-vol", "bucket-one");
-    Assert.assertFalse(result.getIsVersionEnabled());
+    Assertions.assertFalse(result.getIsVersionEnabled());
     OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
         .setVolumeName("sample-vol")
         .setBucketName("bucket-one")
@@ -312,12 +302,11 @@ public class TestBucketManagerImpl {
     writeClient.setBucketProperty(bucketArgs);
     OmBucketInfo updatedResult = bucketManager.getBucketInfo(
         "sample-vol", "bucket-one");
-    Assert.assertTrue(updatedResult.getIsVersionEnabled());
+    Assertions.assertTrue(updatedResult.getIsVersionEnabled());
   }
 
   @Test
   public void testDeleteBucket() throws Exception {
-    thrown.expectMessage("Bucket not found");
     createSampleVol();
     BucketManager bucketManager = omTestManagers.getBucketManager();
     for (int i = 0; i < 5; i++) {
@@ -328,29 +317,27 @@ public class TestBucketManagerImpl {
       writeClient.createBucket(bucketInfo);
     }
     for (int i = 0; i < 5; i++) {
-      Assert.assertEquals("bucket-" + i,
+      Assertions.assertEquals("bucket-" + i,
           bucketManager.getBucketInfo(
               "sample-vol", "bucket-" + i).getBucketName());
     }
     try {
       writeClient.deleteBucket("sample-vol", "bucket-1");
-      Assert.assertNotNull(bucketManager.getBucketInfo(
+      Assertions.assertNotNull(bucketManager.getBucketInfo(
           "sample-vol", "bucket-2"));
     } catch (IOException ex) {
-      Assert.fail(ex.getMessage());
+      Assertions.fail(ex.getMessage());
     }
-    try {
+    OMException omEx = Assertions.assertThrows(OMException.class, () -> {
       bucketManager.getBucketInfo("sample-vol", "bucket-1");
-    } catch (OMException omEx) {
-      Assert.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
+    });
+    Assertions.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
           omEx.getResult());
-      throw omEx;
-    }
+    Assertions.assertTrue(omEx.getMessage().contains("Bucket not found"));
   }
 
   @Test
   public void testDeleteNonEmptyBucket() throws Exception {
-    thrown.expectMessage("Bucket is not empty");
     createSampleVol();
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sample-vol")
@@ -383,13 +370,12 @@ public class TestBucketManagerImpl {
 
     OpenKeySession session2 = writeClient.openKey(args2);
     writeClient.commitKey(args2, session2.getId());
-    try {
+    OMException omEx = Assertions.assertThrows(OMException.class, () -> {
       writeClient.deleteBucket("sample-vol", "bucket-one");
-    } catch (OMException omEx) {
-      Assert.assertEquals(ResultCodes.BUCKET_NOT_EMPTY,
+    });
+    Assertions.assertEquals(ResultCodes.BUCKET_NOT_EMPTY,
           omEx.getResult());
-      throw omEx;
-    }
+    Assertions.assertEquals("Bucket is not empty", omEx.getMessage());
   }
 
   @Test
@@ -431,48 +417,48 @@ public class TestBucketManagerImpl {
 
     OmBucketInfo storedLinkBucket =
         writeClient.getBucketInfo("sample-vol", "link-two");
-    Assert.assertNotNull("Replication config is not set",
-                         storedLinkBucket.getDefaultReplicationConfig());
-    Assert.assertEquals(ecConfig,
+    Assertions.assertNotNull(storedLinkBucket.getDefaultReplicationConfig(),
+        "Replication config is not set");
+    Assertions.assertEquals(ecConfig,
                         storedLinkBucket
                             .getDefaultReplicationConfig()
                             .getReplicationConfig());
 
-    Assert.assertEquals(
+    Assertions.assertEquals(
         "link-two", storedLinkBucket.getBucketName());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         "sample-vol", storedLinkBucket.getVolumeName());
 
-    Assert.assertEquals(
+    Assertions.assertEquals(
         "link-one", storedLinkBucket.getSourceBucket());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         "sample-vol", storedLinkBucket.getSourceVolume());
 
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getBucketLayout(),
         storedLinkBucket.getBucketLayout());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getQuotaInBytes(),
         storedLinkBucket.getQuotaInBytes());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getQuotaInNamespace(),
         storedLinkBucket.getQuotaInNamespace());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getUsedBytes(),
         storedLinkBucket.getUsedBytes());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getUsedNamespace(),
         storedLinkBucket.getUsedNamespace());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getDefaultReplicationConfig(),
         storedLinkBucket.getDefaultReplicationConfig());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getMetadata(),
         storedLinkBucket.getMetadata());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getStorageType(),
         storedLinkBucket.getStorageType());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         bucketInfo.getIsVersionEnabled(),
         storedLinkBucket.getIsVersionEnabled());
   }

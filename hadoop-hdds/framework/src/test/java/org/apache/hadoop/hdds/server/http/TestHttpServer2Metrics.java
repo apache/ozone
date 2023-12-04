@@ -33,8 +33,8 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.Random;
@@ -48,7 +48,7 @@ public class TestHttpServer2Metrics {
   private MetricsCollector metricsCollector;
   private MetricsRecordBuilder recorder;
 
-  @Before
+  @BeforeEach
   public void setup() {
     threadPool = Mockito.mock(QueuedThreadPool.class);
     metricsCollector = Mockito.mock(MetricsCollector.class);

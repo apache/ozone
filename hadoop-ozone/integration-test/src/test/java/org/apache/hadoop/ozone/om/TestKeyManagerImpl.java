@@ -115,6 +115,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -770,10 +771,9 @@ public class TestKeyManagerImpl {
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(true)
         .build();
-
     // lookup for a non-existent key
     try {
-      keyManager.lookupKey(keyArgs, null);
+      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
       fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
@@ -815,39 +815,47 @@ public class TestKeyManagerImpl {
     when(mockScmContainerClient.getContainerWithPipelineBatch(
         Arrays.asList(containerID))).thenReturn(containerWithPipelines);
 
-    OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyName(), keyName);
-    List<OmKeyLocationInfo> keyLocations =
-        key.getLatestVersionLocations().getLocationList();
-    DatanodeDetails leader =
-        keyLocations.get(0).getPipeline().getFirstNode();
-    DatanodeDetails follower1 =
-        keyLocations.get(0).getPipeline().getNodes().get(1);
-    DatanodeDetails follower2 =
-        keyLocations.get(0).getPipeline().getNodes().get(2);
+    Pipeline keyPipeline =
+        key.getLatestVersionLocations().getLocationList().get(0).getPipeline();
+    DatanodeDetails leader = keyPipeline.getFirstNode();
+    DatanodeDetails follower1 = keyPipeline.getNodes().get(1);
+    DatanodeDetails follower2 = keyPipeline.getNodes().get(2);
     assertNotEquals(leader, follower1);
     assertNotEquals(follower1, follower2);
 
     // lookup key, leader as client
-    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, leader.getIpAddress());
+    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+        leader.getIpAddress());
     assertEquals(leader, key1.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower1 as client
-    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, follower1.getIpAddress());
+    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+        follower1.getIpAddress());
     assertEquals(follower1, key2.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower2 as client
-    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, follower2.getIpAddress());
+    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+        follower2.getIpAddress());
     assertEquals(follower2, key3.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, random node as client
-    OmKeyInfo key4 = keyManager.lookupKey(keyArgs,
+    OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertEquals(leader, key4.getLatestVersionLocations()
-        .getLocationList().get(0).getPipeline().getClosestNode());
+    assertTrue(
+        keyPipeline.getNodes().containsAll(key4.getLatestVersionLocations()
+            .getLocationList().get(0).getPipeline().getNodesInOrder()));
+  }
+
+  @NotNull
+  private ResolvedBucket resolvedBucket() {
+    ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
+        VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
+    return bucket;
   }
 
   @Test
@@ -860,7 +868,7 @@ public class TestKeyManagerImpl {
 
     // lookup for a non-existent key
     try {
-      keyManager.lookupKey(keyArgs, null);
+      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
       fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
@@ -902,14 +910,14 @@ public class TestKeyManagerImpl {
     when(mockScmContainerClient.getContainerWithPipelineBatch(
         Arrays.asList(1L))).thenReturn(containerWithPipelines);
 
-    OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyLocationVersions().size(), 1);
 
     keySession = writeClient.createFile(keyArgs, true, true);
     writeClient.commitKey(keyArgs, keySession.getId());
 
     // Test lookupKey (latestLocationVersion == true)
-    key = keyManager.lookupKey(keyArgs, null);
+    key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyLocationVersions().size(), 1);
 
     // Test ListStatus (latestLocationVersion == true)
@@ -934,7 +942,7 @@ public class TestKeyManagerImpl {
         .build();
 
     // Test lookupKey (latestLocationVersion == false)
-    key = keyManager.lookupKey(keyArgs, null);
+    key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListStatus (latestLocationVersion == false)
