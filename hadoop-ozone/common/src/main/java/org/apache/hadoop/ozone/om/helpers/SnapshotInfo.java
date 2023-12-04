@@ -55,7 +55,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
+      Proto2Codec.get(
+          OzoneManagerProtocolProtos.SnapshotInfo.getDefaultInstance()),
       SnapshotInfo::getFromProtobuf,
       SnapshotInfo::getProtobuf);
 

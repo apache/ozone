@@ -67,10 +67,6 @@ public final class ScmConfigKeys {
       "dfs.container.ratis.segment.size";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
       "64MB";
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY =
-      "dfs.container.ratis.segment.buffer.size";
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT =
-      "2MB";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
       "dfs.container.ratis.segment.preallocated.size";
   public static final String
@@ -483,6 +479,10 @@ public final class ScmConfigKeys {
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT =
+      "ozone.scm.datanode.admin.monitor.logging.limit";
+  public static final int
+      OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT_DEFAULT = 1000;
 
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";

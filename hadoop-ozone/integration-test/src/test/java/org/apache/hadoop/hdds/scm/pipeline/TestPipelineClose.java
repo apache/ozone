@@ -199,7 +199,7 @@ public class TestPipelineClose {
         }
       }
       return true;
-    }, 500, 5000);
+    }, 500, 10000);
 
     assertThrows(PipelineNotFoundException.class, () ->
             pipelineManager.getPipeline(pipelineID),

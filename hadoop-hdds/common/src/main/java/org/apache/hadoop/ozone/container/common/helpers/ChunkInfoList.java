@@ -33,7 +33,7 @@ import java.util.List;
  */
 public class ChunkInfoList {
   private static final Codec<ChunkInfoList> CODEC = new DelegatedCodec<>(
-      Proto3Codec.get(ContainerProtos.ChunkInfoList.class),
+      Proto3Codec.get(ContainerProtos.ChunkInfoList.getDefaultInstance()),
       ChunkInfoList::getFromProtoBuf,
       ChunkInfoList::getProtoBufMessage,
       DelegatedCodec.CopyType.SHALLOW);

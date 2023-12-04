@@ -217,6 +217,39 @@ public class TestRatisOverReplicationHandler {
         getOverReplicatedHealthResult(), 0);
   }
 
+  @Test
+  public void testClosedOverReplicatedWithAllUnhealthyReplicas()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        State.UNHEALTHY, 0, 0, 0, 0, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    // 1 replica is already pending delete, so only 1 new command should be
+    // created
+    testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(),
+        1);
+  }
+
+  @Test
+  public void testClosedOverReplicatedWithExcessUnhealthy() throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        State.CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(),
+            1);
+    Pair<DatanodeDetails, SCMCommand<?>> command = commands.iterator().next();
+    assertEquals(unhealthyReplica.getDatanodeDetails(),
+        command.getKey());
+  }
+
   /**
    * Handler should not create any delete commands if removing a replica
    * makes the container mis replicated.
