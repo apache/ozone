@@ -4248,4 +4248,12 @@
       to existing buckets till this operation is completed.
     </description>
   </property>
+  <property>
+    <name>ozone.ec.grpc.zerocopy.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Specify if zero-copy should be enabled for EC GRPC protocol.
+    </description>
+  </property>
 </configuration>
