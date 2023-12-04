@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
@@ -81,6 +82,7 @@ public class TestWatchForCommit {
   private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
+  private PipelineManagerImpl pipelineManager;
   private String volumeName;
   private String bucketName;
   private String keyString;
@@ -154,6 +156,7 @@ public class TestWatchForCommit {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
+    pipelineManager = (PipelineManagerImpl) cluster.getStorageContainerManager().getPipelineManager();
   }
 
 
@@ -267,6 +270,8 @@ public class TestWatchForCommit {
       long index = reply.getLogIndex();
       cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
       cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+      // emulate closing pipeline when SCM detects DEAD datanodes
+      pipelineManager.closePipeline(pipeline, false);
       // again write data with more than max buffer limit. This wi
       try {
         // just watch for a log index which in not updated in the commitInfo Map
@@ -282,6 +287,9 @@ public class TestWatchForCommit {
         // RuntimeException
         Assert.assertFalse(HddsClientUtils
             .checkForException(e) instanceof TimeoutException);
+        // client should not attempt to watch with
+        // MAJORITY_COMMITTED replication level
+        Assert.assertFalse(e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
       }
       clientManager.releaseClient(xceiverClient, false);
     }
