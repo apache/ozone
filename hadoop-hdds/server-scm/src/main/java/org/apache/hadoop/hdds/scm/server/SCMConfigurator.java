@@ -210,18 +210,20 @@ public final class SCMConfigurator {
   }
 
   /**
-   * Allows user to specify clock
-   * @param clock - clock
+   * Allows user to specify clock.
+   * @param clock - clock.
    */
   public void setClock(Clock clock) {
     this.clock = clock;
   }
 
   /**
-   * Get the clock
-   * @return clock
+   * Get the clock.
+   * @return clock.
    */
-  public Clock getClock() { return clock; }
+  public Clock getClock() {
+    return clock;
+  }
 
   /**
    * Gets SCM Node Manager.
