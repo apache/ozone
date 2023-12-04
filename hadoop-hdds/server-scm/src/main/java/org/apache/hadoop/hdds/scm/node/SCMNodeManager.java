@@ -152,7 +152,7 @@ public class SCMNodeManager implements NodeManager {
             scmContext, clock,
         layoutVersionManager, hostname -> null);
   }
-  @SuppressWarnings("8")
+  @SuppressWarnings("parameternumber")
   public SCMNodeManager(
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
