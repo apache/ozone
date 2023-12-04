@@ -226,10 +226,6 @@ public class SnapshotDirectoryCleaningService
             OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
             Table<String, OmKeyInfo> snapDeletedDirTable =
                 currOmSnapshot.getMetadataManager().getDeletedDirTable();
-            Table<String, OmDirectoryInfo> snapDirTable =
-                currOmSnapshot.getMetadataManager().getDirectoryTable();
-            Table<String, String> snapRenamedTable =
-                currOmSnapshot.getMetadataManager().getSnapshotRenamedTable();
 
             try (TableIterator<String, ? extends Table.KeyValue<String,
                 OmKeyInfo>> deletedDirIterator = snapDeletedDirTable
@@ -242,10 +238,9 @@ public class SnapshotDirectoryCleaningService
                 // For each deleted directory we do an in-memory DFS and
                 // do a deep clean and exclusive size calculation.
                 iterateDirectoryTree(deletedDirInfo, volumeId, bucketInfo,
-                    snapDirTable, previousSnapshot, previousToPrevSnapshot,
-                    currOmSnapshot, snapRenamedTable, previousKeyTable,
-                    prevRenamedTable, previousToPrevKeyTable,
-                    dbBucketKeyForDir);
+                    previousSnapshot, previousToPrevSnapshot,
+                    currOmSnapshot, previousKeyTable, prevRenamedTable,
+                    previousToPrevKeyTable, dbBucketKeyForDir);
               }
               updateDeepCleanSnapshotDir(currSnapInfo.getTableKey());
               if (previousSnapshot != null) {
@@ -266,15 +261,18 @@ public class SnapshotDirectoryCleaningService
   private void iterateDirectoryTree(
       Table.KeyValue<String, OmKeyInfo> deletedDirInfo, long volumeId,
       OmBucketInfo bucketInfo,
-      Table<String, OmDirectoryInfo> snapDirTable,
       SnapshotInfo previousSnapshot,
       SnapshotInfo previousToPrevSnapshot,
       OmSnapshot currOmSnapshot,
-      Table<String, String> snapRenamedTable,
       Table<String, OmKeyInfo> previousKeyTable,
       Table<String, String> prevRenamedTable,
       Table<String, OmKeyInfo> previousToPrevKeyTable,
       String dbBucketKeyForDir) throws IOException {
+
+    Table<String, OmDirectoryInfo> snapDirTable =
+        currOmSnapshot.getMetadataManager().getDirectoryTable();
+    Table<String, String> snapRenamedTable =
+        currOmSnapshot.getMetadataManager().getSnapshotRenamedTable();
     Stack<StackNode> stackNodes =
         new Stack<>();
     OmDirectoryInfo omDeletedDirectoryInfo =
