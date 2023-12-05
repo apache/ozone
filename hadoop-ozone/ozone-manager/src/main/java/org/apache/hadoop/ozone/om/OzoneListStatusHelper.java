@@ -217,9 +217,9 @@ public class OzoneListStatusHelper {
   }
 
   private OzoneFileStatus getStatus(String prefixPath, long scmBlockSz,
-                                   String volumeName, String bucketName,
-                                   ReplicationConfig bucketReplication,
-                                   ListIterator.HeapEntry entry) {
+                                    String volumeName, String bucketName,
+                                    ReplicationConfig bucketReplication,
+                                    ListIterator.HeapEntry entry) {
     if (entry == null || entry.getValue() == null) {
       return null;
     }
