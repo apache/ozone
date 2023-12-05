@@ -164,10 +164,11 @@ public class BucketEndpoint extends EndpointBase {
       getMetrics().updateGetBucketFailureStats(startNanos);
       if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else if(ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
-        // File not found, send normal response with 0 keyCount
+      } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
+        // File not found, continue and send normal response with 0 keyCount
+        LOG.debug("Key Not found prefix: {}", prefix);
       } else {
-          throw ex;
+        throw ex;
       }
     } catch (Exception ex) {
       getMetrics().updateGetBucketFailureStats(startNanos);
