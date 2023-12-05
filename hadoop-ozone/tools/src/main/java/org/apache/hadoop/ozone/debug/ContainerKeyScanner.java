@@ -68,7 +68,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
  */
 @CommandLine.Command(
     name = "ckscanner",
-    description = "Parse a list of container IDs"
+    description = "Find keys that reference a container"
 )
 @MetaInfServices(SubcommandWithParent.class)
 public class ContainerKeyScanner implements Callable<Void>,
