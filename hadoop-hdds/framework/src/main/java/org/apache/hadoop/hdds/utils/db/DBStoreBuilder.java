@@ -255,8 +255,8 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public <T extends MessageLite> DBStoreBuilder addProto2Codec(Class<T> type) {
-    return addCodec(type, Proto2Codec.get(type));
+  public <T extends MessageLite> DBStoreBuilder addProto2Codec(T type) {
+    return addCodec((Class<T>)type.getClass(), Proto2Codec.get(type));
   }
 
   public DBStoreBuilder setDBOptions(ManagedDBOptions option) {

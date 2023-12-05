@@ -569,11 +569,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       final int index,
       final int pageSize
   ) throws IOException {
-    if (index < 0 || pageSize <= 0) {
-      throw new IllegalArgumentException(String.format(
-          "Index should be a number >= 0. Given index %d. Page size " +
-              "should be a positive number > 0. Given page size is %d",
-          index, pageSize));
+    if (index < 0 || index > snapDiffJob.getTotalDiffEntries()
+        || pageSize <= 0) {
+      throw new IOException(String.format(
+          "Index (given: %d) should be a number >= 0 and < totalDiffEntries: " +
+              "%d. Page size (given: %d) should be a positive number > 0.",
+          index, snapDiffJob.getTotalDiffEntries(), pageSize));
     }
 
     OFSPath path = getSnapshotRootPath(volumeName, bucketName);

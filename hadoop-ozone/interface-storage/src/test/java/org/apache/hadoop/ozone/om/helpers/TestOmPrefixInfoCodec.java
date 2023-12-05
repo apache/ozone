@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -57,6 +57,6 @@ public class TestOmPrefixInfoCodec extends Proto2CodecTestBase<OmPrefixInfo> {
     OmPrefixInfo opiLoad = codec.fromPersistedFormat(
         codec.toPersistedFormat(opiSave));
 
-    Assert.assertEquals("Loaded not equals to saved", opiSave, opiLoad);
+    Assertions.assertEquals(opiSave, opiLoad, "Loaded not equals to saved");
   }
 }

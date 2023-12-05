@@ -44,7 +44,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       = Comparator.comparingLong(info -> info.getLastUsed().toEpochMilli());
 
   private static final Codec<ContainerInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.ContainerInfoProto.class),
+      Proto2Codec.get(HddsProtos.ContainerInfoProto.getDefaultInstance()),
       ContainerInfo::fromProtobuf,
       ContainerInfo::getProtobuf);
 

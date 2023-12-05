@@ -19,177 +19,142 @@
 package org.apache.hadoop.ozone.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
-import static org.junit.Assert.assertFalse;
+import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.event.Level;
 
 /**
  * Tests ozone containers replication.
  */
-@RunWith(Parameterized.class)
-public class TestContainerReplication {
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+@Timeout(300)
+class TestContainerReplication {
 
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
 
-  private MiniOzoneCluster cluster;
-  private OzoneClient client;
-  private String placementPolicyClass;
+  private static final List<Class<? extends PlacementPolicy>> POLICIES = asList(
+      SCMContainerPlacementCapacity.class,
+      SCMContainerPlacementRackAware.class,
+      SCMContainerPlacementRandom.class
+  );
 
-  @Parameterized.Parameters
-  public static List<String> parameters() {
-    List<String> classes = new ArrayList<>();
-    classes.add(SCMContainerPlacementRackAware.class.getCanonicalName());
-    classes.add(SCMContainerPlacementCapacity.class.getCanonicalName());
-    classes.add(SCMContainerPlacementRandom.class.getCanonicalName());
-    return classes;
+  static List<Arguments> containerReplicationArguments() {
+    List<Arguments> arguments = new LinkedList<>();
+    for (Class<? extends PlacementPolicy> policyClass : POLICIES) {
+      String canonicalName = policyClass.getCanonicalName();
+      arguments.add(Arguments.arguments(canonicalName, true));
+      arguments.add(Arguments.arguments(canonicalName, false));
+    }
+    return arguments;
   }
 
-  public TestContainerReplication(String placementPolicy) {
-    this.placementPolicyClass = placementPolicy;
+  @BeforeAll
+  static void setUp() {
+    setLogLevel(SCMContainerPlacementCapacity.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRackAware.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
   }
 
-  @Before
-  public void setUp() throws Exception {
-    GenericTestUtils.setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(SCMContainerPlacementCapacity.LOG,
-        Level.DEBUG);
-    GenericTestUtils.setLogLevel(SCMContainerPlacementRackAware.LOG,
-        Level.DEBUG);
-  }
+  @ParameterizedTest
+  @MethodSource("containerReplicationArguments")
+  void testContainerReplication(
+      String placementPolicyClass, boolean legacyEnabled) throws Exception {
 
-  @After
-  public void tearDown() {
-    IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
+    OzoneConfiguration conf = createConfiguration(legacyEnabled);
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
+    try (MiniOzoneCluster cluster = newCluster(conf)) {
+      cluster.waitForClusterToBeReady();
+      try (OzoneClient client = cluster.newClient()) {
+        createTestData(client);
+
+        List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
+        assertFalse(keyLocations.isEmpty());
+
+        OmKeyLocationInfo keyLocation = keyLocations.get(0);
+        long containerID = keyLocation.getContainerID();
+        waitForContainerClose(cluster, containerID);
+
+        cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
+        waitForReplicaCount(containerID, 2, cluster);
+
+        waitForReplicaCount(containerID, 3, cluster);
+      }
     }
   }
 
-  @Test
-  public void testContainerReplication() throws Exception {
-    OzoneConfiguration conf = createConfiguration();
-    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
-    cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(conf);
-    createTestData();
-
-    List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
-    assertFalse(keyLocations.isEmpty());
-
-    OmKeyLocationInfo keyLocation = keyLocations.get(0);
-    long containerID = keyLocation.getContainerID();
-    waitForContainerClose(cluster, containerID);
-
-    cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
-    waitForReplicaCount(containerID, 2, cluster);
-
-    waitForReplicaCount(containerID, 3, cluster);
+  private static MiniOzoneCluster newCluster(OzoneConfiguration conf)
+      throws IOException {
+    return MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
+        .build();
   }
 
-  @Test
-  public void testContainerReplicationWithLegacyReplicationManagerDisabled()
-      throws Exception {
-    OzoneConfiguration conf = createConfiguration();
-
-    /*
-    Disable LegacyReplicationManager so that ReplicationManager handles Ratis
-     containers.
-     */
-    ReplicationManagerConfiguration repConf =
-        conf.getObject(ReplicationManagerConfiguration.class);
-    repConf.setEnableLegacy(false);
-    repConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
-    conf.setFromObject(repConf);
-
-    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
-    cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(conf);
-    createTestData();
-
-    List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
-    assertFalse(keyLocations.isEmpty());
-
-    OmKeyLocationInfo keyLocation = keyLocations.get(0);
-    long containerID = keyLocation.getContainerID();
-    waitForContainerClose(cluster, containerID);
-
-    cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
-    waitForReplicaCount(containerID, 2, cluster);
-
-    waitForReplicaCount(containerID, 3, cluster);
-  }
-
-  private static OzoneConfiguration createConfiguration() {
+  private static OzoneConfiguration createConfiguration(boolean enableLegacy) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
 
     ReplicationManagerConfiguration repConf =
         conf.getObject(ReplicationManagerConfiguration.class);
+    repConf.setEnableLegacy(enableLegacy);
     repConf.setInterval(Duration.ofSeconds(1));
+    repConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
+
     return conf;
   }
 
-  private void createTestData() throws IOException {
+  // TODO use common helper to create test data
+  private void createTestData(OzoneClient client) throws IOException {
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(VOLUME);
     OzoneVolume volume = objectStore.getVolume(VOLUME);
     volume.createBucket(BUCKET);
 
     OzoneBucket bucket = volume.getBucket(BUCKET);
-    try (OutputStream out = bucket.createKey(KEY, 0)) {
+
+    try (OutputStream out = bucket.createKey(KEY, 0,
+        RatisReplicationConfig.getInstance(THREE), emptyMap())) {
       out.write("Hello".getBytes(UTF_8));
     }
   }
@@ -200,11 +165,10 @@ public class TestContainerReplication {
         .setVolumeName(VOLUME)
         .setBucketName(BUCKET)
         .setKeyName(KEY)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-    Assert.assertNotNull(locations);
+    assertNotNull(locations);
     return locations.getLocationList();
   }
 
