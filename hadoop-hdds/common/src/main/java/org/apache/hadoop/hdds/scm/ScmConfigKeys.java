@@ -80,8 +80,6 @@ public final class ScmConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
       "dfs.container.ratis.statemachinedata.sync.retries";
-  public static final int
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT = -1;
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS =
       "dfs.container.ratis.statemachine.max.pending.apply-transactions";

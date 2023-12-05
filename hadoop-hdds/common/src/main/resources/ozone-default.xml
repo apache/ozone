@@ -98,10 +98,17 @@
   </property>
   <property>
     <name>dfs.container.ratis.statemachinedata.sync.retries</name>
-    <value>-1</value>
+    <value/>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Number of times the WriteStateMachineData op will be tried
-      before failing, if this value is -1, then this retries indefinitely.
+      before failing. If the value is not configured, it will default
+      to (hdds.ratis.rpc.slowness.timeout / dfs.container.ratis.statemachinedata.sync.timeout),
+      which means that the WriteStatMachineData will be retried for every sync timeout until
+      the configured slowness timeout is hit, after which the StateMachine will close down the pipeline.
+
+      If this value is set to -1, then this retries indefinitely. This might not be desirable
+      since if due to persistent failure the WriteStateMachineData op was not able to complete
+      for a long time, this might block the Ratis write pipeline.
     </description>
   </property>
   <property>
