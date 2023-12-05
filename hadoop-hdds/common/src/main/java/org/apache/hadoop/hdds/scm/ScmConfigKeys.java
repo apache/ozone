@@ -38,35 +38,22 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DB_DIRS = "ozone.scm.db.dirs";
 
   // SCM DB directory permission
-  public static final String OZONE_SCM_DB_DIRS_PERMISSIONS =
-      "ozone.scm.db.dirs.permissions";
+  public static final String OZONE_SCM_DB_DIRS_PERMISSIONS = "ozone.scm.db.dirs.permissions";
 
-  public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
-      = "dfs.container.ratis.enabled";
-  public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
-      = false;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-      = "dfs.container.ratis.rpc.type";
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
-      = "GRPC";
-  public static final String
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME
+  public static final String DFS_CONTAINER_RATIS_ENABLED_KEY = "dfs.container.ratis.enabled";
+  public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT = false;
+  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY = "dfs.container.ratis.rpc.type";
+  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT = "GRPC";
+  public static final String DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME
       = "dfs.container.ratis.num.write.chunk.threads.per.volume";
-  public static final int
-      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
-      = 10;
-  public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = "dfs.container.ratis.replication.level";
-  public static final ReplicationLevel
-      DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT = ReplicationLevel.MAJORITY;
+  public static final int DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT = 10;
+  public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY = "dfs.container.ratis.replication.level";
+  public static final ReplicationLevel DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT = ReplicationLevel.MAJORITY;
   public static final String DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
       = "dfs.container.ratis.num.container.op.executors";
-  public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
-      = 10;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY =
-      "dfs.container.ratis.segment.size";
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
-      "64MB";
+  public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT = 10;
+  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY = "dfs.container.ratis.segment.size";
+  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT = "64MB";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
       "dfs.container.ratis.segment.preallocated.size";
   public static final String
