@@ -446,6 +446,10 @@ public class RDBStore implements DBStore {
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
       }
     }
+    if (!dbUpdatesWrapper.isDBUpdateSuccess()) {
+      LOG.warn("Returned DBUpdates isDBUpdateSuccess: {}",
+          dbUpdatesWrapper.isDBUpdateSuccess());
+    }
     return dbUpdatesWrapper;
   }
 
