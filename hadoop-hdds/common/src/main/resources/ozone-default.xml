@@ -98,10 +98,17 @@
   </property>
   <property>
     <name>dfs.container.ratis.statemachinedata.sync.retries</name>
-    <value>-1</value>
+    <value/>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Number of times the WriteStateMachineData op will be tried
-      before failing, if this value is -1, then this retries indefinitely.
+      before failing. If the value is not configured, it will default
+      to (hdds.ratis.rpc.slowness.timeout / dfs.container.ratis.statemachinedata.sync.timeout),
+      which means that the WriteStatMachineData will be retried for every sync timeout until
+      the configured slowness timeout is hit, after which the StateMachine will close down the pipeline.
+
+      If this value is set to -1, then this retries indefinitely. This might not be desirable
+      since if due to persistent failure the WriteStateMachineData op was not able to complete
+      for a long time, this might block the Ratis write pipeline.
     </description>
   </property>
   <property>
@@ -318,14 +325,6 @@
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment file used
       by Apache Ratis on datanodes. (64 MB by default)
-    </description>
-  </property>
-  <property>
-    <name>dfs.container.ratis.segment.buffer.size</name>
-    <value>2MB</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment buffer used
-      by Apache Ratis on datanodes. (2 MB by default)
     </description>
   </property>
   <property>
@@ -3219,6 +3218,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.datanode.admin.monitor.logging.limit</name>
+    <value>1000</value>
+    <tag>SCM</tag>
+    <description>
+      When a node is checked for decommission or maintenance, this setting
+      controls how many degraded containers are logged on each pass. The limit
+      is applied separately for each type of container, ie under-replicated and
+      unhealthy will each have their own limit.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.list.trash.keys.max</name>
     <value>1000</value>
     <tag>OZONE, CLIENT</tag>
@@ -4243,6 +4253,14 @@
       quota recalculation trigger when upgrade to the layout version QUOTA.
       while upgrade, re-calculation of quota used will block write operation
       to existing buckets till this operation is completed.
+    </description>
+  </property>
+  <property>
+    <name>ozone.ec.grpc.zerocopy.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Specify if zero-copy should be enabled for EC GRPC protocol.
     </description>
   </property>
   <property>

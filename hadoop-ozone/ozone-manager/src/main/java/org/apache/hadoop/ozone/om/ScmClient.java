@@ -31,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +112,14 @@ public class ScmClient {
       containerLocationCache.invalidateAll(containerIds);
     }
     try {
-      return containerLocationCache.getAll(containerIds);
+      Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
+      // Don't keep empty pipelines in the cache.
+      List<Long> emptyPipelines = result.entrySet().stream()
+          .filter(e -> e.getValue().isEmpty())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      containerLocationCache.invalidateAll(emptyPipelines);
+      return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
     } catch (InvalidCacheLoadException e) {

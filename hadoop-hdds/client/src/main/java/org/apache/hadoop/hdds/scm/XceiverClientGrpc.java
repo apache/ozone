@@ -292,23 +292,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
-    try {
-      for (Map.Entry<DatanodeDetails,
+    for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
               entry : futureHashMap.entrySet()) {
+      try {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
-      }
-    } catch (InterruptedException e) {
-      LOG.error("Command execution was interrupted.");
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      String message = "Failed to execute command {}.";
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(message, processForDebug(request), e);
-      } else {
-        LOG.error(message + " Exception Class: {}, Exception Message: {}",
-                request.getCmdType(), e.getClass().getName(), e.getMessage());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        String message =
+            "Failed to execute command {} on datanode " + entry.getKey()
+                .getHostName();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(message, processForDebug(request), e);
+        } else {
+          LOG.error(message + " Exception Class: {}, Exception Message: {}",
+              request.getCmdType(), e.getClass().getName(), e.getMessage());
+        }
       }
     }
     return responseProtoHashMap;
