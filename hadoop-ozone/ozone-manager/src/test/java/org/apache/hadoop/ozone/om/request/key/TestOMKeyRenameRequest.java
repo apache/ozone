@@ -63,15 +63,16 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecute() throws Exception {
+    addKeyToTable(fromKeyInfo);
     doPreExecute(createRenameKeyRequest(
         volumeName, bucketName, fromKeyName, toKeyName));
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    String dbFromKey = addKeyToTable(fromKeyInfo);
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, fromKeyName, toKeyName));
-    String dbFromKey = addKeyToTable(fromKeyInfo);
 
     OMKeyRenameRequest omKeyRenameRequest =
             getOMKeyRenameRequest(modifiedOmRequest);
@@ -97,8 +98,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, fromKeyName, toKeyName));
+    OMRequest omRequest = createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName);
 
     // Add only volume and bucket entry to DB.
 
@@ -108,7 +109,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+        new OMKeyRenameRequest(omRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
@@ -119,11 +120,11 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        "not_exist_volume", "not_exist_bucket", fromKeyName, toKeyName));
+    OMRequest omRequest = createRenameKeyRequest(
+        "not_exist_volume", "not_exist_bucket", fromKeyName, toKeyName);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+        new OMKeyRenameRequest(omRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
@@ -134,14 +135,14 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, "not_exist_bucket", fromKeyName, toKeyName));
+    OMRequest omRequest = createRenameKeyRequest(
+        volumeName, "not_exist_bucket", fromKeyName, toKeyName);
 
     // Add only volume entry to DB.
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+        new OMKeyRenameRequest(omRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
