@@ -183,8 +183,6 @@ public class ListIterator {
 
     private final Iterator<Map.Entry<String, Value>>
         cacheCreatedKeyIter;
-    private final Iterator<Map.Entry<CacheKey<String>, CacheValue<Value>>>
-        cacheIter;
     private final String prefixKey;
     private final String startKey;
     private final String tableName;
@@ -197,18 +195,18 @@ public class ListIterator {
               String prefixKey) {
       this.cacheKeyMap = new TreeMap<>();
 
-      this.cacheIter = cacheIter;
       this.startKey = startKey;
       this.prefixKey = prefixKey;
       this.tableName = tableName;
       this.entryIteratorId = entryIteratorId;
 
-      getCacheValues();
+      populateCacheMap(cacheIter);
 
       cacheCreatedKeyIter = cacheKeyMap.entrySet().iterator();
     }
 
-    private void getCacheValues() {
+    private void populateCacheMap(Iterator<Map.Entry<CacheKey<String>,
+        CacheValue<Value>>> cacheIter) {
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<Value>> entry =
             cacheIter.next();
