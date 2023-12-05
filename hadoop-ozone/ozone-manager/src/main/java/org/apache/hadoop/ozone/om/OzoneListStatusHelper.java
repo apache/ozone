@@ -35,7 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.Collection;
@@ -192,15 +194,21 @@ public class OzoneListStatusHelper {
              new ListIterator.MinHeapIterator(metadataManager, dbPrefixKey,
                  bucketLayout, startKeyPrefix, volumeName, bucketName)) {
 
-      while (map.size() < numEntries && heapIterator.hasNext()) {
-        ListIterator.HeapEntry entry = heapIterator.next();
-        OzoneFileStatus status = getStatus(prefixKey,
-            scmBlockSize, volumeName, bucketName, replication, entry);
-        // Caution: DO NOT use putIfAbsent. putIfAbsent undesirably overwrites
-        // the value with `status` when the existing value in the map is null.
-        if (!map.containsKey(entry.getKey())) {
-          map.put(entry.getKey(), status);
+      try {
+        while (map.size() < numEntries && heapIterator.hasNext()) {
+          ListIterator.HeapEntry entry = heapIterator.next();
+          OzoneFileStatus status = getStatus(prefixKey,
+              scmBlockSize, volumeName, bucketName, replication, entry);
+          // Caution: DO NOT use putIfAbsent. putIfAbsent undesirably overwrites
+          // the value with `status` when the existing value in the map is null.
+          if (!map.containsKey(entry.getKey())) {
+            map.put(entry.getKey(), status);
+          }
         }
+      } catch (NoSuchElementException e) {
+        throw new IOException(e);
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
       }
     }
 

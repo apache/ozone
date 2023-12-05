@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -91,9 +92,6 @@ public class ListIterator {
     }
 
     public boolean equals(Object other) {
-      if (other == null) {
-        return false;
-      }
 
       if (!(other instanceof HeapEntry)) {
         return false;
@@ -156,8 +154,8 @@ public class ListIterator {
     public boolean hasNext() {
       try {
         getNextKey();
-      } catch (Throwable t) {
-        throw new NoSuchElementException();
+      } catch (IOException t) {
+        throw new UncheckedIOException(t);
       }
       return currentKey != null;
     }
@@ -310,8 +308,12 @@ public class ListIterator {
 
       // Insert the element from each of the iterator
       for (Iterator<HeapEntry> iter : iterators) {
-        if (iter.hasNext()) {
-          minHeap.add(iter.next());
+        try {
+          if (iter.hasNext()) {
+            minHeap.add(iter.next());
+          }
+        } catch (UncheckedIOException e) {
+          throw e.getCause();
         }
       }
 

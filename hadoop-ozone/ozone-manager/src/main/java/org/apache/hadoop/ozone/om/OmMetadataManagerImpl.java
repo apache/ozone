@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -117,6 +119,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDir
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1369,13 +1372,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     try (ListIterator.MinHeapIterator snapshotIterator =
         new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
             bucketName, snapshotInfoTable)) {
-      while (snapshotIterator.hasNext() && maxListResult > 0) {
-        SnapshotInfo snapshotInfo = (SnapshotInfo) snapshotIterator.next()
-            .getValue();
-        if (!snapshotInfo.getName().equals(prevSnapshot)) {
-          snapshotInfos.add(snapshotInfo);
-          maxListResult--;
+      try {
+        while (snapshotIterator.hasNext() && maxListResult > 0) {
+          SnapshotInfo snapshotInfo = (SnapshotInfo) snapshotIterator.next()
+              .getValue();
+          if (!snapshotInfo.getName().equals(prevSnapshot)) {
+            snapshotInfos.add(snapshotInfo);
+            maxListResult--;
+          }
         }
+      } catch (NoSuchElementException e) {
+        throw new IOException(e);
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
       }
     }
     return snapshotInfos;
