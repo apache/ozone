@@ -97,12 +97,6 @@ public class HddsConfServlet extends HttpServlet {
       throws IOException {
     try {
       if (cmd == null) {
-        if (FORMAT_XML.equals(format)) {
-          response.setContentType("text/xml; charset=utf-8");
-        } else if (FORMAT_JSON.equals(format)) {
-          response.setContentType("application/json; charset=utf-8");
-        }
-
         writeResponse(getConfFromContext(), out, format, name);
       } else {
         processConfigTagRequest(request, out);
