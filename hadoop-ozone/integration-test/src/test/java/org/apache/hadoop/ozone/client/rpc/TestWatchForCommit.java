@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
@@ -82,7 +81,6 @@ public class TestWatchForCommit {
   private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
-  private PipelineManagerImpl pipelineManager;
   private String volumeName;
   private String bucketName;
   private String keyString;
@@ -156,8 +154,6 @@ public class TestWatchForCommit {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
-    pipelineManager = (PipelineManagerImpl) cluster.getStorageContainerManager()
-        .getPipelineManager();
   }
 
 
