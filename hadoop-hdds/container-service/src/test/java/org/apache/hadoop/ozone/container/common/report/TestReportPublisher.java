@@ -109,7 +109,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Thread.sleep(150);
     Assertions.assertEquals(1,
@@ -131,7 +131,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Thread.sleep(150);
     executorService.shutdown();
@@ -155,7 +155,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Assertions.assertNull(
         ((CommandStatusReportPublisher) publisher).getReport());
@@ -200,7 +200,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Message report =
         ((CRLStatusReportPublisher) publisher).getReport();

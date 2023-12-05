@@ -41,7 +41,7 @@ public final class CRLInfo implements Comparator<CRLInfo>,
     Comparable<CRLInfo> {
 
   private static final Codec<CRLInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(CRLInfoProto.class),
+      Proto2Codec.get(CRLInfoProto.getDefaultInstance()),
       proto -> fromProtobuf(proto, CRLCodec::toIOException),
       CRLInfo::getProtobuf);
 

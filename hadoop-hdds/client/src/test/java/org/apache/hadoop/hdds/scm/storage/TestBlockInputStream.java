@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
-import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +61,10 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
@@ -94,7 +97,8 @@ public class TestBlockInputStream {
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
 
-    blockStream = new DummyBlockInputStream(blockID, blockSize, null, null,
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         false, null, refreshFunction, chunks, chunkDataMap);
   }
 
@@ -137,8 +141,8 @@ public class TestBlockInputStream {
 
   private void seekAndVerify(int pos) throws Exception {
     blockStream.seek(pos);
-    Assert.assertEquals("Current position of buffer does not match with the " +
-        "seeked position", pos, blockStream.getPos());
+    assertEquals(pos, blockStream.getPos(),
+        "Current position of buffer does not match with the sought position");
   }
 
   /**
@@ -152,7 +156,7 @@ public class TestBlockInputStream {
   private void matchWithInputData(byte[] readData, int inputDataStartIndex,
       int length) {
     for (int i = inputDataStartIndex; i < inputDataStartIndex + length; i++) {
-      Assert.assertEquals(blockData[i], readData[i - inputDataStartIndex]);
+      assertEquals(blockData[i], readData[i - inputDataStartIndex]);
     }
   }
 
@@ -161,36 +165,27 @@ public class TestBlockInputStream {
     // Seek to position 0
     int pos = 0;
     seekAndVerify(pos);
-    Assert.assertEquals("ChunkIndex is incorrect", 0,
-        blockStream.getChunkIndex());
+    assertEquals(0, blockStream.getChunkIndex(), "ChunkIndex is incorrect");
 
     // Before BlockInputStream is initialized (initialization happens during
     // read operation), seek should update the BlockInputStream#blockPosition
     pos = CHUNK_SIZE;
     seekAndVerify(pos);
-    Assert.assertEquals("ChunkIndex is incorrect", 0,
-        blockStream.getChunkIndex());
-    Assert.assertEquals(pos, blockStream.getBlockPosition());
+    assertEquals(0, blockStream.getChunkIndex(), "ChunkIndex is incorrect");
+    assertEquals(pos, blockStream.getBlockPosition());
 
-    // Initialize the BlockInputStream. After initializtion, the chunkIndex
-    // should be updated to correspond to the seeked position.
+    // Initialize the BlockInputStream. After initialization, the chunkIndex
+    // should be updated to correspond to the sought position.
     blockStream.initialize();
-    Assert.assertEquals("ChunkIndex is incorrect", 1,
-        blockStream.getChunkIndex());
+    assertEquals(1, blockStream.getChunkIndex(), "ChunkIndex is incorrect");
 
     pos = (CHUNK_SIZE * 4) + 5;
     seekAndVerify(pos);
-    Assert.assertEquals("ChunkIndex is incorrect", 4,
-        blockStream.getChunkIndex());
+    assertEquals(4, blockStream.getChunkIndex(), "ChunkIndex is incorrect");
+    pos = blockSize + 10;
 
-    try {
-      // Try seeking beyond the blockSize.
-      pos = blockSize + 10;
-      seekAndVerify(pos);
-      Assert.fail("Seek to position beyond block size should fail.");
-    } catch (EOFException e) {
-      System.out.println(e);
-    }
+    int finalPos = pos;
+    assertThrows(EOFException.class, () -> seekAndVerify(finalPos));
 
     // Seek to random positions between 0 and the block size.
     Random random = new Random();
@@ -212,8 +207,8 @@ public class TestBlockInputStream {
 
     // The new position of the blockInputStream should be the last index read
     // + 1.
-    Assert.assertEquals(250, blockStream.getPos());
-    Assert.assertEquals(2, blockStream.getChunkIndex());
+    assertEquals(250, blockStream.getPos());
+    assertEquals(2, blockStream.getChunkIndex());
   }
 
   @Test
@@ -228,8 +223,8 @@ public class TestBlockInputStream {
 
     // The new position of the blockInputStream should be the last index read
     // + 1.
-    Assert.assertEquals(250, blockStream.getPos());
-    Assert.assertEquals(2, blockStream.getChunkIndex());
+    assertEquals(250, blockStream.getPos());
+    assertEquals(2, blockStream.getChunkIndex());
   }
 
   @Test
@@ -241,13 +236,13 @@ public class TestBlockInputStream {
     ByteBuffer buffer = ByteBuffer.allocateDirect(200);
     blockStream.read(buffer);
     for (int i = 50; i < 50 + 200; i++) {
-      Assert.assertEquals(blockData[i], buffer.get(i - 50));
+      assertEquals(blockData[i], buffer.get(i - 50));
     }
 
     // The new position of the blockInputStream should be the last index read
     // + 1.
-    Assert.assertEquals(250, blockStream.getPos());
-    Assert.assertEquals(2, blockStream.getChunkIndex());
+    assertEquals(250, blockStream.getPos());
+    assertEquals(2, blockStream.getChunkIndex());
   }
 
   @Test
@@ -269,19 +264,16 @@ public class TestBlockInputStream {
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
-    BlockInputStream blockInputStreamWithRetry =
-        new DummyBlockInputStreamWithRetry(blockID, blockSize,
-            MockPipeline.createSingleNodePipeline(), null,
-            false, null, chunks, chunkDataMap, isRefreshed, null);
 
-    try {
-      Assert.assertFalse(isRefreshed.get());
+    try (BlockInputStream blockInputStreamWithRetry =
+             new DummyBlockInputStreamWithRetry(blockID, blockSize,
+                 MockPipeline.createSingleNodePipeline(), null,
+                 false, null, chunks, chunkDataMap, isRefreshed, null)) {
+      assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
       blockInputStreamWithRetry.read(b, 0, 200);
-      Assert.assertTrue(isRefreshed.get());
-    } finally {
-      blockInputStreamWithRetry.close();
+      assertTrue(isRefreshed.get());
     }
   }
 
@@ -329,7 +321,7 @@ public class TestBlockInputStream {
       int bytesRead = subject.read(b, 0, len);
 
       // THEN
-      Assert.assertEquals(len, bytesRead);
+      assertEquals(len, bytesRead);
       verify(this.refreshFunction).apply(blockID);
     } finally {
       reset(this.refreshFunction);
@@ -422,8 +414,7 @@ public class TestBlockInputStream {
     BlockInputStream subject = new BlockInputStream(blockID, blockSize,
         pipeline, null, false, clientFactory, refreshFunction) {
       @Override
-      protected List<ChunkInfo> getChunkInfos() throws IOException {
-        acquireClient();
+      protected List<ChunkInfo> getChunkInfoListUsingClient() {
         return chunks;
       }
 
@@ -442,7 +433,7 @@ public class TestBlockInputStream {
       int bytesRead = subject.read(b, 0, len);
 
       // THEN
-      Assert.assertEquals(len, bytesRead);
+      assertEquals(len, bytesRead);
       verify(refreshFunction).apply(blockID);
       verify(clientFactory).acquireClientForReadData(pipeline);
       verify(clientFactory).releaseClientForReadData(client, false);

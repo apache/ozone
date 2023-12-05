@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.log4j.Level;
@@ -307,7 +306,6 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   @Test
-  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
   public void testGetStackTrace() {
     ManagedRocksIterator iterator = mock(ManagedRocksIterator.class);
     RocksIterator mock = mock(RocksIterator.class);

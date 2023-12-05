@@ -62,13 +62,12 @@ public class OMDBDefinition extends DBDefinition.WithMap {
                     RepeatedOmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo>
-            USER_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.USER_TABLE,
-                    String.class,
-                    StringCodec.get(),
-                    PersistedUserVolumeInfo.class,
-                    Proto2Codec.get(PersistedUserVolumeInfo.class));
+      USER_TABLE = new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.USER_TABLE,
+          String.class,
+          StringCodec.get(),
+          PersistedUserVolumeInfo.class,
+          Proto2Codec.get(PersistedUserVolumeInfo.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs>
             VOLUME_TABLE =

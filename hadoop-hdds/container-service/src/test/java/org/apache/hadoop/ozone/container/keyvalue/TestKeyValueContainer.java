@@ -291,6 +291,43 @@ public class TestKeyValueContainer {
   }
 
   @Test
+  public void testUnhealthyContainerImportExport() throws Exception {
+    createContainer();
+    long numberOfKeysToWrite = 12;
+    populate(numberOfKeysToWrite);
+    keyValueContainerData.setState(
+        ContainerProtos.ContainerDataProto.State.UNHEALTHY);
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+    keyValueContainer.update(data.getMetadata(), true);
+
+    //destination path
+    File exportTar = folder.newFile("exported.tar");
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+      keyValueContainer.exportContainerData(fos, packer);
+    }
+
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    // import container.
+    try (FileInputStream fis = new FileInputStream(exportTar)) {
+      keyValueContainer.importContainerData(fis, packer);
+    }
+
+    // Re-load container data after import
+    data = keyValueContainer.getContainerData();
+    // Make sure empty chunks dir was unpacked.
+    checkContainerFilesPresent(data, 0);
+    // Ensure the unhealthy state is preserved
+    Assertions.assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        data.getState());
+    assertEquals(numberOfKeysToWrite, keyValueContainerData.getBlockCount());
+  }
+
+  @Test
   public void testContainerImportExport() throws Exception {
     long containerId = keyValueContainer.getContainerData().getContainerID();
     createContainer();

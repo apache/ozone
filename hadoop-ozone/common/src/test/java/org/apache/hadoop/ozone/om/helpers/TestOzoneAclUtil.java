@@ -22,8 +22,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,8 +36,8 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for OzoneAcls utility class.
@@ -114,24 +114,25 @@ public class TestOzoneAclUtil {
   }
 
   private void addAndVerifyAcl(List<OzoneAcl> currentAcls, OzoneAcl addedAcl,
-      boolean expectedResult, int expectedSize) {
+                               boolean expectedResult, int expectedSize) {
     assertEquals(expectedResult, OzoneAclUtil.addAcl(currentAcls, addedAcl));
     if (currentAcls != null) {
       boolean verified = verifyAclAdded(currentAcls, addedAcl);
-      assertTrue("addedAcl: " + addedAcl + " should exist in the" +
-          " current acls: " + currentAcls, verified);
+      assertTrue(verified, "addedAcl: " + addedAcl + " should exist in the" +
+          " current acls: " + currentAcls);
       assertEquals(expectedSize, currentAcls.size());
     }
   }
 
   private void removeAndVerifyAcl(List<OzoneAcl> currentAcls,
-      OzoneAcl removedAcl, boolean expectedResult, int expectedSize) {
+                                  OzoneAcl removedAcl, boolean expectedResult,
+                                  int expectedSize) {
     assertEquals(expectedResult, OzoneAclUtil.removeAcl(currentAcls,
         removedAcl));
     if (currentAcls != null) {
       boolean verified = verifyAclRemoved(currentAcls, removedAcl);
-      assertTrue("removedAcl: " + removedAcl + " should not exist in the" +
-          " current acls: " + currentAcls, verified);
+      assertTrue(verified, "removedAcl: " + removedAcl + " should not exist " +
+          "in the current acls: " + currentAcls);
       assertEquals(expectedSize, currentAcls.size());
     }
   }
@@ -201,8 +202,8 @@ public class TestOzoneAclUtil {
         OzoneAcl.parseAcl("user:masstter:rw[DEFAULT]"));
 
     //[user:masstter:rwx[DEFAULT]]
-    Assert.assertEquals(1, ozoneAcls.size());
-    Assert.assertEquals(DEFAULT, ozoneAcls.get(0).getAclScope());
+    Assertions.assertEquals(1, ozoneAcls.size());
+    Assertions.assertEquals(DEFAULT, ozoneAcls.get(0).getAclScope());
 
     ozoneAcls = new ArrayList<>();
     OzoneAclUtil.addAcl(ozoneAcls,
@@ -211,8 +212,8 @@ public class TestOzoneAclUtil {
         OzoneAcl.parseAcl("user:masstter:rw[ACCESS]"));
 
     //[user:masstter:rwx[ACCESS]]
-    Assert.assertEquals(1, ozoneAcls.size());
-    Assert.assertEquals(ACCESS, ozoneAcls.get(0).getAclScope());
+    Assertions.assertEquals(1, ozoneAcls.size());
+    Assertions.assertEquals(ACCESS, ozoneAcls.get(0).getAclScope());
 
     ozoneAcls = new ArrayList<>();
     OzoneAclUtil.addAcl(ozoneAcls,
@@ -221,10 +222,10 @@ public class TestOzoneAclUtil {
         OzoneAcl.parseAcl("user:masstter:rwx[ACCESS]"));
 
     //[user:masstter:rwx[ACCESS], user:masstter:rwx[DEFAULT]]
-    Assert.assertEquals(2, ozoneAcls.size());
-    Assert.assertNotEquals(ozoneAcls.get(0).getAclScope(),
+    Assertions.assertEquals(2, ozoneAcls.size());
+    Assertions.assertNotEquals(ozoneAcls.get(0).getAclScope(),
         ozoneAcls.get(1).getAclScope());
-    Assert.assertEquals(ozoneAcls.get(0).getAclBitSet(),
+    Assertions.assertEquals(ozoneAcls.get(0).getAclBitSet(),
         ozoneAcls.get(1).getAclBitSet());
   }
 }

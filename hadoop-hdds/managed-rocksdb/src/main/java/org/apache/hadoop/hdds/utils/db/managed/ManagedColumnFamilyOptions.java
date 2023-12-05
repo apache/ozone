@@ -21,19 +21,29 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
 
+import javax.annotation.Nullable;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+
 /**
  * Managed ColumnFamilyOptions.
  */
 public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
-  public ManagedColumnFamilyOptions() {
-    super();
-  }
+
+  @Nullable
+  private final StackTraceElement[] elements = getStackTrace();
 
   /**
    * Indicate if this ColumnFamilyOptions is intentionally used across RockDB
    * instances.
    */
   private boolean reused = false;
+
+  public ManagedColumnFamilyOptions() {
+    super();
+  }
 
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
@@ -76,7 +86,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
   @Override
   protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
+    assertClosed(this, formatStackTrace(elements));
     super.finalize();
   }
 

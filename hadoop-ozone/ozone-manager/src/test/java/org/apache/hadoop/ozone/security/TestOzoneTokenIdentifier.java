@@ -57,10 +57,10 @@ import org.apache.hadoop.util.Time;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,7 +86,7 @@ public class TestOzoneTokenIdentifier {
           + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
           + "SSL_RSA_WITH_RC4_128_MD5";
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
@@ -103,7 +103,7 @@ public class TestOzoneTokenIdentifier {
     return conf;
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanUp() throws Exception {
     FileUtil.fullyDelete(base);
     KeyStoreTestUtil.cleanupSSLConfig(KEYSTORES_DIR, sslConfsDir);
@@ -295,7 +295,7 @@ public class TestOzoneTokenIdentifier {
     OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
     id2.readFields(dis);
-    Assert.assertEquals(id, id2);
+    Assertions.assertEquals(id, id2);
   }
 
 
@@ -327,7 +327,7 @@ public class TestOzoneTokenIdentifier {
     DataInputStream in = new DataInputStream(buf);
     OzoneTokenIdentifier idDecode = new OzoneTokenIdentifier();
     idDecode.readFields(in);
-    Assert.assertEquals(idEncode, idDecode);
+    Assertions.assertEquals(idEncode, idDecode);
   }
 
   @Test
@@ -342,9 +342,9 @@ public class TestOzoneTokenIdentifier {
     try {
       idRead =  idCodec.fromPersistedFormat(oldIdBytes);
     } catch (IOException ex) {
-      Assert.fail("Should not fail to load old token format");
+      Assertions.fail("Should not fail to load old token format");
     }
-    Assert.assertEquals("Deserialize Serialized Token should equal.",
-        idWrite, idRead);
+    Assertions.assertEquals(idWrite, idRead,
+        "Deserialize Serialized Token should equal.");
   }
 }

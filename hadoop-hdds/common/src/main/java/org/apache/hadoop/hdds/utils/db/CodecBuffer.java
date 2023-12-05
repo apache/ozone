@@ -379,7 +379,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putShort(short n) {
     assertRefCnt(1);
-    buf.writeShort(n);
+    final ByteBuf returned = buf.writeShort(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -390,7 +391,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putInt(int n) {
     assertRefCnt(1);
-    buf.writeInt(n);
+    final ByteBuf returned = buf.writeInt(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -401,7 +403,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putLong(long n) {
     assertRefCnt(1);
-    buf.writeLong(n);
+    final ByteBuf returned = buf.writeLong(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -412,7 +415,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer put(byte val) {
     assertRefCnt(1);
-    buf.writeByte(val);
+    final ByteBuf returned = buf.writeByte(val);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -449,7 +453,8 @@ public class CodecBuffer implements AutoCloseable {
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
     final int size = source.applyAsInt(buffer);
-    buf.setIndex(buf.readerIndex(), w + size);
+    final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -470,7 +475,8 @@ public class CodecBuffer implements AutoCloseable {
     try (ByteBufOutputStream out = new ByteBufOutputStream(buf)) {
       size = source.apply(out);
     }
-    buf.setIndex(buf.readerIndex(), w + size);
+    final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -497,7 +503,8 @@ public class CodecBuffer implements AutoCloseable {
     if (size != null) {
       Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
       if (size > 0 && size <= writable) {
-        buf.setIndex(buf.readerIndex(), i + size);
+        final ByteBuf returned = buf.setIndex(buf.readerIndex(), i + size);
+        Preconditions.assertSame(buf, returned, "buf");
       }
     }
     return size;

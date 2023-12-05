@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
@@ -113,6 +114,8 @@ public class TestOzoneConfiguration {
     ozoneConfig.setBoolean("test.scm.client.enabled", true);
     ozoneConfig.setInt("test.scm.client.port", 5555);
     ozoneConfig.setTimeDuration("test.scm.client.wait", 10, TimeUnit.MINUTES);
+    ozoneConfig.setTimeDuration("test.scm.client.duration",
+        3, TimeUnit.SECONDS);
     ozoneConfig.set("test.scm.client.class", Integer.class.getName());
     ozoneConfig.setDouble("test.scm.client.threshold", 10.5);
 
@@ -126,6 +129,7 @@ public class TestOzoneConfiguration {
     Assertions.assertEquals(600, configuration.getWaitTime());
     Assertions.assertSame(Integer.class, configuration.getMyClass());
     Assertions.assertEquals(10.5, configuration.getThreshold());
+    Assertions.assertEquals(Duration.ofSeconds(3), configuration.getDuration());
   }
 
   @Test
@@ -139,6 +143,7 @@ public class TestOzoneConfiguration {
     Assertions.assertEquals(9878, configuration.getPort());
     Assertions.assertSame(Object.class, configuration.getMyClass());
     Assertions.assertEquals(10, configuration.getThreshold());
+    Assertions.assertEquals(Duration.ofHours(1), configuration.getDuration());
   }
 
   @Test
@@ -152,6 +157,7 @@ public class TestOzoneConfiguration {
     object.setWaitTime(600);
     object.setMyClass(this.getClass());
     object.setThreshold(10.5);
+    object.setDuration(Duration.ofMillis(100));
 
     OzoneConfiguration subject = new OzoneConfiguration();
 
@@ -173,6 +179,9 @@ public class TestOzoneConfiguration {
         subject.getClass("test.scm.client.class", null));
     Assertions.assertEquals(object.getThreshold(),
         subject.getDouble("test.scm.client.threshold", 20.5));
+    Assertions.assertEquals(object.getDuration().toMillis(),
+        subject.getTimeDuration("test.scm.client.duration", 0,
+            TimeUnit.MILLISECONDS));
   }
 
   @Test

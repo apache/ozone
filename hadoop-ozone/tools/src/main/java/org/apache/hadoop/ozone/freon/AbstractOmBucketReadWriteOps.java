@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,10 +47,11 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       LoggerFactory.getLogger(AbstractOmBucketReadWriteOps.class);
 
   @Option(names = {"-g", "--size"},
-      description = "Generated data size (in bytes) of each key/file to be " +
-          "written.",
-      defaultValue = "256")
-  private long sizeInBytes;
+      description = "Generated data size of each key/file to be written. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "256B",
+      converter = StorageSizeConverter.class)
+  private StorageSize size;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used for generating the key/file content.",
@@ -103,7 +105,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     writeThreadCount = totalThreadCount - readThreadCount;
 
     display();
-    print("SizeInBytes: " + sizeInBytes);
+    print("SizeInBytes: " + size.toBytes());
     print("bufferSize: " + bufferSize);
     print("totalThreadCount: " + totalThreadCount);
     print("readThreadPercentage: " + readThreadPercentage);
@@ -114,7 +116,7 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     print("numOfWriteOperations: " + numOfWriteOperations);
 
     ozoneConfiguration = createOzoneConfiguration();
-    contentGenerator = new ContentGenerator(sizeInBytes, bufferSize);
+    contentGenerator = new ContentGenerator(size.toBytes(), bufferSize);
     timer = getMetrics().timer("om-bucket-read-write-ops");
 
     initialize(ozoneConfiguration);
@@ -223,6 +225,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
   protected abstract OutputStream create(String pathName) throws IOException;
 
   protected long getSizeInBytes() {
-    return sizeInBytes;
+    return size.toBytes();
   }
 }

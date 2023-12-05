@@ -405,6 +405,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         while (deletedDirIterator.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> deletedDir =
               deletedDirIterator.next();
+          String deletedDirKey = deletedDir.getKey();
+
+          // Exit for dirs out of snapshot scope.
+          if (!deletedDirKey.startsWith(dbBucketKeyForDir)) {
+            break;
+          }
 
           if (isDirReclaimable(deletedDir, previousDirTable,
               renamedTable, renamedList)) {

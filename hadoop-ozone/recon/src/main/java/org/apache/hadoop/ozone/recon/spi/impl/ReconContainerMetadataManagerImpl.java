@@ -518,6 +518,10 @@ public class ReconContainerMetadataManagerImpl
                                           ContainerKeyPrefix containerKeyPrefix)
       throws IOException {
     containerKeyTable.deleteWithBatch(batch, containerKeyPrefix);
+    if (!StringUtils.isEmpty(containerKeyPrefix.getKeyPrefix())) {
+      keyContainerTable.deleteWithBatch(batch,
+          containerKeyPrefix.toKeyPrefixContainer());
+    }
   }
 
   /**
@@ -542,6 +546,11 @@ public class ReconContainerMetadataManagerImpl
   @Override
   public TableIterator getKeyContainerTableIterator() throws IOException {
     return keyContainerTable.iterator();
+  }
+
+  @Override
+  public Table<KeyPrefixContainer, Integer> getKeyContainerTable() {
+    return keyContainerTable;
   }
 
   /**

@@ -185,9 +185,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       volumeName = ozoneManager.getMultiTenantManager()
           .getTenantVolumeName(tenantId);
 
-      acquiredVolumeLock =
-          omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volumeName);
-
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK,
+              volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
@@ -234,10 +235,15 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
         Preconditions.checkNotNull(volumeName);
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
+                volumeName));
       }
       // Release authorizer write lock
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Audit

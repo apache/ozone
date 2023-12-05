@@ -35,13 +35,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -50,22 +50,22 @@ import java.util.concurrent.ThreadLocalRandom;
  * Tests OMDirectoryCreateResponse.
  */
 public class TestOMDirectoryCreateResponse {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -105,14 +105,16 @@ public class TestOMDirectoryCreateResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
-        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
+    Assertions.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneDirKey(
+            volumeName, bucketName, keyName)));
 
     Table.KeyValue<String, OmBucketInfo> keyValue =
         omMetadataManager.getBucketTable().iterator().next();
-    Assert.assertEquals(omMetadataManager.getBucketKey(volumeName,
+    Assertions.assertEquals(omMetadataManager.getBucketKey(volumeName,
         bucketName), keyValue.getKey());
-    Assert.assertEquals(usedNamespace, keyValue.getValue().getUsedNamespace());
+    Assertions.assertEquals(usedNamespace,
+        keyValue.getValue().getUsedNamespace());
   }
 
   public BucketLayout getBucketLayout() {

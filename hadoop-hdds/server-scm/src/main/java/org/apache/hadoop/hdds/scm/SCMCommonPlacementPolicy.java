@@ -500,7 +500,7 @@ public abstract class SCMCommonPlacementPolicy implements
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
       return true;
     }
-    LOG.debug("Datanode {} is not chosen. Required metadata size is {} and " +
+    LOG.info("Datanode {} is not chosen. Required metadata size is {} and " +
             "required data size is {} and NodeStatus is {}",
         datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
     return false;

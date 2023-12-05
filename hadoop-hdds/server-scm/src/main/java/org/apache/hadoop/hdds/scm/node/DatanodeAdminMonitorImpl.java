@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -92,7 +93,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
   // The number of containers for each of under replicated and unhealthy
   // that will be logged in detail each time a node is checked.
-  private static final int CONTAINER_DETAILS_LOGGING_LIMIT = 5;
+  private final int containerDetailsLoggingLimit;
 
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
@@ -103,7 +104,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
-
+    containerDetailsLoggingLimit = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT,
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT_DEFAULT);
     containerStateByHost = new HashMap<>();
   }
 
@@ -336,6 +339,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private boolean checkContainersReplicatedOnNode(DatanodeDetails dn)
       throws NodeNotFoundException {
     int sufficientlyReplicated = 0;
+    int deleting = 0;
     int underReplicated = 0;
     int unhealthy = 0;
     List<ContainerID> underReplicatedIDs = new ArrayList<>();
@@ -346,13 +350,24 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
+
+        // If a container is deleted or deleting, and we have a replica on this
+        // datanode, just ignore it. It should not block decommission.
+        HddsProtos.LifeCycleState containerState
+            = replicaSet.getContainer().getState();
+        if (containerState == HddsProtos.LifeCycleState.DELETED
+            || containerState == HddsProtos.LifeCycleState.DELETING) {
+          deleting++;
+          continue;
+        }
+
         if (replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager)) {
           sufficientlyReplicated++;
         } else {
           if (LOG.isDebugEnabled()) {
             underReplicatedIDs.add(cid);
           }
-          if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
+          if (underReplicated < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}",
                 cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
@@ -377,7 +392,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           if (LOG.isDebugEnabled()) {
             unhealthyIDs.add(cid);
           }
-          if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
+          if (unhealthy < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Unhealthy Container {} {}; {}",
                 cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
@@ -389,9 +404,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
             "in containerManager", cid, dn);
       }
     }
-    LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
-        "unhealthy containers",
-        dn, sufficientlyReplicated, underReplicated, unhealthy);
+    LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
+            "underReplicated and {} unhealthy containers",
+        dn, sufficientlyReplicated, deleting, underReplicated, unhealthy);
     containerStateByHost.put(dn.getHostName(),
         new ContainerStateInWorkflow(dn.getHostName(),
             sufficientlyReplicated,

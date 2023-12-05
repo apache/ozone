@@ -248,6 +248,7 @@ public final class OmUtils {
     case GetFileStatus:
     case LookupFile:
     case ListStatus:
+    case ListStatusLight:
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:
@@ -271,6 +272,7 @@ public final class OmUtils {
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
+    case GetSnapshotInfo:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

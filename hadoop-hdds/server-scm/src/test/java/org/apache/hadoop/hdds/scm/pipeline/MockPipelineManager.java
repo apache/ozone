@@ -207,7 +207,7 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void addContainerToPipelineSCMStart(
           PipelineID pipelineID, ContainerID containerID) throws IOException {
-    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+    stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
@@ -241,6 +241,16 @@ public class MockPipelineManager implements PipelineManager {
       throws IOException {
     stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
+  }
+
+  @Override
+  public void closePipeline(PipelineID pipelineID) throws IOException {
+
+  }
+
+  @Override
+  public void deletePipeline(PipelineID pipelineID) throws IOException {
+
   }
 
   @Override

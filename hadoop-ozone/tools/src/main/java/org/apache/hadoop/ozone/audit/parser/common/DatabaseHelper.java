@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.parser.model.AuditEntry;
@@ -99,7 +98,6 @@ public final class DatabaseHelper {
     return true;
   }
 
-  @SuppressFBWarnings("REC_CATCH_EXCEPTION")
   private static boolean insertAudits(String dbName, String logs)
       throws Exception {
     try (Connection connection = getConnection(dbName);

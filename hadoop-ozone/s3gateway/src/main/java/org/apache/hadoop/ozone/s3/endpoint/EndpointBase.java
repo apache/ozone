@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
@@ -72,6 +73,10 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
  * Basic helpers for all the REST endpoints.
  */
 public abstract class EndpointBase implements Auditor {
+
+  protected static final String ETAG = "ETag";
+
+  protected static final String ETAG_CUSTOM = "etag-custom";
 
   @Inject
   private OzoneClient client;
@@ -123,9 +128,10 @@ public abstract class EndpointBase implements Auditor {
         signatureInfo.getSignature(),
         signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
-    getClient().getObjectStore()
-        .getClientProxy()
-        .setThreadLocalS3Auth(s3Auth);
+    ClientProtocol clientProtocol =
+        getClient().getObjectStore().getClientProxy();
+    clientProtocol.setThreadLocalS3Auth(s3Auth);
+    clientProtocol.setIsS3Request(true);
     init();
   }
 
@@ -311,8 +317,15 @@ public abstract class EndpointBase implements Auditor {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
+      if (entry.getKey().equals(ETAG)) {
+        continue;
+      }
+      String metadataKey = entry.getKey();
+      if (metadataKey.equals(ETAG_CUSTOM)) {
+        metadataKey = ETAG.toLowerCase();
+      }
       responseBuilder
-          .header(CUSTOM_METADATA_HEADER_PREFIX + entry.getKey(),
+          .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
     }
   }
@@ -338,6 +351,14 @@ public abstract class EndpointBase implements Auditor {
       Map<String, String> auditMap) {
     AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
         .withResult(AuditEventStatus.SUCCESS);
+    return builder.build();
+  }
+
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap, PerformanceStringBuilder performance) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
+    builder.setPerformance(performance);
     return builder.build();
   }
 

@@ -24,10 +24,16 @@ import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+<<<<<<< HEAD
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+=======
+import org.junit.jupiter.api.io.TempDir;
+>>>>>>> master
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -61,7 +67,8 @@ import static org.mockito.Mockito.when;
  * require Count.
  */
 public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
-
+  @TempDir
+  private Path temporaryFolder;
   private static GlobalStatsDao globalStatsDao;
   private static OmTableInsightTask omTableInsightTask;
   private static DSLContext dslContext;
@@ -109,15 +116,16 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private void initializeInjector() throws IOException {
     ozoneConfiguration = new OzoneConfiguration();
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     globalStatsDao = getDao(GlobalStatsDao.class);
 
     OzoneStorageContainerManager ozoneStorageContainerManager =
         mock(OzoneStorageContainerManager.class);
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withContainerDB()

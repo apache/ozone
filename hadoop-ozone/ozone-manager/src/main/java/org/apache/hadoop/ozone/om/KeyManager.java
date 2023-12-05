@@ -65,7 +65,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return a OmKeyInfo instance client uses to talk to container.
    * @throws IOException
    */
-  OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress) throws IOException;
+  OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucketLayout,
+      String clientAddress) throws IOException;
 
   /**
    * Return info of an existing key to client side to access to data on
@@ -76,7 +77,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return a OmKeyInfo instance client uses to talk to container.
    * @throws IOException
    */
-  OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress) throws IOException;
+  OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket buctket,
+      String clientAddress) throws IOException;
 
 
   /**
