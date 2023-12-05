@@ -1227,6 +1227,7 @@ public class OzoneBucket extends WithMetadata {
         // Consider the case, keyPrefix="test/", prevKey="" or 'test1/',
         // then 'test/' will be added to the list result.
         startKey = nextOneKeys.get(0).getName();
+        startKey = startKey == null ? "" : startKey;
         if (getKeyPrefix().endsWith(OZONE_URI_DELIMITER) &&
             startKey.equals(getKeyPrefix())) {
           resultList.add(nextOneKeys.get(0));
@@ -1462,6 +1463,7 @@ public class OzoneBucket extends WithMetadata {
         // Note that the startKey needs to be an immediate child of the
         // keyPrefix or black before calling listStatus.
         startKey = adjustStartKey(startKey);
+        startKey = startKey == null ? "" : startKey;
       }
 
       // 2. Get immediate children by listStatus method.
