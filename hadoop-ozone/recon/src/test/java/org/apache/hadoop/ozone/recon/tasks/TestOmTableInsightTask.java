@@ -24,12 +24,9 @@ import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-<<<<<<< HEAD
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-=======
 import org.junit.jupiter.api.io.TempDir;
->>>>>>> master
 
 import java.io.IOException;
 import java.nio.file.Files;
