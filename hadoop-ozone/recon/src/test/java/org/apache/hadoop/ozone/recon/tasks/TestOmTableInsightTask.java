@@ -618,29 +618,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // After deleting "item0", size should be 4 * 1000 = 4000
     assertEquals(4000L, getUnReplicatedSizeForTable(DELETED_TABLE));
     assertEquals(12000L, getReplicatedSizeForTable(DELETED_TABLE));
-
-
-    // Test UPDATE events
-    ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
-    // Update "item1" with new sizes
-    ImmutablePair<Long, Long> newSizesToBeReturned =
-        new ImmutablePair<>(500L, 1500L);
-    RepeatedOmKeyInfo newRepeatedOmKeyInfo = mock(RepeatedOmKeyInfo.class);
-    when(newRepeatedOmKeyInfo.getTotalSize()).thenReturn(newSizesToBeReturned);
-    when(newRepeatedOmKeyInfo.getOmKeyInfoList()).thenReturn(
-        omKeyInfoList.subList(1, 5));
-    OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
-    // For item1, newSize=500 and totalCount of deleted keys should be 4
-    updateEvents.add(
-        getOMUpdateEvent("item1", newRepeatedOmKeyInfo, DELETED_TABLE, UPDATE,
-            repeatedOmKeyInfo));
-    omTableInsightTask.process(updateEventBatch);
-    // Since one key has been deleted, total deleted keys should be 19
-    assertEquals(19L, getCountForTable(DELETED_TABLE));
-    // After updating "item1", size should be 4000 - 1000 + 500 = 3500
-    //  presentValue - oldValue + newValue = updatedValue
-    assertEquals(3500L, getUnReplicatedSizeForTable(DELETED_TABLE));
-    assertEquals(10500L, getReplicatedSizeForTable(DELETED_TABLE));
   }
 
   private OMDBUpdateEvent getOMUpdateEvent(

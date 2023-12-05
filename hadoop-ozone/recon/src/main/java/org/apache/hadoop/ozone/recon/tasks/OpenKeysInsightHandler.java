@@ -47,8 +47,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                              String tableName,
                              Collection<String> sizeRelatedTables,
                              HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unreplicatedSizeCountMap,
-                             HashMap<String, Long> replicatedSizeCountMap) {
+                             HashMap<String, Long> unReplicatedSizeMap,
+                             HashMap<String, Long> replicatedSizeMap) {
 
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
@@ -57,9 +57,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
           (k, size) -> size + omKeyInfo.getDataSize());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size + omKeyInfo.getReplicatedSize());
     } else {
       LOG.warn("Put event does not have the Key Info for {}.",
@@ -76,8 +76,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unreplicatedSizeCountMap,
-                                HashMap<String, Long> replicatedSizeCountMap) {
+                                HashMap<String, Long> unReplicatedSizeMap,
+                                HashMap<String, Long> replicatedSizeMap) {
 
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
@@ -87,10 +87,10 @@ public class OpenKeysInsightHandler implements OmTableHandler {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
       objectCountMap.computeIfPresent(countKey,
           (k, count) -> count > 0 ? count - 1L : 0L);
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
           (k, size) -> size > omKeyInfo.getDataSize() ?
               size - omKeyInfo.getDataSize() : 0L);
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size > omKeyInfo.getReplicatedSize() ?
               size - omKeyInfo.getReplicatedSize() : 0L);
     } else {
@@ -108,8 +108,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unreplicatedSizeCountMap,
-                                HashMap<String, Long> replicatedSizeCountMap) {
+                                HashMap<String, Long> unReplicatedSizeMap,
+                                HashMap<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       if (event.getOldValue() == null) {
@@ -124,10 +124,10 @@ public class OpenKeysInsightHandler implements OmTableHandler {
       // don't need to update the count.
       OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
       OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
           (k, size) -> size - oldKeyInfo.getDataSize() +
               newKeyInfo.getDataSize());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size - oldKeyInfo.getReplicatedSize() +
               newKeyInfo.getReplicatedSize());
     } else {

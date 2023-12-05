@@ -48,8 +48,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                              String tableName,
                              Collection<String> sizeRelatedTables,
                              HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unreplicatedSizeCountMap,
-                             HashMap<String, Long> replicatedSizeCountMap) {
+                             HashMap<String, Long> unReplicatedSizeMap,
+                             HashMap<String, Long> replicatedSizeMap) {
 
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
@@ -61,9 +61,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
       objectCountMap.computeIfPresent(countKey,
           (k, count) -> count + repeatedOmKeyInfo.getOmKeyInfoList().size());
       Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
           (k, size) -> size + result.getLeft());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size + result.getRight());
     } else {
       LOG.warn("Put event does not have the Key Info for {}.",
@@ -81,8 +81,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unreplicatedSizeCountMap,
-                                HashMap<String, Long> replicatedSizeCountMap) {
+                                HashMap<String, Long> unReplicatedSizeMap,
+                                HashMap<String, Long> replicatedSizeMap) {
 
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
@@ -94,9 +94,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
       objectCountMap.computeIfPresent(countKey, (k, count) ->
           count > 0 ? count - repeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
       Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
           (k, size) -> size > result.getLeft() ? size - result.getLeft() : 0L);
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
           (k, size) -> size > result.getRight() ? size - result.getRight() :
               0L);
     } else {
@@ -114,8 +114,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unreplicatedSizeCountMap,
-                                HashMap<String, Long> replicatedSizeCountMap) {
+                                HashMap<String, Long> unReplicatedSizeMap,
+                                HashMap<String, Long> replicatedSizeMap) {
     // The size of deleted directories cannot change hence no-op.
     return;
   }

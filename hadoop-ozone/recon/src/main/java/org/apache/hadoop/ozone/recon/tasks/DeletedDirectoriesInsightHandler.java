@@ -67,8 +67,8 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
                              String tableName,
                              Collection<String> sizeRelatedTables,
                              HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unreplicatedSizeCountMap,
-                             HashMap<String, Long> replicatedSizeCountMap) {
+                             HashMap<String, Long> unreplicatedSizeMap,
+                             HashMap<String, Long> replicatedSizeMap) {
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
 
@@ -81,9 +81,9 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
         Long newDeletedDirectorySize =
             fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
 
-        unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+        unreplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
             (k, size) -> size + newDeletedDirectorySize);
-        replicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+        replicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
             (k, size) -> size + newDeletedDirectorySize * replicationFactor);
 
       } catch (IOException e) {
@@ -105,8 +105,8 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unreplicatedSizeCountMap,
-                                HashMap<String, Long> replicatedSizeCountMap) {
+                                HashMap<String, Long> unreplicatedSizeMap,
+                                HashMap<String, Long> replicatedSizeMap) {
 
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
@@ -119,10 +119,10 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
         Long newDeletedDirectorySize =
             fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
 
-        unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+        unreplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
             (k, size) -> size > newDeletedDirectorySize ?
                 size - newDeletedDirectorySize : 0L);
-        replicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+        replicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
             (k, size) -> size > newDeletedDirectorySize * replicationFactor ?
                 size - newDeletedDirectorySize * replicationFactor : 0L);
 
@@ -142,8 +142,8 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
                                 String tableName,
                                 Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unreplicatedSizeCountMap,
-                                HashMap<String, Long> replicatedSizeCountMap) {
+                                HashMap<String, Long> unReplicatedSizeMap,
+                                HashMap<String, Long> replicatedSizeMap) {
     // The size of deleted directories cannot change hence no-op.
     return;
   }

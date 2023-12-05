@@ -22,16 +22,16 @@ public interface OmTableHandler {
    * @param tableName                Table name associated with the event.
    * @param sizeRelatedTables        Tables Requiring Size Calculation.
    * @param objectCountMap           A map storing object counts.
-   * @param unreplicatedSizeCountMap A map storing unReplicated size counts.
-   * @param replicatedSizeCountMap   A map storing replicated size counts.
+   * @param unReplicatedSizeMap A map storing unReplicated size counts.
+   * @param replicatedSizeMap   A map storing replicated size counts.
    * @throws IOException If an I/O error occurs during processing.
    */
   void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                       String tableName,
                       Collection<String> sizeRelatedTables,
                       HashMap<String, Long> objectCountMap,
-                      HashMap<String, Long> unreplicatedSizeCountMap,
-                      HashMap<String, Long> replicatedSizeCountMap);
+                      HashMap<String, Long> unReplicatedSizeMap,
+                      HashMap<String, Long> replicatedSizeMap);
   /**
    * Handles a DELETE event for size-related tables by updating both the data
    * sizes and their corresponding record counts in the tables.
@@ -40,16 +40,16 @@ public interface OmTableHandler {
    * @param tableName                Table name associated with the event.
    * @param sizeRelatedTables        Tables Requiring Size Calculation.
    * @param objectCountMap           A map storing object counts.
-   * @param unreplicatedSizeCountMap A map storing unReplicated size counts.
-   * @param replicatedSizeCountMap   A map storing replicated size counts.
+   * @param unReplicatedSizeMap A map storing unReplicated size counts.
+   * @param replicatedSizeMap   A map storing replicated size counts.
    * @throws IOException If an I/O error occurs during processing.
    */
   void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
                          Collection<String> sizeRelatedTables,
                          HashMap<String, Long> objectCountMap,
-                         HashMap<String, Long> unreplicatedSizeCountMap,
-                         HashMap<String, Long> replicatedSizeCountMap);
+                         HashMap<String, Long> unReplicatedSizeMap,
+                         HashMap<String, Long> replicatedSizeMap);
 
   /**
    * Handles an UPDATE event for size-related tables by updating both the data
@@ -59,15 +59,15 @@ public interface OmTableHandler {
    * @param tableName                Table name associated with the event.
    * @param sizeRelatedTables        Tables Requiring Size Calculation.
    * @param objectCountMap           A map storing object counts.
-   * @param unreplicatedSizeCountMap A map storing unReplicated size counts.
-   * @param replicatedSizeCountMap   A map storing replicated size counts.
+   * @param unReplicatedSizeMap A map storing unReplicated size counts.
+   * @param replicatedSizeMap   A map storing replicated size counts.
    */
   void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
                          Collection<String> sizeRelatedTables,
                          HashMap<String, Long> objectCountMap,
-                         HashMap<String, Long> unreplicatedSizeCountMap,
-                         HashMap<String, Long> replicatedSizeCountMap);
+                         HashMap<String, Long> unReplicatedSizeMap,
+                         HashMap<String, Long> replicatedSizeMap);
 
 
   /**
