@@ -263,7 +263,7 @@ public class TestChunkUtils {
       // empty file
       runTestReadFile(0, dir, false);
 
-      for(int i = 0; i < 10; i++) {
+      for (int i = 0; i < 10; i++) {
         final int length = RANDOM.nextInt(2 * MAPPED_BUFFER_THRESHOLD) + 1;
         runTestReadFile(length, dir, length > MAPPED_BUFFER_THRESHOLD);
       }
@@ -272,9 +272,10 @@ public class TestChunkUtils {
     }
   }
 
-  public void runTestReadFile(int length, File dir, boolean isMapped) throws Exception {
+  void runTestReadFile(int length, File dir, boolean isMapped)
+      throws Exception {
     final File file;
-    for(int i = length; ; i++) {
+    for (int i = length; ; i++) {
       final File f = new File(dir, "file_" + i);
       if (!f.exists()) {
         file = f;
@@ -288,9 +289,9 @@ public class TestChunkUtils {
     final long seed = System.nanoTime();
     LOG.info("seed: {}", seed);
     RANDOM.setSeed(seed);
-    try(OutputStream out = new BufferedOutputStream(Files.newOutputStream(
+    try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(
         file.toPath(), StandardOpenOption.CREATE_NEW))) {
-      for (int written = 0; written < length; ) {
+      for (int written = 0; written < length;) {
         RANDOM.nextBytes(array);
         final int remaining = length - written;
         final int toWrite = Math.min(remaining, array.length);
@@ -308,10 +309,9 @@ public class TestChunkUtils {
     LOG.info("buffers.size(): {}", buffers.size());
     Assertions.assertEquals((length - 1) / BUFFER_CAPACITY + 1, buffers.size());
     LOG.info("buffer class: {}", buffers.get(0).getClass());
-    LOG.info("buffer class: MappedByteBuffer? {}", buffers.get(0) instanceof  MappedByteBuffer);
 
     RANDOM.setSeed(seed);
-    for(ByteBuffer b : buffers) {
+    for (ByteBuffer b : buffers) {
       Assertions.assertEquals(isMapped, b instanceof MappedByteBuffer);
       RANDOM.nextBytes(array);
       Assertions.assertEquals(ByteBuffer.wrap(array, 0, b.remaining()), b);

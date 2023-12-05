@@ -192,7 +192,7 @@ public final class ChunkUtils {
       throws StorageContainerException {
     if (len > readMappedBufferThreshold) {
       return readData(file, bufferCapacity, off, len, volume);
-    } if (len == 0) {
+    } else if (len == 0) {
       return ChunkBuffer.wrap(Collections.emptyList());
     }
 
