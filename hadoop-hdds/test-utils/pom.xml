@@ -46,6 +46,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>commons-logging</artifactId>
     </dependency>
     <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
       <scope>compile</scope>
