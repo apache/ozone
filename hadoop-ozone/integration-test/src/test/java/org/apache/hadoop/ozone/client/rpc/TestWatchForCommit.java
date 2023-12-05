@@ -271,8 +271,6 @@ public class TestWatchForCommit {
       long index = reply.getLogIndex();
       cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
       cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
-      // emulate closing pipeline when SCM detects DEAD datanodes
-      pipelineManager.closePipeline(pipeline, false);
       // again write data with more than max buffer limit. This wi
       try {
         // just watch for a log index which in not updated in the commitInfo Map
@@ -288,9 +286,6 @@ public class TestWatchForCommit {
         // RuntimeException
         Assert.assertFalse(HddsClientUtils
             .checkForException(e) instanceof TimeoutException);
-        // client should not attempt to watch with
-        // MAJORITY_COMMITTED replication level
-        Assert.assertFalse(e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
       }
       clientManager.releaseClient(xceiverClient, false);
     }
@@ -378,6 +373,9 @@ public class TestWatchForCommit {
       } catch (Exception e) {
         Assert.assertTrue(HddsClientUtils
             .checkForException(e) instanceof GroupMismatchException);
+        // client should not attempt to watch with
+        // MAJORITY_COMMITTED replication level
+        Assert.assertFalse(e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
       }
       clientManager.releaseClient(xceiverClient, false);
     }
