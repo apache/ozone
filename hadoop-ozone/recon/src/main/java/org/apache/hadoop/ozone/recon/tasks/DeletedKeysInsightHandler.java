@@ -116,36 +116,8 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unreplicatedSizeCountMap,
                                 HashMap<String, Long> replicatedSizeCountMap) {
-
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
-
-    if (event.getValue() != null) {
-      if (event.getOldValue() == null) {
-        LOG.warn("Update event does not have the old Key Info for {}.",
-            event.getKey());
-        return;
-      }
-      RepeatedOmKeyInfo oldRepeatedOmKeyInfo =
-          (RepeatedOmKeyInfo) event.getOldValue();
-      RepeatedOmKeyInfo newRepeatedOmKeyInfo =
-          (RepeatedOmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey,
-          (k, count) -> count > 0 ?
-              count - oldRepeatedOmKeyInfo.getOmKeyInfoList().size() +
-                  newRepeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
-      Pair<Long, Long> oldSize = oldRepeatedOmKeyInfo.getTotalSize();
-      Pair<Long, Long> newSize = newRepeatedOmKeyInfo.getTotalSize();
-      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-          (k, size) -> size - oldSize.getLeft() + newSize.getLeft());
-      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-          (k, size) -> size - oldSize.getRight() + newSize.getRight());
-
-    } else {
-      LOG.warn("Update event does not have the Key Info for {}.",
-          event.getKey());
-    }
+    // The size of deleted directories cannot change hence no-op.
+    return;
   }
 
   /**
