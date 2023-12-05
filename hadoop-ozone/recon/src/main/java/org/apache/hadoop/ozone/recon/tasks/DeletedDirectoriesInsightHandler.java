@@ -88,8 +88,8 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
 
       } catch (IOException e) {
         LOG.error(
-            "IOException occurred while fetching size for deleted directory: {}"
-            , event.getKey());
+            "IOException occurred while fetching size for deleted dir: {}",
+            event.getKey());
       }
     } else {
       LOG.warn("Put event does not contain Key Info for {}.", event.getKey());
@@ -128,8 +128,8 @@ public class DeletedDirectoriesInsightHandler implements OmTableHandler {
 
       } catch (IOException e) {
         LOG.error(
-            "IOException occurred while fetching size for deleted directory: {}"
-            , event.getKey());
+            "IOException occurred while fetching size for deleted dir: {}",
+            event.getKey());
       }
     } else {
       LOG.warn("Delete event does not contain Key Info for {}.",
