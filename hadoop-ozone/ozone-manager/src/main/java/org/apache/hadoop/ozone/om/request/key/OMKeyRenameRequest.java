@@ -100,7 +100,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
         .setModificationTime(Time.now()).setKeyName(srcKey);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+    KeyArgs resolvedArgs = resolveBucketAndCheckAcls(newKeyArgs.build(),
         ozoneManager, srcKey, dstKey);
 
     return getOmRequest().toBuilder()
@@ -110,7 +110,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   }
 
-  protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
+  protected KeyArgs resolveBucketAndCheckAcls(KeyArgs keyArgs,
       OzoneManager ozoneManager, String fromKeyName, String toKeyName)
       throws IOException {
     KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);

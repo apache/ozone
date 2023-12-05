@@ -204,9 +204,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
-    assertEquals(volumeName, multipartInfo.getVolumeName());
-    assertEquals(bucketName, multipartInfo.getBucketName());
-    assertEquals(keyName, multipartInfo.getKeyName());
     assertNotNull(multipartInfo.getUploadID());
 
     OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(

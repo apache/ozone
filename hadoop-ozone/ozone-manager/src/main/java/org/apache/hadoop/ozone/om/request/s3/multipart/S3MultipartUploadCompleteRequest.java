@@ -138,16 +138,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     Exception exception = null;
     Result result = null;
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
       multipartKey = omMetadataManager.getMultipartKey(volumeName,
           bucketName, keyName, uploadID);
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));

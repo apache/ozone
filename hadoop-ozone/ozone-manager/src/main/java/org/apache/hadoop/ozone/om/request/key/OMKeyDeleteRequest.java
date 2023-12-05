@@ -87,13 +87,17 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
-    OzoneManagerProtocolProtos.KeyArgs resolvedArgs =
-        resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
-            ACLType.DELETE);
+    KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
             .setKeyArgs(resolvedArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
+  }
+
+  protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
+      KeyArgs.Builder newKeyArgs) throws IOException {
+    return resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
+        ACLType.DELETE);
   }
 
   @Override
