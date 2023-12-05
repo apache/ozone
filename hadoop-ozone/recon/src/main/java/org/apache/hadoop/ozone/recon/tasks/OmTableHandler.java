@@ -31,9 +31,7 @@ public interface OmTableHandler {
                       Collection<String> sizeRelatedTables,
                       HashMap<String, Long> objectCountMap,
                       HashMap<String, Long> unreplicatedSizeCountMap,
-                      HashMap<String, Long> replicatedSizeCountMap)
-      throws IOException;
-
+                      HashMap<String, Long> replicatedSizeCountMap);
   /**
    * Handles a DELETE event for size-related tables by updating both the data
    * sizes and their corresponding record counts in the tables.
@@ -51,9 +49,7 @@ public interface OmTableHandler {
                          Collection<String> sizeRelatedTables,
                          HashMap<String, Long> objectCountMap,
                          HashMap<String, Long> unreplicatedSizeCountMap,
-                         HashMap<String, Long> replicatedSizeCountMap)
-      throws IOException;
-
+                         HashMap<String, Long> replicatedSizeCountMap);
 
   /**
    * Handles an UPDATE event for size-related tables by updating both the data
