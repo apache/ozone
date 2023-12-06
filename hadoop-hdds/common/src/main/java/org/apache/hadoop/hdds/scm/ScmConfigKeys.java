@@ -614,6 +614,11 @@ public final class ScmConfigKeys {
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
       OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
+
+  public static final String OZONE_SCM_GET_CONTAINER_MAX_RETRY =
+      "ozone.scm.get.container.max.retry";
+  public static final int OZONE_SCM_GET_CONTAINER_MAX_RETRY_DEFAULT = 4096;
+
   /**
    * Never constructed.
    */

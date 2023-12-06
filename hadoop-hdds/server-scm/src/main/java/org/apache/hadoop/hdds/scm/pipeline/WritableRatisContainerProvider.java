@@ -36,6 +36,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GET_CONTAINER_MAX_RETRY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GET_CONTAINER_MAX_RETRY_DEFAULT;
+
 /**
  * Class to obtain a writable container for Ratis and Standalone pipelines.
  */
@@ -49,6 +52,8 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
+  private int maxRetryGetContainer;
+
 
   public WritableRatisContainerProvider(ConfigurationSource conf,
       PipelineManager pipelineManager,
@@ -58,6 +63,8 @@ public class WritableRatisContainerProvider
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
+    this.maxRetryGetContainer = conf.getInt(OZONE_SCM_GET_CONTAINER_MAX_RETRY,
+        OZONE_SCM_GET_CONTAINER_MAX_RETRY_DEFAULT);
   }
 
 
@@ -85,8 +92,8 @@ public class WritableRatisContainerProvider
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
 
-
-    while (true) {
+    int currentCount = 0;
+    while (currentCount < maxRetryGetContainer) {
       List<Pipeline> availablePipelines;
       Pipeline pipeline;
       // Acquire pipeline manager lock, to avoid any updates to pipeline
@@ -103,7 +110,13 @@ public class WritableRatisContainerProvider
               excludeList);
         }
         if (containerInfo != null) {
-          return containerInfo;
+          // if containerID == -1, means Container allocation
+          // failed on selected pipeline
+          if (containerInfo.getContainerID() != -1) {
+            return containerInfo;
+          } else {
+            excludeList.addPipeline(containerInfo.getPipelineID());
+          }
         }
       } finally {
         pipelineManager.releaseReadLock();
@@ -164,12 +177,17 @@ public class WritableRatisContainerProvider
           containerInfo = selectContainer(availablePipelines, size, owner,
               excludeList);
           if (containerInfo != null) {
-            return containerInfo;
+            if (containerInfo.getContainerID() != -1) {
+              return containerInfo;
+            } else {
+              excludeList.addPipeline(containerInfo.getPipelineID());
+            }
           }
         } finally {
           pipelineManager.releaseReadLock();
         }
       }
+      currentCount++;
     }
 
     // we have tried all strategies we know but somehow we are not able
@@ -197,7 +215,7 @@ public class WritableRatisContainerProvider
     return pipelines;
   }
 
-  private ContainerInfo selectContainer(List<Pipeline> availablePipelines,
+  protected ContainerInfo selectContainer(List<Pipeline> availablePipelines,
       long size, String owner, ExcludeList excludeList) {
     Pipeline pipeline;
     ContainerInfo containerInfo;
