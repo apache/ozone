@@ -23,44 +23,31 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import org.mockito.Mockito;
+
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -461,66 +448,9 @@ public class TestSCMCommonPlacementPolicy {
           }
         };
     dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1);
-    assertFalse(usedNodesIdentity.get());
+    Assertions.assertFalse(usedNodesIdentity.get());
     dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1);
     Assertions.assertTrue(usedNodesIdentity.get());
-  }
-
-  @Test
-  public void testDatanodeIsInvalidIsCaseOfIncreasingCommittedBytes() {
-    NodeManager nodeMngr = mock(NodeManager.class);
-    ConfigurationSource confing = mock(ConfigurationSource.class);
-    when(confing.isConfigured(eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE)))
-        .thenReturn(true);
-    when(confing.getStorageSize(eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE),
-            eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT),
-            eq(StorageUnit.BYTES))).thenReturn(100000.0);
-    UUID datanodeUuid = spy(UUID.randomUUID());
-    DummyPlacementPolicy placementPolicy =
-        new DummyPlacementPolicy(nodeMngr, confing, 1);
-    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-    when(datanodeDetails.getUuid()).thenReturn(datanodeUuid);
-
-    DatanodeInfo datanodeInfo = mock(DatanodeInfo.class);
-    NodeStatus nodeStatus = mock(NodeStatus.class);
-    when(nodeStatus.isNodeWritable()).thenReturn(true);
-    when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
-    when(nodeMngr.getNodeByUuid(eq(datanodeUuid))).thenReturn(datanodeInfo);
-
-    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
-        StorageContainerDatanodeProtocolProtos.StorageReportProto.newBuilder()
-            .setCommitted(500)
-            .setCapacity(200000)
-            .setRemaining(101000)
-            .setStorageUuid(UUID.randomUUID().toString())
-            .setStorageLocation("/data/hdds")
-            .build();
-    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
-        StorageContainerDatanodeProtocolProtos.StorageReportProto.newBuilder()
-            .setCommitted(1000)
-            .setCapacity(200000)
-            .setRemaining(101000)
-            .setStorageUuid(UUID.randomUUID().toString())
-            .setStorageLocation("/data/hdds")
-            .build();
-    StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
-        metaReport =
-        StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
-            .newBuilder()
-            .setRemaining(200)
-            .setStorageLocation("/data/metadata")
-            .build();
-    when(datanodeInfo.getStorageReports())
-        .thenReturn(Collections.singletonList(storageReport1))
-        .thenReturn(Collections.singletonList(storageReport2));
-    when(datanodeInfo.getMetadataStorageReports())
-        .thenReturn(Collections.singletonList(metaReport));
-
-
-    // 500 committed bytes
-    assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
-    // 1000 committed bytes
-    assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
   }
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
@@ -555,7 +485,7 @@ public class TestSCMCommonPlacementPolicy {
       super(nodeManager, conf);
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
-      .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
+      .mapToObj(i -> Mockito.mock(Node.class)).collect(Collectors.toList());
       List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(

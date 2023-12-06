@@ -42,20 +42,17 @@ public final class StorageLocationReport implements
   private final long capacity;
   private final long scmUsed;
   private final long remaining;
-  private final long committed;
   private final StorageType storageType;
   private final String storageLocation;
 
-  @SuppressWarnings("checkstyle:parameternumber")
   private StorageLocationReport(String id, boolean failed, long capacity,
-      long scmUsed, long remaining, long committed, StorageType storageType,
+      long scmUsed, long remaining, StorageType storageType,
       String storageLocation) {
     this.id = id;
     this.failed = failed;
     this.capacity = capacity;
     this.scmUsed = scmUsed;
     this.remaining = remaining;
-    this.committed = committed;
     this.storageType = storageType;
     this.storageLocation = storageLocation;
   }
@@ -83,11 +80,6 @@ public final class StorageLocationReport implements
   @Override
   public long getRemaining() {
     return remaining;
-  }
-
-  @Override
-  public long getCommitted() {
-    return committed;
   }
 
   @Override
@@ -170,7 +162,6 @@ public final class StorageLocationReport implements
         .setCapacity(getCapacity())
         .setScmUsed(getScmUsed())
         .setRemaining(getRemaining())
-        .setCommitted(getCommitted())
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
@@ -275,7 +266,6 @@ public final class StorageLocationReport implements
     private long capacity;
     private long scmUsed;
     private long remaining;
-    private long committed;
     private StorageType storageType;
     private String storageLocation;
 
@@ -345,17 +335,6 @@ public final class StorageLocationReport implements
     }
 
     /**
-     * Sets the committed bytes count.
-     * (bytes for previously created containers)
-     * @param committed previously created containers size
-     * @return StorageLocationReport.Builder
-     */
-    public Builder setCommitted(long committed) {
-      this.committed = committed;
-      return this;
-    }
-
-    /**
      * Sets the storageLocation.
      *
      * @param storageLocationValue location of the volume
@@ -373,7 +352,7 @@ public final class StorageLocationReport implements
      */
     public StorageLocationReport build() {
       return new StorageLocationReport(id, failed, capacity, scmUsed,
-          remaining, committed, storageType, storageLocation);
+          remaining, storageType, storageLocation);
     }
 
   }

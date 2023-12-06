@@ -51,8 +51,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter.hasVolumeEnoughSpace;
-
 /**
  * This policy implements a set of invariants which are common
  * for all basic placement policies, acts as the repository of helper
@@ -276,7 +274,7 @@ public abstract class SCMCommonPlacementPolicy implements
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, conf))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -300,9 +298,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return true if we have enough space.
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-                                       long metadataSizeRequired,
-                                       long dataSizeRequired,
-                                       ConfigurationSource conf) {
+      long metadataSizeRequired, long dataSizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     boolean enoughForData = false;
@@ -312,9 +308,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (hasVolumeEnoughSpace(reportProto.getCapacity(),
-            reportProto.getRemaining(), reportProto.getCommitted(),
-            dataSizeRequired, conf)) {
+        if (reportProto.getRemaining() > dataSizeRequired) {
           enoughForData = true;
           break;
         }
@@ -500,7 +494,7 @@ public abstract class SCMCommonPlacementPolicy implements
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
     if (nodeStatus.isNodeWritable() &&
         (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-            dataSizeRequired, conf))) {
+            dataSizeRequired))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

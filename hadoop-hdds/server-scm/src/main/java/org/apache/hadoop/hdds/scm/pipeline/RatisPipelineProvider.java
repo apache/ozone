@@ -163,7 +163,7 @@ public class RatisPipelineProvider
     switch (factor) {
     case ONE:
       dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
-          containerSizeBytes, conf);
+          containerSizeBytes);
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
