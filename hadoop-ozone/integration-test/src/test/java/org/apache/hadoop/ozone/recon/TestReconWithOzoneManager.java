@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProvider
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -68,6 +69,7 @@ import org.apache.http.util.EntityUtils;
 
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -273,6 +275,9 @@ public class TestReconWithOzoneManager {
   // And Recon should fall back on full snapshot and recover itself.
   @Test
   public void testOmDBSyncWithSeqNumberMismatch() throws Exception {
+    GenericTestUtils.LogCapturer
+        logs = GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
+    GenericTestUtils.setLogLevel(RDBStore.getLogger(), INFO);
     // add a vol, bucket and key
     addKeys(10, 15);
 
@@ -301,7 +306,7 @@ public class TestReconWithOzoneManager {
         OmDeltaRequest.name(),
         "lastUpdatedSeqNumber");
 
-    // verify sequence number after full snapshot
+    // verify sequence number after incremental delta snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
     assertEquals(0, metrics.getSequenceNumberLag().value());
 
@@ -342,6 +347,8 @@ public class TestReconWithOzoneManager {
     // OM active DB lastSequence number and Recon's OM snapshot DB lastSequence
     // number.
     impl.syncDataFromOM();
+    assertTrue(logs.getOutput()
+        .contains("Requested sequence not yet written in the db"));
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
             .getLatestSequenceNumber();
@@ -352,6 +359,8 @@ public class TestReconWithOzoneManager {
         OmDeltaRequest.name(),
         "lastUpdatedSeqNumber");
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(17, omLatestSeqNumber);
+    assertEquals(17, reconLatestSeqNumber);
   }
 
   private static OmKeyLocationInfoGroup getOmKeyLocationInfoGroup() {
