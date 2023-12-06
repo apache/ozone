@@ -55,7 +55,6 @@ public class TestHddsConfServlet {
 
   private static final Map<String, String> TEST_PROPERTIES = new HashMap<>();
   private static final Map<String, String> TEST_FORMATS = new HashMap<>();
-  private static final Set<String> TEST_CMDS = new HashSet<>();
   private static final String TEST_KEY = "testconfservlet.key";
   private static final String TEST_VAL = "testval";
 
@@ -64,9 +63,6 @@ public class TestHddsConfServlet {
     TEST_PROPERTIES.put("test.key1", "value1");
     TEST_PROPERTIES.put("test.key2", "value2");
     TEST_PROPERTIES.put("test.key3", "value3");
-    TEST_CMDS.add("getOzoneTags");
-    TEST_CMDS.add("getPropertyByTag");
-    TEST_CMDS.add("illegal");
     TEST_FORMATS.put(HddsConfServlet.FORMAT_XML, "application/xml");
     TEST_FORMATS.put(HddsConfServlet.FORMAT_JSON, "application/json");
   }
