@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import com.google.gson.Gson;
@@ -28,8 +28,8 @@ import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
 import org.apache.hadoop.util.XMLUtils;
 import org.eclipse.jetty.util.ajax.JSON;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.mockito.Mockito;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -47,9 +47,7 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 public class TestHddsConfServlet {
 
@@ -58,7 +56,7 @@ public class TestHddsConfServlet {
   private static final String TEST_KEY = "testconfservlet.key";
   private static final String TEST_VAL = "testval";
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     TEST_PROPERTIES.put("test.key1", "value1");
     TEST_PROPERTIES.put("test.key2", "value2");
