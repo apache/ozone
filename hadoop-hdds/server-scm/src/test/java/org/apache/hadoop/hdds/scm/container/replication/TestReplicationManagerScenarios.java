@@ -93,6 +93,8 @@ public class TestReplicationManagerScenarios {
 
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
   private Set<ContainerInfo> containerInfoSet;
+  private ContainerReplicaPendingOps containerReplicaPendingOps;
+  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
   private ReplicationManager replicationManager;
@@ -104,11 +106,8 @@ public class TestReplicationManagerScenarios {
   private SCMContext scmContext;
   private NodeManager nodeManager;
   private TestClock clock;
-  private ContainerReplicaPendingOps containerReplicaPendingOps;
-
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
 
   private static List<URI> getTestFiles() throws URISyntaxException {
     File[] fileList = (new File(TestReplicationManagerScenarios.class
@@ -239,10 +238,25 @@ public class TestReplicationManagerScenarios {
     return TEST_SCENARIOS.stream();
   }
 
+  private void loadPendingOps(ContainerInfo container, Scenario scenario) {
+    for (PendingReplica r : scenario.getPendingReplicas()) {
+      if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
+        containerReplicaPendingOps.scheduleAddReplica(
+            container.containerID(), r.getDatanodeDetails(),
+            r.getReplicaIndex(), Long.MAX_VALUE);
+      } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        containerReplicaPendingOps.scheduleDeleteReplica(
+            container.containerID(), r.getDatanodeDetails(),
+            r.getReplicaIndex(), Long.MAX_VALUE);
+      }
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
     ContainerInfo containerInfo = scenario.buildContainerInfo();
+    loadPendingOps(containerInfo, scenario);
 
     Set<ContainerReplica> replicas = new HashSet<>();
     for (TestReplica replica : scenario.getReplicas()) {
@@ -536,7 +550,7 @@ public class TestReplicationManagerScenarios {
       this.type = SCMCommandProto.Type.valueOf(command);
     }
 
-    public SCMCommandProto.Type getType () {
+    public SCMCommandProto.Type getType() {
       return type;
     }
 
@@ -551,6 +565,46 @@ public class TestReplicationManagerScenarios {
       }
       return datanodeDetails;
     }
+  }
+
+  /**
+   * This class is used to define the pending replicas for the container. It is
+   * created by deserializing JSON files.
+   */
+  public static class PendingReplica {
+    private ContainerReplicaOp.PendingOpType type;
+    private String datanode;
+    private int replicaIndex;
+
+    public void setDatanode(String dn) {
+      this.datanode = dn;
+    }
+
+    public void setType(String type) {
+      this.type = ContainerReplicaOp.PendingOpType.valueOf(type);
+    }
+
+    public void setReplicaIndex(int index) {
+      this.replicaIndex = index;
+    }
+
+    public DatanodeDetails getDatanodeDetails() {
+      if (datanode == null) {
+        return MockDatanodeDetails.randomDatanodeDetails();
+      } else {
+        return DATANODE_ALIASES.computeIfAbsent(datanode, (k) ->
+            MockDatanodeDetails.randomDatanodeDetails());
+      }
+    }
+
+    public ContainerReplicaOp.PendingOpType getType() {
+      return type;
+    }
+
+    public int getReplicaIndex() {
+      return this.replicaIndex;
+    }
+
   }
 
   /**
@@ -569,9 +623,11 @@ public class TestReplicationManagerScenarios {
     private int sequenceId = 0;
     private ReplicationConfig replicationConfig = RatisReplicationConfig
         .getInstance(HddsProtos.ReplicationFactor.THREE);
-    private TestReplica[] replicas;
+    private TestReplica[] replicas = new TestReplica[0];
+    private PendingReplica[] pendingReplicas = new PendingReplica[0];
     private Expectations expectation;
-    private ExpectedCommands[] commands;
+    private ExpectedCommands[] checkCommands = new ExpectedCommands[0];
+    private ExpectedCommands[] commands = new ExpectedCommands[0];
 
     public void setDescription(String description) {
       this.description = description;
@@ -609,12 +665,28 @@ public class TestReplicationManagerScenarios {
       this.id = id;
     }
 
+    public void setPendingReplicas(PendingReplica[] pending) {
+      this.pendingReplicas = pending;
+    }
+
+    public PendingReplica[] getPendingReplicas() {
+      return this.pendingReplicas;
+    }
+
     public void setExpectation(Expectations expectation) {
       this.expectation = expectation;
     }
 
     public void setCommands(ExpectedCommands[] commands) {
       this.commands = commands;
+    }
+
+    public void setCheckCommands(ExpectedCommands[] cmds) {
+      this.checkCommands = cmds;
+    }
+
+    public ExpectedCommands[] getCheckCommands() {
+      return checkCommands;
     }
 
     public TestReplica[] getReplicas() {
