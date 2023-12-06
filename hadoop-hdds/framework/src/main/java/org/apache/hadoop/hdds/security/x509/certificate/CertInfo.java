@@ -37,7 +37,7 @@ import java.util.Objects;
  */
 public final class CertInfo implements Comparable<CertInfo>, Serializable {
   private static final Codec<CertInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(CertInfoProto.class),
+      Proto2Codec.get(CertInfoProto.getDefaultInstance()),
       CertInfo::fromProtobuf,
       CertInfo::getProtobuf);
 

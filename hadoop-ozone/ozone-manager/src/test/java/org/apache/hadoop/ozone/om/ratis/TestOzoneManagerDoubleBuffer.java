@@ -340,35 +340,40 @@ class TestOzoneManagerDoubleBuffer {
     Assertions.assertEquals("alice", ugiAlice.getShortUserName());
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
-    // Create 3 secrets and store them in the cache and double buffer.
-    processSuccessSecretRequest(userPrincipalId1, 1, true);
-    processSuccessSecretRequest(userPrincipalId2, 2, true);
-    processSuccessSecretRequest(userPrincipalId3, 3, true);
+    try {
+      // Stop the double buffer thread to prevent automatic flushing every
+      // second and to enable manual flushing.
+      doubleBuffer.stopDaemon();
 
-    S3SecretCache cache = secretManager.cache();
-    // Check if all the three secrets are cached.
-    Assertions.assertTrue(cache.get(userPrincipalId1) != null);
-    Assertions.assertTrue(cache.get(userPrincipalId2) != null);
-    Assertions.assertTrue(cache.get(userPrincipalId3) != null);
+      // Create 3 secrets and store them in the cache and double buffer.
+      processSuccessSecretRequest(userPrincipalId1, 1, true);
+      processSuccessSecretRequest(userPrincipalId2, 2, true);
+      processSuccessSecretRequest(userPrincipalId3, 3, true);
 
-    // Flush the current buffer.
-    doubleBuffer.flushCurrentBuffer();
+      S3SecretCache cache = secretManager.cache();
+      // Check if all the three secrets are cached.
+      Assertions.assertTrue(cache.get(userPrincipalId1) != null);
+      Assertions.assertTrue(cache.get(userPrincipalId2) != null);
+      Assertions.assertTrue(cache.get(userPrincipalId3) != null);
 
-    // Check if all the three secrets are cleared from the cache.
-    Assertions.assertTrue(cache.get(userPrincipalId3) == null);
-    Assertions.assertTrue(cache.get(userPrincipalId2) == null);
-    Assertions.assertTrue(cache.get(userPrincipalId1) == null);
+      // Flush the current buffer.
+      doubleBuffer.flushCurrentBuffer();
 
-    // cleanup metrics
-    doubleBuffer.stopDaemon();
-    OzoneManagerDoubleBufferMetrics metrics =
-        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
-    metrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
-    metrics.setAvgFlushTransactionsInOneIteration(0);
-    metrics.incrTotalSizeOfFlushedTransactions(
-        -metrics.getTotalNumOfFlushedTransactions());
-    metrics.incrTotalNumOfFlushOperations(
-        -metrics.getTotalNumOfFlushOperations());
+      // Check if all the three secrets are cleared from the cache.
+      Assertions.assertTrue(cache.get(userPrincipalId3) == null);
+      Assertions.assertTrue(cache.get(userPrincipalId2) == null);
+      Assertions.assertTrue(cache.get(userPrincipalId1) == null);
+    } finally {
+      // cleanup metrics
+      OzoneManagerDoubleBufferMetrics metrics =
+          doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+      metrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
+      metrics.setAvgFlushTransactionsInOneIteration(0);
+      metrics.incrTotalSizeOfFlushedTransactions(
+          -metrics.getTotalNumOfFlushedTransactions());
+      metrics.incrTotalNumOfFlushOperations(
+          -metrics.getTotalNumOfFlushOperations());
+    }
   }
 
   private void processSuccessSecretRequest(

@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 // TODO: support Auditable interface
 public final class OmPrefixInfo extends WithObjectID {
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(PersistedPrefixInfo.class),
+      Proto2Codec.get(PersistedPrefixInfo.getDefaultInstance()),
       OmPrefixInfo::getFromProtobuf,
       OmPrefixInfo::getProtobuf);
 
