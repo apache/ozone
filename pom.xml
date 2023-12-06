@@ -125,7 +125,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-logging.version>1.2</commons-logging.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.1.1</commons-math3.version>
-    <commons-net.version>3.9.0</commons-net.version>
+    <commons-net.version>3.10.0</commons-net.version>
     <commons-pool2.version>2.6.0</commons-pool2.version>
     <commons-text.version>1.10.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
@@ -269,7 +269,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-shade-plugin.version>3.4.1</maven-shade-plugin.version>
     <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
-    <maven-source-plugin.version>2.3</maven-source-plugin.version>
+    <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.5</maven-remote-resources-plugin.version>
     <maven-enforcer-plugin.version>3.2.1</maven-enforcer-plugin.version>
