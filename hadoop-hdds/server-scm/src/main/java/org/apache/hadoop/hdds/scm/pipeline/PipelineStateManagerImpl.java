@@ -51,7 +51,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManagerImpl.class);
 
-  private PipelineStateMap pipelineStateMap;
+  private PipelineMap pipelineStateMap;
   private final NodeManager nodeManager;
   private Table<PipelineID, Pipeline> pipelineStore;
   private final DBTransactionBuffer transactionBuffer;
