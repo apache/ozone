@@ -25,6 +25,9 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+
+import java.io.IOException;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 
@@ -45,13 +48,18 @@ public class ContainerHealthStatus {
   private final Set<ContainerReplica> healthyReplicas;
   private final Set<ContainerReplica> healthyAvailReplicas;
   private final ContainerPlacementStatus placementStatus;
+  private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final int numReplicas;
+  private final long numKeys;
   private final RatisContainerReplicaCount ratisContainerReplicaCount;
 
   ContainerHealthStatus(ContainerInfo container,
                         Set<ContainerReplica> replicas,
                         PlacementPolicy placementPolicy,
+                        ReconContainerMetadataManager
+                            reconContainerMetadataManager,
                         OzoneConfiguration conf) {
+    this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
     this.healthyReplicas = replicas
@@ -71,6 +79,7 @@ public class ContainerHealthStatus {
     this.replicaDelta = repFactor - this.healthyAvailReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
     this.numReplicas = replicas.size();
+    this.numKeys = getContainerKeyCount(container.getContainerID());
 
     int minNumMaintenanceReplicas = getMinimumRequiredReplicaNum(conf);
     this.ratisContainerReplicaCount =
@@ -147,12 +156,29 @@ public class ContainerHealthStatus {
     return numReplicas == 0;
   }
 
+  public boolean isEmpty() {
+    return numKeys == 0;
+  }
+
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
     List<DatanodeDetails> dns = healthyReplicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
     return policy.validateContainerPlacement(dns, repFactor);
+  }
+
+  private long getContainerKeyCount(long containerID) {
+    try {
+      return reconContainerMetadataManager.getKeyCountForContainer(
+          containerID);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public long getNumKeys() {
+    return numKeys;
   }
 
   private int getMinimumRequiredReplicaNum(OzoneConfiguration conf) {

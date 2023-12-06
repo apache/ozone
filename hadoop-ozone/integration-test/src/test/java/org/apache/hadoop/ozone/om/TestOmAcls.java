@@ -33,14 +33,11 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,20 +48,15 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.audit.AuditLogTestUtils.verifyAuditLog;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for Ozone Manager ACLs.
  */
+@Timeout(300)
 public class TestOmAcls {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static boolean volumeAclAllow = true;
   private static boolean bucketAclAllow = true;
@@ -83,7 +75,7 @@ public class TestOmAcls {
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
@@ -104,7 +96,7 @@ public class TestOmAcls {
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -113,7 +105,7 @@ public class TestOmAcls {
     AuditLogTestUtils.deleteAuditLogFile();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     logCapturer.clearOutput();
     AuditLogTestUtils.truncateAuditLogFile();

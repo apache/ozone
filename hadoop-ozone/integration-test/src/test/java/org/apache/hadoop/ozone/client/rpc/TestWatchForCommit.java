@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -63,7 +64,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.Assert;
@@ -109,9 +109,10 @@ public class TestWatchForCommit {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamBufferFlushDelay(false);
     conf.setFromObject(clientConfig);
-    
-    conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 10,
-            TimeUnit.SECONDS);
+
+    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     conf.setQuietMode(false);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
 
@@ -248,6 +249,8 @@ public class TestWatchForCommit {
 
   @Test
   public void testWatchForCommitForRetryfailure() throws Exception {
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
       ContainerWithPipeline container1 = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -267,6 +270,9 @@ public class TestWatchForCommit {
       long index = reply.getLogIndex();
       cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
       cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+      // emulate closing pipeline when SCM detects DEAD datanodes
+      cluster.getStorageContainerManager()
+          .getPipelineManager().closePipeline(pipeline, false);
       // again write data with more than max buffer limit. This wi
       try {
         // just watch for a log index which in not updated in the commitInfo Map
@@ -282,6 +288,12 @@ public class TestWatchForCommit {
         // RuntimeException
         Assert.assertFalse(HddsClientUtils
             .checkForException(e) instanceof TimeoutException);
+        // client should not attempt to watch with
+        // MAJORITY_COMMITTED replication level, except the grpc IO issue
+        if (!logCapturer.getOutput().contains("Connection refused")) {
+          Assert.assertFalse(
+              e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
+        }
       }
       clientManager.releaseClient(xceiverClient, false);
     }

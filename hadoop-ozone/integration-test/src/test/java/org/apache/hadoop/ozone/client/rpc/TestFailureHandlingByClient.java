@@ -174,6 +174,10 @@ public class TestFailureHandlingByClient {
 
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    // assert that the exclude list's expire time equals to
+    // default value 600000 ms in OzoneClientConfig.java
+    Assert.assertEquals(((KeyOutputStream) key.getOutputStream())
+        .getExcludeList().getExpiryTime(), 600000);
     KeyOutputStream groupOutputStream =
         (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =

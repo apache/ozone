@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -68,9 +68,9 @@ class TestSendContainerRequestHandler {
     StreamObserver observer = mock(StreamObserver.class);
     doAnswer(invocation -> {
       Object arg = invocation.getArgument(0);
-      Assert.assertTrue(arg instanceof StorageContainerException);
-      Assert.assertEquals(((StorageContainerException) arg).getResult(),
-          ContainerProtos.Result.CONTAINER_EXISTS);
+      Assertions.assertTrue(arg instanceof StorageContainerException);
+      Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+          ((StorageContainerException) arg).getResult());
       return null;
     }).when(observer).onError(any());
     SendContainerRequestHandler sendContainerRequestHandler

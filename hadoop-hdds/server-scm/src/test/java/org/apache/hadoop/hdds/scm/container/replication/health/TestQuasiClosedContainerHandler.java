@@ -128,8 +128,16 @@ public class TestQuasiClosedContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
 
-    Assertions.assertTrue(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
     Mockito.verify(replicationManager, times(2))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
@@ -224,8 +232,16 @@ public class TestQuasiClosedContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
 
-    Assertions.assertTrue(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
     // verify close command was sent for replicas with sequence ID 1001, that
     // is dnTwo and dnThree
     Mockito.verify(replicationManager, times(1))

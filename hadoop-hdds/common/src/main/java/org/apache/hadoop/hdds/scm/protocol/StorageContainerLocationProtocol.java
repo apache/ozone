@@ -410,9 +410,9 @@ public interface StorageContainerLocationProtocol extends Closeable {
   boolean getContainerBalancerStatus() throws IOException;
 
   /**
-   * Get Datanode usage information by ip or uuid.
+   * Get Datanode usage information by ip or hostname or uuid.
    *
-   * @param ipaddress datanode IP address String
+   * @param address datanode IP address or Hostname String
    * @param uuid datanode UUID String
    * @param clientVersion Client's version number
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
@@ -421,7 +421,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException;
+      String address, String uuid, int clientVersion) throws IOException;
 
   /**
    * Get usage information of most or least used datanodes.

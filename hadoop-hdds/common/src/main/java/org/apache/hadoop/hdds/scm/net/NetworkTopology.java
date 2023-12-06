@@ -244,6 +244,6 @@ public interface NetworkTopology {
    * or shuffled input nodes otherwise. The size of returned list is limited
    * by activeLen parameter.
    */
-  List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen);
+  <N extends Node> List<N> sortByDistanceCost(Node reader,
+      List<N> nodes, int activeLen);
 }

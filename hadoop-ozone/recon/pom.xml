@@ -25,6 +25,7 @@
   <artifactId>ozone-recon</artifactId>
   <properties>
     <pnpm.version>7.33.6</pnpm.version>
+    <allow.junit4>false</allow.junit4>
   </properties>
   <build>
     <resources>
@@ -298,11 +299,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -50,8 +51,7 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   private int currentIndex;
 
   ChunkBufferImplWithByteBufferList(List<ByteBuffer> buffers) {
-    Preconditions.checkArgument(buffers != null, "buffer == null");
-
+    Objects.requireNonNull(buffers, "buffers == null");
     this.buffers = !buffers.isEmpty() ? ImmutableList.copyOf(buffers) :
         EMPTY_BUFFER;
     this.limit = buffers.stream().mapToInt(ByteBuffer::limit).sum();

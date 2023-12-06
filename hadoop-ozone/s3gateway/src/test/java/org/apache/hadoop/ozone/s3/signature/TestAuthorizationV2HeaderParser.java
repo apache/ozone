@@ -18,12 +18,11 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * This class tests Authorization header format v2.
@@ -43,31 +42,31 @@ public class TestAuthorizationV2HeaderParser {
   public void testIncorrectHeader1() throws MalformedResourceException {
     String auth = "AAA accessKey:signature";
     AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-    Assert.assertNull(v2.parseSignature());
+    assertNull(v2.parseSignature());
 
   }
 
-  @Test(expected = MalformedResourceException.class)
+  @Test
   public void testIncorrectHeader2() throws MalformedResourceException {
     String auth = "AWS :accessKey";
     AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-    Assert.assertNull(v2.parseSignature());
-    fail("testIncorrectHeader");
+    assertThrows(MalformedResourceException.class, () -> v2.parseSignature(),
+        "testIncorrectHeader");
   }
 
-  @Test(expected = MalformedResourceException.class)
+  @Test
   public void testIncorrectHeader3() throws MalformedResourceException {
     String auth = "AWS :signature";
     AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-    Assert.assertNull(v2.parseSignature());
-    fail("testIncorrectHeader");
+    assertThrows(MalformedResourceException.class, () -> v2.parseSignature(),
+        "testIncorrectHeader");
   }
 
-  @Test(expected = MalformedResourceException.class)
+  @Test
   public void testIncorrectHeader4() throws MalformedResourceException {
     String auth = "AWS accessKey:";
     AuthorizationV2HeaderParser v2 = new AuthorizationV2HeaderParser(auth);
-    Assert.assertNull(v2.parseSignature());
-    fail("testIncorrectHeader");
+    assertThrows(MalformedResourceException.class, () -> v2.parseSignature(),
+        "testIncorrectHeader");
   }
 }

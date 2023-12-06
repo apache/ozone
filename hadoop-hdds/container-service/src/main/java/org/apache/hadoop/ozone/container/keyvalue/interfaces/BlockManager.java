@@ -93,6 +93,9 @@ public interface BlockManager {
 
   int getDefaultReadBufferCapacity();
 
+  /** @return the threshold to read using memory mapped buffers. */
+  int getReadMappedBufferThreshold();
+
   /**
    * Shutdown ContainerManager.
    */

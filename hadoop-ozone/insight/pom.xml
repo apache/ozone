@@ -27,6 +27,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <description>Apache Ozone Insight Tool</description>
   <name>Apache Ozone Insight Tool</name>
   <packaging>jar</packaging>
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -77,11 +80,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

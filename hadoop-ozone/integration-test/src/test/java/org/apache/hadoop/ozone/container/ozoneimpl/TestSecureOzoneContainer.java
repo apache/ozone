@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
-import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -43,19 +42,18 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.PrivilegedAction;
 import java.time.Instant;
 import java.util.Arrays;
@@ -75,74 +73,62 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Tests ozone containers via secure grpc/netty.
  */
-@RunWith(Parameterized.class)
-public class TestSecureOzoneContainer {
+@Timeout(300)
+class TestSecureOzoneContainer {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestSecureOzoneContainer.class);
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
+  @TempDir
+  private Path tempFolder;
 
   private OzoneConfiguration conf;
-  private SecurityConfig secConfig;
-  private final boolean requireToken;
-  private final boolean hasToken;
-  private final boolean tokenExpired;
   private CertificateClientTestImpl caClient;
   private SecretKeyClient secretKeyClient;
   private ContainerTokenSecretManager secretManager;
 
-  public TestSecureOzoneContainer(Boolean requireToken,
-      Boolean hasToken, Boolean tokenExpired) {
-    this.requireToken = requireToken;
-    this.hasToken = hasToken;
-    this.tokenExpired = tokenExpired;
+  static Collection<Arguments> blockTokenOptions() {
+    return Arrays.asList(
+        Arguments.arguments(true, true, false),
+        Arguments.arguments(true, true, true),
+        Arguments.arguments(true, false, false),
+        Arguments.arguments(false, true, false),
+        Arguments.arguments(false, false, false)
+    );
   }
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> blockTokenOptions() {
-    return Arrays.asList(new Object[][] {
-        {true, true, false},
-        {true, true, true},
-        {true, false, false},
-        {false, true, false},
-        {false, false, false}});
-  }
-
-  @Before
-  public void setup() throws Exception {
+  @BeforeAll
+  static void init() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
+  }
+
+  @BeforeEach
+  void setup() throws Exception {
     conf = new OzoneConfiguration();
     String ozoneMetaPath =
         GenericTestUtils.getTempPath("ozoneMeta");
     conf.set(OZONE_METADATA_DIRS, ozoneMetaPath);
-    secConfig = new SecurityConfig(conf);
     caClient = new CertificateClientTestImpl(conf);
     secretKeyClient = new SecretKeyTestClient();
     secretManager = new ContainerTokenSecretManager(
         TimeUnit.DAYS.toMillis(1), secretKeyClient);
   }
 
-  @Test
-  public void testCreateOzoneContainer() throws Exception {
-    LOG.info("Test case: requireBlockToken: {} hasBlockToken: {} " +
-        "blockTokenExpired: {}.", requireToken, hasToken,
-        tokenExpired);
+  @ParameterizedTest
+  @MethodSource("blockTokenOptions")
+  void testCreateOzoneContainer(boolean requireToken, boolean hasToken,
+      boolean tokenExpired) throws Exception {
+    final String testCase = testCase(requireToken, hasToken, tokenExpired);
+    LOG.info("Test case: {}", testCase);
+
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, requireToken);
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, requireToken);
 
     ContainerID containerID = ContainerID.valueOf(getTestContainerID());
     OzoneContainer container = null;
-    System.out.println(System.getProperties().getProperty("java.library.path"));
     try {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.getRoot().getPath());
+      conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.toString());
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT, pipeline
           .getFirstNode().getPort(DatanodeDetails.Port.Name.STANDALONE)
           .getValue());
@@ -183,11 +169,11 @@ public class TestSecureOzoneContainer {
               !requireToken || (hasToken && !tokenExpired)
                   ? ContainerProtos.Result.SUCCESS
                   : ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
-          assertEquals(expectedResult, response.getResult(), this::testCase);
+          assertEquals(expectedResult, response.getResult(), testCase);
         } catch (SCMSecurityException e) {
-          assertState(requireToken && hasToken && tokenExpired);
+          assertTrue(requireToken && hasToken && tokenExpired, testCase);
         } catch (IOException e) {
-          assertState(requireToken && !hasToken);
+          assertTrue(requireToken && !hasToken, testCase);
         } catch (Exception e) {
           fail(e);
         }
@@ -200,11 +186,8 @@ public class TestSecureOzoneContainer {
     }
   }
 
-  private void assertState(boolean condition) {
-    assertTrue(condition, this::testCase);
-  }
-
-  private String testCase() {
+  private String testCase(boolean requireToken, boolean hasToken,
+      boolean tokenExpired) {
     if (!requireToken) {
       return "unsecure";
     }
