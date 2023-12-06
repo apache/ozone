@@ -29,9 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -204,11 +202,12 @@ public class SCMBlockProtocolServer implements
         if (block != null) {
           blocks.add(block);
           // Sort the datanodes if client machine is specified
-          if (StringUtils.isNotEmpty(clientMachine)) {
-            List<String> uuidList = HddsUtils.toNodeUuid(
-                block.getPipeline().getNodes());
-            block.getPipeline().setNodesInOrder(
-                sortDatanodes(uuidList, clientMachine));
+          final Node client = getClientDatanode(clientMachine);
+          if (client != null) {
+            final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
+            final List<DatanodeDetails> sorted = scm.getClusterMap()
+                .sortByDistanceCost(client, nodes, nodes.size());
+            block.getPipeline().setNodesInOrder(sorted);
           }
         }
       }
@@ -357,11 +356,7 @@ public class SCMBlockProtocolServer implements
     auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
-      Node client = getDatanode(clientMachine);
-      // not datanode
-      if (client == null) {
-        client = getOtherNode(clientMachine);
-      }
+      final Node client = getClientDatanode(clientMachine);
       List<DatanodeDetails> nodeList = new ArrayList<>();
       nodes.forEach(uuid -> {
         DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
@@ -386,10 +381,11 @@ public class SCMBlockProtocolServer implements
     }
   }
 
-  private Node getDatanode(String clientMachine) {
+  private Node getClientDatanode(String clientMachine) {
     List<DatanodeDetails> datanodes = scm.getScmNodeManager()
         .getNodesByAddress(clientMachine);
-    return !datanodes.isEmpty() ? datanodes.get(0) : null;
+    return !datanodes.isEmpty() ? datanodes.get(0) :
+        getOtherNode(clientMachine);
   }
 
   private Node getOtherNode(String clientMachine) {
