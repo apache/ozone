@@ -115,6 +115,15 @@ public abstract class TestContainerScannerIntegrationAbstract {
     bucket = volume.getBucket(bucketName);
   }
 
+  void pauseScanner() {
+    getOzoneContainer().pauseContainerScrub();
+  }
+
+  void resumeScanner() {
+    getOzoneContainer().resumeContainerScrub();
+  }
+
+
   @AfterAll
   static void shutdown() throws IOException {
     if (ozClient != null) {
@@ -142,11 +151,14 @@ public abstract class TestContainerScannerIntegrationAbstract {
             != HddsProtos.LifeCycleState.OPEN);
   }
 
-  protected Container<?> getDnContainer(long containerID) {
+  private static OzoneContainer getOzoneContainer() {
     assertEquals(1, cluster.getHddsDatanodes().size());
     HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
-    OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
-    return oc.getContainerSet().getContainer(containerID);
+    return dn.getDatanodeStateMachine().getContainer();
+  }
+
+  protected Container<?> getDnContainer(long containerID) {
+    return getOzoneContainer().getContainerSet().getContainer(containerID);
   }
 
   protected long writeDataThenCloseContainer() throws Exception {
@@ -349,7 +361,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
       RANDOM.nextBytes(corruptedBytes);
       try {
         Files.write(file.toPath(), corruptedBytes,
-            StandardOpenOption.TRUNCATE_EXISTING);
+            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);
@@ -362,7 +374,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
     private static void truncateFile(File file) {
       try {
         Files.write(file.toPath(), new byte[]{},
-            StandardOpenOption.TRUNCATE_EXISTING);
+            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);
