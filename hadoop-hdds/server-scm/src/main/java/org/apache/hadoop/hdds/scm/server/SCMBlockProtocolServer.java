@@ -189,6 +189,7 @@ public class SCMBlockProtocolServer implements
     auditMap.put("num", String.valueOf(num));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
+    auditMap.put("client", clientMachine);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
 
     if (LOG.isDebugEnabled()) {
