@@ -207,6 +207,9 @@ public class WritableECContainerProvider
         excludedNodes, Collections.emptyList());
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
+    if (container != null && container.getContainerID() == -1) {
+      container = null;
+    }
     pipelineManager.openPipeline(newPipeline.getId());
     LOG.info("Created and opened new pipeline {}", newPipeline);
     return container;
