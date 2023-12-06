@@ -278,6 +278,13 @@ public class TestReconWithOzoneManager {
     GenericTestUtils.LogCapturer
         logs = GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
     GenericTestUtils.setLogLevel(RDBStore.getLogger(), INFO);
+
+    GenericTestUtils.LogCapturer
+        omServiceProviderImplLogs = GenericTestUtils.LogCapturer.captureLogs(
+        OzoneManagerServiceProviderImpl.getLogger());
+    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.getLogger(),
+        INFO);
+
     // add a vol, bucket and key
     addKeys(10, 15);
 
@@ -349,6 +356,8 @@ public class TestReconWithOzoneManager {
     impl.syncDataFromOM();
     assertTrue(logs.getOutput()
         .contains("Requested sequence not yet written in the db"));
+    assertTrue(logs.getOutput()
+        .contains("Returned DBUpdates isDBUpdateSuccess: false"));
     reconLatestSeqNumber =
         ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
             .getLatestSequenceNumber();
@@ -361,6 +370,9 @@ public class TestReconWithOzoneManager {
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
     assertEquals(17, omLatestSeqNumber);
     assertEquals(17, reconLatestSeqNumber);
+    impl.syncDataFromOM();
+    assertTrue(omServiceProviderImplLogs.getOutput()
+        .contains("isDBUpdateSuccess: true"));
   }
 
   private static OmKeyLocationInfoGroup getOmKeyLocationInfoGroup() {

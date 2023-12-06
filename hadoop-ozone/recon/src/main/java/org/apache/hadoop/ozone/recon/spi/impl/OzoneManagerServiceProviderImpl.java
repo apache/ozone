@@ -578,5 +578,9 @@ public class OzoneManagerServiceProviderImpl
   public OzoneManagerSyncMetrics getMetrics() {
     return metrics;
   }
+
+  public static Logger getLogger() {
+    return LOG;
+  }
 }
 
