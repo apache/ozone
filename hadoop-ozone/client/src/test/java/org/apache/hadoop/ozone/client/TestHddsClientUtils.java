@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.client;
 
+import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,6 +48,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -321,5 +325,21 @@ public class TestHddsClientUtils {
         fail("Rejected valid string [" + name + "] as a name");
       }
     }
+  }
+
+  @Test
+  void testContainsException() {
+    Exception ex1 = new ConnectException();
+    Exception ex2 = new IOException(ex1);
+    Exception ex3 = new IllegalArgumentException(ex2);
+
+    assertSame(ex1,
+        HddsClientUtils.containsException(ex3, ConnectException.class));
+    assertSame(ex2,
+        HddsClientUtils.containsException(ex3, IOException.class));
+    assertSame(ex3,
+        HddsClientUtils.containsException(ex3, IllegalArgumentException.class));
+    assertNull(
+        HddsClientUtils.containsException(ex3, IllegalStateException.class));
   }
 }
