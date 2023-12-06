@@ -61,6 +61,8 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -85,6 +87,7 @@ public class AbstractReconContainerManagerTest {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
+    TestClock testClock = TestClock.newInstance();
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
@@ -103,7 +106,7 @@ public class AbstractReconContainerManagerTest {
     when(layoutVersionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, scmContext, layoutVersionManager);
+        eventQueue, clusterMap, scmContext, testClock, layoutVersionManager);
     pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf,
         nodeManager,

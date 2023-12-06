@@ -48,6 +48,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,7 +67,7 @@ public class TestSCMNodeMetrics {
 
   @BeforeAll
   public static void setup() throws Exception {
-
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration source = new OzoneConfiguration();
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =
@@ -79,6 +80,7 @@ public class TestSCMNodeMetrics {
         .thenReturn(maxLayoutVersion());
     nodeManager = new SCMNodeManager(source, config, publisher,
         new NetworkTopologyImpl(source), SCMContext.emptyContext(),
+            testClock,
             versionManager);
 
     registeredDatanode = DatanodeDetails.newBuilder()

@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -110,6 +111,7 @@ public class TestIncrementalContainerReportHandler {
   @BeforeEach
   public void setup() throws IOException, InvalidStateTransitionException,
       TimeoutException {
+    TestClock testClock = TestClock.newInstance();
     final OzoneConfiguration conf = new OzoneConfiguration();
     final String path =
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
@@ -127,7 +129,7 @@ public class TestIncrementalContainerReportHandler {
         .thenReturn(maxLayoutVersion());
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
-            scmContext, versionManager);
+            scmContext, testClock, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestIncrementalContainerReportHandler.class.getSimpleName()

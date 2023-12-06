@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestClock;
 import org.assertj.core.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -275,12 +276,13 @@ public class MockNodeManager implements NodeManager {
   @Override
   public List<DatanodeDetails> getNodes(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
+    TestClock testClock = TestClock.newInstance();
     if (nodestate == HEALTHY) {
       // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto());
+            UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();

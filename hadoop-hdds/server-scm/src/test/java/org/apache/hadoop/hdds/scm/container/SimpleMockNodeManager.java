@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.TestClock;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -64,9 +65,10 @@ public class SimpleMockNodeManager implements NodeManager {
   private Map<UUID, Set<ContainerID>> containerMap = new ConcurrentHashMap<>();
 
   public void register(DatanodeDetails dd, NodeStatus status) {
+    TestClock testClock = TestClock.newInstance();
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null));
+    nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status, null, testClock));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {

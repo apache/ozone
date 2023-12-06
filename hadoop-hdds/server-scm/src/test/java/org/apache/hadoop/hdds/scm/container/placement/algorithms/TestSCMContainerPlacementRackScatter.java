@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.ozone.test.TestClock;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -176,11 +177,12 @@ public class TestSCMContainerPlacementRackScatter {
    * @param datanodeDetails the datanode to setup
    */
   private void setupDatanode(DatanodeDetails datanodeDetails) {
+    TestClock testClock = TestClock.newInstance();
     datanodes.add(datanodeDetails);
     cluster.add(datanodeDetails);
     DatanodeInfo datanodeInfo = new DatanodeInfo(
         datanodeDetails, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto());
+        UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
@@ -482,6 +484,7 @@ public class TestSCMContainerPlacementRackScatter {
   @MethodSource("numDatanodes")
   public void testDatanodeWithDefaultNetworkLocation(int datanodeCount)
       throws SCMException {
+    TestClock testClock = TestClock.newInstance();
     setup(datanodeCount);
     String hostname = "node";
     List<DatanodeInfo> dnInfoList = new ArrayList<>();
@@ -494,7 +497,7 @@ public class TestSCMContainerPlacementRackScatter {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getUuid(), "/data1-" + dnInfo.getUuidString(),

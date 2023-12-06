@@ -61,6 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,6 +107,7 @@ public class TestReconPipelineManager {
   public void testInitialize() throws IOException, TimeoutException {
 
     // Get 3 OPEN pipelines from SCM.
+    TestClock testClock = TestClock.newInstance();
     List<Pipeline> pipelinesFromScm = getPipelines(3);
 
     // Recon has 2 pipelines in ALLOCATED state. (1 is valid and 1 is obsolete)
@@ -138,7 +140,8 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(),
+            testClock, versionManager);
 
     try (ReconPipelineManager reconPipelineManager =
              ReconPipelineManager.newReconPipelineManager(
@@ -181,7 +184,7 @@ public class TestReconPipelineManager {
 
   @Test
   public void testAddPipeline() throws IOException, TimeoutException {
-
+    TestClock testClock = TestClock.newInstance();
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
@@ -192,7 +195,8 @@ public class TestReconPipelineManager {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(),
+            testClock, versionManager);
 
     ReconPipelineManager reconPipelineManager =
         ReconPipelineManager.newReconPipelineManager(

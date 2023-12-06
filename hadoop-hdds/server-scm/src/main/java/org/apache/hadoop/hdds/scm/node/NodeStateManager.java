@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.Closeable;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -164,6 +164,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private final Predicate<LayoutVersionProto> layoutMatchCondition;
   private final Predicate<LayoutVersionProto> layoutMisMatchCondition;
+  private final Clock clock;
 
   /**
    * Constructs a NodeStateManager instance with the given configuration.
@@ -175,11 +176,13 @@ public class NodeStateManager implements Runnable, Closeable {
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
                           LayoutVersionManager layoutManager,
-                          SCMContext scmContext) {
+                          SCMContext scmContext,
+                          Clock clock) {
     this.layoutVersionManager = layoutManager;
-    this.nodeStateMap = new NodeStateMap();
+    this.nodeStateMap = new NodeStateMap(clock);
     this.node2PipelineMap = new Node2PipelineMap();
     this.eventPublisher = eventPublisher;
+    this.clock = clock;
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
@@ -792,7 +795,7 @@ public class NodeStateManager implements Runnable, Closeable {
      *
      * The Processing starts from current time and looks backwards in time.
      */
-    long processingStartTime = Time.monotonicNow();
+    long processingStartTime = clock.millis();
     // After this time node is considered to be stale.
     long healthyNodeDeadline = processingStartTime - staleNodeIntervalMs;
     // After this time node is considered to be dead.
@@ -851,7 +854,7 @@ public class NodeStateManager implements Runnable, Closeable {
       // the node entry after we got the list of UUIDs.
       LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
     }
-    long processingEndTime = Time.monotonicNow();
+    long processingEndTime = clock.millis();
     //If we have taken too much time for HB processing, log that information.
     if ((processingEndTime - processingStartTime) >
         heartbeatCheckerIntervalMs) {
@@ -879,7 +882,7 @@ public class NodeStateManager implements Runnable, Closeable {
           "thread for Node Manager.");
     }
 
-    lastHealthCheck = Time.monotonicNow();
+    lastHealthCheck = clock.millis();
   }
 
   /**
@@ -890,7 +893,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private boolean shouldSkipCheck() {
 
-    long currentTime = Time.monotonicNow();
+    long currentTime = clock.millis();
     long minInterval = Math.min(staleNodeIntervalMs, deadNodeIntervalMs);
 
     return ((currentTime - lastHealthCheck) >= minInterval);

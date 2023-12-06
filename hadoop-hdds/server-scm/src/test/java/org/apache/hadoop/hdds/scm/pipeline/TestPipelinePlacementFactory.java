@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,6 +87,7 @@ public class TestPipelinePlacementFactory {
   private void setupRacks(int datanodeCount, int nodesPerRack,
                           boolean firstRackLessNode)
       throws Exception {
+    TestClock testClock = TestClock.newInstance();
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
     NodeSchema[] schemas = new NodeSchema[]
@@ -106,7 +108,7 @@ public class TestPipelinePlacementFactory {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(

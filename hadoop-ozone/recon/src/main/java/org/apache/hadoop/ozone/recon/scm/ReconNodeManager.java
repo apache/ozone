@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -67,6 +68,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ReconNodeManager extends SCMNodeManager {
 
+  private final Clock clock;
+
   public static final Logger LOG = LoggerFactory
       .getLogger(ReconNodeManager.class);
 
@@ -87,17 +90,20 @@ public class ReconNodeManager extends SCMNodeManager {
   private static final DatanodeDetails EMPTY_DATANODE_DETAILS =
       DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
 
+
   public ReconNodeManager(OzoneConfiguration conf,
                           SCMStorageConfig scmStorageConfig,
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
                           Table<UUID, DatanodeDetails> nodeDB,
-                          HDDSLayoutVersionManager scmLayoutVersionManager) {
+                          HDDSLayoutVersionManager scmLayoutVersionManager,
+                          Clock clock) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
-        SCMContext.emptyContext(), scmLayoutVersionManager);
+        SCMContext.emptyContext(), clock, scmLayoutVersionManager);
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
         HddsServerUtil.getReconHeartbeatInterval(conf);
     this.nodeDB = nodeDB;
+    this.clock = clock;
     loadExistingNodes();
   }
 

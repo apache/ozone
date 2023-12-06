@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.when;
 public class TestSCMContainerPlacementCapacity {
   @Test
   public void chooseDatanodes() throws SCMException {
+    TestClock testClock = TestClock.newInstance();
     //given
     OzoneConfiguration conf = new OzoneConfiguration();
     // We are using small units here
@@ -62,7 +64,7 @@ public class TestSCMContainerPlacementCapacity {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), testClock);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),

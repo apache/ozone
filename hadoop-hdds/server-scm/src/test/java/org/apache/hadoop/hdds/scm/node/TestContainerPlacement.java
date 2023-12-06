@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.ozone.test.TestClock;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -93,6 +95,7 @@ public class TestContainerPlacement {
   @BeforeEach
   public void setUp() throws Exception {
     conf = getConf();
+
     testDir = GenericTestUtils.getTestDir(
         TestContainerPlacement.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -134,6 +137,7 @@ public class TestContainerPlacement {
    */
 
   SCMNodeManager createNodeManager(OzoneConfiguration config) {
+    TestClock testClock = TestClock.newInstance();
     EventQueue eventQueue = new EventQueue();
     eventQueue.addHandler(SCMEvents.NEW_NODE,
         Mockito.mock(NewNodeHandler.class));
@@ -152,7 +156,7 @@ public class TestContainerPlacement {
     Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     SCMNodeManager scmNodeManager = new SCMNodeManager(config, storageConfig,
-        eventQueue, null, SCMContext.emptyContext(), versionManager);
+        eventQueue, null, SCMContext.emptyContext(), testClock, versionManager);
     return scmNodeManager;
   }
 
@@ -180,6 +184,7 @@ public class TestContainerPlacement {
     final long used = 2L * OzoneConsts.GB;
     final long remaining = capacity - used;
 
+    TestClock testClock = TestClock.newInstance();
     testDir = PathUtils.getTestDir(
         TestContainerPlacement.class);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -203,7 +208,8 @@ public class TestContainerPlacement {
       }
 
       //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
+//      Thread.sleep(4 * 1000);
+      testClock.fastForward(Duration.ofSeconds(4));
       assertEquals(nodeCount, scmNodeManager.getNodeCount(null, HEALTHY));
       assertEquals(capacity * nodeCount,
           (long) scmNodeManager.getStats().getCapacity().get());

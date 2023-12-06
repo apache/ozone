@@ -208,7 +208,6 @@ public class TestHealthyPipelineSafeModeRule {
   @Test
   public void testHealthyPipelineSafeModeRuleWithMixedPipelines()
       throws Exception {
-
     String storageDir = GenericTestUtils.getTempPath(
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
 

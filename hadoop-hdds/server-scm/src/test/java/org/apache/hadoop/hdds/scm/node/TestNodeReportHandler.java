@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,7 @@ public class TestNodeReportHandler implements EventPublisher {
 
   @BeforeEach
   public void resetEventCollector() throws IOException {
+    TestClock testClock = TestClock.newInstance();
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
@@ -77,7 +79,7 @@ public class TestNodeReportHandler implements EventPublisher {
         .thenReturn(maxLayoutVersion());
     nodeManager =
         new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
-            SCMContext.emptyContext(), versionManager);
+            SCMContext.emptyContext(), testClock, versionManager);
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 

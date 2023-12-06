@@ -70,6 +70,7 @@ import org.slf4j.LoggerFactory;
 import javax.management.ObjectName;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -145,22 +146,25 @@ public class SCMNodeManager implements NodeManager {
       EventPublisher eventPublisher,
       NetworkTopology networkTopology,
       SCMContext scmContext,
+      Clock clock,
       HDDSLayoutVersionManager layoutVersionManager) {
-    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
+    this(conf, scmStorageConfig, eventPublisher, networkTopology,
+            scmContext, clock,
         layoutVersionManager, hostname -> null);
   }
-
+  @SuppressWarnings("parameternumber")
   public SCMNodeManager(
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
       NetworkTopology networkTopology,
       SCMContext scmContext,
+      Clock clock,
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext);
+        layoutVersionManager, scmContext, clock);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;

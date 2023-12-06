@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.time.Duration;
 
 /**
  * Verifies the statics in NodeManager.
@@ -83,6 +85,7 @@ public class TestStatisticsUpdate {
   @Test
   public void testStatisticsUpdate() throws Exception {
     //GIVEN
+    TestClock testClock = TestClock.newInstance();
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
 
@@ -129,11 +132,11 @@ public class TestStatisticsUpdate {
         .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
         .build();
     nodeManager.processHeartbeat(datanode2, layoutInfo);
-    Thread.sleep(1000);
+    testClock.fastForward(Duration.ofSeconds(1));
     nodeManager.processHeartbeat(datanode2, layoutInfo);
-    Thread.sleep(1000);
+    testClock.fastForward(Duration.ofSeconds(1));
     nodeManager.processHeartbeat(datanode2, layoutInfo);
-    Thread.sleep(1000);
+    testClock.fastForward(Duration.ofSeconds(1));
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();

@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -67,7 +68,7 @@ public class TestReconIncrementalContainerReportHandler
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
-
+    TestClock testClock = TestClock.newInstance();
     ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
@@ -95,7 +96,8 @@ public class TestReconIncrementalContainerReportHandler
         .thenReturn(maxLayoutVersion());
 
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
-        eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
+        eventQueue, clusterMap, SCMContext.emptyContext(),
+            testClock, versionManager);
 
     nodeManager.register(datanodeDetails, null, null);
 
