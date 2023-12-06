@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.http.HttpServer2;
@@ -99,7 +100,7 @@ public class HddsConfServlet extends HttpServlet {
       if (cmd == null) {
         writeResponse(getConfFromContext(), out, format, name);
       } else {
-        processConfigTagRequest(request, out);
+        processConfigTagRequest(request, cmd, out);
       }
     } catch (BadFormatException bfe) {
       response.sendError(HttpServletResponse.SC_BAD_REQUEST, bfe.getMessage());
@@ -142,9 +143,8 @@ public class HddsConfServlet extends HttpServlet {
     }
   }
 
-  private void processConfigTagRequest(HttpServletRequest request,
+  private void processConfigTagRequest(HttpServletRequest request, String cmd,
       Writer out) throws IOException {
-    String cmd = request.getParameter(COMMAND);
     Gson gson = new Gson();
     OzoneConfiguration config = getOzoneConfig();
 
@@ -154,6 +154,10 @@ public class HddsConfServlet extends HttpServlet {
       break;
     case "getPropertyByTag":
       String tags = request.getParameter("tags");
+      if (Strings.isNullOrEmpty(tags)) {
+        throw new IllegalArgumentException("The tags parameter should be set" +
+                " when using the getPropertyByTag command.");
+      }
       Map<String, Properties> propMap = new HashMap<>();
 
       for (String tag : tags.split(",")) {
