@@ -818,6 +818,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.get.container.max.retry</name>
+    <value>4096</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      This property determines how many times SCM is going to retry getContainer operation for Ratis type container.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.chunk.size</name>
     <value>4MB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
