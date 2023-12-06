@@ -36,8 +36,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
  * Handler to print decommissioning nodes status.
  */
 @CommandLine.Command(
-    name = "decommission-status",
-    description = "Show decommission status for datanodes",
+    name = "decommission",
+    description = "Show status of datanodes in DECOMMISSIONING",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 

@@ -1,4 +1,5 @@
-/*
+package org.apache.hadoop.hdds.scm.cli.datanode;
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,39 +16,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
-
+import picocli.CommandLine.Command;
 import java.util.concurrent.Callable;
 
 /**
- * Subcommand for datanode related operations.
+ * View status of one or more datanodes.
  */
-@CommandLine.Command(
-    name = "datanode",
-    description = "Datanode specific operations",
+@Command(
+    name = "status",
+    description = "Show status of datanodes",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        ListInfoSubcommand.class,
-        DecommissionSubCommand.class,
-        MaintenanceSubCommand.class,
-        RecommissionSubCommand.class,
-        UsageInfoSubcommand.class
+        DecommissionStatusSubCommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
 
-  @Spec
-  private CommandSpec spec;
+@MetaInfServices(SubcommandWithParent.class)
+public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   @Override
   public Void call() throws Exception {
@@ -57,6 +51,6 @@ public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Class<?> getParentType() {
-    return OzoneAdmin.class;
+    return DatanodeCommands.class;
   }
 }
