@@ -214,10 +214,10 @@ public class ContainerReader implements Runnable {
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
-            cleanupContainer(hddsVolume, kvContainer);
-            kvContainer.delete();
-            LOG.info("Delete recovering container {}.",
-                kvContainer.getContainerData().getContainerID());
+            kvContainer.markContainerUnhealthy();
+            LOG.info("Stale recovering container {} marked UNHEALTHY",
+                kvContainerData.getContainerID());
+            containerSet.addContainer(kvContainer);
           }
           return;
         }
