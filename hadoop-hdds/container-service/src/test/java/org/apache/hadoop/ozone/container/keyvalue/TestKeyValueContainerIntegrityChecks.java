@@ -72,7 +72,7 @@ public class TestKeyValueContainerIntegrityChecks {
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  private void intialize(ContainerTestVersionInfo versionInfo){
+  private void initialize(ContainerTestVersionInfo versionInfo) {
     LOG.info("new TestKeyValueContainerIntegrityChecks for {}", versionInfo);
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(
@@ -90,7 +90,7 @@ public class TestKeyValueContainerIntegrityChecks {
   }
 
   public void setUp(ContainerTestVersionInfo versionInfo) throws Exception {
-    intialize(versionInfo);
+    initialize(versionInfo);
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());

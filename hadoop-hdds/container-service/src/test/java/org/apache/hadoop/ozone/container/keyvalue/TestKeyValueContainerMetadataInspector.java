@@ -43,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.apache.ozone.test.GenericTestUtils.toLog4j;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,7 +60,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testRunDisabled(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testRunDisabled(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     setUp(versionInfo);
     // Create incorrect container.
     KeyValueContainer container = createClosedContainer(3);
@@ -86,7 +86,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testSystemPropertyAndReadOnly(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testSystemPropertyAndReadOnly(
+      ContainerTestVersionInfo versionInfo) throws Exception {
     setUp(versionInfo);
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     ContainerInspector inspector = new KeyValueContainerMetadataInspector();
@@ -120,7 +121,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testIncorrectTotalsNoData(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testIncorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     setUp(versionInfo);
     int createBlocks = 0;
     int setBlocks = -3;
@@ -134,7 +136,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testIncorrectTotalsWithData(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testIncorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     setUp(versionInfo);
     int createBlocks = 3;
     int setBlocks = 4;
@@ -149,7 +152,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testCorrectTotalsNoData(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testCorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     setUp(versionInfo);
 
     int createBlocks = 0;
@@ -163,7 +167,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testCorrectTotalsWithData(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testCorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     setUp(versionInfo);
     int createBlocks = 3;
     int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
@@ -205,7 +210,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testCorrectDeleteWithTransaction(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testCorrectDeleteWithTransaction(
+      ContainerTestVersionInfo versionInfo) throws Exception {
     setUp(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
@@ -228,7 +234,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testIncorrectDeleteWithTransaction(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testIncorrectDeleteWithTransaction(
+      ContainerTestVersionInfo versionInfo) throws Exception {
     setUp(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
@@ -252,7 +259,8 @@ public class TestKeyValueContainerMetadataInspector
 
   @ParameterizedTest
   @MethodSource("data")
-  public void testIncorrectDeleteWithoutTransaction(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testIncorrectDeleteWithoutTransaction(
+      ContainerTestVersionInfo versionInfo) throws Exception {
     setUp(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;

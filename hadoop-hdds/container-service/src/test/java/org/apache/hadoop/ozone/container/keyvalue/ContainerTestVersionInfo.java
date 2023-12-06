@@ -73,8 +73,10 @@ public class ContainerTestVersionInfo {
         .collect(toList());
   }
 
-  /*
-  This method is created to support the parameterized data during migration to Junit5.
+  /**
+   * This method is created to support the parameterized data during
+   * migration to Junit5.
+   * @return Stream of ContainerTestVersionInfo objects.
    */
   public static Stream<Object> versionParametersStream() {
     return layoutList.stream().map(each -> new Object[] {each});

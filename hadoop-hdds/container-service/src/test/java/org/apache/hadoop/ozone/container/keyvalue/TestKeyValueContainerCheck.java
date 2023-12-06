@@ -51,7 +51,8 @@ public class TestKeyValueContainerCheck
    */
   @ParameterizedTest
   @MethodSource("data")
-  public void testKeyValueContainerCheckNoCorruption(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testKeyValueContainerCheckNoCorruption(
+      ContainerTestVersionInfo versionInfo) throws Exception {
     setUp(versionInfo);
     long containerID = 101;
     int deletedBlocks = 1;
@@ -86,7 +87,8 @@ public class TestKeyValueContainerCheck
    */
   @ParameterizedTest
   @MethodSource("data")
-  public void testKeyValueContainerCheckCorruption(ContainerTestVersionInfo versionInfo) throws Exception {
+  public void testKeyValueContainerCheckCorruption(
+      ContainerTestVersionInfo versionInfo) throws Exception {
     setUp(versionInfo);
     long containerID = 102;
     int deletedBlocks = 1;
