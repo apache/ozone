@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -53,15 +54,19 @@ public class TestContainerHealthTaskRecordGenerator {
 
   private PlacementPolicy placementPolicy;
   private ContainerInfo container;
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() {
     placementPolicy = mock(PlacementPolicy.class);
     container = mock(ContainerInfo.class);
+    when(container.getReplicationFactor())
+        .thenReturn(HddsProtos.ReplicationFactor.THREE);
     when(container.getReplicationConfig())
         .thenReturn(
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE));
+    when(container.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
     when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
@@ -73,7 +78,7 @@ public class TestContainerHealthTaskRecordGenerator {
   public void testMissingRecordRetained() {
     Set<ContainerReplica> replicas = new HashSet<>();
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     // Missing record should be retained
     assertTrue(ContainerHealthTask.ContainerHealthRecords
         .retainOrUpdateRecord(status, missingRecord()
@@ -91,7 +96,8 @@ public class TestContainerHealthTaskRecordGenerator {
         ));
 
     replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
         .retainOrUpdateRecord(status, missingRecord()
         ));
@@ -103,7 +109,7 @@ public class TestContainerHealthTaskRecordGenerator {
     Set<ContainerReplica> replicas =
         generateReplicas(container, CLOSED, CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
 
     UnhealthyContainersRecord rec = underReplicatedRecord();
     assertTrue(ContainerHealthTask.ContainerHealthRecords
@@ -125,7 +131,8 @@ public class TestContainerHealthTaskRecordGenerator {
 
     // Container is now replicated OK - should be removed.
     replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
         .retainOrUpdateRecord(status, rec));
   }
@@ -136,7 +143,7 @@ public class TestContainerHealthTaskRecordGenerator {
     Set<ContainerReplica> replicas =
         generateReplicas(container, CLOSED, CLOSED, CLOSED, CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
 
     UnhealthyContainersRecord rec = overReplicatedRecord();
     assertTrue(ContainerHealthTask.ContainerHealthRecords
@@ -158,7 +165,8 @@ public class TestContainerHealthTaskRecordGenerator {
 
     // Container is now replicated OK - should be removed.
     replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
         .retainOrUpdateRecord(status, rec));
   }
@@ -172,7 +180,7 @@ public class TestContainerHealthTaskRecordGenerator {
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 3, 5));
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
 
     UnhealthyContainersRecord rec = misReplicatedRecord();
     assertTrue(ContainerHealthTask.ContainerHealthRecords
@@ -197,7 +205,8 @@ public class TestContainerHealthTaskRecordGenerator {
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(3, 3, 5));
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
         .retainOrUpdateRecord(status, rec));
   }
@@ -209,7 +218,7 @@ public class TestContainerHealthTaskRecordGenerator {
 
     // HEALTHY container - no records generated.
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     List<UnhealthyContainers> records =
         ContainerHealthTask.ContainerHealthRecords
             .generateUnhealthyRecords(status, (long)1234567);
@@ -219,7 +228,7 @@ public class TestContainerHealthTaskRecordGenerator {
     replicas =
         generateReplicas(container, CLOSED, CLOSED, CLOSED, CLOSED, CLOSED);
     status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     records = ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, (long)1234567);
     assertEquals(1, records.size());
@@ -237,7 +246,7 @@ public class TestContainerHealthTaskRecordGenerator {
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     records = ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, (long)1234567);
     assertEquals(2, records.size());
@@ -265,7 +274,7 @@ public class TestContainerHealthTaskRecordGenerator {
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     records = ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, (long)1234567);
     assertEquals(1, records.size());
@@ -288,7 +297,7 @@ public class TestContainerHealthTaskRecordGenerator {
     Set<ContainerReplica> replicas = generateReplicas(
         container, CLOSED, CLOSED, CLOSED, CLOSED, CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     List<UnhealthyContainers> records =
         ContainerHealthTask.ContainerHealthRecords
             .generateUnhealthyRecords(status, existingRec, (long)1234567);
@@ -296,7 +305,8 @@ public class TestContainerHealthTaskRecordGenerator {
 
     // Missing
     replicas.clear();
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     records = ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, existingRec, (long)1234567);
     assertEquals(0, records.size());
@@ -306,7 +316,8 @@ public class TestContainerHealthTaskRecordGenerator {
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     records = ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, existingRec, (long)1234567);
     assertEquals(0, records.size());

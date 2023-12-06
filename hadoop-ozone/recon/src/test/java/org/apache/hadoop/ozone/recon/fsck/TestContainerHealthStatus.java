@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -50,6 +51,7 @@ public class TestContainerHealthStatus {
 
   private PlacementPolicy placementPolicy;
   private ContainerInfo container;
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   private static Stream<Arguments> outOfServiceNodeStates() {
     return Stream.of(
@@ -64,9 +66,12 @@ public class TestContainerHealthStatus {
   public void setup() {
     placementPolicy = mock(PlacementPolicy.class);
     container = mock(ContainerInfo.class);
+    when(container.getReplicationFactor())
+        .thenReturn(HddsProtos.ReplicationFactor.THREE);
     when(container.getReplicationConfig())
         .thenReturn(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE));
+    when(container.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
     when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
@@ -81,8 +86,8 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertTrue(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isProperlyReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
@@ -104,8 +109,8 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.UNHEALTHY);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertTrue(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isProperlyReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
@@ -118,8 +123,8 @@ public class TestContainerHealthStatus {
   public void testMissingContainer() {
     Set<ContainerReplica> replicas = new HashSet<>();
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertFalse(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertFalse(status.isProperlyReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(3, status.replicaDelta());
@@ -133,8 +138,8 @@ public class TestContainerHealthStatus {
     Set<ContainerReplica> replicas = generateReplicas(container,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertFalse(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertFalse(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isOverReplicated());
     assertTrue(status.isUnderReplicated());
@@ -151,8 +156,8 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertFalse(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertFalse(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertTrue(status.isOverReplicated());
@@ -164,11 +169,12 @@ public class TestContainerHealthStatus {
   /**
    * Starting with a ContainerHealthStatus of 1 over-replicated container
    * replica and then updating a datanode to one of the out-of-service states.
-   * Container should then be considered healthy.
+   * Replicas belonging to out-of-service nodes should be ignored and
+   * the container should be considered properly replicated.
    */
   @ParameterizedTest
   @MethodSource("outOfServiceNodeStates")
-  public void testOverReplicatedWithOutOfServiceNodes(
+  public void testOverReplicationWithOutOfServiceNodes(
       HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replicas = generateReplicas(container,
         ContainerReplicaProto.State.CLOSED,
@@ -176,8 +182,8 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertFalse(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertFalse(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -190,8 +196,9 @@ public class TestContainerHealthStatus {
       break;
     }
 
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertTrue(status.isHealthy());
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -199,21 +206,27 @@ public class TestContainerHealthStatus {
   }
 
   /**
-   * Starting with a healthy ContainerHealthStatus and then updating
-   * a datanode to one of the out-of-service states.
-   * Container should then be considered under-replicated.
+   * Nodes in Decommission aren't expected to come back.
+   * If 1/3 nodes goes into decommission, the container is
+   * considered under-replicated. If 1/3 nodes goes into maintenance,
+   * because the node is expected to come back and there are
+   * 2 available replicas (minimum required num for Ratis THREE)
+   * the container isn't considered under-replicated.
    */
   @ParameterizedTest
   @MethodSource("outOfServiceNodeStates")
-  public void testUnderReplicatedWithOutOfServiceNodes(
+  public void testUnderReplicationWithOutOfServiceNodes(
       HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replicas = generateReplicas(container,
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
+    // IN_SERVICE, IN_SERVICE, IN_SERVICE
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
     assertTrue(status.isHealthy());
+    assertTrue(status.isSufficientlyReplicated());
+    assertTrue(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -226,8 +239,103 @@ public class TestContainerHealthStatus {
       break;
     }
 
-    status = new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertFalse(status.isHealthy());
+    // IN_SERVICE, IN_SERVICE, DECOMMISSION/MAINTENANCE
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isHealthy());
+    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isOverReplicated());
+
+    if (state.equals(HddsProtos.NodeOperationalState.DECOMMISSIONING) ||
+        state.equals(HddsProtos.NodeOperationalState.DECOMMISSIONED)) {
+      assertFalse(status.isSufficientlyReplicated());
+      assertTrue(status.isUnderReplicated());
+    } else {
+      assertTrue(status.isSufficientlyReplicated());
+      assertFalse(status.isUnderReplicated());
+    }
+  }
+
+  /**
+   * Starting with a healthy ContainerHealthStatus and then updating
+   * a datanode to a maintenance state.
+   * Any node in maintenance is expected to come back and since 2 replicas
+   * in online nodes are meeting the minimum requirement for
+   * proper replication, no additional replica-copy is made.
+   *
+   * IN_SERVICE, IN_SERVICE, IN_MAINTENANCE
+   *
+   * If 1 more node goes into maintenance, then 1 replica copy is made to
+   * maintain the minimum requirement for proper replication.
+   *
+   * IN_SERVICE, IN_SERVICE, IN_MAINTENANCE, IN_MAINTENANCE
+   *
+   * Before the copy is made we have
+   *
+   * IN_SERVICE, IN_MAINTENANCE, ENTERING_MAINTENANCE
+   *
+   * for that short time, the container is under-replicated.
+   *
+   * When the copy is made, the container is again considered
+   * sufficiently replicated.
+   */
+  @Test
+  public void testReplicationWithNodesInMaintenance() {
+    Set<ContainerReplica> replicas = generateReplicas(container,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+    // IN_SERVICE, IN_SERVICE, IN_SERVICE
+    ContainerHealthStatus status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isHealthy());
+    assertTrue(status.isSufficientlyReplicated());
+    assertTrue(status.isProperlyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isOverReplicated());
+
+    // 1/3 replicas goes into maintenance
+    // IN_SERVICE, IN_SERVICE, IN_MAINTENANCE
+    for (ContainerReplica replica : replicas) {
+      replicas.remove(replica);
+      replica.getDatanodeDetails().setPersistedOpState(
+          HddsProtos.NodeOperationalState.IN_MAINTENANCE);
+      replicas.add(replica);
+      break;
+    }
+
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isHealthy());
+    assertTrue(status.isSufficientlyReplicated());
+    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isOverReplicated());
+
+    // IN_SERVICE, IN_MAINTENANCE, ENTERING_MAINTENANCE
+    for (ContainerReplica replica : replicas) {
+      if (replica.getDatanodeDetails().getPersistedOpState().equals(
+          HddsProtos.NodeOperationalState.IN_SERVICE)) {
+        replicas.remove(replica);
+        replica.getDatanodeDetails().setPersistedOpState(
+            HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE);
+        replicas.add(replica);
+        break;
+      }
+    }
+
+    // Container should be under-replicated.
+    status =
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertTrue(status.isHealthy());
+    assertFalse(status.isSufficientlyReplicated());
+    assertFalse(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertTrue(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -244,8 +352,8 @@ public class TestContainerHealthStatus {
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
-    assertFalse(status.isHealthy());
+        new ContainerHealthStatus(container, replicas, placementPolicy, CONF);
+    assertFalse(status.isProperlyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isOverReplicated());

@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -58,15 +59,17 @@ public class ContainerHealthTask extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
 
-  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
+  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
-  private StorageContainerServiceProvider scmClient;
-  private ContainerManager containerManager;
-  private ContainerHealthSchemaManager containerHealthSchemaManager;
-  private PlacementPolicy placementPolicy;
+  private final StorageContainerServiceProvider scmClient;
+  private final ContainerManager containerManager;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final PlacementPolicy placementPolicy;
   private final long interval;
 
-  private Set<ContainerInfo> processedContainers = new HashSet<>();
+  private final Set<ContainerInfo> processedContainers = new HashSet<>();
+
+  private final OzoneConfiguration conf;
 
   public ContainerHealthTask(
       ContainerManager containerManager,
@@ -74,12 +77,14 @@ public class ContainerHealthTask extends ReconScmTask {
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
-      ReconTaskConfig reconTaskConfig) {
+      ReconTaskConfig reconTaskConfig,
+      OzoneConfiguration conf) {
     super(reconTaskStatusDao);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
+    this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
   }
 
@@ -128,7 +133,8 @@ public class ContainerHealthTask extends ReconScmTask {
         containerManager.getContainer(ContainerID.valueOf(recordId));
     Set<ContainerReplica> replicas =
         containerManager.getContainerReplicas(container.containerID());
-    return new ContainerHealthStatus(container, replicas, placementPolicy);
+    return new ContainerHealthStatus(
+        container, replicas, placementPolicy, conf);
   }
 
   private void completeProcessingContainer(ContainerHealthStatus container,
@@ -206,8 +212,8 @@ public class ContainerHealthTask extends ReconScmTask {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(container.containerID());
       ContainerHealthStatus h = new ContainerHealthStatus(
-          container, containerReplicas, placementPolicy);
-      if (h.isHealthy() || h.isDeleted()) {
+          container, containerReplicas, placementPolicy, conf);
+      if (h.isProperlyReplicated() || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
@@ -314,7 +320,7 @@ public class ContainerHealthTask extends ReconScmTask {
         ContainerHealthStatus container, Set<String> recordForStateExists,
         long time) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if (container.isHealthy() || container.isDeleted()) {
+      if (container.isProperlyReplicated() || container.isDeleted()) {
         return records;
       }
 

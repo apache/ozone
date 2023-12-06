@@ -241,7 +241,7 @@ public class ReconStorageContainerManagerFacade
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
         containerManager, scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy, reconTaskConfig);
+        containerPlacementPolicy, reconTaskConfig, conf);
 
     this.containerSizeCountTask = new ContainerSizeCountTask(
         containerManager,
