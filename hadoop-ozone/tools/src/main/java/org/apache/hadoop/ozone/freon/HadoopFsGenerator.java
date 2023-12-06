@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -87,12 +88,11 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
     configuration = createOzoneConfiguration();
     uri = URI.create(rootPath);
-    String scheme = uri.getScheme();
-    if (scheme == null) {
-      throw new IllegalArgumentException("--path requires FQDN");
-    }
-    String disableCacheName = String.format("fs.%s.impl.disable.cache",
-        uri.getScheme());
+    String scheme = Optional.ofNullable(uri.getScheme())
+            .orElseGet(() -> FileSystem.getDefaultUri(configuration)
+                    .getScheme());
+    String disableCacheName =
+            String.format("fs.%s.impl.disable.cache", scheme);
     print("Disabling FS cache: " + disableCacheName);
     configuration.setBoolean(disableCacheName, true);
 
