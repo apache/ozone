@@ -179,8 +179,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   @Override
   public void connect() throws Exception {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Connecting to pipeline:{} datanode:{}", getPipeline().getId(),
-          RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
+      LOG.debug("Connecting to pipeline:{} leaderDatanode:{}, " +
+          "primaryDatanode:{}", getPipeline().getId(),
+          RatisHelper.toRaftPeerId(pipeline.getLeaderNode()),
+          RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
     if (!client.compareAndSet(null,
