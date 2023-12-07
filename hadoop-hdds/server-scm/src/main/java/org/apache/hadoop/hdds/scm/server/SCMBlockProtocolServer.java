@@ -203,7 +203,7 @@ public class SCMBlockProtocolServer implements
         if (block != null) {
           blocks.add(block);
           // Sort the datanodes if client machine is specified
-          final Node client = getClientDatanode(clientMachine);
+          final Node client = getClientNode(clientMachine);
           if (client != null) {
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
@@ -357,7 +357,7 @@ public class SCMBlockProtocolServer implements
     auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
-      final Node client = getClientDatanode(clientMachine);
+      final Node client = getClientNode(clientMachine);
       List<DatanodeDetails> nodeList = new ArrayList<>();
       nodes.forEach(uuid -> {
         DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
@@ -382,7 +382,7 @@ public class SCMBlockProtocolServer implements
     }
   }
 
-  private Node getClientDatanode(String clientMachine) {
+  private Node getClientNode(String clientMachine) {
     List<DatanodeDetails> datanodes = scm.getScmNodeManager()
         .getNodesByAddress(clientMachine);
     return !datanodes.isEmpty() ? datanodes.get(0) :
