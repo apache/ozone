@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.client.rpc;
 import org.junit.BeforeClass;
 
 /**
- * Tests key output stream without zero-copy enabled.
+ * Tests key output stream with zero-copy enabled.
  */
-public class TestECKeyOutputStream extends
+public class TestECKeyOutputStreamWithZeroCopy extends
     AbstractTestECKeyOutputStream {
   @BeforeClass
   public static void init() throws Exception {
-    init(false);
+    init(true);
   }
 }

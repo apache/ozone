@@ -36,10 +36,8 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.log4j.PatternLayout;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,22 +45,24 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.ozone.test.GenericTestUtils.toLog4j;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
  */
-@RunWith(Parameterized.class)
 public class TestKeyValueContainerMetadataInspector
     extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
 
-  public TestKeyValueContainerMetadataInspector(
-      ContainerTestVersionInfo versionInfo) {
-    super(versionInfo);
-  }
-
-  @Test
-  public void testRunDisabled() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testRunDisabled(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setUp(versionInfo);
     // Create incorrect container.
     KeyValueContainer container = createClosedContainer(3);
     KeyValueContainerData containerData = container.getContainerData();
@@ -71,53 +71,59 @@ public class TestKeyValueContainerMetadataInspector
     // No system property set. Should not run.
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     ContainerInspectorUtil.load();
-    Assert.assertNull(runInspectorAndGetReport(containerData));
+    assertNull(runInspectorAndGetReport(containerData));
     ContainerInspectorUtil.unload();
 
     // Unloaded. Should not run even with system property.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
-    Assert.assertNull(runInspectorAndGetReport(containerData));
+    assertNull(runInspectorAndGetReport(containerData));
 
     // Unloaded and no system property. Should not run.
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
-    Assert.assertNull(runInspectorAndGetReport(containerData));
+    assertNull(runInspectorAndGetReport(containerData));
   }
 
-  @Test
-  public void testSystemPropertyAndReadOnly() {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testSystemPropertyAndReadOnly(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     ContainerInspector inspector = new KeyValueContainerMetadataInspector();
-    Assert.assertFalse(inspector.load());
-    Assert.assertTrue(inspector.isReadOnly());
+    assertFalse(inspector.load());
+    assertTrue(inspector.isReadOnly());
 
     // Inspect mode: valid argument and readonly.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.INSPECT.toString());
     inspector = new KeyValueContainerMetadataInspector();
-    Assert.assertTrue(inspector.load());
-    Assert.assertTrue(inspector.isReadOnly());
+    assertTrue(inspector.load());
+    assertTrue(inspector.isReadOnly());
 
     // Repair mode: valid argument and not readonly.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         KeyValueContainerMetadataInspector.Mode.REPAIR.toString());
     inspector = new KeyValueContainerMetadataInspector();
-    Assert.assertTrue(inspector.load());
-    Assert.assertFalse(inspector.isReadOnly());
+    assertTrue(inspector.load());
+    assertFalse(inspector.isReadOnly());
 
     // Bad argument: invalid argument and readonly.
     System.setProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY,
         "badvalue");
     inspector = new KeyValueContainerMetadataInspector();
-    Assert.assertFalse(inspector.load());
-    Assert.assertTrue(inspector.isReadOnly());
+    assertFalse(inspector.load());
+    assertTrue(inspector.isReadOnly());
 
     // Clean slate for other tests.
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
   }
 
-  @Test
-  public void testIncorrectTotalsNoData() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testIncorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setUp(versionInfo);
     int createBlocks = 0;
     int setBlocks = -3;
     int setBytes = -2;
@@ -128,8 +134,11 @@ public class TestKeyValueContainerMetadataInspector
         createBlocks, setBlocks, setBytes, 0, 0);
   }
 
-  @Test
-  public void testIncorrectTotalsWithData() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testIncorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setUp(versionInfo);
     int createBlocks = 3;
     int setBlocks = 4;
     int setBytes = -2;
@@ -141,8 +150,12 @@ public class TestKeyValueContainerMetadataInspector
         createBlocks, setBlocks, setBytes, 0, 0);
   }
 
-  @Test
-  public void testCorrectTotalsNoData() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setUp(versionInfo);
+
     int createBlocks = 0;
     int setBytes = 0;
 
@@ -152,8 +165,11 @@ public class TestKeyValueContainerMetadataInspector
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  @Test
-  public void testCorrectTotalsWithData() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setUp(versionInfo);
     int createBlocks = 3;
     int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
 
@@ -192,8 +208,11 @@ public class TestKeyValueContainerMetadataInspector
   static final DeletedBlocksTransactionGeneratorForTesting GENERATOR
       = new DeletedBlocksTransactionGeneratorForTesting();
 
-  @Test
-  public void testCorrectDeleteWithTransaction() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCorrectDeleteWithTransaction(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     final int deleteCount = 10;
@@ -206,15 +225,18 @@ public class TestKeyValueContainerMetadataInspector
         .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
     LOG.info("deleteTransactions = {}", deleteTransactions);
     LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
-    Assert.assertEquals(deleteCount, numDeletedLocalIds);
+    assertEquals(deleteCount, numDeletedLocalIds);
 
     setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  @Test
-  public void testIncorrectDeleteWithTransaction() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testIncorrectDeleteWithTransaction(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     final int deleteCount = 10;
@@ -235,8 +257,11 @@ public class TestKeyValueContainerMetadataInspector
         deleteCount, numDeletedLocalIds);
   }
 
-  @Test
-  public void testIncorrectDeleteWithoutTransaction() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testIncorrectDeleteWithoutTransaction(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     final int deleteCount = 10;
@@ -259,10 +284,10 @@ public class TestKeyValueContainerMetadataInspector
   public void inspectThenRepairOnCorrectContainer(
       KeyValueContainerData containerData) throws Exception {
     // No output for correct containers.
-    Assert.assertNull(runInspectorAndGetReport(containerData,
+    assertNull(runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.INSPECT));
 
-    Assert.assertNull(runInspectorAndGetReport(containerData,
+    assertNull(runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.REPAIR));
   }
 
@@ -292,7 +317,7 @@ public class TestKeyValueContainerMetadataInspector
       createdFiles = createdBlocks * CHUNKS_PER_BLOCK;
       break;
     default:
-      Assert.fail("Unrecognized chunk layout version.");
+      fail("Unrecognized chunk layout version.");
     }
 
     String containerState = containerData.getState().toString();
@@ -325,31 +350,31 @@ public class TestKeyValueContainerMetadataInspector
       long setPendingDeleteCount, long createdPendingDeleteCount,
       boolean shouldRepair) {
     // Check main container properties.
-    Assert.assertEquals(inspectJson.get("containerID").getAsLong(),
+    assertEquals(inspectJson.get("containerID").getAsLong(),
         CONTAINER_ID);
-    Assert.assertEquals(inspectJson.get("containerState").getAsString(),
+    assertEquals(inspectJson.get("containerState").getAsString(),
         expectedContainerState);
 
     // Check DB metadata.
     JsonObject jsonDbMetadata = inspectJson.getAsJsonObject("dBMetadata");
-    Assert.assertEquals(setBlocks,
+    assertEquals(setBlocks,
         jsonDbMetadata.get(OzoneConsts.BLOCK_COUNT).getAsLong());
-    Assert.assertEquals(setBytes,
+    assertEquals(setBytes,
         jsonDbMetadata.get(OzoneConsts.CONTAINER_BYTES_USED).getAsLong());
 
     // Check aggregate metadata values.
     JsonObject jsonAggregates = inspectJson.getAsJsonObject("aggregates");
-    Assert.assertEquals(createdBlocks,
+    assertEquals(createdBlocks,
         jsonAggregates.get("blockCount").getAsLong());
-    Assert.assertEquals(createdBytes,
+    assertEquals(createdBytes,
         jsonAggregates.get("usedBytes").getAsLong());
-    Assert.assertEquals(createdPendingDeleteCount,
+    assertEquals(createdPendingDeleteCount,
         jsonAggregates.get("pendingDeleteBlocks").getAsLong());
 
     // Check chunks directory.
     JsonObject jsonChunksDir = inspectJson.getAsJsonObject("chunksDirectory");
-    Assert.assertTrue(jsonChunksDir.get("present").getAsBoolean());
-    Assert.assertEquals(createdFiles,
+    assertTrue(jsonChunksDir.get("present").getAsBoolean());
+    assertEquals(createdFiles,
         jsonChunksDir.get("fileCount").getAsLong());
 
     // Check errors.
@@ -382,7 +407,7 @@ public class TestKeyValueContainerMetadataInspector
       String propertyValue, JsonPrimitive correctExpected,
       JsonPrimitive correctActual, boolean correctRepair) {
 
-    Assert.assertFalse(jsonReport.get("correct").getAsBoolean());
+    assertFalse(jsonReport.get("correct").getAsBoolean());
 
     JsonArray jsonErrors = jsonReport.getAsJsonArray("errors");
     boolean matchFound = false;
@@ -396,20 +421,20 @@ public class TestKeyValueContainerMetadataInspector
 
         JsonPrimitive expectedJsonPrim =
             jsonErrorObject.get("expected").getAsJsonPrimitive();
-        Assert.assertEquals(correctExpected, expectedJsonPrim);
+        assertEquals(correctExpected, expectedJsonPrim);
 
         JsonPrimitive actualJsonPrim =
             jsonErrorObject.get("actual").getAsJsonPrimitive();
-        Assert.assertEquals(correctActual, actualJsonPrim);
+        assertEquals(correctActual, actualJsonPrim);
 
         boolean repaired =
             jsonErrorObject.get("repaired").getAsBoolean();
-        Assert.assertEquals(correctRepair, repaired);
+        assertEquals(correctRepair, repaired);
         break;
       }
     }
 
-    Assert.assertTrue(matchFound);
+    assertTrue(matchFound);
   }
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
@@ -471,14 +496,14 @@ public class TestKeyValueContainerMetadataInspector
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
       long bytesUsed = metadataTable.get(containerData.getBytesUsedKey());
-      Assert.assertEquals(expectedBytesUsed, bytesUsed);
+      assertEquals(expectedBytesUsed, bytesUsed);
 
       long blockCount = metadataTable.get(containerData.getBlockCountKey());
-      Assert.assertEquals(expectedBlockCount, blockCount);
+      assertEquals(expectedBlockCount, blockCount);
 
       final long deleteCount = metadataTable.get(
           containerData.getPendingDeleteBlockCountKey());
-      Assert.assertEquals(expectedDeletedCount, deleteCount);
+      assertEquals(expectedDeletedCount, deleteCount);
     }
   }
 
@@ -525,8 +550,8 @@ public class TestKeyValueContainerMetadataInspector
 
   private void containsAllStrings(String logOutput, String[] expectedMessages) {
     for (String expectedMessage : expectedMessages) {
-      Assert.assertTrue("Log output did not contain \"" +
-              expectedMessage + "\"", logOutput.contains(expectedMessage));
+      assertTrue(logOutput.contains(expectedMessage),
+          "Log output did not contain \"" + expectedMessage + "\"");
     }
   }
 }

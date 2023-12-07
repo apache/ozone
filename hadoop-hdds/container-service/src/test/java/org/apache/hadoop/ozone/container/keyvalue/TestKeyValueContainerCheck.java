@@ -33,18 +33,17 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.RandomAccessFile;
 
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -54,19 +53,17 @@ import static org.mockito.Mockito.when;
 /**
  * Basic sanity test for the KeyValueContainerCheck class.
  */
-@RunWith(Parameterized.class)
 public class TestKeyValueContainerCheck
     extends TestKeyValueContainerIntegrityChecks {
-
-  public TestKeyValueContainerCheck(ContainerTestVersionInfo versionInfo) {
-    super(versionInfo);
-  }
 
   /**
    * Sanity test, when there are no corruptions induced.
    */
-  @Test
-  public void testKeyValueContainerCheckNoCorruption() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testKeyValueContainerCheckNoCorruption(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
@@ -98,8 +95,11 @@ public class TestKeyValueContainerCheck
   /**
    * Sanity test, when there are corruptions induced.
    */
-  @Test
-  public void testKeyValueContainerCheckCorruption() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testKeyValueContainerCheckCorruption(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
@@ -150,8 +150,11 @@ public class TestKeyValueContainerCheck
     assertFalse(valid);
   }
 
-  @Test
-  public void testKeyValueContainerCheckDeleted() {
+  @ParameterizedTest
+  @MethodSource("data")
+  void testKeyValueContainerCheckDeleted(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setUp(versionInfo);
 
     long containerID = 103;
     int deletedBlocks = 3;

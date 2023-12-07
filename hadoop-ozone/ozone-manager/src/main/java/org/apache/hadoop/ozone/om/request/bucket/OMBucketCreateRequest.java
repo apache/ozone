@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -97,6 +98,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
         ozoneManager.isStrictS3());
 
+    validateMaxBucket(ozoneManager);
+
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
         ozoneManager.getKmsProvider();
@@ -140,6 +143,23 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
         .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+  }
+
+  private static void validateMaxBucket(OzoneManager ozoneManager)
+      throws IOException {
+    int maxBucket = ozoneManager.getConfiguration().getInt(
+        OMConfigKeys.OZONE_OM_MAX_BUCKET,
+        OMConfigKeys.OZONE_OM_MAX_BUCKET_DEFAULT);
+    if (maxBucket <= 0) {
+      maxBucket = OMConfigKeys.OZONE_OM_MAX_BUCKET_DEFAULT;
+    }
+    long nrOfBuckets = ozoneManager.getMetadataManager().getBucketTable()
+        .getEstimatedKeyCount();
+    if (nrOfBuckets >= maxBucket) {
+      throw new OMException("Cannot create more than " + maxBucket
+          + " buckets",
+          ResultCodes.TOO_MANY_BUCKETS);
+    }
   }
 
   @Override

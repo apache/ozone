@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -654,7 +653,7 @@ public class TestIncrementalContainerReportHandler {
             new IncrementalContainerReportHandler(nodeManager,
                     containerManager, scmContext);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assert.assertEquals(containerStateManager
+    Assertions.assertEquals(containerStateManager
             .getContainerReplicas(container.containerID()).stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex)), expectedReplicaMap);

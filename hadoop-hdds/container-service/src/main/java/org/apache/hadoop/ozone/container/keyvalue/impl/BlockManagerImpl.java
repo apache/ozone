@@ -24,7 +24,6 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -60,6 +59,7 @@ public class BlockManagerImpl implements BlockManager {
 
   // Default Read Buffer capacity when Checksum is not present
   private final int defaultReadBufferCapacity;
+  private final int readMappedBufferThreshold;
 
   /**
    * Constructs a Block Manager.
@@ -69,19 +69,12 @@ public class BlockManagerImpl implements BlockManager {
   public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
-    final double size = config.getStorageSize(
+    this.defaultReadBufferCapacity = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
-        ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT,
-        StorageUnit.BYTES);
-    if (size <= 0) {
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY + " <= 0");
-    } else if (size > Integer.MAX_VALUE) {
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY
-              + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE);
-    }
-    this.defaultReadBufferCapacity = (int) size;
+        ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT);
+    this.readMappedBufferThreshold = config.getBufferSize(
+        ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY,
+        ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT);
   }
 
   @Override
@@ -265,6 +258,10 @@ public class BlockManagerImpl implements BlockManager {
   @Override
   public int getDefaultReadBufferCapacity() {
     return defaultReadBufferCapacity;
+  }
+
+  public int getReadMappedBufferThreshold() {
+    return readMappedBufferThreshold;
   }
 
   /**
