@@ -30,8 +30,6 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -39,12 +37,9 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
- * Class for handling Legacy buckets.
+ * Class for handling OBS buckets NameSpaceSummaries.
  */
 public class OBSBucketHandler extends BucketHandler {
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      OBSBucketHandler.class);
 
   private final String vol;
   private final String bucket;
@@ -69,6 +64,7 @@ public class OBSBucketHandler extends BucketHandler {
    * @return KEY, or UNKNOWN
    * @throws IOException
    */
+  @Override
   public EntityType determineKeyPath(String keyName)
       throws IOException {
     String key = OM_KEY_PREFIX + vol +
@@ -104,6 +100,7 @@ public class OBSBucketHandler extends BucketHandler {
    * @return the total DU of all direct keys
    * @throws IOException IOE
    */
+  @Override
   public long handleDirectKeys(long parentId, boolean withReplica,
                                boolean listFile,
                                List<DUResponse.DiskUsage> duData,
@@ -168,6 +165,7 @@ public class OBSBucketHandler extends BucketHandler {
    *
    * @return null
    */
+  @Override
   public long calculateDUUnderObject(long parentId)
       throws IOException {
     return Long.parseLong(null);
@@ -178,6 +176,7 @@ public class OBSBucketHandler extends BucketHandler {
    *
    * @return null
    */
+  @Override
   public long getDirObjectId(String[] names) throws IOException {
     return Long.parseLong(null);
   }
@@ -187,11 +186,16 @@ public class OBSBucketHandler extends BucketHandler {
    *
    * @return null
    */
+  @Override
   public long getDirObjectId(String[] names, int cutoff) throws IOException {
     return Long.parseLong(null);
   }
 
-
+  /**
+   * Returns the keyInfo object from the KEY table.
+   * @return OmKeyInfo
+   */
+  @Override
   public OmKeyInfo getKeyInfo(String[] names) throws IOException {
     String ozoneKey = OM_KEY_PREFIX;
     ozoneKey += String.join(OM_KEY_PREFIX, names);

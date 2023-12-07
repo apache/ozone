@@ -32,8 +32,6 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -47,10 +45,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Class for handling all entity types.
  */
 public abstract class EntityHandler {
-
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      EntityHandler.class);
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
