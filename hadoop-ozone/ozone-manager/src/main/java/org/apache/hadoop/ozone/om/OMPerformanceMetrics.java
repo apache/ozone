@@ -113,6 +113,11 @@ public class OMPerformanceMetrics {
   @Metric(about = "Ratis local command execution latency in nano seconds")
   private MutableRate validateAndUpdateCacneLatencyNs;
 
+  @Metric(about = "average pagination for listKeys")
+  private MutableRate listKeysAveragePagination;
+
+  @Metric(about = "ops per second for listKeys")
+  private MutableRate listKeysOpsPerSec;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -209,5 +214,13 @@ public class OMPerformanceMetrics {
 
   public MutableRate getValidateAndUpdateCacneLatencyNs() {
     return validateAndUpdateCacneLatencyNs;
+  }
+
+  public void setListKeysAveragePagination(long averagePagination) {
+    listKeysAveragePagination.add(averagePagination);
+  }
+
+  public void setListKeysOpsPerSec(long opsPerSec) {
+    listKeysOpsPerSec.add(opsPerSec);
   }
 }

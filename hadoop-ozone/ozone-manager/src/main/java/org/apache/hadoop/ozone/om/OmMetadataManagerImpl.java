@@ -315,6 +315,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
+  private final OMPerformanceMetrics perfMetrics;
 
   /**
    * OmMetadataManagerImpl constructor.
@@ -334,6 +335,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
     this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
+    this.perfMetrics = ozoneManager.getPerfMetrics();
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
@@ -347,6 +349,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     OzoneConfiguration conf = new OzoneConfiguration();
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = 0;
+    perfMetrics = null;
   }
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
@@ -381,6 +384,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
+    perfMetrics = null;
   }
 
 
@@ -418,6 +422,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       stop();
       throw e;
     }
+    perfMetrics = null;
   }
 
   @Override
@@ -1177,7 +1182,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public ListKeysResult listKeys(String volumeName, String bucketName,
                                  String startKey, String keyPrefix, int maxKeys)
       throws IOException {
-
+    long startNanos = Time.monotonicNowNanos();
     List<OmKeyInfo> result = new ArrayList<>();
     if (maxKeys <= 0) {
       return new ListKeysResult(result, false);
@@ -1276,6 +1281,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
+    long averagePagination;
+    if(isTruncated)
+    {
+      averagePagination = maxKeys;
+    }
+    else
+    {
+      averagePagination = cacheKeyMap.size();
+    }
+    perfMetrics.setListKeysAveragePagination(averagePagination);
+    long opsPerSec = averagePagination/(Time.monotonicNowNanos() - startNanos);
+    perfMetrics.setListKeysOpsPerSec(opsPerSec);
 
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
