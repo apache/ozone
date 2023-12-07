@@ -28,22 +28,19 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
@@ -58,19 +55,13 @@ import static org.mockito.Mockito.mock;
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
  * class.
  */
-@RunWith(Parameterized.class)
+@Timeout(600)
 public class TestKeyValueContainerMarkUnhealthy {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueContainerMarkUnhealthy.class);
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
@@ -86,7 +77,6 @@ public class TestKeyValueContainerMarkUnhealthy {
     this.layout = layout;
   }
 
-  @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
@@ -95,7 +85,8 @@ public class TestKeyValueContainerMarkUnhealthy {
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
-    String dataDir = folder.newFolder("data").getAbsolutePath();
+    String dataDir = Files.createDirectory(
+        folder.resolve("data")).toAbsolutePath().toString();
     HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)
         .conf(conf)
         .datanodeUuid(datanodeId.toString())
@@ -112,7 +103,8 @@ public class TestKeyValueContainerMarkUnhealthy {
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
-    final File metaDir = folder.newFolder("meta");
+    final File metaDir = Files.createDirectory(
+        folder.resolve("meta")).toAbsolutePath().toFile();
     keyValueContainerData.setMetadataPath(metaDir.getPath());
 
 
@@ -154,8 +146,9 @@ public class TestKeyValueContainerMarkUnhealthy {
   @Test
   public void testCloseUnhealthyContainer() throws IOException {
     keyValueContainer.markContainerUnhealthy();
-    thrown.expect(StorageContainerException.class);
-    keyValueContainer.markContainerForClose();
+    Assertions.assertThrows(StorageContainerException.class, () ->
+        keyValueContainer.markContainerForClose());
+
   }
 
   /**

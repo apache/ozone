@@ -49,9 +49,9 @@ import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
@@ -62,7 +62,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test the tar/untar for a given container.
  */
-@RunWith(Parameterized.class)
 public class TestTarContainerPacker {
 
   private static final String TEST_DB_FILE_NAME = "test1";
@@ -88,28 +87,26 @@ public class TestTarContainerPacker {
 
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
   private OzoneConfiguration conf;
 
-  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo,
+  private void initTests(ContainerTestVersionInfo versionInfo,
       CopyContainerCompression compression) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     packer = new TarContainerPacker(compression);
-
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  public static List<Arguments> getLayoutAndCompression() {
     List<ContainerTestVersionInfo> layoutList =
         ContainerTestVersionInfo.getLayoutList();
-    List<Object[]> parameterList = new ArrayList<>();
+    List<Arguments> parameterList = new ArrayList<>();
     for (ContainerTestVersionInfo containerTestVersionInfo : layoutList) {
       for (CopyContainerCompression compr : CopyContainerCompression.values()) {
-        parameterList.add(new Object[]{containerTestVersionInfo, compr});
+        parameterList.add(Arguments.of(containerTestVersionInfo, compr));
       }
     }
     return parameterList;
@@ -165,8 +162,11 @@ public class TestTarContainerPacker {
     return containerData;
   }
 
-  @Test
-  public void pack() throws IOException {
+  @ParameterizedTest
+  @MethodSource("getLayoutAndCompression")
+  public void pack(ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression) throws IOException {
+    initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -252,9 +252,13 @@ public class TestTarContainerPacker {
     inputForUnpackData.assertClosedExactlyOnce();
   }
 
-  @Test
-  public void unpackContainerDataWithValidRelativeDbFilePath()
+  @ParameterizedTest
+  @MethodSource("getLayoutAndCompression")
+  public void unpackContainerDataWithValidRelativeDbFilePath(
+      ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression)
       throws Exception {
+    initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -273,9 +277,13 @@ public class TestTarContainerPacker {
         TarContainerPacker.getDbPath(dest), fileName);
   }
 
-  @Test
-  public void unpackContainerDataWithValidRelativeChunkFilePath()
+  @ParameterizedTest
+  @MethodSource("getLayoutAndCompression")
+  public void unpackContainerDataWithValidRelativeChunkFilePath(
+      ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression)
       throws Exception {
+    initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -293,9 +301,13 @@ public class TestTarContainerPacker {
     assertExampleChunkFileIsGood(Paths.get(dest.getChunksPath()), fileName);
   }
 
-  @Test
-  public void unpackContainerDataWithInvalidRelativeDbFilePath()
+  @ParameterizedTest
+  @MethodSource("getLayoutAndCompression")
+  public void unpackContainerDataWithInvalidRelativeDbFilePath(
+      ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression)
       throws Exception {
+    initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -310,9 +322,13 @@ public class TestTarContainerPacker {
         () -> unpackContainerData(containerFile));
   }
 
-  @Test
-  public void unpackContainerDataWithInvalidRelativeChunkFilePath()
+  @ParameterizedTest
+  @MethodSource("getLayoutAndCompression")
+  public void unpackContainerDataWithInvalidRelativeChunkFilePath(
+      ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression)
       throws Exception {
+    initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);

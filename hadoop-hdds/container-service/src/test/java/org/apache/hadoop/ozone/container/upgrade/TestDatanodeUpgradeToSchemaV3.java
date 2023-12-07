@@ -46,20 +46,18 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
-import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -70,57 +68,43 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests upgrading a single datanode from container Schema V2 to Schema V3.
  */
-@RunWith(Parameterized.class)
 public class TestDatanodeUpgradeToSchemaV3 {
-  @Rule
-  public TemporaryFolder tempFolder;
+  @TempDir
+  private Path tempFolder;
 
   private DatanodeStateMachine dsm;
-  private final OzoneConfiguration conf;
+  private OzoneConfiguration conf;
   private static final String CLUSTER_ID = "clusterID";
-  private final boolean schemaV3Enabled;
 
   private RPC.Server scmRpcServer;
   private InetSocketAddress address;
-  private ScmTestMock scmServerImpl;
 
   private Random random;
 
-  // hdds.datanode.container.schema.v3.enabled
-  @Parameterized.Parameters
-  public static Collection<Object[]> getSchemaFiles() {
-    Collection<Object[]> parameters = new ArrayList<>();
-    parameters.add(new Boolean[]{false});
-    parameters.add(new Boolean[]{true});
-    return parameters;
-  }
-
-  public TestDatanodeUpgradeToSchemaV3(Boolean enable) {
-    this.schemaV3Enabled = enable;
+  private void initTests(Boolean enable) throws Exception {
+    boolean schemaV3Enabled = enable;
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
-        this.schemaV3Enabled);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-        true);
+        schemaV3Enabled);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     conf.setBoolean(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
+    setup();
   }
 
-  @BeforeEach
-  public void setup() throws Exception {
-    tempFolder = new TemporaryFolder();
-    tempFolder.create();
+  private void setup() throws Exception {
     random = new Random();
 
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempFolder.getRoot().getAbsolutePath());
+        tempFolder.toString());
   }
 
   @AfterEach
@@ -139,8 +123,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * enabled or not.
    * If Schema V3 is enabled, RocksDB will be loaded.
    */
-  @Test
-  public void testDBOnHddsVolume() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {true, false})
+  public void testDBOnHddsVolume(boolean schemaV3Enabled) throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -172,8 +158,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * Schema V3 is enabled or not.
    * If Schema V3 is enabled, RocksDB will be loaded.
    */
-  @Test
-  public void testDBOnDbVolume() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testDBOnDbVolume(boolean schemaV3Enabled) throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -209,8 +197,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * Test RocksDB in created in Finalize action for an existing hddsVolume.
    * This mimics the real cluster upgrade situation.
    */
-  @Test
-  public void testDBCreatedInFinalize() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testDBCreatedInFinalize(boolean schemaV3Enabled)
+      throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     // add one HddsVolume
@@ -253,8 +244,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * Test finalize twice won't recreate any RocksDB for HddsVolume.
    */
-  @Test
-  public void testFinalizeTwice() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testFinalizeTwice(boolean schemaV3Enabled) throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     // add one HddsVolume and two DbVolume
@@ -278,8 +271,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * For a finalized cluster, add a new HddsVolume.
    */
-  @Test
-  public void testAddHddsVolumeAfterFinalize() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testAddHddsVolumeAfterFinalize(boolean schemaV3Enabled)
+      throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -307,8 +303,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * For a finalized cluster, add a new DbVolume.
    */
-  @Test
-  public void testAddDbVolumeAfterFinalize() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testAddDbVolumeAfterFinalize(boolean schemaV3Enabled)
+      throws Exception {
+    initTests(schemaV3Enabled);
     startScmServer();
     addHddsVolume();
 
@@ -343,8 +342,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * For a finalized cluster, add a new DbVolume and a new HddsVolume.
    */
-  @Test
-  public void testAddDbAndHddsVolumeAfterFinalize() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testAddDbAndHddsVolumeAfterFinalize(boolean schemaV3Enabled)
+      throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -390,16 +392,21 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * Test data write after finalization.
    */
-  @Test
-  public void testWriteWithV3Enabled() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testWriteWithV3Enabled(boolean schemaV3Enabled) throws Exception {
+    initTests(schemaV3Enabled);
     testWrite(false, OzoneConsts.SCHEMA_V2);
   }
 
   /**
    * Test data write after finalization.
    */
-  @Test
-  public void testWriteWithV3Disabled() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testWriteWithV3Disabled(boolean schemaV3Enabled)
+      throws Exception {
+    initTests(schemaV3Enabled);
     testWrite(true, OzoneConsts.SCHEMA_V3);
   }
 
@@ -445,8 +452,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * Test data read during and after finalization.
    */
-  @Test
-  public void testReadsDuringFinalize() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testReadsDuringFinalize(boolean schemaV3Enabled)
+      throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -481,8 +491,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
   /**
    * Test finalization failure.
    */
-  @Test
-  public void testFinalizeFailure() throws Exception {
+  @ParameterizedTest(name = "schema V3 enabled :{0}")
+  @ValueSource(booleans = {false, true})
+  public void testFinalizeFailure(boolean schemaV3Enabled) throws Exception {
+    initTests(schemaV3Enabled);
     // start DN and SCM
     startScmServer();
     addHddsVolume();
@@ -522,7 +534,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     HddsVolume volume = Mockito.mock(HddsVolume.class);
     Mockito.doThrow(new IOException("Failed to init DB")).when(volume).
-        createDbStore(anyObject());
+        createDbStore(any());
     Map volumeMap = new HashMap<String, StorageVolume>();
     volumeMap.put(dataVolume.getStorageID(), volume);
     dsm.getContainer().getVolumeSet().setVolumeMap(volumeMap);
@@ -583,8 +595,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
    */
   public void startPreFinalizedDatanode() throws Exception {
     // Set layout version.
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempFolder.getRoot().getAbsolutePath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFolder.toString());
     DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
@@ -640,7 +651,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
   public String startScmServer() throws IOException {
     String scmID = UUID.randomUUID().toString();
-    scmServerImpl = new ScmTestMock(CLUSTER_ID, scmID);
+    ScmTestMock scmServerImpl = new ScmTestMock(CLUSTER_ID, scmID);
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
         scmServerImpl, address, 10);
     return scmID;
@@ -729,7 +740,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * @return The root directory for the new volume.
    */
   public File addHddsVolume() throws IOException {
-    File vol = tempFolder.newFolder(UUID.randomUUID().toString());
+
+    File vol = Files.createDirectory(tempFolder.resolve(UUID.randomUUID()
+        .toString())).toFile();
     String[] existingVolumes =
         conf.getStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
     List<String> allVolumes = new ArrayList<>();
@@ -749,7 +762,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
    * @return The root directory for the new volume.
    */
   public File addDbVolume() throws Exception {
-    File vol = tempFolder.newFolder(UUID.randomUUID().toString());
+    File vol = Files.createDirectory(tempFolder.resolve(UUID.randomUUID()
+        .toString())).toFile();
     String[] existingVolumes =
         conf.getStrings(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR);
     List<String> allVolumes = new ArrayList<>();

@@ -36,14 +36,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
-import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -58,11 +56,10 @@ import static org.mockito.Mockito.mock;
 /**
  * This class is used to test key related operations on the container.
  */
-@RunWith(Parameterized.class)
 public class TestBlockManagerImpl {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
   private OzoneConfiguration config;
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -75,27 +72,28 @@ public class TestBlockManagerImpl {
   private BlockID blockID;
   private BlockID blockID1;
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
 
-  public TestBlockManagerImpl(ContainerTestVersionInfo versionInfo) {
+  private void initTest(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.config = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, config);
+    initilaze();
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> getVersionParameters() {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @BeforeEach
-  public void setUp() throws Exception {
+  private void initilaze() throws Exception {
     UUID datanodeId = UUID.randomUUID();
-    HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
-        .toString()).build();
+    HddsVolume hddsVolume = new HddsVolume.Builder(folder.toString())
+        .conf(config)
+        .datanodeUuid(datanodeId.toString())
+        .build();
     StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, config,
         null, null);
 
@@ -150,8 +148,11 @@ public class TestBlockManagerImpl {
     BlockUtils.shutdownCache(config);
   }
 
-  @Test
-  public void testPutBlock() throws Exception {
+  @ParameterizedTest
+  @MethodSource("getVersionParameters")
+  public void testPutBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block with bcsId != 0
     blockManager.putBlock(keyValueContainer, blockData1);
@@ -178,8 +179,11 @@ public class TestBlockManagerImpl {
 
   }
 
-  @Test
-  public void testPutAndGetBlock() throws Exception {
+  @ParameterizedTest
+  @MethodSource("getVersionParameters")
+  public void testPutAndGetBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block
     blockManager.putBlock(keyValueContainer, blockData);
@@ -198,8 +202,11 @@ public class TestBlockManagerImpl {
 
   }
 
-  @Test
-  public void testListBlock() throws Exception {
+  @ParameterizedTest
+  @MethodSource("getVersionParameters")
+  public void testListBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     blockManager.putBlock(keyValueContainer, blockData);
     List<BlockData> listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
