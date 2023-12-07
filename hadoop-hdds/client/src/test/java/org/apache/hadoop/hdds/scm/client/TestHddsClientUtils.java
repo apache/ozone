@@ -125,8 +125,7 @@ public class TestHddsClientUtils {
 
   }
 
-  private void checkAddr(OzoneConfiguration conf, String address,
-                         int port) {
+  private void checkAddr(OzoneConfiguration conf, String address, int port) {
     Iterator<InetSocketAddress> scmAddrIterator =
         HddsUtils.getScmAddressForClients(conf).iterator();
     assertTrue(scmAddrIterator.hasNext());
@@ -134,8 +133,6 @@ public class TestHddsClientUtils {
     assertThat(scmAddr.getHostString(), is(address));
     assertThat(scmAddr.getPort(), is(port));
   }
-
-
 
   @Test
   public void testBlockClientFallbackToClientNoPort() {
