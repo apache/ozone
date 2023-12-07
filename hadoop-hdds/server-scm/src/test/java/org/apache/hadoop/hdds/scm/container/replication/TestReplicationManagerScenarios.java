@@ -295,12 +295,10 @@ public class TestReplicationManagerScenarios {
     Expectation expectation = scenario.getExpectation();
     Assertions.assertEquals(expectation.getUnderReplicatedQueue(),
         repQueue.underReplicatedQueueSize(), "Test: "
-            + scenario.getDescription()
-            + ": Unexpected count for underReplicatedQueue");
+            + scenario + ": Unexpected count for underReplicatedQueue");
     Assertions.assertEquals(expectation.getOverReplicatedQueue(),
         repQueue.overReplicatedQueueSize(), "Test: "
-            + scenario.getDescription()
-            + ": Unexpected count for overReplicatedQueue");
+            + scenario + ": Unexpected count for overReplicatedQueue");
 
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
@@ -329,15 +327,14 @@ public class TestReplicationManagerScenarios {
         ReplicationManagerReport.HealthState.values()) {
       Assertions.assertEquals(expectation.getExpected(state),
           report.getStat(state), "Test: "
-              + scenario.getDescription() + ": Unexpected count for " + state);
+              + scenario + ": Unexpected count for " + state);
     }
   }
 
   private void assertExpectedCommands(Scenario scenario,
       ExpectedCommands[] expectedCommands) {
     Assertions.assertEquals(expectedCommands.length, commandsSent.size(),
-        "Test: " + scenario.getDescription()
-            + ": Unexpected count for commands sent");
+        "Test: " + scenario + ": Unexpected count for commands sent");
     // Iterate the expected commands and check that they were all sent. If we
     // have a target datanode, then we need to check that the command was sent
     // to that target. The targets in the tests work off aliases for the
@@ -365,7 +362,7 @@ public class TestReplicationManagerScenarios {
           }
         }
       }
-      Assertions.assertTrue(found, "Test: " + scenario.getDescription()
+      Assertions.assertTrue(found, "Test: " + scenario
           + ": Expected command not sent: " + expectedCommand.getType());
     }
   }
@@ -640,7 +637,7 @@ public class TestReplicationManagerScenarios {
     }
 
     public void setResourceName(String resourceName) {
-      this.description = resourceName;
+      this.resourceName = resourceName;
     }
 
     public int getEcMaintenanceRedundancy() {
