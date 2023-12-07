@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -43,7 +42,6 @@ import static org.apache.hadoop.ozone.container.common.interfaces.Container.Scan
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -163,17 +161,10 @@ public class TestKeyValueContainerCheck
     ContainerScannerConfiguration sc = conf.getObject(
         ContainerScannerConfiguration.class);
 
-    KeyValueContainer container = null;
-    try {
-      // Create container with deleting blocks
-      container = createContainerWithBlocks(containerID,
-          normalBlocks, deletedBlocks, false);
-      container.close();
-    } catch (StorageContainerException e) {
-      fail(e.getMessage());
-    } catch (Exception e) {
-      fail(e.getMessage());
-    }
+    // Create container with deleting blocks
+    KeyValueContainer container = createContainerWithBlocks(containerID,
+        normalBlocks, deletedBlocks, false);
+    container.close();
 
     KeyValueContainerData containerData = container.getContainerData();
 
