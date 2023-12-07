@@ -233,6 +233,7 @@ CDDL 1.1 + GPLv2 with classpath exception
    com.sun.jersey:jersey-server
    com.sun.jersey:jersey-servlet
    javax.activation:activation
+   javax.activation:javax.activation-api
    javax.annotation:javax.annotation-api
    javax.el:javax.el-api
    javax.interceptor:javax.interceptor-api

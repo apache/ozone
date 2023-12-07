@@ -114,6 +114,7 @@ share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar
 share/ozone/lib/javassist-GA.jar
+share/ozone/lib/javax.activation-api.jar
 share/ozone/lib/javax.annotation-api.jar
 share/ozone/lib/javax.el-api.jar
 share/ozone/lib/javax.inject.jar
