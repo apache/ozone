@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -114,6 +115,11 @@ public class TestReplicationManagerScenarios {
     File[] fileList = (new File(TestReplicationManagerScenarios.class
         .getClass().getResource(TEST_RESOURCE_PATH)
         .toURI())).listFiles();
+    if (fileList == null) {
+      Assertions.fail("No test file resources found");
+      // Make findbugs happy.
+      return Collections.emptyList();
+    }
     List<URI> uris = new ArrayList<>();
     for (File file : fileList) {
       uris.add(file.toURI());
@@ -140,6 +146,14 @@ public class TestReplicationManagerScenarios {
     List<URI> testFiles = getTestFiles();
     for (URI file : testFiles) {
       Scenario[] scenarios = loadTestsInFile(file);
+      Set<String> names = new HashSet<>();
+      for (Scenario scenario : scenarios) {
+        if (!names.add(scenario.getDescription())) {
+          Assertions.fail("Duplicate test name: " + scenario.getDescription() +
+              " in file: " + file);
+        }
+        scenario.setResourceName(file.toString());
+      }
       Collections.addAll(TEST_SCENARIOS, scenarios);
     }
   }
@@ -369,6 +383,7 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the replicas used in the test scenarios. It is
    * created by deserializing JSON files.
    */
+  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class TestReplica {
     private ContainerReplicaProto.State state
         = ContainerReplicaProto.State.CLOSED;
@@ -389,48 +404,16 @@ public class TestReplicationManagerScenarios {
     private String origin;
     private UUID originId;
 
-    public void setState(String state) {
+    private void setState(String state) {
       this.state = ContainerReplicaProto.State.valueOf(state);
     }
 
-    public void setContainerId(long containerId) {
-      this.containerId = containerId;
-    }
-
-    public void setDatanode(String datanode) {
-      this.datanode = datanode;
-    }
-
-    public void setIndex(int index) {
-      this.index = index;
-    }
-
-    public void setSequenceId(int sequenceId) {
-      this.sequenceId = sequenceId;
-    }
-
-    public void setKeys(long keys) {
-      this.keys = keys;
-    }
-
-    public void setUsed(long used) {
-      this.used = used;
-    }
-
-    public void setIsEmpty(boolean isEmpty) {
-      this.isEmpty = isEmpty;
-    }
-
-    public void setOrigin(String origin) {
-      this.origin = origin;
-    }
-
-    public void setHealthState(String healthState) {
+    private void setHealthState(String healthState) {
       this.healthState = HddsProtos.NodeState.valueOf(
           healthState.toUpperCase());
     }
 
-    public void setOperationalState(String operationalState) {
+    private void setOperationalState(String operationalState) {
       this.operationalState = HddsProtos.NodeOperationalState.valueOf(
           operationalState.toUpperCase());
     }
@@ -498,6 +481,7 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the expected counts for each health state and
    * queues. It is created by deserializing JSON files.
    */
+  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class Expectation {
 
     private Map<ReplicationManagerReport.HealthState, Integer> stateCounts
@@ -505,52 +489,44 @@ public class TestReplicationManagerScenarios {
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
-    public void setUnderReplicated(int underReplicated) {
+    private void setUnderReplicated(int underReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED,
           underReplicated);
     }
 
-    public void setOverReplicated(int overReplicated) {
+    private void setOverReplicated(int overReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED,
           overReplicated);
     }
 
-    public void setMisReplicated(int misReplicated) {
+    private void setMisReplicated(int misReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED,
           misReplicated);
     }
 
-    public void setUnhealthy(int unhealthy) {
+    private void setUnhealthy(int unhealthy) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY,
           unhealthy);
     }
 
-    public void setMissing(int missing) {
+    private void setMissing(int missing) {
       stateCounts.put(ReplicationManagerReport.HealthState.MISSING,
           missing);
     }
 
-    public void setEmpty(int empty) {
+    private void setEmpty(int empty) {
       stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,
           empty);
     }
 
-    public void setQuasiClosedStuck(int quasiClosedStuck) {
+    private void setQuasiClosedStuck(int quasiClosedStuck) {
       stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK,
           quasiClosedStuck);
     }
 
-    public void setOpenUnhealthy(int openUnhealthy) {
+    private void setOpenUnhealthy(int openUnhealthy) {
       stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
           openUnhealthy);
-    }
-
-    public void setUnderReplicatedQueue(int underReplicatedQueue) {
-      this.underReplicatedQueue = underReplicatedQueue;
-    }
-
-    public void setOverReplicatedQueue(int overReplicatedQueue) {
-      this.overReplicatedQueue = overReplicatedQueue;
     }
 
     public int getExpected(ReplicationManagerReport.HealthState state) {
@@ -570,15 +546,12 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the expected commands for each replica. It is
    * created by deserializing JSON files.
    */
+  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class ExpectedCommands {
     private SCMCommandProto.Type type;
     private String datanode;
 
-    public void setDatanode(String datanode) {
-      this.datanode = datanode;
-    }
-
-    public void setType(String command) {
+    private void setType(String command) {
       ReplicateContainerCommand replicateContainerCommand;
       this.type = SCMCommandProto.Type.valueOf(command);
     }
@@ -604,21 +577,14 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the pending replicas for the container. It is
    * created by deserializing JSON files.
    */
+  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class PendingReplica {
     private ContainerReplicaOp.PendingOpType type;
     private String datanode;
     private int replicaIndex;
 
-    public void setDatanode(String dn) {
-      this.datanode = dn;
-    }
-
-    public void setType(String type) {
+    private void setType(String type) {
       this.type = ContainerReplicaOp.PendingOpType.valueOf(type);
-    }
-
-    public void setReplicaIndex(int index) {
-      this.replicaIndex = index;
     }
 
     public DatanodeDetails getDatanodeDetails() {
@@ -645,8 +611,10 @@ public class TestReplicationManagerScenarios {
    * deserializing JSON files. It defines the base container used for the test,
    * and provides getter for the replicas and expected results.
    */
+  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class Scenario {
     private String description;
+    private String resourceName;
     private int ecMaintenanceRedundancy;
     private int ratisMaintenanceMinimum;
     private HddsProtos.LifeCycleState containerState =
@@ -671,16 +639,8 @@ public class TestReplicationManagerScenarios {
       ratisMaintenanceMinimum = conf.getMaintenanceReplicaMinimum();
     }
 
-    public void setDescription(String description) {
-      this.description = description;
-    }
-
-    public void setEcMaintenanceRedundancy(int val) {
-      this.ecMaintenanceRedundancy = val;
-    }
-
-    public void setRatisMaintenanceMinimum(int val) {
-      this.ratisMaintenanceMinimum = val;
+    public void setResourceName(String resourceName) {
+      this.description = resourceName;
     }
 
     public int getEcMaintenanceRedundancy() {
@@ -695,60 +655,20 @@ public class TestReplicationManagerScenarios {
       return description;
     }
 
-    public void setContainerState(String containerState) {
+    private void setContainerState(String containerState) {
       this.containerState = HddsProtos.LifeCycleState.valueOf(containerState);
     }
 
-    public void setSequenceId(int sequenceId) {
-      this.sequenceId = sequenceId;
-    }
-
-    public void setReplicas(TestReplica[] replicas) {
-      this.replicas = replicas;
-    }
-
-    public void setUsed(long used) {
-      this.used = used;
-    }
-
-    public void setOwner(String owner) {
-      this.owner = owner;
-    }
-
-    public void setKeys(long keys) {
-      this.keys = keys;
-    }
-
-    public void setId(long id) {
-      this.id = id;
-    }
-
-    public void setPendingReplicas(PendingReplica[] pending) {
-      this.pendingReplicas = pending;
-    }
-
     public PendingReplica[] getPendingReplicas() {
-      return this.pendingReplicas;
-    }
-
-    public void setExpectation(Expectation expectation) {
-      this.expectation = expectation;
-    }
-
-    public void setCommands(ExpectedCommands[] commands) {
-      this.commands = commands;
-    }
-
-    public void setCheckCommands(ExpectedCommands[] cmds) {
-      this.checkCommands = cmds;
+      return this.pendingReplicas.clone();
     }
 
     public ExpectedCommands[] getCheckCommands() {
-      return checkCommands;
+      return checkCommands.clone();
     }
 
     public TestReplica[] getReplicas() {
-      return replicas;
+      return replicas.clone();
     }
 
     public Expectation getExpectation() {
@@ -761,7 +681,7 @@ public class TestReplicationManagerScenarios {
      *    EC:rs-3-2-1024k
      * @param replicationConfig
      */
-    public void setReplicationConfig(String replicationConfig) {
+    private void setReplicationConfig(String replicationConfig) {
       String[] parts = replicationConfig.split(":");
       if (parts.length != 2) {
         throw new IllegalArgumentException(
@@ -795,12 +715,12 @@ public class TestReplicationManagerScenarios {
     }
 
     public ExpectedCommands[] getCommands() {
-      return commands;
+      return commands.clone();
     }
 
     @Override
     public String toString() {
-      return description;
+      return resourceName + ": " + description;
     }
   }
 }
