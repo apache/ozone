@@ -49,6 +49,7 @@ import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Test for {@link HddsConfServlet}. */
 public class TestHddsConfServlet {
 
   private static final Map<String, String> TEST_PROPERTIES = new HashMap<>();
@@ -75,10 +76,12 @@ public class TestHddsConfServlet {
     verifyMap.put("application/json", HddsConfServlet.FORMAT_JSON);
 
     HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
-    for (String contentTypeExpected : verifyMap.keySet()) {
-      String contenTypeActual = verifyMap.get(contentTypeExpected);
-      Mockito.when(request.getHeader(HttpHeaders.ACCEPT)).thenReturn(contentTypeExpected);
-      assertEquals(contenTypeActual, HddsConfServlet.parseAcceptHeader(request));
+    for (Map.Entry<String, String> entry : verifyMap.entrySet()) {
+      String contenTypeActual = entry.getValue();
+      Mockito.when(request.getHeader(HttpHeaders.ACCEPT))
+          .thenReturn(entry.getKey());
+      assertEquals(contenTypeActual,
+          HddsConfServlet.parseAcceptHeader(request));
     }
   }
 
@@ -86,10 +89,14 @@ public class TestHddsConfServlet {
   public void testGetProperty() throws Exception {
     OzoneConfiguration conf = getPropertiesConf();
     // list various of property names
-    String[] keys = new String[] {"test1.key1", "test.unknown.key", "", "test.key2", null};
-    for (String format : TEST_FORMATS.keySet()) {
+    String[] keys = new String[] {"test1.key1",
+        "test.unknown.key",
+        "",
+        "test.key2",
+        null};
+    for (Map.Entry<String, String> entry : TEST_FORMATS.entrySet()) {
       for (String key : keys) {
-        verifyGetProperty(conf, format, key);
+        verifyGetProperty(conf, entry.getKey(), key);
       }
     }
   }
@@ -124,7 +131,8 @@ public class TestHddsConfServlet {
       String key = (String) propertyInfo.get("key");
       String val = (String) propertyInfo.get("value");
       String resource = (String) propertyInfo.get("resource");
-      if (TEST_KEY.equals(key) && TEST_VAL.equals(val) && "programmatically".equals(resource)) {
+      if (TEST_KEY.equals(key) && TEST_VAL.equals(val)
+          && "programmatically".equals(resource)) {
         foundSetting = true;
       }
     }
@@ -137,7 +145,8 @@ public class TestHddsConfServlet {
     HddsConfServlet.writeResponse(getTestConf(), sw, "xml", null);
     String xml = sw.toString();
 
-    DocumentBuilderFactory docBuilderFactory = XMLUtils.newSecureDocumentBuilderFactory();
+    DocumentBuilderFactory docBuilderFactory =
+        XMLUtils.newSecureDocumentBuilderFactory();
     DocumentBuilder builder = docBuilderFactory.newDocumentBuilder();
     Document doc = builder.parse(new InputSource(new StringReader(xml)));
     NodeList nameNodes = doc.getElementsByTagName("name");
@@ -148,7 +157,8 @@ public class TestHddsConfServlet {
       if (TEST_KEY.equals(key)) {
         foundSetting = true;
         Element propertyElem = (Element) nameNode.getParentNode();
-        String val = propertyElem.getElementsByTagName("value").item(0).getTextContent();
+        String val = propertyElem.getElementsByTagName("value").
+            item(0).getTextContent();
         assertEquals(TEST_VAL, val);
       }
     }
@@ -167,7 +177,8 @@ public class TestHddsConfServlet {
     assertEquals("", sw.toString());
   }
 
-  private String getResultWithCmd(OzoneConfiguration conf, String cmd) throws Exception {
+  private String getResultWithCmd(OzoneConfiguration conf, String cmd)
+      throws Exception {
     StringWriter sw = null;
     PrintWriter pw = null;
     HddsConfServlet service = null;
@@ -176,10 +187,12 @@ public class TestHddsConfServlet {
       ServletConfig servletConf = mock(ServletConfig.class);
       ServletContext context = mock(ServletContext.class);
       service.init(servletConf);
-      when(context.getAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE)).thenReturn(conf);
+      when(context.getAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE))
+          .thenReturn(conf);
       when(service.getServletContext()).thenReturn(context);
       HttpServletRequest request = mock(HttpServletRequest.class);
-      when(request.getHeader(HttpHeaders.ACCEPT)).thenReturn(TEST_FORMATS.get(null));
+      when(request.getHeader(HttpHeaders.ACCEPT)).
+          thenReturn(TEST_FORMATS.get(null));
       when(request.getParameter("cmd")).thenReturn(cmd);
       when(request.getParameter("tags")).thenReturn(ConfigTag.DEBUG.toString());
       HttpServletResponse response = mock(HttpServletResponse.class);
@@ -209,8 +222,8 @@ public class TestHddsConfServlet {
     }
   }
 
-  private void verifyGetProperty(OzoneConfiguration conf, String format, String propertyName)
-      throws Exception {
+  private void verifyGetProperty(OzoneConfiguration conf, String format,
+      String propertyName) throws Exception {
     StringWriter sw = null;
     PrintWriter pw = null;
     HddsConfServlet service = null;
@@ -219,11 +232,13 @@ public class TestHddsConfServlet {
       ServletConfig servletConf = mock(ServletConfig.class);
       ServletContext context = mock(ServletContext.class);
       service.init(servletConf);
-      when(context.getAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE)).thenReturn(conf);
+      when(context.getAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE))
+          .thenReturn(conf);
       when(service.getServletContext()).thenReturn(context);
 
       HttpServletRequest request = mock(HttpServletRequest.class);
-      when(request.getHeader(HttpHeaders.ACCEPT)).thenReturn(TEST_FORMATS.get(format));
+      when(request.getHeader(HttpHeaders.ACCEPT)).
+          thenReturn(TEST_FORMATS.get(format));
       when(request.getParameter("name")).thenReturn(propertyName);
 
       HttpServletResponse response = mock(HttpServletResponse.class);
@@ -238,16 +253,17 @@ public class TestHddsConfServlet {
       // if property name is null or empty, expect all properties
       // in the response
       if (Strings.isNullOrEmpty(propertyName)) {
-        for (String key : TEST_PROPERTIES.keySet()) {
-          assertTrue(result.contains(key) && result.contains(TEST_PROPERTIES.get(key)));
+        for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
+          assertTrue(result.contains(entry.getKey()) &&
+                  result.contains(entry.getValue()));
         }
       } else {
         if (conf.get(propertyName) != null) {
           // if property name is not empty and property is found
           assertTrue(result.contains(propertyName));
-          for (String key : TEST_PROPERTIES.keySet()) {
-            if (!key.equals(propertyName)) {
-              assertFalse(result.contains(key));
+          for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
+            if (!entry.getKey().equals(propertyName)) {
+              assertFalse(result.contains(entry.getKey()));
             }
           }
         } else {
@@ -280,12 +296,15 @@ public class TestHddsConfServlet {
 
   private OzoneConfiguration getPropertiesConf() {
     OzoneConfiguration testConf = new OzoneConfiguration();
-    for (String key : TEST_PROPERTIES.keySet()) {
-      testConf.set(key, TEST_PROPERTIES.get(key));
+    for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
+      testConf.set(entry.getKey(), entry.getValue());
     }
     return testConf;
   }
 
+  /**
+  * Configuration value for test.
+  */
   @ConfigGroup(prefix = "ozone.test")
   public static class OzoneTestConfig {
     @Config(
