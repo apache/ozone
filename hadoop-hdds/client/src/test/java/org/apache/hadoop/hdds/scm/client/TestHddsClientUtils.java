@@ -61,7 +61,7 @@ import org.junit.jupiter.api.Timeout;
  * {@link org.apache.hadoop.hdds.scm.client.HddsClientUtils}.
  */
 @Timeout(300)
-public class HddsClientUtilsTest {
+public class TestHddsClientUtils {
 
   /**
    * Verify client endpoint lookup failure if it is not configured.
