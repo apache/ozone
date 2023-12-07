@@ -200,6 +200,8 @@ public class TestOmContainerLocationCache {
     XceiverClientManager manager = mock(XceiverClientManager.class);
     when(manager.acquireClient(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
+    when(manager.acquireClient(argThat(matchEmptyPipeline()),
+        Mockito.anyBoolean())).thenCallRealMethod();
     when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
 
@@ -626,7 +628,8 @@ public class TestOmContainerLocationCache {
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
             any(ReplicationConfig.class),
             Mockito.anyString(),
-            any(ExcludeList.class)))
+            any(ExcludeList.class),
+            Mockito.anyString()))
         .thenReturn(Collections.singletonList(block));
   }
 
