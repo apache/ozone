@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +33,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.List;
+
+import static org.apache.ratis.thirdparty.com.google.common.base.Preconditions.checkArgument;
 
 /**
  * A {@link javax.net.ssl.TrustManager} implementation for gRPC and Ratis
@@ -79,14 +82,6 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   private X509ExtendedTrustManager trustManager;
 
   /**
-   * An interface that defines a trust anchor provider API this class relies on.
-   */
-  @FunctionalInterface
-  public interface CACertificateProvider {
-    List<X509Certificate> provideCACerts() throws IOException;
-  }
-
-  /**
    * Creates a ClientTrustManager instance based on an in-memory and a remote
    * trust anchor provider.
    *
@@ -96,12 +91,9 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
    * Once the trust can not be established it uses the remote trust anchor
    * provider to refresh the locally known list of certificates.
    *
-   * Both provider is allowed to be null, if any of them is null, then it
-   * will not be used to get the certificate list to be trusted.
-   * If both the remote and in memory provider is null, any call to verify
-   * a server certificate will fail with an underlying SSL error. The trust
-   * check does not fall back to a system provided trust store, as in Ozone
-   * we are not currently rely on that.
+   * Any provider is allowed to be null, but not both.
+   * If any of them is null, then the mechanism will not be used to get the
+   * certificate list to be trusted.
    *
    * @param remoteProvider the provider to call once the root of trust has to
    *                       be renewed potentially as certificate verification
@@ -112,6 +104,9 @@ public class ClientTrustManager extends X509ExtendedTrustManager {
   public ClientTrustManager(CACertificateProvider remoteProvider,
       CACertificateProvider inMemoryProvider)
       throws IOException {
+    checkArgument(remoteProvider != null || inMemoryProvider != null,
+        "Client trust configuration error, no mechanism present to find the" +
+            " rootCA certificate of the cluster.");
     this.remoteProvider = remoteProvider;
     try {
       initialize(loadCerts(inMemoryProvider));

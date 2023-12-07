@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.scm.client.ClientTrustManager.CACertificateProvider;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import java.io.IOException;
