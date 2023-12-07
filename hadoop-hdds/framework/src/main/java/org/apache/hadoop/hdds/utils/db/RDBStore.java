@@ -446,6 +446,10 @@ public class RDBStore implements DBStore {
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
       }
     }
+    if (!dbUpdatesWrapper.isDBUpdateSuccess()) {
+      LOG.warn("Returned DBUpdates isDBUpdateSuccess: {}",
+          dbUpdatesWrapper.isDBUpdateSuccess());
+    }
     return dbUpdatesWrapper;
   }
 
@@ -469,5 +473,9 @@ public class RDBStore implements DBStore {
 
   public RDBMetrics getMetrics() {
     return rdbMetrics;
+  }
+
+  public static Logger getLogger() {
+    return LOG;
   }
 }

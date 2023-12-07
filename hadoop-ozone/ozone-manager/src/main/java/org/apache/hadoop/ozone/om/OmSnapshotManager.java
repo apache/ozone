@@ -40,7 +40,6 @@ import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.utils.ThrowableFunction;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -66,6 +65,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -512,7 +512,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static void performOperationOnKeys(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
-      ThrowableFunction<Table.KeyValue<String, ?>,
+      CheckedFunction<Table.KeyValue<String, ?>,
       Void, IOException> operationFunction) throws IOException {
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place

@@ -29,14 +29,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,10 +51,15 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import static org.apache.ozone.test.GenericTestUtils.getTempPath;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test secure Ozone Manager operation in distributed handler scenario.
  */
+@Timeout(25)
 public class TestSecureOzoneManager {
 
   private static final String COMPONENT = "om";
@@ -70,15 +71,12 @@ public class TestSecureOzoneManager {
   private Path metaDir;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(25));
-
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -99,7 +97,7 @@ public class TestSecureOzoneManager {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -127,22 +125,22 @@ public class TestSecureOzoneManager {
     OMCertificateClient client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
-    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
+    assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     privateKey = client.getPrivateKey();
     publicKey = client.getPublicKey();
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
     client.close();
 
     // Case 2: If key pair already exist than response should be GETCERT.
     client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
-    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
+    assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
     client.close();
 
     // Case 3: When public key as well as certificate is missing.
@@ -151,10 +149,10 @@ public class TestSecureOzoneManager {
             securityConfig, null, omStorage, omInfo, "", null, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
-    Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
+    assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
     client.close();
 
     // Case 4: When private key and certificate is missing.
@@ -164,10 +162,10 @@ public class TestSecureOzoneManager {
     KeyCodec keyCodec = new KeyCodec(securityConfig, COMPONENT);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPrivateKeyFileName()).toFile());
-    Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
-    Assert.assertNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNull(client.getCertificate());
+    assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
+    assertNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
     client.close();
 
     // Case 5: When only certificate is present.
@@ -184,10 +182,10 @@ public class TestSecureOzoneManager {
     client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
-    Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
-    Assert.assertNull(client.getPrivateKey());
-    Assert.assertNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
+    assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
+    assertNull(client.getPrivateKey());
+    assertNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
     client.close();
 
     // Case 6: When private key and certificate is present.
@@ -197,20 +195,20 @@ public class TestSecureOzoneManager {
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     keyCodec.writePrivateKey(privateKey);
-    Assert.assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
+    assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
     client.close();
 
     // Case 7 When keypair and certificate is present.
     client =
         new OMCertificateClient(
             securityConfig, null, omStorage, omInfo, "", scmId, null, null);
-    Assert.assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
-    Assert.assertNotNull(client.getPrivateKey());
-    Assert.assertNotNull(client.getPublicKey());
-    Assert.assertNotNull(client.getCertificate());
+    assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
     client.close();
   }
 
@@ -224,9 +222,9 @@ public class TestSecureOzoneManager {
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
-    RuntimeException rte = Assert.assertThrows(RuntimeException.class,
+    RuntimeException rte = assertThrows(RuntimeException.class,
         () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
-    Assert.assertEquals("Can't get SCM signed certificate. omRpcAdd:" +
+    assertEquals("Can't get SCM signed certificate. omRpcAdd:" +
         " om-unknown:9862", rte.getMessage());
   }
 

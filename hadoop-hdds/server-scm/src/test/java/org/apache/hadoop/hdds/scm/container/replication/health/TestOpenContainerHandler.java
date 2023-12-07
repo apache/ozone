@@ -107,7 +107,15 @@ public class TestOpenContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
+    Assertions.assertTrue(openContainerHandler.handle(readRequest));
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
   }
@@ -161,7 +169,15 @@ public class TestOpenContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
+    Assertions.assertTrue(openContainerHandler.handle(readRequest));
     Mockito.verify(replicationManager, times(1))
         .sendCloseContainerEvent(Mockito.any());
   }

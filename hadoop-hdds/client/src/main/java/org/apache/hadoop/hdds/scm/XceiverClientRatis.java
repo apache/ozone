@@ -286,9 +286,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       Preconditions.checkState(updated >= index);
       return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);
     } catch (Exception e) {
-      Throwable t = HddsClientUtils.checkForException(e);
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
-      if (t instanceof GroupMismatchException) {
+      Throwable t =
+          HddsClientUtils.containsException(e, GroupMismatchException.class);
+      if (t != null) {
         throw e;
       }
       final RaftClientReply reply = getClient().async()
