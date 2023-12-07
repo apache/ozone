@@ -271,14 +271,8 @@ public class TestReplicationManagerScenarios {
     replicationManager.processContainer(containerInfo, repQueue, repReport);
 
     // Check the results in the report and queue against the expected results.
+    assertExpectations(scenario, repReport);
     Expectations expectations = scenario.getExpectation();
-    for (ReplicationManagerReport.HealthState state :
-        ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(expectations.getExpected(state),
-          repReport.getStat(state), "Test: "
-              + scenario.getDescription() + ": Unexpected count for " + state);
-    }
-
     Assertions.assertEquals(expectations.getUnderReplicatedQueue(),
         repQueue.underReplicatedQueueSize(), "Test: "
             + scenario.getDescription()
@@ -291,8 +285,10 @@ public class TestReplicationManagerScenarios {
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
 
-    // TODO - run in read only and check expectations but also no commands sent.
-
+    ReplicationManagerReport roReport = new ReplicationManagerReport();
+    replicationManager.checkContainerStatus(containerInfo, roReport);
+    Assertions.assertEquals(0, commandsSent.size());
+    assertExpectations(scenario, roReport);
 
     // Now run the replication manager execute phase, where we expect commands
     // to be sent to fix the under and over replicated containers.
@@ -307,6 +303,17 @@ public class TestReplicationManagerScenarios {
 
     // TODO - set maintenance allowed
     // TODO - is there a way to handle mis-replication here?
+  }
+
+  private void assertExpectations(Scenario scenario,
+      ReplicationManagerReport report) {
+    Expectations expectations = scenario.getExpectation();
+    for (ReplicationManagerReport.HealthState state :
+        ReplicationManagerReport.HealthState.values()) {
+      Assertions.assertEquals(expectations.getExpected(state),
+          report.getStat(state), "Test: "
+              + scenario.getDescription() + ": Unexpected count for " + state);
+    }
   }
 
   private void assertExpectedCommands(Scenario scenario,
