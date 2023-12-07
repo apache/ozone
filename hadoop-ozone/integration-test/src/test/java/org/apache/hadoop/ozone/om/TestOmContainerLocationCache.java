@@ -200,6 +200,8 @@ public class TestOmContainerLocationCache {
     XceiverClientManager manager = mock(XceiverClientManager.class);
     when(manager.acquireClient(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
+    when(manager.acquireClient(argThat(matchEmptyPipeline()),
+        Mockito.anyBoolean())).thenCallRealMethod();
     when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
 
