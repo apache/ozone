@@ -23,25 +23,17 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.UUID;
 
 /**
  * Verifies OM startup with different layout.
  */
+@Timeout(300)
 public class TestOMStartupWithBucketLayout {
-
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
@@ -161,8 +153,8 @@ public class TestOMStartupWithBucketLayout {
 
   private void verifyBucketLayout(OzoneBucket bucket,
       BucketLayout metadataLayout) {
-    Assert.assertNotNull(bucket);
-    Assert.assertEquals(metadataLayout, bucket.getBucketLayout());
+    Assertions.assertNotNull(bucket);
+    Assertions.assertEquals(metadataLayout, bucket.getBucketLayout());
   }
 
 }

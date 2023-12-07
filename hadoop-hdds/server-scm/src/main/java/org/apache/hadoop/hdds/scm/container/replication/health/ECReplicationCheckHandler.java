@@ -131,7 +131,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under
         // replication is not caused only by decommission, we say it is not
-        // due to decommission/
+        // due to decommission
         dueToOutOfService = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }

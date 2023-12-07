@@ -26,21 +26,21 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
 /**
  * Tests to verify Object store without prefix enabled.
  */
+@Timeout(1200)
 public class TestObjectStore {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
@@ -49,16 +49,13 @@ public class TestObjectStore {
   private static String omId;
   private static OzoneClient client;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
-
   /**
    * Create a MiniOzoneCluster for testing.
    * <p>
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -73,7 +70,7 @@ public class TestObjectStore {
   /**
    * Shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -93,8 +90,8 @@ public class TestObjectStore {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     volume.createBucket(sampleBucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
 
     // Case 2: Bucket layout: OBJECT_STORE
@@ -102,8 +99,8 @@ public class TestObjectStore {
     builder.setBucketLayout(BucketLayout.OBJECT_STORE);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.OBJECT_STORE,
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.OBJECT_STORE,
         bucket.getBucketLayout());
 
     // Case 3: Bucket layout: LEGACY
@@ -111,16 +108,16 @@ public class TestObjectStore {
     builder.setBucketLayout(BucketLayout.LEGACY);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.LEGACY, bucket.getBucketLayout());
 
     // Case 3: Bucket layout: FILE_SYSTEM_OPTIMIZED
     sampleBucketName = UUID.randomUUID().toString();
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volume.createBucket(sampleBucketName, builder.build());
     bucket = volume.getBucket(sampleBucketName);
-    Assert.assertEquals(sampleBucketName, bucket.getName());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(sampleBucketName, bucket.getName());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucket.getBucketLayout());
   }
 
@@ -164,16 +161,16 @@ public class TestObjectStore {
 
     // Check that Link Buckets' layouts match source bucket layouts
     OzoneBucket bucket = volume.getBucket(linkBucket1Name);
-    Assert.assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
+    assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
 
     bucket = volume.getBucket(linkBucket2Name);
-    Assert.assertEquals(sourceBucket2Layout, bucket.getBucketLayout());
+    assertEquals(sourceBucket2Layout, bucket.getBucketLayout());
 
     // linkBucket3 is chained onto linkBucket1, hence its bucket layout matches
     // linkBucket1's source bucket.
     bucket = volume.getBucket(linkBucket3Name);
-    Assert.assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
-    Assert.assertEquals(linkBucket1Name, bucket.getSourceBucket());
+    assertEquals(sourceBucket1Layout, bucket.getBucketLayout());
+    assertEquals(linkBucket1Name, bucket.getSourceBucket());
   }
 
   @Test
@@ -198,10 +195,10 @@ public class TestObjectStore {
     // since sourceBucket does not exist, layout depends on
     // OZONE_DEFAULT_BUCKET_LAYOUT config.
     OzoneBucket bucket = volume.getBucket(danglingLinkBucketName);
-    Assert.assertEquals(BucketLayout.fromString(
+    assertEquals(BucketLayout.fromString(
             conf.get(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT)),
         bucket.getBucketLayout());
-    Assert.assertEquals(sourceBucketName, bucket.getSourceBucket());
+    assertEquals(sourceBucketName, bucket.getSourceBucket());
   }
 
   @Test
@@ -225,10 +222,10 @@ public class TestObjectStore {
 
     try {
       volume.getBucket(linkBucket1Name);
-      Assert.fail("Should throw Exception due to loop in Link Buckets");
+      fail("Should throw Exception due to loop in Link Buckets");
     } catch (OMException oe) {
       // Expected exception
-      Assert.assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
           oe.getResult());
     }
   }

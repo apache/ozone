@@ -81,6 +81,7 @@ public class TestOMClientRequestWithUserInfo {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     inetAddress = InetAddress.getByName("127.0.0.1");
   }
 

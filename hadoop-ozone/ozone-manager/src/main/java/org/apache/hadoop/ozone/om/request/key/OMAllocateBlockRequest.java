@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -106,7 +107,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-
+    UserInfo userInfo = getUserInfo();
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
@@ -118,7 +119,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(),
-            ozoneManager.getOMServiceId(), ozoneManager.getMetrics());
+            ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
+            keyArgs.getSortDatanodes(), userInfo);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -138,7 +140,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     newAllocatedBlockRequest.setKeyLocation(
         omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
-    return getOmRequest().toBuilder().setUserInfo(getUserInfo())
+    return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
   }

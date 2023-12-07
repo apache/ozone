@@ -34,6 +34,13 @@ public interface XceiverClientFactory extends Closeable {
   XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
       throws IOException;
 
-  void releaseClientForReadData(XceiverClientSpi xceiverClient, boolean b);
+  void releaseClientForReadData(XceiverClientSpi xceiverClient,
+                                boolean invalidateClient);
+
+  XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware)
+      throws IOException;
+
+  void releaseClient(XceiverClientSpi xceiverClient, boolean invalidateClient,
+                     boolean topologyAware);
 
 }

@@ -79,7 +79,6 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1073,14 +1072,14 @@ public class TestSCMNodeManager {
     nodeManager.onMessage(
         new CommandForDatanode<>(datanode1, createPipelineCommand), null);
 
-    Assert.assertEquals(2, nodeManager.getCommandQueueCount(
+    assertEquals(2, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(1, nodeManager.getCommandQueueCount(
+    assertEquals(1, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.createPipelineCommand));
-    Assert.assertEquals(0, nodeManager.getCommandQueueCount(
+    assertEquals(0, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closePipelineCommand));
 
-    Assert.assertEquals(0, nodeManager.getCommandQueueCount(
+    assertEquals(0, nodeManager.getCommandQueueCount(
         datanode2, SCMCommandProto.Type.closeContainerCommand));
   }
 

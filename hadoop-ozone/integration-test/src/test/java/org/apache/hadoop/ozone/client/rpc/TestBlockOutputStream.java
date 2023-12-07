@@ -106,8 +106,8 @@ class TestBlockOutputStream {
     conf.setFromObject(ratisClientConfig);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
+        .setNumDatanodes(5)
+        .setTotalPipelineNumLimit(3)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferFlushSize(FLUSH_SIZE)
