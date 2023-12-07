@@ -34,7 +34,7 @@ import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.apache.ratis.thirdparty.com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * A {@link javax.net.ssl.TrustManager} implementation for gRPC and Ratis
