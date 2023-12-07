@@ -288,8 +288,7 @@ public class TestReplicationManagerScenarios {
             + scenario.getDescription()
             + ": Unexpected count for overReplicatedQueue");
 
-    // TODO - check command sent in check phase, eg to close containers etc.
-
+    assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
 
     // TODO - run in read only and check expectations but also no commands sent.
@@ -304,12 +303,17 @@ public class TestReplicationManagerScenarios {
       replicationManager.processOverReplicatedContainer(
           repQueue.dequeueOverReplicatedContainer());
     }
-    ExpectedCommands[] expectedCommands = scenario.getCommands();
+    assertExpectedCommands(scenario, scenario.getCommands());
 
+    // TODO - set maintenance allowed
+    // TODO - is there a way to handle mis-replication here?
+  }
+
+  private void assertExpectedCommands(Scenario scenario,
+      ExpectedCommands[] expectedCommands) {
     Assertions.assertEquals(expectedCommands.length, commandsSent.size(),
         "Test: " + scenario.getDescription()
-        + ": Unexpected count for commands sent");
-
+            + ": Unexpected count for commands sent");
     // Iterate the expected commands and check that they were all sent. If we
     // have a target datanode, then we need to check that the command was sent
     // to that target. The targets in the tests work off aliases for the
@@ -340,9 +344,6 @@ public class TestReplicationManagerScenarios {
       Assertions.assertTrue(found, "Test: " + scenario.getDescription()
           + ": Expected command not sent: " + expectedCommand.getType());
     }
-
-    // TODO - set maintenance allowed
-    // TODO - is there a way to handle mis-replication here?
   }
 
   private DatanodeDetails findDatanodeFromUUID(UUID uuid) {
@@ -365,8 +366,7 @@ public class TestReplicationManagerScenarios {
     // This is a string identifier for a datanode that can be referenced in
     // test expectations and commands. The real datanode will be generated.
     private String datanode;
-    private DatanodeDetails datanodeDetails =
-        MockDatanodeDetails.randomDatanodeDetails();
+    private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState
         = HddsProtos.NodeOperationalState.IN_SERVICE;
     private HddsProtos.NodeState healthState = HddsProtos.NodeState.HEALTHY;
@@ -389,8 +389,6 @@ public class TestReplicationManagerScenarios {
 
     public void setDatanode(String datanode) {
       this.datanode = datanode;
-      this.datanodeDetails = DATANODE_ALIASES.computeIfAbsent(datanode, (k) ->
-          MockDatanodeDetails.randomDatanodeDetails());
     }
 
     public void setIndex(int index) {
@@ -415,7 +413,6 @@ public class TestReplicationManagerScenarios {
 
     public void setOrigin(String origin) {
       this.origin = origin;
-      this.originId = getOrCreateOrigin(origin);
     }
 
     public void setHealthState(String healthState) {
@@ -429,6 +426,7 @@ public class TestReplicationManagerScenarios {
     }
 
     public String getOrigin() {
+      createOrigin();
       return origin;
     }
 
@@ -438,11 +436,13 @@ public class TestReplicationManagerScenarios {
     }
 
     public DatanodeDetails getDatanodeDetails() {
+      createDatanodeDetails();
       return datanodeDetails;
     }
 
     public ContainerReplica buildContainerReplica() {
-
+      createDatanodeDetails();
+      createOrigin();
       NODE_STATUS_MAP.put(datanodeDetails,
           new NodeStatus(operationalState, healthState));
       datanodeDetails.setPersistedOpState(operationalState);
@@ -458,6 +458,29 @@ public class TestReplicationManagerScenarios {
           .setBytesUsed(used)
           .setEmpty(isEmpty)
           .setOriginNodeId(originId).build();
+    }
+
+    private void createDatanodeDetails() {
+      if (datanodeDetails != null) {
+        return;
+      }
+      if (datanode != null) {
+        datanodeDetails = DATANODE_ALIASES.computeIfAbsent(datanode, (k) ->
+            MockDatanodeDetails.randomDatanodeDetails());
+      } else {
+        datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+      }
+    }
+
+    private void createOrigin() {
+      if (originId != null) {
+        return;
+      }
+      if (origin != null) {
+        originId = getOrCreateOrigin(origin);
+      } else {
+        originId = UUID.randomUUID();
+      }
     }
   }
 
