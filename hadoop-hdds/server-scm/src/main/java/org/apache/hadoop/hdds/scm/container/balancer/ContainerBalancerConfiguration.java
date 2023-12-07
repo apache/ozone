@@ -30,6 +30,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +60,26 @@ public final class ContainerBalancerConfiguration {
       description = "Maximum percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration.")
   private int maxDatanodesPercentageToInvolvePerIteration = 20;
+
+  @Config(key = "adapt.balance.when.close.to.limit",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "true",
+      tags = {ConfigTag.BALANCER},
+      description = "Allow to reset potential target datanodes if balancer " +
+          "is one datanode away from " +
+          "datanodes.involved.max.percentage.per.iteration limit"
+  )
+  private boolean adaptBalanceWhenCloseToLimit = true;
+
+  @Config(key = "adapt.balance.when.reach.the.limit",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "true",
+      tags = {ConfigTag.BALANCER},
+      description = "lAlow to reset potential source and target datanodes " +
+          "if balancer has reached " +
+          "datanodes.involved.max.percentage.per.iteration limit"
+  )
+  private boolean adaptBalanceWhenReachTheLimit = true;
 
   @Config(key = "size.moved.max.per.iteration", type = ConfigType.SIZE,
       defaultValue = "500GB", tags = {ConfigTag.BALANCER},
@@ -169,13 +190,12 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Gets the iteration count for Container Balancer. A value of -1 means
-   * infinite number of iterations.
+   * Gets the iteration count for Container Balancer. A value of -1 means infinite number of iterations.
    *
-   * @return a value greater than 0, or -1
+   * @return a value greater than 0, or Integer.MAX_VALUE that means number of iterations when values is -1
    */
   public int getIterations() {
-    return iterations;
+    return (iterations != -1) ? iterations : Integer.MAX_VALUE;
   }
 
   /**
@@ -286,6 +306,22 @@ public final class ContainerBalancerConfiguration {
     this.maxSizeToMovePerIteration = maxSizeToMovePerIteration;
   }
 
+  public boolean adaptBalanceWhenCloseToLimits() {
+    return adaptBalanceWhenCloseToLimit;
+  }
+
+  public void setAdaptBalanceWhenCloseToLimit(boolean value) {
+    adaptBalanceWhenCloseToLimit = value;
+  }
+
+  public boolean adaptBalanceWhenReachTheLimits() {
+    return adaptBalanceWhenReachTheLimit;
+  }
+
+  public void setAdaptBalanceWhenReachTheLimit(boolean value) {
+    adaptBalanceWhenReachTheLimit = value;
+  }
+
   public long getMaxSizeEnteringTarget() {
     return maxSizeEnteringTarget;
   }
@@ -302,7 +338,7 @@ public final class ContainerBalancerConfiguration {
     this.maxSizeLeavingSource = maxSizeLeavingSource;
   }
 
-  public Set<ContainerID> getExcludeContainers() {
+  public @Nonnull Set<ContainerID> getExcludeContainers() {
     if (excludeContainers.isEmpty()) {
       return new HashSet<>();
     }

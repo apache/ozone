@@ -14,7 +14,8 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.hdds.scm.container.balancer;
+
+package org.apache.hadoop.hdds.scm.container.balancer.iteration;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -24,15 +25,17 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -40,31 +43,26 @@ import java.util.TreeSet;
  * The selection criteria for selecting containers that will be moved and
  * selecting datanodes that containers will move to.
  */
-public class ContainerBalancerSelectionCriteria {
+public class ContainerSelectionCriteria {
   private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerBalancerSelectionCriteria.class);
+      LoggerFactory.getLogger(ContainerSelectionCriteria.class);
 
-  private ContainerBalancerConfiguration balancerConfiguration;
-  private NodeManager nodeManager;
-  private ReplicationManager replicationManager;
-  private ContainerManager containerManager;
-  private Set<ContainerID> selectedContainers;
-  private Set<ContainerID> excludeContainers;
-  private FindSourceStrategy findSourceStrategy;
+  private final ContainerBalancerConfiguration config;
+  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
+  private final ContainerManager containerManager;
+  private final Set<ContainerID> selectedContainers = new HashSet<>();
+  private final Set<ContainerID> excludeContainers;
 
-  public ContainerBalancerSelectionCriteria(
-      ContainerBalancerConfiguration balancerConfiguration,
-      NodeManager nodeManager,
-      ReplicationManager replicationManager,
-      ContainerManager containerManager,
-      FindSourceStrategy findSourceStrategy) {
-    this.balancerConfiguration = balancerConfiguration;
-    this.nodeManager = nodeManager;
-    this.replicationManager = replicationManager;
-    this.containerManager = containerManager;
-    selectedContainers = new HashSet<>();
-    excludeContainers = balancerConfiguration.getExcludeContainers();
-    this.findSourceStrategy = findSourceStrategy;
+  public ContainerSelectionCriteria(
+      @Nonnull ContainerBalancerConfiguration balancerConfig,
+      @Nonnull StorageContainerManager scm
+  ) {
+    config = balancerConfig;
+    nodeManager = scm.getScmNodeManager();
+    replicationManager = scm.getReplicationManager();
+    containerManager = scm.getContainerManager();
+    excludeContainers = balancerConfig.getExcludeContainers();
   }
 
   /**
@@ -73,7 +71,9 @@ public class ContainerBalancerSelectionCriteria {
    * @param containerID Container to check.
    * @return true if container is replicating or deleting, otherwise false.
    */
-  private boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
+  private boolean isContainerReplicatingOrDeleting(
+      @Nonnull ContainerID containerID
+  ) {
     return replicationManager.isContainerReplicatingOrDeleting(containerID);
   }
 
@@ -87,55 +87,63 @@ public class ContainerBalancerSelectionCriteria {
    * 5. Container should be closed.
    * 6. Container should not be an EC container
    * //TODO Temporarily not considering EC containers as candidates
+   *
+   * @param node       datanodeDetails for which to find candidate containers
+   * @param lowerLimit the value of lower limit for node utilization:
+   *                   clusterAvgUtilisation - threshold
+   * @return NavigableSet of candidate containers that satisfy the criteria.
    * @see
    * <a href="https://issues.apache.org/jira/browse/HDDS-6940">HDDS-6940</a>
-   *
-   * @param node DatanodeDetails for which to find candidate containers.
-   * @return NavigableSet of candidate containers that satisfy the criteria.
    */
-  public NavigableSet<ContainerID> getCandidateContainers(
-      DatanodeDetails node, long sizeMovedAlready) {
-    NavigableSet<ContainerID> containerIDSet =
+  public @Nonnull Set<ContainerID> getCandidateContainers(
+      @Nonnull DatanodeDetails node,
+      @Nonnull FindSourceStrategy sourceStrategy,
+      long sizeMovedAlready,
+      double lowerLimit
+  ) {
+    Set<ContainerID> containerIDSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
       containerIDSet.addAll(nodeManager.getContainers(node));
     } catch (NodeNotFoundException e) {
       LOG.warn("Could not find Datanode {} while selecting candidate " +
-          "containers for Container Balancer.", node.toString(), e);
+          "containers for Container Balancer.", node, e);
       return containerIDSet;
     }
-    if (excludeContainers != null) {
-      containerIDSet.removeAll(excludeContainers);
-    }
-    if (selectedContainers != null) {
-      containerIDSet.removeAll(selectedContainers);
-    }
+    containerIDSet.removeAll(excludeContainers);
+    containerIDSet.removeAll(selectedContainers);
 
     containerIDSet.removeIf(
-        containerID -> shouldBeExcluded(containerID, node, sizeMovedAlready));
+        containerID -> shouldBeExcluded(containerID, node, sourceStrategy,
+            sizeMovedAlready, lowerLimit)
+    );
     return containerIDSet;
   }
 
   /**
    * Checks if the first container has more used space than second.
-   * @param first first container to compare
+   *
+   * @param first  first container to compare
    * @param second second container to compare
    * @return An integer greater than 0 if first is more used, 0 if they're
    * the same containers or a container is not found, and a value less than 0
    * if first is less used than second. If both containers have equal used
    * space, they're compared using {@link ContainerID#compareTo(ContainerID)}.
    */
-  private int isContainerMoreUsed(ContainerID first,
-                                  ContainerID second) {
+  private int isContainerMoreUsed(
+      @Nonnull ContainerID first,
+      @Nonnull ContainerID second
+  ) {
     if (first.equals(second)) {
       return 0;
     }
     try {
-      ContainerInfo firstInfo = containerManager.getContainer(first);
-      ContainerInfo secondInfo = containerManager.getContainer(second);
-      if (firstInfo.getUsedBytes() > secondInfo.getUsedBytes()) {
+      long firstUsedBytes = containerManager.getContainer(first).getUsedBytes();
+      long secondUsedBytes =
+          containerManager.getContainer(second).getUsedBytes();
+      if (firstUsedBytes > secondUsedBytes) {
         return 1;
-      } else if (firstInfo.getUsedBytes() < secondInfo.getUsedBytes()) {
+      } else if (firstUsedBytes < secondUsedBytes) {
         return -1;
       } else {
         return first.compareTo(second);
@@ -149,27 +157,34 @@ public class ContainerBalancerSelectionCriteria {
 
   /**
    * Compares containers on the basis of used space.
+   *
    * @return First container is more used if it has used space greater than
    * second container.
    */
-  private Comparator<ContainerID> orderContainersByUsedBytes() {
+  private @Nonnull Comparator<ContainerID> orderContainersByUsedBytes() {
     return this::isContainerMoreUsed;
   }
 
   /**
    * Checks whether a Container has the ReplicationType
    * {@link HddsProtos.ReplicationType#EC}.
+   *
    * @param container container to check
    * @return true if the ReplicationType is EC and "hdds.scm.replication
    * .enable.legacy" is true, else false
    */
-  private boolean isECContainer(ContainerInfo container) {
+  private boolean isECContainer(@Nonnull ContainerInfo container) {
     return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
         && replicationManager.getConfig().isLegacyEnabled();
   }
 
-  private boolean shouldBeExcluded(ContainerID containerID,
-      DatanodeDetails node, long sizeMovedAlready) {
+  private boolean shouldBeExcluded(
+      @Nonnull ContainerID containerID,
+      @Nonnull DatanodeDetails node,
+      @Nonnull FindSourceStrategy sourceStrategy,
+      long sizeMovedAlready,
+      double lowerLimit
+  ) {
     ContainerInfo container;
     try {
       container = containerManager.getContainer(containerID);
@@ -178,26 +193,32 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return !isContainerClosed(container, node) || isECContainer(container) ||
+    long usedBytes = container.getUsedBytes();
+    return !isContainerClosed(container, node) ||
+        isECContainer(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
-        !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
-        || breaksMaxSizeToMoveLimit(container.containerID(),
-        container.getUsedBytes(), sizeMovedAlready);
+        !sourceStrategy.canSizeLeaveSource(node, usedBytes,
+            config.getMaxSizeLeavingSource(), lowerLimit) ||
+        breaksMaxSizeToMoveLimit(container.containerID(), usedBytes,
+            sizeMovedAlready);
   }
 
   /**
    * Checks whether specified container is closed. Also checks if the replica
    * on the specified datanode is CLOSED. Assumes that there will only be one
    * replica of a container on a particular Datanode.
-   * @param container container to check
+   *
+   * @param container       container to check
    * @param datanodeDetails datanode on which a replica of the container is
-   * present
+   *                        present
    * @return true if container LifeCycleState is
    * {@link HddsProtos.LifeCycleState#CLOSED} and its replica on the
    * specified datanode is CLOSED, else false
    */
-  private boolean isContainerClosed(ContainerInfo container,
-                                    DatanodeDetails datanodeDetails) {
+  private boolean isContainerClosed(
+      @Nonnull ContainerInfo container,
+      @Nonnull DatanodeDetails datanodeDetails
+  ) {
     if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
       return false;
     }
@@ -222,12 +243,13 @@ public class ContainerBalancerSelectionCriteria {
     return false;
   }
 
-  private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
-                                           long usedBytes,
-                                           long sizeMovedAlready) {
+  private boolean breaksMaxSizeToMoveLimit(
+      @Nonnull ContainerID containerID,
+      long usedBytes,
+      long sizeMovedAlready
+  ) {
     // check max size to move per iteration limit
-    if (sizeMovedAlready + usedBytes >
-        balancerConfiguration.getMaxSizeToMovePerIteration()) {
+    if (sizeMovedAlready + usedBytes > config.getMaxSizeToMovePerIteration()) {
       LOG.debug("Removing container {} because it fails max size " +
           "to move per iteration check.", containerID);
       return true;
@@ -235,14 +257,11 @@ public class ContainerBalancerSelectionCriteria {
     return false;
   }
 
-  public void setExcludeContainers(
-      Set<ContainerID> excludeContainers) {
-    this.excludeContainers = excludeContainers;
-  }
-
-  public void setSelectedContainers(
-      Set<ContainerID> selectedContainers) {
-    this.selectedContainers = selectedContainers;
+  public void updateSelectedContainer(
+      @Nonnull Set<ContainerID> newSelectedContainers
+  ) {
+    selectedContainers.clear();
+    selectedContainers.addAll(newSelectedContainers);
   }
 
 }

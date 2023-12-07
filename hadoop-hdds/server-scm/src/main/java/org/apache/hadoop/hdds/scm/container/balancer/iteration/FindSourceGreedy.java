@@ -15,16 +15,17 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.balancer;
+package org.apache.hadoop.hdds.scm.container.balancer.iteration;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -39,14 +40,12 @@ import java.util.UUID;
 public class FindSourceGreedy implements FindSourceStrategy {
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
-  private Map<DatanodeDetails, Long> sizeLeavingNode;
-  private PriorityQueue<DatanodeUsageInfo> potentialSources;
-  private NodeManager nodeManager;
-  private ContainerBalancerConfiguration config;
-  private Double lowerLimit;
+  private final Map<DatanodeDetails, Long> sizeLeavingNode = new HashMap<>();
+  private final PriorityQueue<DatanodeUsageInfo> potentialSources;
+  private final NodeManager nodeManager;
 
-  FindSourceGreedy(NodeManager nodeManager) {
-    sizeLeavingNode = new HashMap<>();
+  public FindSourceGreedy(@Nonnull NodeManager nodeManager) {
+    this.nodeManager = nodeManager;
     potentialSources = new PriorityQueue<>((a, b) -> {
       double currentUsageOfA = a.calculateUtilization(
           -sizeLeavingNode.get(a.getDatanodeDetails()));
@@ -61,48 +60,49 @@ public class FindSourceGreedy implements FindSourceStrategy {
       UUID uuidB = b.getDatanodeDetails().getUuid();
       return uuidA.compareTo(uuidB);
     });
-    this.nodeManager = nodeManager;
-  }
-
-  private void setLowerLimit(Double lowerLimit) {
-    this.lowerLimit = lowerLimit;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public void resetPotentialSources(
-      @NotNull Collection<DatanodeDetails> sources) {
-    List<DatanodeUsageInfo> usageInfos = new ArrayList<>(sources.size());
-    sources.forEach(source -> usageInfos.add(nodeManager.getUsageInfo(source)));
-    resetSources(usageInfos);
   }
 
   /**
    * Resets the collection of source datanodes that are considered when
    * selecting the next source datanode.
+   *
    * @param sources potential sources
    */
-  private void resetSources(Collection<DatanodeUsageInfo> sources) {
+  public void resetPotentialSources(
+      @Nonnull Collection<DatanodeDetails> sources
+  ) {
     potentialSources.clear();
     /* since sizeLeavingNode map is being used to track how much data has
     left a DN in an iteration, put keys only if they don't already exist
      */
     sources.forEach(source -> {
-      sizeLeavingNode.putIfAbsent(source.getDatanodeDetails(), 0L);
-      potentialSources.add(source);
+      DatanodeUsageInfo usageInfo = nodeManager.getUsageInfo(source);
+      resetSources(usageInfo);
     });
   }
 
-  private void setConfiguration(ContainerBalancerConfiguration conf) {
-    this.config = conf;
+  /**
+   * Resets the collection of source datanodes that are considered when
+   * selecting the next source datanode.
+   *
+   * @param source potential source
+   */
+  private void resetSources(@Nonnull DatanodeUsageInfo source) {
+    /* since sizeLeavingNode map is being used to track how much data has
+    left a DN in an iteration, put keys only if they don't already exist
+     */
+    sizeLeavingNode.putIfAbsent(source.getDatanodeDetails(), 0L);
+    potentialSources.add(source);
   }
 
   /**
    * increase the Leaving size of a candidate source data node.
    */
   @Override
-  public void increaseSizeLeaving(DatanodeDetails dui, long size) {
+  public void increaseSizeLeaving(
+      @Nonnull DatanodeDetails dui,
+      long size
+  ) {
     Long currentSize = sizeLeavingNode.get(dui);
     if (currentSize != null) {
       sizeLeavingNode.put(dui, currentSize + size);
@@ -115,13 +115,12 @@ public class FindSourceGreedy implements FindSourceStrategy {
   }
 
   /**
-   * get the next candidate source data node according to
-   * the strategy.
+   * get the next candidate source data node according to the strategy.
    *
    * @return the nex candidate source data node.
    */
   @Override
-  public DatanodeDetails getNextCandidateSourceDataNode() {
+  public @Nullable DatanodeDetails getNextCandidateSourceDataNode() {
     if (potentialSources.isEmpty()) {
       LOG.info("no more candidate source data node");
       return null;
@@ -130,12 +129,13 @@ public class FindSourceGreedy implements FindSourceStrategy {
   }
 
   /**
-   * remove the specified data node from candidate source
-   * data nodes.
+   * remove the specified data node from candidate source data nodes.
    */
   @Override
-  public void removeCandidateSourceDataNode(DatanodeDetails dui) {
-    potentialSources.removeIf(a -> a.getDatanodeDetails().equals(dui));
+  public void removeCandidateSourceDataNode(
+      @Nonnull DatanodeDetails dnDetails
+  ) {
+    potentialSources.removeIf(a -> a.getDatanodeDetails().equals(dnDetails));
   }
 
   /**
@@ -143,12 +143,19 @@ public class FindSourceGreedy implements FindSourceStrategy {
    * according to {@link ContainerBalancerConfiguration}
    * "size.entering.target.max".
    *
-   * @param source target datanode in which size is entering
-   * @param size   size in bytes
+   * @param source     target datanode in which size is entering
+   * @param size       size in bytes
+   * @param lowerLimit the value of lower limit for node utilization:
+   *                   clusterAvgUtilisation - threshold
    * @return true if size can leave, else false
    */
   @Override
-  public boolean canSizeLeaveSource(DatanodeDetails source, long size) {
+  public boolean canSizeLeaveSource(
+      @Nonnull DatanodeDetails source,
+      long size,
+      long maxSizeLeavingSource,
+      double lowerLimit
+  ) {
     if (sizeLeavingNode.containsKey(source)) {
       long sizeLeavingAfterMove = sizeLeavingNode.get(source) + size;
       //size can be moved out of source datanode only when the following
@@ -157,10 +164,10 @@ public class FindSourceGreedy implements FindSourceStrategy {
       // MaxSizeLeavingTarget
       //2 after subtracting sizeLeavingAfterMove, the usage is bigger
       // than or equal to lowerLimit
-      if (sizeLeavingAfterMove > config.getMaxSizeLeavingSource()) {
+      if (sizeLeavingAfterMove > maxSizeLeavingSource) {
         LOG.debug("{} bytes cannot leave datanode {} because 'size.leaving" +
                 ".source.max' limit is {} and {} bytes have already left.",
-            size, source.getUuidString(), config.getMaxSizeLeavingSource(),
+            size, source.getUuidString(), maxSizeLeavingSource,
             sizeLeavingNode.get(source));
         return false;
       }
@@ -182,12 +189,10 @@ public class FindSourceGreedy implements FindSourceStrategy {
    * reInitialize FindSourceStrategy.
    */
   @Override
-  public void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
-                           ContainerBalancerConfiguration conf,
-                           Double lowLimit) {
-    setConfiguration(conf);
-    setLowerLimit(lowLimit);
+  public void reInitialize(
+      @Nonnull List<DatanodeUsageInfo> potentialDataNodes
+  ) {
     sizeLeavingNode.clear();
-    resetSources(potentialDataNodes);
+    potentialDataNodes.forEach(this::resetSources);
   }
 }

@@ -114,7 +114,7 @@ public final class ContainerBalancerMetrics {
     return numContainerMovesScheduled.value();
   }
 
-  void incrementNumContainerMovesScheduled(long valueToAdd) {
+  public void incrementNumContainerMovesScheduled(long valueToAdd) {
     this.numContainerMovesScheduled.incr(valueToAdd);
   }
 
@@ -127,7 +127,8 @@ public final class ContainerBalancerMetrics {
     return numContainerMovesScheduledInLatestIteration.value();
   }
 
-  void incrementNumContainerMovesScheduledInLatestIteration(long valueToAdd) {
+  public void incrementNumContainerMovesScheduledInLatestIteration(
+      long valueToAdd) {
     this.numContainerMovesScheduledInLatestIteration.incr(valueToAdd);
   }
 

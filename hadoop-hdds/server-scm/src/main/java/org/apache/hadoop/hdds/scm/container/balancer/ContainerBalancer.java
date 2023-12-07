@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -44,15 +46,14 @@ public class ContainerBalancer extends StatefulService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
-
-  private StorageContainerManager scm;
+  private final StorageContainerManager scm;
   private final SCMContext scmContext;
-  private OzoneConfiguration ozoneConfiguration;
+  private final OzoneConfiguration ozoneConfiguration;
   private ContainerBalancerConfiguration config;
-  private ContainerBalancerMetrics metrics;
+  private final ContainerBalancerMetrics metrics;
   private volatile Thread currentBalancingThread;
   private volatile ContainerBalancerTask task = null;
-  private ReentrantLock lock;
+  private final ReentrantLock lock;
 
   /**
    * Constructs ContainerBalancer with the specified arguments. Initializes
@@ -61,7 +62,7 @@ public class ContainerBalancer extends StatefulService {
    *
    * @param scm the storage container manager
    */
-  public ContainerBalancer(StorageContainerManager scm) {
+  public ContainerBalancer(@Nonnull StorageContainerManager scm) {
     super(scm.getStatefulServiceStateManager());
     this.scm = scm;
     this.ozoneConfiguration = scm.getConfiguration();
@@ -123,6 +124,7 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Checks if ContainerBalancer should start (after a leader change, restart
    * etc.) by reading persisted state.
+   *
    * @return true if the persisted state is true, otherwise false
    */
   @Override
@@ -170,7 +172,7 @@ public class ContainerBalancer extends StatefulService {
    *
    * @return true if balancer started, otherwise false
    */
-  public ContainerBalancerTask.Status getBalancerStatus() {
+  public @Nonnull ContainerBalancerTask.Status getBalancerStatus() {
     return null != task ? task.getBalancerStatus()
         : ContainerBalancerTask.Status.STOPPED;
   }
@@ -196,13 +198,16 @@ public class ContainerBalancer extends StatefulService {
    * Starts ContainerBalancer as an SCMService. Validates state, reads and
    * validates persisted configuration, and then starts the balancing
    * thread.
-   * @throws IllegalContainerBalancerStateException if balancer should not
-   * run according to persisted configuration
-   * @throws InvalidContainerBalancerConfigurationException if failed to
-   * retrieve persisted configuration, or the configuration is null
+   *
+   * @throws IllegalContainerBalancerStateException
+   *        if balancer should not run according to persisted configuration
+   * @throws InvalidContainerBalancerConfigurationException
+   *        if failed to retrieve persisted configuration,
+   *        or the configuration is null
    */
   @Override
-  public void start() throws IllegalContainerBalancerStateException,
+  public void start()
+      throws IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
@@ -240,13 +245,13 @@ public class ContainerBalancer extends StatefulService {
    * Starts Container Balancer after checking its state and validating
    * configuration.
    *
-   * @throws IllegalContainerBalancerStateException if ContainerBalancer is
-   * not in a start-appropriate state
-   * @throws InvalidContainerBalancerConfigurationException if
-   * {@link ContainerBalancerConfiguration} config file is incorrectly
-   * configured
-   * @throws IOException on failure to persist
-   * {@link ContainerBalancerConfiguration}
+   * @throws IllegalContainerBalancerStateException
+   *            if ContainerBalancer is not in a start-appropriate state
+   * @throws InvalidContainerBalancerConfigurationException
+   *            if {@link ContainerBalancerConfiguration} config file
+   *            is incorrectly configured
+   * @throws IOException
+   *            on failure to persist {@link ContainerBalancerConfiguration}
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
@@ -270,11 +275,11 @@ public class ContainerBalancer extends StatefulService {
    * Starts a new balancing thread asynchronously.
    */
   private void startBalancingThread(int nextIterationIndex,
-      boolean delayStart) {
+                                    boolean delayStart
+  ) {
     String prefix = scmContext.threadNamePrefix();
-    task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
-        config, delayStart);
-    Thread thread = new Thread(task);
+    task = new ContainerBalancerTask(scm, this, config);
+    Thread thread = new Thread(() -> task.run(nextIterationIndex, delayStart));
     thread.setName(prefix + "ContainerBalancerTask-" + ID.incrementAndGet());
     thread.setDaemon(true);
     thread.start();
@@ -288,9 +293,9 @@ public class ContainerBalancer extends StatefulService {
    *
    * @param expectedRunning true if ContainerBalancer is expected to be
    *                        running, else false
-   * @throws IllegalContainerBalancerStateException if SCM is not
-   * leader-ready, is in safe mode, or state does not match the specified
-   * expected state
+   * @throws IllegalContainerBalancerStateException
+   *            if SCM is not leader-ready, is in safe mode, or state
+   *            does not match the specified expected state
    */
   private void validateState(boolean expectedRunning)
       throws IllegalContainerBalancerStateException {
@@ -338,7 +343,7 @@ public class ContainerBalancer extends StatefulService {
     blockTillTaskStop(balancingThread);
   }
 
-  private static void blockTillTaskStop(Thread balancingThread) {
+  private static void blockTillTaskStop(@Nonnull Thread balancingThread) {
     // NOTE: join should be called outside the lock in hierarchy
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
@@ -357,8 +362,8 @@ public class ContainerBalancer extends StatefulService {
    * {@link ContainerBalancer#shouldRun()} will return false. This is the
    * "stop" command.
    */
-  public void stopBalancer()
-      throws IOException, IllegalContainerBalancerStateException {
+  public void stopBalancer() throws IOException,
+      IllegalContainerBalancerStateException {
     Thread balancingThread;
     lock.lock();
     try {
@@ -373,9 +378,11 @@ public class ContainerBalancer extends StatefulService {
     blockTillTaskStop(balancingThread);
   }
 
-  public void saveConfiguration(ContainerBalancerConfiguration configuration,
-                                boolean shouldRun, int index)
-      throws IOException {
+  public void saveConfiguration(
+      @Nonnull ContainerBalancerConfiguration configuration,
+      boolean shouldRun,
+      int index
+  ) throws IOException {
     config = configuration;
     saveConfiguration(configuration.toProtobufBuilder()
         .setShouldRun(shouldRun)
@@ -383,8 +390,9 @@ public class ContainerBalancer extends StatefulService {
         .build());
   }
 
-  private void validateConfiguration(ContainerBalancerConfiguration conf)
-      throws InvalidContainerBalancerConfigurationException {
+  private void validateConfiguration(
+      @Nonnull ContainerBalancerConfiguration conf
+  ) throws InvalidContainerBalancerConfigurationException {
     // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
     // greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
@@ -426,15 +434,16 @@ public class ContainerBalancer extends StatefulService {
           conf.getMoveTimeout().toMinutes());
       throw new InvalidContainerBalancerConfigurationException(
           "hdds.container.balancer.move.replication.timeout should " +
-          "be less than hdds.container.balancer.move.timeout.");
+              "be less than hdds.container.balancer.move.timeout.");
     }
   }
 
-  public ContainerBalancerMetrics getMetrics() {
+  public @Nonnull ContainerBalancerMetrics getMetrics() {
     return metrics;
   }
 
   @VisibleForTesting
+  @Nullable
   Thread getCurrentBalancingThread() {
     return currentBalancingThread;
   }

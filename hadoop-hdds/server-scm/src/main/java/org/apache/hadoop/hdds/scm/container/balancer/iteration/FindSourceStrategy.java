@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.balancer;
+package org.apache.hadoop.hdds.scm.container.balancer.iteration;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 
@@ -29,7 +31,7 @@ import java.util.List;
  * This interface can be used to implement strategies to get a
  * source datanode.
  */
-public interface FindSourceStrategy {
+interface FindSourceStrategy {
 
   /**
    * get the next candidate source data node according to
@@ -37,42 +39,48 @@ public interface FindSourceStrategy {
    *
    * @return the nex candidate source data node.
    */
-  DatanodeDetails getNextCandidateSourceDataNode();
+  @Nullable DatanodeDetails getNextCandidateSourceDataNode();
 
   /**
    * remove the specified data node from candidate source
    * data nodes.
    */
-  void removeCandidateSourceDataNode(DatanodeDetails dui);
+  void removeCandidateSourceDataNode(@Nonnull DatanodeDetails dui);
 
   /**
    * increase the Leaving size of a candidate source data node.
    */
-  void increaseSizeLeaving(DatanodeDetails dui, long size);
+  void increaseSizeLeaving(@Nonnull DatanodeDetails dui, long size);
 
   /**
    * Checks if specified size can leave a specified source datanode
    * according to {@link ContainerBalancerConfiguration}
    * "size.entering.target.max".
    *
-   * @param source target datanode in which size is entering
-   * @param size   size in bytes
+   * @param source     target datanode in which size is entering
+   * @param size       size in bytes
+   * @param lowerLimit the value of lower limit for node utilization:
+   *                   clusterAvgUtilisation - threshold
    * @return true if size can leave, else false
    */
-  boolean canSizeLeaveSource(DatanodeDetails source, long size);
+  boolean canSizeLeaveSource(
+      @Nonnull DatanodeDetails source,
+      long size,
+      long maxSizeLeavingSource,
+      double lowerLimit
+  );
 
   /**
    * reInitialize FindSourceStrategy.
    */
-  void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
-                    ContainerBalancerConfiguration config, Double lowerLimit);
+  void reInitialize(@Nonnull List<DatanodeUsageInfo> potentialDataNodes);
 
   /**
    * Resets the collection of source {@link DatanodeUsageInfo} that can be
    * selected for balancing.
    *
-   * @param sources collection of source
-   *                {@link DatanodeDetails} that containers can move from
+   * @param sources collection of source {@link DatanodeDetails}
+   *                that containers can move from
    */
   void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
 }

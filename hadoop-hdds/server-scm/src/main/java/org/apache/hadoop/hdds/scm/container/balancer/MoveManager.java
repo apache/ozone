@@ -138,7 +138,7 @@ public final class MoveManager implements
     return pendingMoves;
   }
 
-  void resetState() {
+  public void resetState() {
     pendingMoves.clear();
   }
 
@@ -205,7 +205,7 @@ public final class MoveManager implements
    * @param src source datanode
    * @param tgt target datanode
    */
-  CompletableFuture<MoveResult> move(
+  public CompletableFuture<MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException,
       ContainerReplicaNotFoundException {
@@ -496,11 +496,11 @@ public final class MoveManager implements
     }
   }
 
-  void setMoveTimeout(long moveTimeout) {
+  public void setMoveTimeout(long moveTimeout) {
     this.moveTimeout = moveTimeout;
   }
 
-  void setReplicationTimeout(long replicationTimeout) {
+  public void setReplicationTimeout(long replicationTimeout) {
     this.replicationTimeout = replicationTimeout;
   }
 }

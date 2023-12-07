@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,34 +15,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container.balancer;
+
+package org.apache.hadoop.hdds.scm.container.balancer.iteration;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import javax.annotation.Nonnull;
+import java.util.Collection;
+import java.util.TreeSet;
 
 /**
- * This class represents a target datanode and the container to be moved from
- * a source to that target.
+ * an implementation of FindTargetGreedy, which will always select the
+ * target with the lowest space usage.
  */
-public class ContainerMoveSelection {
-  private final DatanodeDetails targetNode;
-  private final ContainerID containerID;
+class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
+  private final TreeSet<DatanodeUsageInfo> potentialTargets;
 
-  public ContainerMoveSelection(
-      @Nonnull DatanodeDetails targetNode,
-      @Nonnull ContainerID containerID
-  ) {
-    this.targetNode = targetNode;
-    this.containerID = containerID;
+  FindTargetGreedyByUsageInfo(@Nonnull StorageContainerManager scm) {
+    super(scm, FindTargetGreedyByUsageInfo.class);
+    potentialTargets = new TreeSet<>(this::compareByUsage);
   }
 
-  public DatanodeDetails getTargetNode() {
-    return targetNode;
+  @Override
+  protected Collection<DatanodeUsageInfo> getPotentialTargets() {
+    return potentialTargets;
   }
 
-  public ContainerID getContainerID() {
-    return containerID;
+  @Override
+  public void sortTargetForSource(@Nonnull DatanodeDetails source) {
+    // noop, Treeset is naturally sorted.
   }
 }
