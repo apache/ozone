@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
@@ -33,6 +27,12 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Interface for creating pipelines.
@@ -100,11 +100,10 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
               "data in healthy node set. Nodes required: %d Found: %d",
           metadataSizeRequired, dataSizeRequired, nodesRequired,
           healthyDNsWithSpace.size());
-      LOG.error(msg);
+      LOG.debug(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
-
     return healthyDNsWithSpace;
   }
 
