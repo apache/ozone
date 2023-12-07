@@ -80,6 +80,7 @@ import static org.mockito.ArgumentMatchers.any;
  * deserialize the JSON files into Java objects. In general any field which is a
  * setter on the inner class can be set in the JSON file.
  *
+ * TODO - The framework does not allow for testing mis-replicated containers.
  */
 
 public class TestReplicationManagerScenarios {
@@ -196,16 +197,13 @@ public class TestReplicationManagerScenarios {
             any(SCMCommandProto.Type.class), any(SCMCommandProto.Type.class)))
         .thenReturn(countMap);
 
-    replicationManager = createReplicationManager();
+    // Ensure that RM will run when asked.
+    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
+    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     repReport = new ReplicationManagerReport();
     repQueue = new ReplicationQueue();
-
-    // Ensure that RM will run when asked.
-    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
-    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
-
     ORIGINS.clear();
     DATANODE_ALIASES.clear();
     NODE_STATUS_MAP.clear();
@@ -255,6 +253,14 @@ public class TestReplicationManagerScenarios {
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
+    ReplicationManager.ReplicationManagerConfiguration conf =
+        new ReplicationManager.ReplicationManagerConfiguration();
+    conf.setMaintenanceRemainingRedundancy(
+        scenario.getEcMaintenanceRedundancy());
+    conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
+    configuration.setFromObject(conf);
+    replicationManager = createReplicationManager();
+
     ContainerInfo containerInfo = scenario.buildContainerInfo();
     loadPendingOps(containerInfo, scenario);
 
@@ -272,12 +278,12 @@ public class TestReplicationManagerScenarios {
 
     // Check the results in the report and queue against the expected results.
     assertExpectations(scenario, repReport);
-    Expectations expectations = scenario.getExpectation();
-    Assertions.assertEquals(expectations.getUnderReplicatedQueue(),
+    Expectation expectation = scenario.getExpectation();
+    Assertions.assertEquals(expectation.getUnderReplicatedQueue(),
         repQueue.underReplicatedQueueSize(), "Test: "
             + scenario.getDescription()
             + ": Unexpected count for underReplicatedQueue");
-    Assertions.assertEquals(expectations.getOverReplicatedQueue(),
+    Assertions.assertEquals(expectation.getOverReplicatedQueue(),
         repQueue.overReplicatedQueueSize(), "Test: "
             + scenario.getDescription()
             + ": Unexpected count for overReplicatedQueue");
@@ -300,17 +306,14 @@ public class TestReplicationManagerScenarios {
           repQueue.dequeueOverReplicatedContainer());
     }
     assertExpectedCommands(scenario, scenario.getCommands());
-
-    // TODO - set maintenance allowed
-    // TODO - is there a way to handle mis-replication here?
   }
 
   private void assertExpectations(Scenario scenario,
       ReplicationManagerReport report) {
-    Expectations expectations = scenario.getExpectation();
+    Expectation expectation = scenario.getExpectation();
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(expectations.getExpected(state),
+      Assertions.assertEquals(expectation.getExpected(state),
           report.getStat(state), "Test: "
               + scenario.getDescription() + ": Unexpected count for " + state);
     }
@@ -495,7 +498,7 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the expected counts for each health state and
    * queues. It is created by deserializing JSON files.
    */
-  public static class Expectations {
+  public static class Expectation {
 
     private Map<ReplicationManagerReport.HealthState, Integer> stateCounts
         = new HashMap<>();
@@ -644,6 +647,8 @@ public class TestReplicationManagerScenarios {
    */
   public static class Scenario {
     private String description;
+    private int ecMaintenanceRedundancy;
+    private int ratisMaintenanceMinimum;
     private HddsProtos.LifeCycleState containerState =
         HddsProtos.LifeCycleState.CLOSED;
     private long used = 10;
@@ -655,12 +660,35 @@ public class TestReplicationManagerScenarios {
         .getInstance(HddsProtos.ReplicationFactor.THREE);
     private TestReplica[] replicas = new TestReplica[0];
     private PendingReplica[] pendingReplicas = new PendingReplica[0];
-    private Expectations expectation;
+    private Expectation expectation = new Expectation();
     private ExpectedCommands[] checkCommands = new ExpectedCommands[0];
     private ExpectedCommands[] commands = new ExpectedCommands[0];
 
+    public Scenario() {
+      ReplicationManager.ReplicationManagerConfiguration conf =
+          new ReplicationManager.ReplicationManagerConfiguration();
+      ecMaintenanceRedundancy = conf.getMaintenanceRemainingRedundancy();
+      ratisMaintenanceMinimum = conf.getMaintenanceReplicaMinimum();
+    }
+
     public void setDescription(String description) {
       this.description = description;
+    }
+
+    public void setEcMaintenanceRedundancy(int val) {
+      this.ecMaintenanceRedundancy = val;
+    }
+
+    public void setRatisMaintenanceMinimum(int val) {
+      this.ratisMaintenanceMinimum = val;
+    }
+
+    public int getEcMaintenanceRedundancy() {
+      return this.ecMaintenanceRedundancy;
+    }
+
+    public int getRatisMaintenanceMinimum() {
+      return this.ratisMaintenanceMinimum;
     }
 
     public String getDescription() {
@@ -703,7 +731,7 @@ public class TestReplicationManagerScenarios {
       return this.pendingReplicas;
     }
 
-    public void setExpectation(Expectations expectation) {
+    public void setExpectation(Expectation expectation) {
       this.expectation = expectation;
     }
 
@@ -723,7 +751,7 @@ public class TestReplicationManagerScenarios {
       return replicas;
     }
 
-    public Expectations getExpectation() {
+    public Expectation getExpectation() {
       return expectation;
     }
 
