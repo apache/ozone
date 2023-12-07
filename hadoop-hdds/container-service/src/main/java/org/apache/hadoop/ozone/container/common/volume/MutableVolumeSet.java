@@ -464,6 +464,7 @@ public class MutableVolumeSet implements VolumeSet {
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
+        long committed = 0;
         String rootDir = "";
         failed = true;
         if (volumeInfo.isPresent()) {
@@ -472,9 +473,8 @@ public class MutableVolumeSet implements VolumeSet {
             scmUsed = volumeInfo.get().getScmUsed();
             remaining = volumeInfo.get().getAvailable();
             capacity = volumeInfo.get().getCapacity();
-            if (volume instanceof HddsVolume) {
-              remaining -= ((HddsVolume)volume).getCommittedBytes();
-            }
+            committed = (volume instanceof HddsVolume) ?
+                ((HddsVolume) volume).getCommittedBytes() : 0;
             failed = false;
           } catch (UncheckedIOException ex) {
             LOG.warn("Failed to get scmUsed and remaining for container " +
@@ -494,6 +494,7 @@ public class MutableVolumeSet implements VolumeSet {
             .setCapacity(capacity)
             .setRemaining(remaining)
             .setScmUsed(scmUsed)
+            .setCommitted(committed)
             .setStorageType(volume.getStorageType());
         StorageLocationReport r = builder.build();
         reports[counter++] = r;
