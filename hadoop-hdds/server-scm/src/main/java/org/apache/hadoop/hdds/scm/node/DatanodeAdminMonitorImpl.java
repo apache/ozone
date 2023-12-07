@@ -78,7 +78,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private ReplicationManager replicationManager;
   private Queue<DatanodeDetails> pendingNodes = new ArrayDeque();
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
-  private Set<DatanodeDetails> trackedNodes = new HashSet<>();
+  private Set<TrackedNode> trackedNodes = new HashSet<>();
   private NodeDecommissionMetrics metrics;
   private long pipelinesWaitingToClose = 0;
   private long sufficientlyReplicatedContainers = 0;
@@ -86,6 +86,24 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long trackedRecommission = 0;
   private long unhealthyContainers = 0;
   private long underReplicatedContainers = 0;
+
+  public static final class TrackedNode {
+
+    private DatanodeDetails datanodeDetails;
+
+    public TrackedNode(DatanodeDetails datanodeDetails) {
+      this.datanodeDetails = datanodeDetails;
+    }
+
+    @Override
+    public int hashCode() {
+      return datanodeDetails.hashCode();
+    }
+
+    public DatanodeDetails getDatanodeDetails() {
+      return datanodeDetails;
+    }
+  }
 
   private Map<String, ContainerStateInWorkflow> containerStateByHost;
 
@@ -145,7 +163,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
    * @return An unmodifiable set of the tracked nodes.
    */
   @Override
-  public synchronized Set<DatanodeDetails> getTrackedNodes() {
+  public synchronized Set<TrackedNode> getTrackedNodes() {
     return Collections.unmodifiableSet(trackedNodes);
   }
 
@@ -220,7 +238,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     while (!cancelledNodes.isEmpty()) {
       DatanodeDetails dn = cancelledNodes.poll();
       try {
-        stopTrackingNode(dn);
+        stopTrackingNode(new TrackedNode(dn));
         putNodeBackInService(dn);
         LOG.info("Recommissioned node {}", dn);
       } catch (NodeNotFoundException e) {
@@ -237,10 +255,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void processTransitioningNodes() {
     resetContainerMetrics();
-    Iterator<DatanodeDetails> iterator = trackedNodes.iterator();
+    Iterator<TrackedNode> iterator = trackedNodes.iterator();
 
     while (iterator.hasNext()) {
-      DatanodeDetails dn = iterator.next();
+      DatanodeDetails dn = iterator.next().getDatanodeDetails();
       try {
         NodeStatus status = getNodeStatus(dn);
 
@@ -462,10 +480,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void startTrackingNode(DatanodeDetails dn) {
     eventQueue.fireEvent(SCMEvents.START_ADMIN_ON_NODE, dn);
-    trackedNodes.add(dn);
+    trackedNodes.add(new TrackedNode(dn));
   }
 
-  private void stopTrackingNode(DatanodeDetails dn) {
+  private void stopTrackingNode(TrackedNode dn) {
     trackedNodes.remove(dn);
   }
 
