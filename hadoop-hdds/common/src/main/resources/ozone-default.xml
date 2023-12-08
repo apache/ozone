@@ -4271,4 +4271,12 @@
       Specify if zero-copy should be enabled for EC GRPC protocol.
     </description>
   </property>
+  <property>
+    <name>ozone.om.max.buckets</name>
+    <value>100000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      maximum number of buckets across all volumes.
+    </description>
+  </property>
 </configuration>

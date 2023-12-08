@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -38,6 +39,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -180,6 +183,31 @@ public class TestOmUtils {
     Assertions.assertTrue(hosts.contains("om1-host"));
 
     Assertions.assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
+  }
+
+  @Test
+  public void testgetOmSocketAddress() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // First try a client address with just a host name. Verify it falls
+    // back to the default port.
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4");
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertThat(addr.getHostString(), is("1.2.3.4"));
+    assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
+
+    // Next try a client address with just a host name and port. Verify the port
+    // is ignored and the default OM port is used.
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4:100");
+    addr = OmUtils.getOmAddress(conf);
+    assertThat(addr.getHostString(), is("1.2.3.4"));
+    assertThat(addr.getPort(), is(100));
+
+    // Assert the we are able to use default configs if no value is specified.
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
+    addr = OmUtils.getOmAddress(conf);
+    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
   }
 }
 

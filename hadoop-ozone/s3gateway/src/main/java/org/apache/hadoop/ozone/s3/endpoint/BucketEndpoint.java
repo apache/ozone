@@ -116,10 +116,10 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
-    Iterator<? extends OzoneKey> ozoneKeyIterator;
+    Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
-    OzoneBucket bucket;
+    OzoneBucket bucket = null;
 
     try {
       if (aclMarker != null) {
@@ -164,6 +164,9 @@ public class BucketEndpoint extends EndpointBase {
       getMetrics().updateGetBucketFailureStats(startNanos);
       if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
+        // File not found, continue and send normal response with 0 keyCount
+        LOG.debug("Key Not found prefix: {}", prefix);
       } else {
         throw ex;
       }
@@ -206,9 +209,9 @@ public class BucketEndpoint extends EndpointBase {
     }
     String lastKey = null;
     int count = 0;
-    while (ozoneKeyIterator.hasNext()) {
+    while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
       OzoneKey next = ozoneKeyIterator.next();
-      if (bucket.getBucketLayout().isFileSystemOptimized() &&
+      if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
           StringUtils.isNotEmpty(prefix) &&
           !next.getName().startsWith(prefix)) {
         // prefix has delimiter but key don't have
