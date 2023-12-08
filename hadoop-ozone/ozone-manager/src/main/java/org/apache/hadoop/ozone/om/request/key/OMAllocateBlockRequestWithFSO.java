@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.helpers.OmGetOpenKey;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -214,15 +215,14 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       String keyName, long clientID, OzoneManager ozoneManager)
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(
-            volumeName, bucketName);
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-            pathComponents, keyName, omMetadataManager);
-    return omMetadataManager.getOpenFileName(volumeId, bucketId, parentID,
-            fileName, clientID);
+
+		return new OmGetOpenKey.Builder()
+					.setVolumeName(volumeName)
+					.setBucketName(bucketName)
+					.setKeyName(keyName)
+					.setOmMetadataManager(omMetadataManager)
+					.setClientID(clientID)
+					.build().getKey();
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
