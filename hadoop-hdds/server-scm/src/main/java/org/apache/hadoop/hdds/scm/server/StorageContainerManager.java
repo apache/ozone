@@ -412,6 +412,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
               scmHAManager.getRatisServer());
+      if (!ratisEnabled) {
+        secretKeyManagerService.getSecretKeyManager().checkAndInitialize();
+      }
       serviceManager.register(secretKeyManagerService);
     } else {
       secretKeyManagerService = null;
