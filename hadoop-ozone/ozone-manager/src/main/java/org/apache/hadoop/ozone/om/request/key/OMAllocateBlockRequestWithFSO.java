@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.helpers.OmGetOpenKey;
+import org.apache.hadoop.ozone.om.helpers.OmGetKey;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -52,10 +52,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -216,13 +213,13 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-		return new OmGetOpenKey.Builder()
+		return new OmGetKey.Builder()
 					.setVolumeName(volumeName)
 					.setBucketName(bucketName)
 					.setKeyName(keyName)
 					.setOmMetadataManager(omMetadataManager)
 					.setClientID(clientID)
-					.build().getKey();
+					.build().getOpenKey();
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
