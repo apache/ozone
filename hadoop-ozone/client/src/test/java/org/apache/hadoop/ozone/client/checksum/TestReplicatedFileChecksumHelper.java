@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -51,9 +52,9 @@ import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
@@ -70,9 +71,9 @@ import java.util.concurrent.CompletableFuture;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /**
@@ -84,9 +85,14 @@ public class TestReplicatedFileChecksumHelper {
   private OzoneVolume volume;
   private RpcClient rpcClient;
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     ConfigurationSource config = new InMemoryConfiguration();
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
+
+    ((InMemoryConfiguration)config).setFromObject(clientConfig);
+
     rpcClient = new RpcClient(config, null) {
 
       @Override
@@ -104,12 +110,13 @@ public class TestReplicatedFileChecksumHelper {
         return new MockXceiverClientFactory();
       }
     };
+
     client = new OzoneClient(config, rpcClient);
 
     store = client.getObjectStore();
   }
 
-  @After
+  @AfterEach
   public void close() throws IOException {
     client.close();
   }
@@ -241,6 +248,36 @@ public class TestReplicatedFileChecksumHelper {
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
+
+    FileChecksum cachedChecksum = new MD5MD5CRC32GzipFileChecksum();
+    /// test cached checksum
+    OmKeyInfo omKeyInfoWithChecksum = new OmKeyInfo.Builder()
+        .setVolumeName(null)
+        .setBucketName(null)
+        .setKeyName(null)
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, omKeyLocationInfoList)))
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(0)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+        .setFileEncryptionInfo(null)
+        .setAcls(null)
+        .setFileChecksum(cachedChecksum)
+        .build();
+    when(om.lookupKey(ArgumentMatchers.any())).
+        thenReturn(omKeyInfoWithChecksum);
+
+    helper = new ReplicatedFileChecksumHelper(
+        mockVolume, bucket, "dummy", 10, combineMode,
+        mockRpcClient);
+
+    helper.compute();
+    fileChecksum = helper.getFileChecksum();
+    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertEquals(1, helper.getKeyLocationInfoList().size());
   }
 
   private XceiverClientReply buildValidResponse() {
@@ -327,7 +364,9 @@ public class TestReplicatedFileChecksumHelper {
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
-      assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+      //assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+      assertEquals(DataChecksum.Type.CRC32C,
+          ((MD5MD5CRC32FileChecksum)fileChecksum).getCrcType());
       assertEquals(1, helper.getKeyLocationInfoList().size());
     }
   }

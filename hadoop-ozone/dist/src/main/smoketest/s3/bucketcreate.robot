@@ -33,10 +33,22 @@ Create new bucket
     Create bucket
 
 Create bucket which already exists
-    ${bucket} =                 Create bucket
-    Create bucket with name     ${bucket}
+    ${bucket} =         Create bucket
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ${bucket}   255
+                        Should contain          ${result}           BucketAlreadyExists
 
 Create bucket with invalid bucket name
     ${randStr} =        Generate Ozone String
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
-                        Should contain              ${result}         InvalidBucketName
+                        Should contain          ${result}           InvalidBucketName
+
+Create new bucket and check no group ACL
+    ${bucket} =         Create bucket
+    ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
+    ${group} =          Get Regexp Matches   ${acl}     "GROUP"
+    IF      '${group}' is not '[]'
+        ${json} =           Evaluate    json.loads('''${acl}''')    json
+        # make sure this check is for group acl
+        Should contain      ${json}[1][type]       GROUP
+        Should contain      ${json}[1][aclList]    NONE
+    END

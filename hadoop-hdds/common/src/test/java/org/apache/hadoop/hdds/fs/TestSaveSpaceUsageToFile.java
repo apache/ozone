@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.fs;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,9 +32,9 @@ import java.util.OptionalLong;
 
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link SaveSpaceUsageToFile}.
@@ -51,14 +51,14 @@ public class TestSaveSpaceUsageToFile {
 
   private File file;
 
-  @Before
+  @BeforeEach
   public void setup() {
     FileUtil.fullyDelete(DIR);
     assertTrue(DIR.mkdirs());
     file = new File(DIR, "space_usage.txt");
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     FileUtil.fullyDelete(DIR);
   }

@@ -105,13 +105,14 @@ public class DatanodeCRLStoreImpl implements DatanodeCRLStore {
 
   @Override
   public List<CRLInfo> getPendingCRLs() throws IOException {
-    TableIterator<Long, ? extends Table.KeyValue<Long, CRLInfo>> iter =
-        pendingCRLsTable.iterator();
-    List<CRLInfo> pendingCRLs = new ArrayList<>();
-    while (iter.hasNext()) {
-      pendingCRLs.add(iter.next().getValue());
+    try (TableIterator<Long, ? extends Table.KeyValue<Long, CRLInfo>> iter =
+        pendingCRLsTable.iterator()) {
+      List<CRLInfo> pendingCRLs = new ArrayList<>();
+      while (iter.hasNext()) {
+        pendingCRLs.add(iter.next().getValue());
+      }
+      return pendingCRLs;
     }
-    return pendingCRLs;
   }
 
   private void checkTableStatus(Table table, String name) throws IOException {

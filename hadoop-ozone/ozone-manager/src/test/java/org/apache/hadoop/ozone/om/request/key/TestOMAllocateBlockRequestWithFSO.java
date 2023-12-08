@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * Tests OMAllocateBlockRequest class prefix layout.
@@ -73,7 +73,11 @@ public class TestOMAllocateBlockRequestWithFSO
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
-    return omMetadataManager.getOzonePathKey(parentID, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentID, fileName);
   }
 
   @NotNull
@@ -92,8 +96,8 @@ public class TestOMAllocateBlockRequestWithFSO
   @Override
   protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
       boolean doAssert) throws Exception {
-    long bucketId = OMRequestTestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
     for (int indx = 0; indx < pathComponents.length; indx++) {
@@ -101,24 +105,26 @@ public class TestOMAllocateBlockRequestWithFSO
       // Reached last component, which is file name
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName =
-            omMetadataManager.getOpenFileName(parentId, pathElement, id);
+            omMetadataManager.getOpenFileName(volumeId, bucketId,
+                    parentId, pathElement, id);
         OmKeyInfo omKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
-          Assert.assertNotNull("Invalid key!", omKeyInfo);
+          Assertions.assertNotNull(omKeyInfo, "Invalid key!");
         }
         return omKeyInfo;
       } else {
         // directory
-        String dbKey = omMetadataManager.getOzonePathKey(parentId, pathElement);
+        String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+                parentId, pathElement);
         OmDirectoryInfo dirInfo =
             omMetadataManager.getDirectoryTable().get(dbKey);
         parentId = dirInfo.getObjectID();
       }
     }
     if (doAssert) {
-      Assert.fail("Invalid key!");
+      Assertions.fail("Invalid key!");
     }
     return  null;
   }

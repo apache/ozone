@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
@@ -58,9 +61,37 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private boolean isRunning = true;
 
-  private static final Gson TRACING_SERIALIZER = new GsonBuilder().create();
+  private static final Gson TRACING_SERIALIZER = new GsonBuilder()
+          .setExclusionStrategies(new DatanodeDetailsGsonExclusionStrategy())
+          .create();
 
   private boolean isSilent = false;
+  private final String threadNamePrefix;
+
+  public EventQueue() {
+    threadNamePrefix = "";
+  }
+
+  public EventQueue(String threadNamePrefix) {
+    this.threadNamePrefix = threadNamePrefix;
+  }
+
+  // The field parent in DatanodeDetails class has the circular reference
+  // which will result in Gson infinite recursive parsing. We need to exclude
+  // this field when generating json string for DatanodeDetails object
+  static class DatanodeDetailsGsonExclusionStrategy
+          implements ExclusionStrategy {
+    @Override
+    public boolean shouldSkipField(FieldAttributes f) {
+      return f.getDeclaringClass() == NodeImpl.class
+              && f.getName().equals("parent");
+    }
+
+    @Override
+    public boolean shouldSkipClass(Class<?> aClass) {
+      return false;
+    }
+  }
 
   /**
    * Add new handler to the event queue.
@@ -79,7 +110,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     Preconditions.checkNotNull(handler, "Handler should not be null.");
     validateEvent(event);
     String executorName = getExecutorName(event, handler);
-    this.addHandler(event, new SingleThreadExecutor<>(executorName), handler);
+    SingleThreadExecutor<PAYLOAD> executor =
+        new SingleThreadExecutor<>(executorName, threadNamePrefix);
+    this.addHandler(event, executor, handler);
   }
 
   /**

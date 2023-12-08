@@ -18,4 +18,5 @@
 
 <suppressions>
   <suppress checks="JavadocPackage" files="[\\/]src[\\/]test[\\/].*"/>
+  <suppress checks="JavadocPackage" files="src/main/java/org/apache/hadoop/io/erasurecode/rawcoder"/>
 </suppressions>

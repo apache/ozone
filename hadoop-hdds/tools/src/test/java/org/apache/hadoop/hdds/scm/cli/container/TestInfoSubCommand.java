@@ -27,18 +27,24 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import picocli.CommandLine;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -48,7 +54,10 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -62,22 +71,39 @@ public class TestInfoSubCommand {
   private Logger logger;
   private TestAppender appender;
 
-  @Before
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private ByteArrayInputStream inContent;
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+  private final InputStream originalIn = System.in;
+
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+
+  @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
     datanodes = createDatanodeDetails(3);
     Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
-        .thenReturn(getContainerWithPipeline());
+        .then(i -> getContainerWithPipeline(i.getArgument(0)));
+    Mockito.when(scmClient.getPipeline(any()))
+        .thenThrow(new PipelineNotFoundException("Pipeline not found."));
 
     appender = new TestAppender();
     logger = Logger.getLogger(
         org.apache.hadoop.hdds.scm.cli.container.InfoSubcommand.class);
     logger.addAppender(appender);
+
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void after() {
     logger.removeAppender(appender);
+    System.setOut(originalOut);
+    System.setErr(originalErr);
+    System.setIn(originalIn);
   }
 
   @Test
@@ -90,6 +116,96 @@ public class TestInfoSubCommand {
     testReplicaIncludedInOutput(true);
   }
 
+  @Test
+  public void testErrorWhenNoContainerIDParam() throws Exception {
+    cmd = new InfoSubcommand();
+    assertThrows(CommandLine.MissingParameterException.class, () -> {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs();
+      cmd.execute(scmClient);
+    });
+  }
+
+  @Test
+  public void testMultipleContainersCanBePassed() throws Exception {
+    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("1", "123", "456", "invalid", "789");
+    cmd.execute(scmClient);
+    validateMultiOutput();
+  }
+
+  @Test
+  public void testContainersCanBeReadFromStdin() throws IOException {
+    String input = "1\n123\n456\ninvalid\n789\n";
+    inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
+    System.setIn(inContent);
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-");
+    cmd.execute(scmClient);
+
+    validateMultiOutput();
+  }
+
+  private void validateMultiOutput() throws UnsupportedEncodingException {
+    // Ensure we have a log line for each containerID
+    List<LoggingEvent> logs = appender.getLog();
+    List<LoggingEvent> replica = logs.stream()
+        .filter(m -> m.getRenderedMessage()
+            .matches("(?s)^Container id: (1|123|456|789).*"))
+        .collect(Collectors.toList());
+    Assertions.assertEquals(4, replica.size());
+
+    Pattern p = Pattern.compile(
+        "^Invalid\\scontainer\\sID:\\sinvalid.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
+
+  @Test
+  public void testContainersCanBeReadFromStdinJson()
+      throws IOException {
+    String input = "1\n123\n456\ninvalid\n789\n";
+    inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
+    System.setIn(inContent);
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-", "--json");
+    cmd.execute(scmClient);
+
+    validateJsonMultiOutput();
+  }
+
+
+  @Test
+  public void testMultipleContainersCanBePassedJson() throws Exception {
+    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("1", "123", "456", "invalid", "789", "--json");
+    cmd.execute(scmClient);
+
+    validateJsonMultiOutput();
+  }
+
+  private void validateJsonMultiOutput() throws UnsupportedEncodingException {
+    // Ensure we have a log line for each containerID
+    List<LoggingEvent> logs = appender.getLog();
+    List<LoggingEvent> replica = logs.stream()
+        .filter(m -> m.getRenderedMessage()
+            .matches("(?s)^.*\"containerInfo\".*"))
+        .collect(Collectors.toList());
+    Assertions.assertEquals(4, replica.size());
+
+    Pattern p = Pattern.compile(
+        "^Invalid\\scontainer\\sID:\\sinvalid.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
 
   private void testReplicaIncludedInOutput(boolean includeIndex)
       throws IOException {
@@ -105,20 +221,30 @@ public class TestInfoSubCommand {
     List<LoggingEvent> replica = logs.stream()
         .filter(m -> m.getRenderedMessage().matches("(?s)^Replicas:.*"))
         .collect(Collectors.toList());
-    Assert.assertEquals(1, replica.size());
+    Assertions.assertEquals(1, replica.size());
 
     // Ensure each DN UUID is mentioned in the message:
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(".*" + dn.getUuid().toString() + ".*",
           Pattern.DOTALL);
       Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
-      Assert.assertTrue(matcher.matches());
+      Assertions.assertTrue(matcher.matches());
+    }
+    // Ensure the replicaIndex output is in order
+    if (includeIndex) {
+      List<Integer> indexList = new ArrayList<>();
+      for (int i = 1; i < datanodes.size() + 1; i++) {
+        String temp = "ReplicaIndex: " + i;
+        indexList.add(replica.get(0).getRenderedMessage().indexOf(temp));
+      }
+      Assertions.assertEquals(datanodes.size(), indexList.size());
+      Assertions.assertTrue(inSort(indexList));
     }
     // Ensure ReplicaIndex is not mentioned as it was not passed in the proto:
     Pattern pattern = Pattern.compile(".*ReplicaIndex.*",
         Pattern.DOTALL);
     Matcher matcher = pattern.matcher(replica.get(0).getRenderedMessage());
-    Assert.assertEquals(includeIndex, matcher.matches());
+    Assertions.assertEquals(includeIndex, matcher.matches());
   }
 
   @Test
@@ -135,15 +261,12 @@ public class TestInfoSubCommand {
     List<LoggingEvent> replica = logs.stream()
         .filter(m -> m.getRenderedMessage().matches("(?s)^Replicas:.*"))
         .collect(Collectors.toList());
-    Assert.assertEquals(0, replica.size());
+    Assertions.assertEquals(0, replica.size());
 
-    // Ensure we have an error logged:
-    List<LoggingEvent> error = logs.stream()
-        .filter(m -> m.getLevel() == Level.ERROR)
-        .collect(Collectors.toList());
-    Assert.assertEquals(1, error.size());
-    Assert.assertTrue(error.get(0).getRenderedMessage()
-        .matches("(?s)^Unable to retrieve the replica details.*"));
+    Pattern p = Pattern.compile(
+        "^Unable to retrieve the replica details.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
   }
 
   @Test
@@ -156,13 +279,10 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     List<LoggingEvent> logs = appender.getLog();
-    Assert.assertEquals(2, logs.size());
-    String error = logs.get(0).getRenderedMessage();
-    String json = logs.get(1).getRenderedMessage();
+    Assertions.assertEquals(1, logs.size());
+    String json = logs.get(0).getRenderedMessage();
 
-    Assert.assertTrue(error
-        .matches("(?s)^Unable to retrieve the replica details.*"));
-    Assert.assertFalse(json.matches("(?s).*replicas.*"));
+    Assertions.assertFalse(json.matches("(?s).*replicas.*"));
   }
 
   @Test
@@ -181,6 +301,15 @@ public class TestInfoSubCommand {
     testJsonOutput();
   }
 
+  private static boolean inSort(List<Integer> list) {
+    for (int i = 0; i < list.size(); i++) {
+      if (list.indexOf(i) > list.indexOf(i + 1)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private void testJsonOutput() throws IOException {
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -188,26 +317,27 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     List<LoggingEvent> logs = appender.getLog();
-    Assert.assertEquals(1, logs.size());
+    Assertions.assertEquals(1, logs.size());
 
     // Ensure each DN UUID is mentioned in the message after replicas:
     String json = logs.get(0).getRenderedMessage();
-    Assert.assertTrue(json.matches("(?s).*replicas.*"));
+    Assertions.assertTrue(json.matches("(?s).*replicas.*"));
     for (DatanodeDetails dn : datanodes) {
       Pattern pattern = Pattern.compile(
           ".*replicas.*" + dn.getUuid().toString() + ".*", Pattern.DOTALL);
       Matcher matcher = pattern.matcher(json);
-      Assert.assertTrue(matcher.matches());
+      Assertions.assertTrue(matcher.matches());
     }
     Pattern pattern = Pattern.compile(".*replicaIndex.*",
         Pattern.DOTALL);
     Matcher matcher = pattern.matcher(json);
-    Assert.assertTrue(matcher.matches());
+    Assertions.assertTrue(matcher.matches());
   }
 
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
+    int index = 1;
     for (DatanodeDetails dn : datanodes) {
       ContainerReplicaInfo.Builder container
           = new ContainerReplicaInfo.Builder()
@@ -219,14 +349,14 @@ public class TestInfoSubCommand {
           .setKeyCount(1)
           .setSequenceId(1);
       if (includeIndex) {
-        container.setReplicaIndex(4);
+        container.setReplicaIndex(index++);
       }
       replicas.add(container.build());
     }
     return replicas;
   }
 
-  private ContainerWithPipeline getContainerWithPipeline() {
+  private ContainerWithPipeline getContainerWithPipeline(long containerID) {
     Pipeline pipeline = new Pipeline.Builder()
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
@@ -235,6 +365,7 @@ public class TestInfoSubCommand {
         .build();
 
     ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(containerID)
         .setSequenceId(1)
         .setPipelineID(pipeline.getId())
         .setUsedBytes(1234)

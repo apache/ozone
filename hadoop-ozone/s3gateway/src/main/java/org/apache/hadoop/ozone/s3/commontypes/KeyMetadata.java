@@ -31,7 +31,7 @@ public class KeyMetadata {
 
   @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Key")
-  private String key; // or the Object Name
+  private EncodingTypeObject key; // or the Object Name
 
   @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "LastModified")
@@ -46,11 +46,11 @@ public class KeyMetadata {
   @XmlElement(name = "StorageClass")
   private String storageClass;
 
-  public String getKey() {
+  public EncodingTypeObject getKey() {
     return key;
   }
 
-  public void setKey(String key) {
+  public void setKey(EncodingTypeObject key) {
     this.key = key;
   }
 

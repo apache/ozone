@@ -18,34 +18,34 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
 
 /**
- * {@link Codec} for {@link GeneratedMessage} objects.
+ * {@link Codec} for {@link Message} objects.
  */
 public class GeneratedMessageCodec implements Codec {
 
   @Override
   public ByteString serialize(Object object) {
-    return ((GeneratedMessage)object).toByteString();
+    return ((Message)object).toByteString();
   }
 
   @Override
-  public GeneratedMessage deserialize(Class<?> type, ByteString value)
+  public Message deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      return (GeneratedMessage) ReflectionUtil.getMethod(type,
+      return (Message) ReflectionUtil.getMethod(type,
           "parseFrom", byte[].class)
           .invoke(null, (Object) value.toByteArray());
     } catch (NoSuchMethodException | IllegalAccessException
         | InvocationTargetException ex) {
       ex.printStackTrace();
       throw new InvalidProtocolBufferException(
-          "GeneratedMessage cannot be decoded: " + ex.getMessage());
+          "Message cannot be decoded: " + ex.getMessage());
     }
   }
 }

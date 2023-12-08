@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * This class is used to capture the current status of a datanode. This
@@ -28,7 +31,39 @@ import java.util.Objects;
  * in_service, decommissioned and maintenance mode) along with the expiry time
  * for the operational state (used with maintenance mode).
  */
-public class NodeStatus {
+public class NodeStatus implements Comparable<NodeStatus> {
+
+  private static final Set<HddsProtos.NodeOperationalState>
+      MAINTENANCE_STATES = ImmutableSet.copyOf(EnumSet.of(
+          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+          HddsProtos.NodeOperationalState.IN_MAINTENANCE
+      ));
+
+  private static final Set<HddsProtos.NodeOperationalState>
+      DECOMMISSION_STATES = ImmutableSet.copyOf(EnumSet.of(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING,
+          HddsProtos.NodeOperationalState.DECOMMISSIONED
+      ));
+
+  private static final Set<HddsProtos.NodeOperationalState>
+      OUT_OF_SERVICE_STATES = ImmutableSet.copyOf(EnumSet.of(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING,
+          HddsProtos.NodeOperationalState.DECOMMISSIONED,
+          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+          HddsProtos.NodeOperationalState.IN_MAINTENANCE
+      ));
+
+  public static Set<HddsProtos.NodeOperationalState> maintenanceStates() {
+    return MAINTENANCE_STATES;
+  }
+
+  public static Set<HddsProtos.NodeOperationalState> decommissionStates() {
+    return DECOMMISSION_STATES;
+  }
+
+  public static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
+    return OUT_OF_SERVICE_STATES;
+  }
 
   private HddsProtos.NodeOperationalState operationalState;
   private HddsProtos.NodeState health;
@@ -93,6 +128,10 @@ public class NodeStatus {
     return System.currentTimeMillis() / 1000 >= opStateExpiryEpochSeconds;
   }
 
+  public boolean isInService() {
+    return operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
+  }
+
   /**
    * Returns true if the nodeStatus indicates the node is in any decommission
    * state.
@@ -100,8 +139,7 @@ public class NodeStatus {
    * @return True if the node is in any decommission state, false otherwise
    */
   public boolean isDecommission() {
-    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONING
-        || operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONED;
+    return DECOMMISSION_STATES.contains(operationalState);
   }
 
   /**
@@ -128,9 +166,7 @@ public class NodeStatus {
    * @return True if the node is in any maintenance state, false otherwise
    */
   public boolean isMaintenance() {
-    return operationalState
-        == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE
-        || operationalState == HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+    return MAINTENANCE_STATES.contains(operationalState);
   }
 
   /**
@@ -153,13 +189,14 @@ public class NodeStatus {
   }
 
   /**
-   * Returns true if the nodeStatus is healthy (ie not stale or dead) and false
-   * otherwise.
+   * Returns true if the nodeStatus is healthy or healthy_readonly (ie not stale
+   * or dead) and false otherwise.
    *
-   * @return True if the node is Healthy, false otherwise
+   * @return True if the node is healthy or healthy_readonly, false otherwise.
    */
   public boolean isHealthy() {
-    return health == HddsProtos.NodeState.HEALTHY;
+    return health == HddsProtos.NodeState.HEALTHY
+        || health == HddsProtos.NodeState.HEALTHY_READONLY;
   }
 
   /**
@@ -211,6 +248,18 @@ public class NodeStatus {
   public String toString() {
     return "OperationalState: " + operationalState + " Health: " + health +
         " OperationStateExpiry: " + opStateExpiryEpochSeconds;
+  }
+
+  @Override
+  public int compareTo(NodeStatus o) {
+    int order = Boolean.compare(o.isHealthy(), isHealthy());
+    if (order == 0) {
+      order = Boolean.compare(isDead(), o.isDead());
+    }
+    if (order == 0) {
+      order = operationalState.compareTo(o.operationalState);
+    }
+    return order;
   }
 
 }

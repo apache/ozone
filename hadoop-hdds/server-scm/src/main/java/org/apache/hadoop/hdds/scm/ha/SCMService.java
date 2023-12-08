@@ -60,13 +60,14 @@ public interface SCMService {
   enum Event {
     PRE_CHECK_COMPLETED,
     NEW_NODE_HANDLER_TRIGGERED,
+    NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED,
     UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
   }
 
   /**
    * starts the SCM service.
    */
-  void start();
+  void start() throws SCMServiceException;
 
   /**
    * stops the SCM service.

@@ -17,16 +17,33 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.TimeDuration;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
@@ -46,16 +63,23 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for SCM HA-related configuration.
  */
-public class TestSCMHAConfiguration {
+class TestSCMHAConfiguration {
   private OzoneConfiguration conf;
 
-  @Before
-  public void setup() {
+  @BeforeEach
+  void setup(@TempDir File tempDir) {
     conf = new OzoneConfiguration();
+    conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
+    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test
@@ -115,74 +139,88 @@ public class TestSCMHAConfiguration {
           scmServiceId, nodeId), port++);
     }
 
-
-    SCMHANodeDetails.loadSCMHAConfig(conf);
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
 
     port = 9880;
 
     // Validate configs.
-    Assert.assertEquals("localhost:" + port++,
+    assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         scmServiceId, "scm1")));
-    Assert.assertEquals(port,
+    assertEquals(port,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
         scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1",
+    assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY,
             scmServiceId, "scm1")));
 
 
-    Assert.assertEquals("localhost:" + port++,
+    assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(
             OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId, "scm1")));
-    Assert.assertEquals(port, conf.getInt(ConfUtils.addKeySuffixes(
+    assertEquals(port, conf.getInt(ConfUtils.addKeySuffixes(
         OZONE_SCM_SECURITY_SERVICE_PORT_KEY, scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1",
+    assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(
             OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, scmServiceId, "scm1")));
 
 
-    Assert.assertEquals("localhost:" + port++,
+    assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_ADDRESS_KEY,
             scmServiceId, "scm1")));
-    Assert.assertEquals(port,
+    assertEquals(port,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
             scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(
+    assertEquals("172.28.9.1", conf.get(
         ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_BIND_HOST_KEY, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals("localhost:" + port++,
+    assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_ADDRESS_KEY,
             scmServiceId, "scm1")));
-    Assert.assertEquals(port,
+    assertEquals(port,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
             scmServiceId, "scm1"), 9999));
-    Assert.assertEquals("172.28.9.1", conf.get(
+    assertEquals("172.28.9.1", conf.get(
         ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_BIND_HOST_KEY, scmServiceId,
         "scm1")));
 
 
-    Assert.assertEquals("localhost:" + port++,
+    assertEquals("localhost:" + port++,
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_ADDRESS_KEY,
         scmServiceId, "scm1")));
-    Assert.assertEquals("172.28.9.1",
+    assertEquals("172.28.9.1",
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_HTTP_BIND_HOST_KEY,
         scmServiceId, "scm1")));
 
-    Assert.assertEquals("localhost", conf.get(ConfUtils.addKeySuffixes(
+    assertEquals("localhost", conf.get(ConfUtils.addKeySuffixes(
         OZONE_SCM_ADDRESS_KEY, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals("/var/scm-metadata1",
+    assertEquals("/var/scm-metadata1",
         conf.get(ConfUtils.addKeySuffixes(OZONE_SCM_DB_DIRS, scmServiceId,
         "scm1")));
 
-    Assert.assertEquals(port++,
+    assertEquals(port++,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
         scmServiceId, "scm1"), 9999));
 
 
+    final ScmRatisServerConfig scmRatisConfig = conf.getObject(
+        ScmRatisServerConfig.class);
+    assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
+        "getLogAppenderWaitTimeMin");
+
+    final File testDir = GenericTestUtils.getRandomizedTestDir();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+
+    final RaftProperties p = RatisUtil.newRaftProperties(conf);
+    final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
+    assertEquals(TimeDuration.ZERO, t,
+        RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
 
@@ -209,11 +247,14 @@ public class TestSCMHAConfiguration {
     conf.set(OZONE_SCM_DATANODE_PORT_KEY, "9898");
     conf.set(OZONE_SCM_SECURITY_SERVICE_PORT_KEY, "9899");
 
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    SCMHANodeDetails scmhaNodeDetails =
+        SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
 
-    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf);
-
-    Assert.assertEquals("10000", conf.get(OZONE_SCM_RATIS_PORT_KEY));
-    Assert.assertEquals("10001", conf.get(OZONE_SCM_GRPC_PORT_KEY));
+    assertEquals("10000", conf.get(OZONE_SCM_RATIS_PORT_KEY));
+    assertEquals("10001", conf.get(OZONE_SCM_GRPC_PORT_KEY));
 
 
     InetSocketAddress clientAddress =
@@ -223,36 +264,118 @@ public class TestSCMHAConfiguration {
         NetUtils.createSocketAddr("0.0.0.0", 9896);
     InetSocketAddress datanodeAddress =
         NetUtils.createSocketAddr("0.0.0.0", 9898);
-    Assert.assertEquals(clientAddress, scmhaNodeDetails.getLocalNodeDetails()
+    assertEquals(clientAddress,
+        scmhaNodeDetails.getLocalNodeDetails()
             .getClientProtocolServerAddress());
-    Assert.assertEquals(blockAddress, scmhaNodeDetails.getLocalNodeDetails()
+    assertEquals(blockAddress, scmhaNodeDetails.getLocalNodeDetails()
         .getBlockProtocolServerAddress());
-    Assert.assertEquals(datanodeAddress, scmhaNodeDetails.getLocalNodeDetails()
-        .getDatanodeProtocolServerAddress());
+    assertEquals(datanodeAddress,
+        scmhaNodeDetails.getLocalNodeDetails()
+            .getDatanodeProtocolServerAddress());
 
-    Assert.assertEquals(10000,
+    assertEquals(10000,
         scmhaNodeDetails.getLocalNodeDetails().getRatisPort());
-    Assert.assertEquals(10001,
+    assertEquals(10001,
         scmhaNodeDetails.getLocalNodeDetails().getGrpcPort());
 
     for (SCMNodeDetails peer : scmhaNodeDetails.getPeerNodeDetails()) {
-      Assert.assertEquals(clientAddress, peer.getClientProtocolServerAddress());
-      Assert.assertEquals(blockAddress, peer.getBlockProtocolServerAddress());
-      Assert.assertEquals(datanodeAddress,
+      assertEquals(clientAddress,
+          peer.getClientProtocolServerAddress());
+      assertEquals(blockAddress,
+          peer.getBlockProtocolServerAddress());
+      assertEquals(datanodeAddress,
           peer.getDatanodeProtocolServerAddress());
 
-      Assert.assertEquals(10000, peer.getRatisPort());
-      Assert.assertEquals(10001,
+      assertEquals(10000, peer.getRatisPort());
+      assertEquals(10001,
           peer.getGrpcPort());
     }
 
 
     // Security protocol address is not set in SCMHANode Details.
     // Check conf is properly set with expected port.
-    Assert.assertEquals(
+    assertEquals(
         NetUtils.createSocketAddr("0.0.0.0", 9899),
         HddsServerUtil.getScmSecurityInetAddress(conf));
 
 
   }
+
+  @Test
+  public void testRatisEnabledDefaultConfigWithoutInitializedSCM()
+      throws IOException {
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
+        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+    DefaultConfigManager.clearDefaultConfigs();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+    assertFalse(SCMHAUtils.isSCMHAEnabled(conf));
+    DefaultConfigManager.clearDefaultConfigs();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
+  }
+
+  @Test
+  public void testRatisEnabledDefaultConfigWithInitializedSCM()
+      throws IOException, NoSuchFieldException, IllegalAccessException {
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.INITIALIZED);
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
+    DefaultConfigManager.clearDefaultConfigs();
+    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
+        scmStorageConfig.isSCMHAEnabled());
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
+    DefaultConfigManager.clearDefaultConfigs();
+    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testRatisEnabledDefaultConflictConfigWithInitializedSCM(
+      boolean isRatisEnabled) {
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
+        .thenReturn(Storage.StorageState.INITIALIZED);
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(isRatisEnabled);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled);
+    assertThrows(ConfigurationException.class,
+            () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testHAConfig(boolean ratisEnabled) throws IOException {
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ratisEnabled);
+    SCMStorageConfig scmStorageConfig = newStorageConfig(ratisEnabled);
+    StorageContainerManager.scmInit(conf, scmStorageConfig.getClusterID());
+    assertEquals(ratisEnabled, DefaultConfigManager.getValue(
+        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !ratisEnabled));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testInvalidHAConfig(boolean ratisEnabled) throws IOException {
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ratisEnabled);
+    SCMStorageConfig scmStorageConfig = newStorageConfig(!ratisEnabled);
+    String clusterID = scmStorageConfig.getClusterID();
+    assertThrows(ConfigurationException.class,
+        () -> StorageContainerManager.scmInit(conf, clusterID));
+  }
+
+  private SCMStorageConfig newStorageConfig(
+      boolean ratisEnabled) throws IOException {
+    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
+    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
+    scmStorageConfig.setSCMHAFlag(ratisEnabled);
+    scmStorageConfig.initialize();
+    return scmStorageConfig;
+  }
+
 }

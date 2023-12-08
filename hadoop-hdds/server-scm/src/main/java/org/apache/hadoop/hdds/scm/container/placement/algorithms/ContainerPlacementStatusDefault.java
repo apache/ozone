@@ -18,6 +18,9 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  *  Simple Status object to check if a container is replicated across enough
  *  racks.
@@ -29,16 +32,32 @@ public class ContainerPlacementStatusDefault
   private final int currentRacks;
   private final int totalRacks;
 
+  private final int maxReplicasPerRack;
+  private final List<Integer> rackReplicaCnts;
+
+
   public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks,
-      int totalRacks) {
+      int totalRacks, int maxReplicasPerRack, List<Integer> rackReplicaCnts) {
     this.requiredRacks = requiredRacks;
     this.currentRacks = currentRacks;
     this.totalRacks = totalRacks;
+    this.maxReplicasPerRack = maxReplicasPerRack;
+    this.rackReplicaCnts = rackReplicaCnts;
+  }
+
+  public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks,
+      int totalRacks) {
+    this(currentRacks, requiredRacks, totalRacks, 1,
+         currentRacks == 0 ? Collections.emptyList()
+                 : Collections.nCopies(currentRacks, 1));
   }
 
   @Override
   public boolean isPolicySatisfied() {
-    return currentRacks >= totalRacks || currentRacks >= requiredRacks;
+    if (currentRacks < Math.min(totalRacks, requiredRacks)) {
+      return false;
+    }
+    return rackReplicaCnts.stream().allMatch(cnt -> cnt <= maxReplicasPerRack);
   }
 
   @Override
@@ -46,8 +65,13 @@ public class ContainerPlacementStatusDefault
     if (isPolicySatisfied()) {
       return null;
     }
-    return "The container is mis-replicated as it is on " + currentRacks +
-        " racks but should be on " + requiredRacks + " racks.";
+    if (currentRacks < expectedPlacementCount()) {
+      return "The container is mis-replicated as it is on " + currentRacks +
+              " racks but should be on " + expectedPlacementCount() + " racks.";
+    }
+    return "The container is mis-replicated as max number of replicas per rack "
+            + "is " + maxReplicasPerRack + " but number of replicas per rack" +
+            " are " + rackReplicaCnts.toString();
   }
 
   @Override
@@ -55,7 +79,9 @@ public class ContainerPlacementStatusDefault
     if (isPolicySatisfied()) {
       return 0;
     }
-    return requiredRacks - currentRacks;
+    return Math.max(expectedPlacementCount() - currentRacks,
+            rackReplicaCnts.stream().mapToInt(
+                    cnt -> Math.max(cnt - maxReplicasPerRack, 0)).sum());
   }
 
   @Override

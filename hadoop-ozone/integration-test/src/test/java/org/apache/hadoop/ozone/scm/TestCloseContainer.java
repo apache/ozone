@@ -17,30 +17,29 @@
  */
 package org.apache.hadoop.ozone.scm;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static junit.framework.TestCase.assertEquals;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -49,7 +48,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration test to ensure a container can be closed and its replicas
@@ -62,8 +62,9 @@ public class TestCloseContainer {
   private static String volName = "vol1";
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
+  private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int interval = 100;
@@ -87,12 +88,14 @@ public class TestCloseContainer {
         .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
+    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -111,12 +114,7 @@ public class TestCloseContainer {
     // Pick any container on the cluster, get its pipeline, close it and then
     // wait for the container to close
     ContainerInfo container = scm.getContainerManager().getContainers().get(0);
-    Pipeline pipeline = scm.getPipelineManager()
-        .getPipeline(container.getPipelineID());
-    scm.getPipelineManager().closePipeline(pipeline, false);
-    GenericTestUtils.waitFor(() ->
-            container.getState() == HddsProtos.LifeCycleState.CLOSED,
-        200, 30000);
+    OzoneTestUtils.closeContainer(scm, container);
 
     long originalSeq = container.getSequenceId();
 
@@ -143,14 +141,9 @@ public class TestCloseContainer {
    * @return
    */
   private Set<ContainerReplica> getContainerReplicas(ContainerInfo c) {
-    Set<ContainerReplica> replicas = null;
-    try {
-      replicas = cluster.getStorageContainerManager()
-          .getContainerManager().getContainerReplicas(c.containerID());
-    } catch (ContainerNotFoundException e) {
-      fail("Unexpected ContainerNotFoundException");
-    }
-    return replicas;
+    return assertDoesNotThrow(() -> cluster.getStorageContainerManager()
+        .getContainerManager().getContainerReplicas(c.containerID()),
+        "Unexpected exception while retrieving container replicas");
   }
 
 }

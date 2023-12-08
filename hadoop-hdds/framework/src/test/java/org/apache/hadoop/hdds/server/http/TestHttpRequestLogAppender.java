@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test Http request log appender.
@@ -32,9 +32,9 @@ public class TestHttpRequestLogAppender {
     HttpRequestLogAppender requestLogAppender = new HttpRequestLogAppender();
     requestLogAppender.setFilename("jetty-namenode-yyyy_mm_dd.log");
     requestLogAppender.setRetainDays(17);
-    assertEquals("Filename mismatch", "jetty-namenode-yyyy_mm_dd.log",
-        requestLogAppender.getFilename());
-    assertEquals("Retain days mismatch", 17,
-        requestLogAppender.getRetainDays());
+    assertEquals("jetty-namenode-yyyy_mm_dd.log",
+        requestLogAppender.getFilename(), "Filename mismatch");
+    assertEquals(17, requestLogAppender.getRetainDays(),
+        "Retain days mismatch");
   }
 }

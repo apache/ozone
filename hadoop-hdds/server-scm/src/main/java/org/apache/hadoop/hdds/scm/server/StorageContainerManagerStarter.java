@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.ozone.common.StorageInfo;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
@@ -56,6 +57,8 @@ public class StorageContainerManagerStarter extends GenericCli {
       LoggerFactory.getLogger(StorageContainerManagerStarter.class);
 
   public static void main(String[] args) {
+    OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new StorageContainerManagerStarter(
         new StorageContainerManagerStarter.SCMStarterHelper()).run(args);
   }
@@ -153,7 +156,7 @@ public class StorageContainerManagerStarter extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
-        StorageContainerManager.class, originalArgs, LOG);
+        StorageContainerManager.class, originalArgs, LOG, conf);
   }
 
   /**

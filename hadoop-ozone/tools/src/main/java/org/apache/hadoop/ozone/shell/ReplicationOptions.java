@@ -81,7 +81,21 @@ public abstract class ReplicationOptions {
   }
 
   // Option is defined in subclasses
-  public void setType(ReplicationType type) {
-    this.type = type;
+  public void setType(String type) {
+    try {
+      ReplicationType replicationType = ReplicationType.valueOf(type);
+      if (replicationType == ReplicationType.CHAINED
+              || replicationType == ReplicationType.STAND_ALONE) {
+        throw new IllegalArgumentException(
+                String.format("Unsupported replication type %s",
+                        replicationType.name()));
+      }
+      this.type = replicationType;
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException(
+              String.format("Invalid value '%s' for option '--type'. %s." +
+                      " Supported values are: RATIS, EC.",
+                      type, ex.getMessage()));
+    }
   }
 }

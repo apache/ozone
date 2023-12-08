@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.block;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -43,7 +44,7 @@ public interface BlockManager extends Closeable {
    */
   AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig,
       String owner,
-      ExcludeList excludeList) throws IOException;
+      ExcludeList excludeList) throws IOException, TimeoutException;
 
   /**
    * Deletes a list of blocks in an atomic operation. Internally, SCM

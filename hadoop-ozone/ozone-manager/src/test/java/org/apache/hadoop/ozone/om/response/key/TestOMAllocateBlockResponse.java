@@ -19,16 +19,17 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+import java.io.IOException;
 
 /**
  * Tests OMAllocateBlockResponse.
@@ -39,9 +40,6 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   public void testAddToDBBatch() throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo();
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setAllocateBlockResponse(
@@ -55,23 +53,20 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     String openKey = getOpenKey();
 
     // Not adding key entry before to test whether commit is successful or not.
-    Assert.assertFalse(
+    Assertions.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     omAllocateBlockResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertTrue(
+    Assertions.assertTrue(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
   }
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = createOmKeyInfo();
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setAllocateBlockResponse(
@@ -84,7 +79,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
 
     // Before calling addToDBBatch
     String openKey = getOpenKey();
-    Assert.assertFalse(
+    Assertions.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     omAllocateBlockResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
@@ -93,7 +88,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse is error it is a no-op.
-    Assert.assertFalse(
+    Assertions.assertFalse(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
   }
@@ -111,7 +106,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   @NotNull
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
-          OMResponse omResponse) {
+          OMResponse omResponse) throws IOException {
     return new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
         getBucketLayout());
   }

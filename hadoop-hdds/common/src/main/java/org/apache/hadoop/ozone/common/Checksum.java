@@ -32,6 +32,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Ints;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,7 @@ public class Checksum {
   }
 
   public static ByteString int2ByteString(int n) {
-    return ByteString.copyFrom(Ints.toByteArray(n));
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(n));
   }
 
   private static Function<ByteBuffer, ByteString> newChecksumByteBufferFunction(
@@ -139,6 +140,11 @@ public class Checksum {
    */
   public ChecksumData computeChecksum(ByteBuffer data)
       throws OzoneChecksumException {
+    // If type is set to NONE, we do not need to compute the checksums. We also
+    // need to avoid unnecessary conversions.
+    if (checksumType == ChecksumType.NONE) {
+      return new ChecksumData(checksumType, bytesPerChecksum);
+    }
     if (!data.isReadOnly()) {
       data = data.asReadOnlyBuffer();
     }
@@ -225,6 +231,11 @@ public class Checksum {
     return verifyChecksum(ByteBuffer.wrap(data), checksumData, 0);
   }
 
+  private static boolean verifyChecksum(ByteBuffer data,
+      ChecksumData checksumData, int startIndex) throws OzoneChecksumException {
+    return verifyChecksum(ChunkBuffer.wrap(data), checksumData, startIndex);
+  }
+
   /**
    * Computes the ChecksumData for the input data and verifies that it
    * matches with that of the input checksumData.
@@ -234,7 +245,7 @@ public class Checksum {
    *                   data's computed checksum.
    * @throws OzoneChecksumException is thrown if checksums do not match
    */
-  private static boolean verifyChecksum(ByteBuffer data,
+  public static boolean verifyChecksum(ChunkBuffer data,
       ChecksumData checksumData,
       int startIndex) throws OzoneChecksumException {
     ChecksumType checksumType = checksumData.getChecksumType();

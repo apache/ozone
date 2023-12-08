@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
+
 /**
  * Ozone data generator and performance test tool.
  */
@@ -52,6 +54,7 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
+        S3BucketGenerator.class,
         DatanodeChunkGenerator.class,
         DatanodeChunkValidator.class,
         DatanodeBlockPutter.class,
@@ -64,7 +67,14 @@ import picocli.CommandLine.Option;
         ClosedContainerReplicator.class,
         StreamingGenerator.class,
         SCMThroughputBenchmark.class,
-        OmBucketReadWriteFileOps.class},
+        OmBucketReadWriteFileOps.class,
+        OmBucketReadWriteKeyOps.class,
+        OmRPCLoadGenerator.class,
+        OzoneClientKeyReadWriteListOps.class,
+        RangeKeysGenerator.class,
+        DatanodeSimulator.class,
+        OmMetadataGenerator.class
+    },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {
@@ -86,11 +96,11 @@ public class Freon extends GenericCli {
   private OzoneConfiguration conf;
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     conf = createOzoneConfiguration();
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
-    super.execute(argv);
+    return super.execute(argv);
   }
 
   public void stopHttpServer() {
@@ -106,6 +116,7 @@ public class Freon extends GenericCli {
   public void startHttpServer() {
     if (httpServer) {
       try {
+        setHttpBaseDir(conf);
         freonHttpServer = new FreonHttpServer(conf);
         freonHttpServer.start();
       } catch (IOException e) {

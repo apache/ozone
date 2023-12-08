@@ -125,7 +125,7 @@ public class ReconRestServletModule extends ServletModule {
       if (aclEnabled) {
         for (String path: adminSubPaths) {
           String adminPath =
-              UriBuilder.fromPath(basePath).path(path).build().toString();
+              UriBuilder.fromPath(basePath).path(path + "*").build().toString();
           filter(adminPath).through(ReconAdminFilter.class);
           if (LOG.isDebugEnabled()) {
             LOG.debug("Added admin filter to path {}", adminPath);

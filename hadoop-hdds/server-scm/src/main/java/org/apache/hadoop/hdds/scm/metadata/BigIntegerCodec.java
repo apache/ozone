@@ -24,9 +24,20 @@ import java.math.BigInteger;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 /**
- * Encode and decode BigInteger.
+ * Codec to serialize/deserialize {@link BigInteger}.
  */
-public class BigIntegerCodec implements Codec<BigInteger> {
+public final class BigIntegerCodec implements Codec<BigInteger> {
+
+  private static final Codec<BigInteger> INSTANCE = new BigIntegerCodec();
+
+  public static Codec<BigInteger> get() {
+    return INSTANCE;
+  }
+
+  private BigIntegerCodec() {
+    // singleton
+  }
+
   @Override
   public byte[] toPersistedFormat(BigInteger object) throws IOException {
     return object.toByteArray();

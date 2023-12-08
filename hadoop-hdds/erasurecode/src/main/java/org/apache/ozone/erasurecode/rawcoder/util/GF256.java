@@ -17,8 +17,7 @@
  */
 package org.apache.ozone.erasurecode.rawcoder.util;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
  * A GaloisField utility class only caring of 256 fields for efficiency. Some
@@ -139,7 +138,6 @@ public final class GF256 {
       (byte) 0xaf
   };
 
-  @SuppressFBWarnings("MS_EXPOSE_REP")
   private static byte[][] theGfMulTab; // multiply result table in GF 256 space
 
   /**

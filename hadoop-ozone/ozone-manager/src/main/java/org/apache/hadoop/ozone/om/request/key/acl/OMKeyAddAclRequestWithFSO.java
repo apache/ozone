@@ -99,7 +99,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   }
 
   @Override void onComplete(Result result, boolean operationResult,
-      IOException exception, long trxnLogIndex, AuditLogger auditLogger,
+      Exception exception, long trxnLogIndex, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
@@ -140,14 +140,16 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
         omDoubleBufferHelper);
   }
 
-  @Override OMClientResponse onSuccess(
+  @Override
+  OMClientResponse onSuccess(
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
-      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDir) {
+      OmKeyInfo omKeyInfo, boolean operationResult, boolean isDir,
+      long volumeId, long bucketId) {
     omResponse.setSuccess(operationResult);
     omResponse.setAddAclResponse(
         OzoneManagerProtocolProtos.AddAclResponse.newBuilder()
             .setResponse(operationResult));
     return new OMKeyAclResponseWithFSO(omResponse.build(), omKeyInfo, isDir,
-        getBucketLayout());
+        getBucketLayout(), volumeId, bucketId);
   }
 }

@@ -166,7 +166,7 @@ public class TestContainerStateManagerIntegration {
     cluster.restartStorageContainerManager(false);
 
     List<ContainerInfo> result = cluster.getStorageContainerManager()
-        .getContainerManager().getContainers(null, 100);
+        .getContainerManager().getContainers();
 
     long matchCount = result.stream()
         .filter(info ->
@@ -268,7 +268,7 @@ public class TestContainerStateManagerIntegration {
 
   @Test
   public void testUpdateContainerState() throws IOException,
-      InvalidStateTransitionException {
+      InvalidStateTransitionException, TimeoutException {
     Set<ContainerID> containerList = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.OPEN);
     int containers = containerList == null ? 0 : containerList.size();

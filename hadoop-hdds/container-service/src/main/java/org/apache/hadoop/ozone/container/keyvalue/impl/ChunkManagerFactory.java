@@ -23,13 +23,13 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA_DEFAULT;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration.HDDS_CONTAINER_SCRUB_ENABLED;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED;
 
 /**
  * Select an appropriate ChunkManager implementation as per config setting.
@@ -58,10 +58,10 @@ public final class ChunkManagerFactory {
         HDDS_CONTAINER_PERSISTDATA_DEFAULT);
 
     if (!persist) {
-      ContainerScrubberConfiguration scrubber = conf.getObject(
-          ContainerScrubberConfiguration.class);
-      if (scrubber.isEnabled()) {
-        // Data Scrubber needs to be disabled for non-persistent chunks.
+      ContainerScannerConfiguration scannerConfig = conf.getObject(
+          ContainerScannerConfiguration.class);
+      if (scannerConfig.isEnabled()) {
+        // Data scanner needs to be disabled for non-persistent chunks.
         LOG.warn("Failed to set " + HDDS_CONTAINER_PERSISTDATA + " to false."
             + " Please set " + HDDS_CONTAINER_SCRUB_ENABLED
             + " also to false to enable non-persistent containers.");

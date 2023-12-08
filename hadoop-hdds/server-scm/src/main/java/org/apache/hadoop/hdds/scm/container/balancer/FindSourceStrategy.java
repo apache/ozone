@@ -21,6 +21,8 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 
+import javax.annotation.Nonnull;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -64,4 +66,13 @@ public interface FindSourceStrategy {
    */
   void reInitialize(List<DatanodeUsageInfo> potentialDataNodes,
                     ContainerBalancerConfiguration config, Double lowerLimit);
+
+  /**
+   * Resets the collection of source {@link DatanodeUsageInfo} that can be
+   * selected for balancing.
+   *
+   * @param sources collection of source
+   *                {@link DatanodeDetails} that containers can move from
+   */
+  void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
 }

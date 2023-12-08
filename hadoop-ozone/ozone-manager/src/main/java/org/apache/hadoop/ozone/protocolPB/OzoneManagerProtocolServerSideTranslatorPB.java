@@ -20,15 +20,21 @@ import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServe
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -42,6 +48,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -49,6 +56,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -65,7 +73,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
   private static final String OM_REQUESTS_PACKAGE = 
       "org.apache.hadoop.ozone";
-  
+
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final boolean isRatisEnabled;
@@ -75,6 +83,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
   private final RequestValidations requestValidations;
+  private final OMPerformanceMetrics perfMetrics;
+
+  // always true, only used in tests
+  private boolean shouldFlushCache = true;
 
   /**
    * Constructs an instance of the server handler.
@@ -88,6 +100,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       boolean enableRatis,
       long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
+    this.perfMetrics = impl.getPerfMetrics();
     this.isRatisEnabled = enableRatis;
     // Update the transactionIndex with the last TransactionIndex read from DB.
     // New requests should have transactionIndex incremented from this index
@@ -122,8 +135,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         new RequestValidations()
             .fromPackage(OM_REQUESTS_PACKAGE)
             .withinContext(
-                ValidationContext.of(ozoneManager.getVersionManager()))
+                ValidationContext.of(ozoneManager.getVersionManager(),
+                    ozoneManager.getMetadataManager()))
             .load();
+
   }
 
   /**
@@ -134,7 +149,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OMRequest request) throws ServiceException {
     OMRequest validatedRequest;
     try {
-      validatedRequest = requestValidations.validateRequest(request);
+      validatedRequest = captureLatencyNs(
+          perfMetrics.getValidateRequestLatencyNs(),
+          () -> requestValidations.validateRequest(request));
     } catch (Exception e) {
       if (e instanceof OMException) {
         return createErrorResponse(request, (OMException) e);
@@ -142,58 +159,93 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throw new ServiceException(e);
     }
 
-    OMResponse response = 
-        dispatcher.processRequest(validatedRequest, this::processRequest,
-        request.getCmdType(), request.getTraceID());
-    
-    return requestValidations.validateResponse(request, response);
+    OMResponse response = dispatcher.processRequest(validatedRequest,
+        this::processRequest, request.getCmdType(), request.getTraceID());
+
+    return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
+        () -> requestValidations.validateResponse(request, response));
   }
 
-  private OMResponse processRequest(OMRequest request) throws
-      ServiceException {
-    if (isRatisEnabled) {
-      boolean s3Auth = false;
-      try {
-        // If Request has S3Authentication validate S3 credentials
-        // if current OM is leader and then proceed with processing the request.
-        if (request.hasS3Authentication()) {
-          s3Auth = true;
-          checkLeaderStatus();
-          S3SecurityUtil.validateS3Credential(request, ozoneManager);
-        }
-      } catch (IOException ex) {
-        // If validate credentials fail return error OM Response.
-        return createErrorResponse(request, ex);
+  @VisibleForTesting
+  public OMResponse processRequest(OMRequest request) throws ServiceException {
+    OMResponse response = internalProcessRequest(request);
+    if (response.hasOmLockDetails()) {
+      OzoneManagerProtocolProtos.OMLockDetailsProto omLockDetailsProto =
+          response.getOmLockDetails();
+      Server.Call call = Server.getCurCall().get();
+      if (call != null) {
+        call.getProcessingDetails().add(Timing.LOCKWAIT,
+            omLockDetailsProto.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+        call.getProcessingDetails().add(Timing.LOCKSHARED,
+            omLockDetailsProto.getReadLockNanos(), TimeUnit.NANOSECONDS);
+        call.getProcessingDetails().add(Timing.LOCKEXCLUSIVE,
+            omLockDetailsProto.getWriteLockNanos(), TimeUnit.NANOSECONDS);
       }
-      // Check if the request is a read only request
-      if (OmUtils.isReadOnly(request)) {
+    }
+    return response;
+  }
+
+  private OMResponse internalProcessRequest(OMRequest request) throws
+      ServiceException {
+    OMClientRequest omClientRequest = null;
+    boolean s3Auth = false;
+
+    try {
+      if (request.hasS3Authentication()) {
+        OzoneManager.setS3Auth(request.getS3Authentication());
         try {
-          if (request.hasS3Authentication()) {
-            ozoneManager.setS3Auth(request.getS3Authentication());
-          }
-          return submitReadRequestToOM(request);
-        } finally {
-          ozoneManager.setS3Auth(null);
-        }
-      } else {
-        // To validate credentials we have already verified leader status.
-        // This will skip of checking leader status again if request has S3Auth.
-        if (!s3Auth) {
-          checkLeaderStatus();
-        }
-        try {
-          OMClientRequest omClientRequest =
-              createClientRequest(request, ozoneManager);
-          request = omClientRequest.preExecute(ozoneManager);
+          s3Auth = true;
+          // If request has S3Authentication, validate S3 credentials.
+          // If current OM is leader and then proceed with the request.
+          S3SecurityUtil.validateS3Credential(request, ozoneManager);
         } catch (IOException ex) {
-          // As some of the preExecute returns error. So handle here.
           return createErrorResponse(request, ex);
         }
-        return submitRequestToRatis(request);
       }
-    } else {
-      return submitRequestDirectlyToOM(request);
+
+      if (!isRatisEnabled) {
+        return submitRequestDirectlyToOM(request);
+      }
+
+      if (OmUtils.isReadOnly(request)) {
+        return submitReadRequestToOM(request);
+      }
+
+      // To validate credentials we have already verified leader status.
+      // This will skip of checking leader status again if request has S3Auth.
+      if (!s3Auth) {
+        OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+      }
+      OMRequest requestToSubmit;
+      try {
+        omClientRequest = createClientRequest(request, ozoneManager);
+        // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+        //  return null, which triggered the findbugs warning.
+        //  Added the assertion.
+        assert (omClientRequest != null);
+        OMClientRequest finalOmClientRequest = omClientRequest;
+        requestToSubmit = preExecute(finalOmClientRequest);
+      } catch (IOException ex) {
+        if (omClientRequest != null) {
+          omClientRequest.handleRequestFailure(ozoneManager);
+        }
+        return createErrorResponse(request, ex);
+      }
+
+      OMResponse response = submitRequestToRatis(requestToSubmit);
+      if (!response.getSuccess()) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      }
+      return response;
+    } finally {
+      OzoneManager.setS3Auth(null);
     }
+  }
+
+  private OMRequest preExecute(OMClientRequest finalOmClientRequest)
+      throws IOException {
+    return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+        () -> finalOmClientRequest.preExecute(ozoneManager));
   }
 
   /**
@@ -227,12 +279,18 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private ServiceException createNotLeaderException() {
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
+    RaftPeerId raftLeaderId = null;
+    String raftLeaderAddress = null;
+    RaftPeer leader = omRatisServer.getLeader();
+    if (null != leader) {
+      raftLeaderId = leader.getId();
+      raftLeaderAddress = omRatisServer.getRaftLeaderAddress(leader);
+    }
 
     OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
+        raftLeaderId == null ? new OMNotLeaderException(raftPeerId) :
+            new OMNotLeaderException(raftPeerId, raftLeaderId,
+                raftLeaderAddress);
 
     LOG.debug(notLeaderException.getMessage());
 
@@ -255,36 +313,25 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    * Submits request directly to OM.
    */
   private OMResponse submitRequestDirectlyToOM(OMRequest request) {
-    OMClientResponse omClientResponse = null;
-    long index = 0L;
+    OMClientResponse omClientResponse;
     try {
-      // If Request has S3Authentication validate S3 credentials and
-      // then proceed with processing the request.
-      if (request.hasS3Authentication()) {
-        S3SecurityUtil.validateS3Credential(request, ozoneManager);
-      }
       if (OmUtils.isReadOnly(request)) {
-        try {
-          if (request.hasS3Authentication()) {
-            ozoneManager.setS3Auth(request.getS3Authentication());
-          }
-          return handler.handleReadRequest(request);
-        } finally {
-          ozoneManager.setS3Auth(null);
-        }
+        return handler.handleReadRequest(request);
       } else {
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
-        index = transactionIndex.incrementAndGet();
+        long index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);
       }
     } catch (IOException ex) {
-      // As some of the preExecute returns error. So handle here.
+      // As some preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
     try {
-      omClientResponse.getFlushFuture().get();
+      if (shouldFlushCache) {
+        omClientResponse.getFlushFuture().get();
+      }
       if (LOG.isTraceEnabled()) {
         LOG.trace("Future for {} is completed", request);
       }
@@ -297,11 +344,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       Thread.currentThread().interrupt();
     }
     return omClientResponse.getOMResponse();
-  }
-
-  private void checkLeaderStatus() throws ServiceException {
-    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
-        omRatisServer.getRaftPeerId());
   }
 
   /**
@@ -335,5 +377,24 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   public static Logger getLog() {
     return LOG;
+  }
+
+  /**
+   * Wait until both buffers are flushed.  This is used in cases like
+   * "follower bootstrap tarball creation" where the rocksDb for the active
+   * fs needs to synchronized with the rocksdb's for the snapshots.
+   */
+  public void awaitDoubleBufferFlush() throws InterruptedException {
+    ozoneManagerDoubleBuffer.awaitFlush();
+  }
+
+  @VisibleForTesting
+  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
+    return ozoneManagerDoubleBuffer;
+  }
+
+  @VisibleForTesting
+  public void setShouldFlushCache(boolean shouldFlushCache) {
+    this.shouldFlushCache = shouldFlushCache;
   }
 }

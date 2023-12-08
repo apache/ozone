@@ -38,24 +38,22 @@ import org.slf4j.LoggerFactory;
 public class ITestOzoneContractGetFileStatus
     extends AbstractContractGetFileStatusTest {
 
-  private static boolean fsOptimizedServer;
+  public ITestOzoneContractGetFileStatus(boolean fso) {
+    // Actual init done in initParam().
+  }
 
-  public ITestOzoneContractGetFileStatus(boolean fsoServer)
-      throws IOException {
-    if (fsOptimizedServer != fsoServer) {
-      setFsOptimizedServer(fsoServer);
-      ITestOzoneContractUtils.restartCluster(
-          fsOptimizedServer);
-    }
+  @Parameterized.BeforeParam
+  public static void initParam(boolean fso) throws IOException {
+    OzoneContract.createCluster(fso);
+  }
+
+  @Parameterized.AfterParam
+  public static void teardownParam() throws IOException {
+    OzoneContract.destroyCluster();
   }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestOzoneContractGetFileStatus.class);
-
-
-  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
-    ITestOzoneContractGetFileStatus.fsOptimizedServer = fsOptimizedServer;
-  }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
@@ -79,7 +77,7 @@ public class ITestOzoneContractGetFileStatus
   }
 
   @Parameterized.Parameters
-  public static Collection data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
+  public static Collection<Boolean> data() {
+    return OzoneContract.getFsoCombinations();
   }
 }

@@ -29,6 +29,7 @@ import java.util.UUID;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -101,10 +102,9 @@ public class ReconNodeManager extends SCMNodeManager {
   }
 
   private void loadExistingNodes() {
-    try {
+    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+             iterator = nodeDB.iterator()) {
       int nodeCount = 0;
-      TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
-          iterator = nodeDB.iterator();
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
         register(datanodeDetails, null, null,
@@ -225,7 +225,7 @@ public class ReconNodeManager extends SCMNodeManager {
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo) {
+      LayoutVersionProto layoutInfo, CommandQueueReportProto queueReport) {
     List<SCMCommand> cmds = new ArrayList<>();
     long currentTime = Time.now();
     if (needUpdate(datanodeDetails, currentTime)) {
@@ -237,7 +237,8 @@ public class ReconNodeManager extends SCMNodeManager {
     }
     // Update heartbeat map with current time
     datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
-    cmds.addAll(super.processHeartbeat(datanodeDetails, layoutInfo));
+    cmds.addAll(super.processHeartbeat(datanodeDetails,
+        layoutInfo, queueReport));
     return cmds.stream()
         .filter(c -> ALLOWED_COMMANDS.contains(c.getType()))
         .collect(toList());
@@ -294,7 +295,7 @@ public class ReconNodeManager extends SCMNodeManager {
           nodeStatus.getOperationalState());
 
       setNodeOperationalState(dnDetails, nodeOperationalStateFromScm);
-      DatanodeDetails scmDnd = getNodeByUuid(dnDetails.getUuidString());
+      DatanodeDetails scmDnd = getNodeByUuid(dnDetails.getUuid());
       scmDnd.setPersistedOpState(nodeOperationalStateFromScm);
     }
   }
@@ -313,12 +314,13 @@ public class ReconNodeManager extends SCMNodeManager {
   @VisibleForTesting
   public long getNodeDBKeyCount() throws IOException {
     long nodeCount = 0;
-    TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
-        iterator = nodeDB.iterator();
-    while (iterator.hasNext()) {
-      iterator.next();
-      nodeCount++;
+    try (TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+        iterator = nodeDB.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        nodeCount++;
+      }
+      return nodeCount;
     }
-    return nodeCount;
   }
 }

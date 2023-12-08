@@ -18,9 +18,9 @@
 package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.ozone.erasurecode.ECChunk;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,7 +34,7 @@ public class TestDummyRawCoder extends TestRawCoderBase {
     super(DummyRawErasureCoderFactory.class, DummyRawErasureCoderFactory.class);
   }
 
-  @Before
+  @BeforeEach
   public void setup() {
     setAllowDump(false);
     setChunkSize(baseChunkSize);
@@ -66,7 +66,7 @@ public class TestDummyRawCoder extends TestRawCoderBase {
     try {
       encode(dataChunks, parityChunks);
     } catch (IOException e) {
-      Assert.fail("Unexpected IOException: " + e.getMessage());
+      Assertions.fail("Unexpected IOException: " + e.getMessage());
     }
     compareAndVerify(parityChunks, getEmptyChunks(parityChunks.length));
 
@@ -81,7 +81,7 @@ public class TestDummyRawCoder extends TestRawCoderBase {
       decode(inputChunks, getErasedIndexesForDecoding(),
           recoveredChunks);
     } catch (IOException e) {
-      Assert.fail("Unexpected IOException: " + e.getMessage());
+      Assertions.fail("Unexpected IOException: " + e.getMessage());
     }
     compareAndVerify(recoveredChunks, getEmptyChunks(recoveredChunks.length));
   }

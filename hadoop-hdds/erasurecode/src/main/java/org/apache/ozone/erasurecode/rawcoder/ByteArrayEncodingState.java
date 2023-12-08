@@ -18,7 +18,7 @@
 package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import java.nio.ByteBuffer;
 

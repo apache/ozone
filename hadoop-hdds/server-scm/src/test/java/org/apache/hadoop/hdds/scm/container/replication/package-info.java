@@ -17,7 +17,6 @@
  *
  */
 /**
- * SCM Testing and Mocking Utils.
+ * Test classes for Replication functionality.
  */
 package org.apache.hadoop.hdds.scm.container.replication;
-// Test classes for Replication functionality.

@@ -37,12 +37,14 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,8 +76,9 @@ import static org.junit.Assert.assertTrue;
  */
 @NotThreadSafe
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-@Ignore("Fix this after adding audit support for HA Acl code. This will be " +
-    "fixed by HDDS-2038")
+@Category(UnhealthyTest.class)
+@Unhealthy("Fix this after adding audit support for HA Acl code. This will " +
+    "be fixed by HDDS-2038")
 public class TestOzoneRpcClientForAclAuditLog {
 
   private static final Logger LOG =

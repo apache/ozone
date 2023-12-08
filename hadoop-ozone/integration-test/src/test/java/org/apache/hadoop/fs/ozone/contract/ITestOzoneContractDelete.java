@@ -35,19 +35,18 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public class ITestOzoneContractDelete extends AbstractContractDeleteTest {
 
-  private static boolean fsOptimizedServer;
-
-  public ITestOzoneContractDelete(boolean fsoServer)
-      throws IOException {
-    if (fsOptimizedServer != fsoServer) {
-      setFsOptimizedServer(fsoServer);
-      ITestOzoneContractUtils.restartCluster(
-          fsOptimizedServer);
-    }
+  public ITestOzoneContractDelete(boolean fso) {
+    // Actual init done in initParam().
   }
 
-  public static void setFsOptimizedServer(boolean fsOptimizedServer) {
-    ITestOzoneContractDelete.fsOptimizedServer = fsOptimizedServer;
+  @Parameterized.BeforeParam
+  public static void initParam(boolean fso) throws IOException {
+    OzoneContract.createCluster(fso);
+  }
+
+  @Parameterized.AfterParam
+  public static void teardownParam() throws IOException {
+    OzoneContract.destroyCluster();
   }
 
   @AfterClass
@@ -61,7 +60,7 @@ public class ITestOzoneContractDelete extends AbstractContractDeleteTest {
   }
 
   @Parameterized.Parameters
-  public static Collection data() {
-    return ITestOzoneContractUtils.getFsoCombinations();
+  public static Collection<Boolean> data() {
+    return OzoneContract.getFsoCombinations();
   }
 }

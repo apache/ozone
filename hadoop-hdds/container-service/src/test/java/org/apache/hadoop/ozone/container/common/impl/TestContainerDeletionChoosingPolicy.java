@@ -38,8 +38,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoo
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
@@ -94,7 +93,7 @@ public class TestContainerDeletionChoosingPolicy {
         RandomContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
 
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
@@ -120,7 +119,7 @@ public class TestContainerDeletionChoosingPolicy {
 
     long totPendingBlocks = 0;
     for (ContainerBlockInfo pr : result0) {
-      totPendingBlocks += pr.getBlocks();
+      totPendingBlocks += pr.getNumBlocksToDelete();
     }
     Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
@@ -156,7 +155,7 @@ public class TestContainerDeletionChoosingPolicy {
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
 
     int numContainers = 10;
     Random random = new Random();
@@ -192,7 +191,7 @@ public class TestContainerDeletionChoosingPolicy {
         .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
     long totPendingBlocks = 0;
     for (ContainerBlockInfo pr : result0) {
-      totPendingBlocks += pr.getBlocks();
+      totPendingBlocks += pr.getNumBlocksToDelete();
     }
     Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 

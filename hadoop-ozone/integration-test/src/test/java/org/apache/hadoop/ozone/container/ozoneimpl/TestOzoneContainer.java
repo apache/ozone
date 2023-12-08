@@ -29,15 +29,13 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -76,17 +74,15 @@ public class TestOzoneContainer {
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      StateContext context = Mockito.mock(StateContext.class);
-      DatanodeStateMachine dsm = Mockito.mock(DatanodeStateMachine.class);
-      Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(dsm);
-      container = new OzoneContainer(datanodeDetails, conf, context, null);
+      container = ContainerTestUtils
+          .getOzoneContainer(datanodeDetails, conf);
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-      client.connect();
-      createContainerForTesting(client, containerID);
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
+        client.connect();
+        createContainerForTesting(client, containerID);
+      }
     } finally {
       if (container != null) {
         container.stop();
@@ -108,12 +104,8 @@ public class TestOzoneContainer {
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      StateContext context = Mockito.mock(StateContext.class);
-      DatanodeStateMachine dsm = Mockito.mock(DatanodeStateMachine.class);
-      Mockito.when(dsm.getDatanodeDetails()).thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(dsm);
-      container = new OzoneContainer(datanodeDetails, conf,
-          context, null);
+      container = ContainerTestUtils
+          .getOzoneContainer(datanodeDetails, conf);
 
       String clusterId = UUID.randomUUID().toString();
       container.start(clusterId);
@@ -531,7 +523,7 @@ public class TestOzoneContainer {
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper.getWriteChunkRequest(client.getPipeline(),
-            blockID, dataLen, null);
+            blockID, dataLen);
     ContainerProtos.ContainerCommandResponseProto response =
         client.sendCommand(writeChunkRequest);
     Assert.assertNotNull(response);

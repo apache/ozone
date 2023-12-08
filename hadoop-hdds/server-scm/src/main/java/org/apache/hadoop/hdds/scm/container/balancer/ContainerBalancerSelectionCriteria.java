@@ -18,10 +18,12 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -83,12 +85,16 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
+   * 6. Container should not be an EC container
+   * //TODO Temporarily not considering EC containers as candidates
+   * @see
+   * <a href="https://issues.apache.org/jira/browse/HDDS-6940">HDDS-6940</a>
    *
    * @param node DatanodeDetails for which to find candidate containers.
    * @return NavigableSet of candidate containers that satisfy the criteria.
    */
   public NavigableSet<ContainerID> getCandidateContainers(
-      DatanodeDetails node) {
+      DatanodeDetails node, long sizeMovedAlready) {
     NavigableSet<ContainerID> containerIDSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
@@ -105,37 +111,8 @@ public class ContainerBalancerSelectionCriteria {
       containerIDSet.removeAll(selectedContainers);
     }
 
-    // remove not closed containers
-    containerIDSet.removeIf(containerID -> {
-      try {
-        return containerManager.getContainer(containerID).getState() !=
-            HddsProtos.LifeCycleState.CLOSED;
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Could not retrieve ContainerInfo for container {} for " +
-            "checking LifecycleState in ContainerBalancer. Excluding this " +
-            "container.", containerID.toString(), e);
-        return true;
-      }
-    });
-
-    //if the utilization of the source data node becomes lower than lowerLimit
-    //after the container is moved out , then the container can not be
-    // a candidate one, and we should remove it from the candidateContainers.
-    containerIDSet.removeIf(c -> {
-      ContainerInfo cInfo;
-      try {
-        cInfo = containerManager.getContainer(c);
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Could not find container {} when " +
-            "be matched with a move target", c);
-        //remove this not found container
-        return true;
-      }
-      return !findSourceStrategy.canSizeLeaveSource(
-          node, cInfo.getUsedBytes());
-    });
-
-    containerIDSet.removeIf(this::isContainerReplicatingOrDeleting);
+    containerIDSet.removeIf(
+        containerID -> shouldBeExcluded(containerID, node, sizeMovedAlready));
     return containerIDSet;
   }
 
@@ -145,7 +122,8 @@ public class ContainerBalancerSelectionCriteria {
    * @param second second container to compare
    * @return An integer greater than 0 if first is more used, 0 if they're
    * the same containers or a container is not found, and a value less than 0
-   * if first is not more used than second.
+   * if first is less used than second. If both containers have equal used
+   * space, they're compared using {@link ContainerID#compareTo(ContainerID)}.
    */
   private int isContainerMoreUsed(ContainerID first,
                                   ContainerID second) {
@@ -157,8 +135,10 @@ public class ContainerBalancerSelectionCriteria {
       ContainerInfo secondInfo = containerManager.getContainer(second);
       if (firstInfo.getUsedBytes() > secondInfo.getUsedBytes()) {
         return 1;
-      } else {
+      } else if (firstInfo.getUsedBytes() < secondInfo.getUsedBytes()) {
         return -1;
+      } else {
+        return first.compareTo(second);
       }
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not retrieve ContainerInfo from container manager for " +
@@ -174,6 +154,85 @@ public class ContainerBalancerSelectionCriteria {
    */
   private Comparator<ContainerID> orderContainersByUsedBytes() {
     return this::isContainerMoreUsed;
+  }
+
+  /**
+   * Checks whether a Container has the ReplicationType
+   * {@link HddsProtos.ReplicationType#EC}.
+   * @param container container to check
+   * @return true if the ReplicationType is EC and "hdds.scm.replication
+   * .enable.legacy" is true, else false
+   */
+  private boolean isECContainer(ContainerInfo container) {
+    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
+        && replicationManager.getConfig().isLegacyEnabled();
+  }
+
+  private boolean shouldBeExcluded(ContainerID containerID,
+      DatanodeDetails node, long sizeMovedAlready) {
+    ContainerInfo container;
+    try {
+      container = containerManager.getContainer(containerID);
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Could not find Container {} to check if it should be a " +
+          "candidate container. Excluding it.", containerID);
+      return true;
+    }
+    return !isContainerClosed(container, node) || isECContainer(container) ||
+        isContainerReplicatingOrDeleting(containerID) ||
+        !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
+        || breaksMaxSizeToMoveLimit(container.containerID(),
+        container.getUsedBytes(), sizeMovedAlready);
+  }
+
+  /**
+   * Checks whether specified container is closed. Also checks if the replica
+   * on the specified datanode is CLOSED. Assumes that there will only be one
+   * replica of a container on a particular Datanode.
+   * @param container container to check
+   * @param datanodeDetails datanode on which a replica of the container is
+   * present
+   * @return true if container LifeCycleState is
+   * {@link HddsProtos.LifeCycleState#CLOSED} and its replica on the
+   * specified datanode is CLOSED, else false
+   */
+  private boolean isContainerClosed(ContainerInfo container,
+                                    DatanodeDetails datanodeDetails) {
+    if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
+      return false;
+    }
+
+    // also check that the replica on the specified DN is closed
+    Set<ContainerReplica> replicas;
+    try {
+      replicas = containerManager.getContainerReplicas(container.containerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
+          "this container.", container.getContainerID(), e);
+      return false;
+    }
+    for (ContainerReplica replica : replicas) {
+      if (replica.getDatanodeDetails().equals(datanodeDetails)) {
+        // don't consider replica if it's not closed
+        // assumption: there's only one replica of this container on this DN
+        return replica.getState().equals(ContainerReplicaProto.State.CLOSED);
+      }
+    }
+
+    return false;
+  }
+
+  private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
+                                           long usedBytes,
+                                           long sizeMovedAlready) {
+    // check max size to move per iteration limit
+    if (sizeMovedAlready + usedBytes >
+        balancerConfiguration.getMaxSizeToMovePerIteration()) {
+      LOG.debug("Removing container {} because it fails max size " +
+          "to move per iteration check.", containerID);
+      return true;
+    }
+    return false;
   }
 
   public void setExcludeContainers(

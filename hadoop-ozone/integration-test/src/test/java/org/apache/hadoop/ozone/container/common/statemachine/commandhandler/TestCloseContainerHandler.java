@@ -51,7 +51,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test to behaviour of the datanode when receive close container command.
@@ -62,7 +64,7 @@ public class TestCloseContainerHandler {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -93,15 +95,16 @@ public class TestCloseContainerHandler {
     cluster.waitForClusterToBeReady();
 
     //the easiest way to create an open container is creating a key
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume("test");
-    objectStore.getVolume("test").createBucket("test");
-    OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("test", 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes(UTF_8));
-    key.close();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume("test");
+      objectStore.getVolume("test").createBucket("test");
+      OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
+          .createKey("test", 1024, ReplicationType.RATIS,
+              ReplicationFactor.ONE, new HashMap<>());
+      key.write("test".getBytes(UTF_8));
+      key.close();
+    }
 
     //get the name of a valid container
     OmKeyArgs keyArgs =
@@ -109,7 +112,6 @@ public class TestCloseContainerHandler {
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("test")
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =

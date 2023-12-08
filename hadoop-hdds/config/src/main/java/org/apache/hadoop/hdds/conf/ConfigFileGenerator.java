@@ -21,6 +21,8 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedSourceVersion;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
@@ -42,6 +44,7 @@ import java.util.Set;
  * Annotation processor to generate config fragments from Config annotations.
  */
 @SupportedAnnotationTypes("org.apache.hadoop.hdds.conf.ConfigGroup")
+@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class ConfigFileGenerator extends AbstractProcessor {
 
   public static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";

@@ -24,8 +24,10 @@ package org.apache.hadoop.hdds.scm.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -39,7 +41,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -66,9 +70,12 @@ import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -174,15 +181,16 @@ public class SCMBlockProtocolServer implements
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      String owner, ExcludeList excludeList,
+      String clientMachine
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
+    auditMap.put("client", clientMachine);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
-    boolean auditSuccess = true;
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Allocating {} blocks of size {}, with {}",
@@ -194,21 +202,37 @@ public class SCMBlockProtocolServer implements
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
+          // Sort the datanodes if client machine is specified
+          final Node client = getClientNode(clientMachine);
+          if (client != null) {
+            final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
+            final List<DatanodeDetails> sorted = scm.getClusterMap()
+                .sortByDistanceCost(client, nodes, nodes.size());
+            block.getPipeline().setNodesInOrder(sorted);
+          }
         }
       }
-      return blocks;
-    } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(SCMAction.ALLOCATE_BLOCK, auditMap, ex)
-      );
-      throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.ALLOCATE_BLOCK, auditMap)
+
+      auditMap.put("allocated", String.valueOf(blocks.size()));
+
+      if (blocks.size() < num) {
+        AUDIT.logWriteFailure(buildAuditMessageForFailure(
+            SCMAction.ALLOCATE_BLOCK, auditMap, null)
         );
+      } else {
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+            SCMAction.ALLOCATE_BLOCK, auditMap));
       }
+
+      return blocks;
+    } catch (TimeoutException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_BLOCK, auditMap, ex));
+      throw new IOException(ex);
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ALLOCATE_BLOCK, auditMap, ex));
+      throw ex;
     }
   }
 
@@ -225,6 +249,7 @@ public class SCMBlockProtocolServer implements
       LOG.debug("SCM is informed by OM to delete {} blocks",
           keyBlocksInfoList.size());
     }
+
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
@@ -254,13 +279,13 @@ public class SCMBlockProtocolServer implements
       }
     }
     for (BlockGroup bg : keyBlocksInfoList) {
-      auditMap.put("KeyBlockToDelete", bg.toString());
       List<DeleteBlockResult> blockResult = new ArrayList<>();
       for (BlockID b : bg.getBlockIDList()) {
         blockResult.add(new DeleteBlockResult(b, resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
+    auditMap.put("KeyBlockToDelete", keyBlocksInfoList.toString());
     if (e == null) {
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap));
@@ -297,6 +322,7 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public boolean addSCM(AddSCMRequest request) throws IOException {
+    scm.checkAdminAccess(getRemoteUser(), false);
     LOG.debug("Adding SCM {} addr {} cluster id {}",
         request.getScmId(), request.getRatisAddr(), request.getClusterId());
 
@@ -309,13 +335,13 @@ public class SCMBlockProtocolServer implements
       return scm.getScmHAManager().addSCM(request);
     } catch (Exception ex) {
       auditSuccess = false;
-      AUDIT.logReadFailure(
+      AUDIT.logWriteFailure(
           buildAuditMessageForFailure(SCMAction.ADD_SCM, auditMap, ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logReadSuccess(
+        AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.ADD_SCM, auditMap)
         );
       }
@@ -324,41 +350,61 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
-      String clientMachine) throws IOException {
+      String clientMachine) {
     boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put("client", clientMachine);
+    auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
-      Node client = null;
-      List<DatanodeDetails> possibleClients =
-          nodeManager.getNodesByAddress(clientMachine);
-      if (possibleClients.size() > 0) {
-        client = possibleClients.get(0);
-      }
-      List<Node> nodeList = new ArrayList();
-      nodes.stream().forEach(uuid -> {
+      final Node client = getClientNode(clientMachine);
+      List<DatanodeDetails> nodeList = new ArrayList<>();
+      nodes.forEach(uuid -> {
         DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
         if (node != null) {
           nodeList.add(node);
         }
       });
-      List<? extends Node> sortedNodeList = scm.getClusterMap()
-          .sortByDistanceCost(client, nodeList, nodes.size());
-      List<DatanodeDetails> ret = new ArrayList<>();
-      sortedNodeList.stream().forEach(node -> ret.add((DatanodeDetails)node));
-      return ret;
+      return scm.getClusterMap()
+          .sortByDistanceCost(client, nodeList, nodeList.size());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
-          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, null, ex)
+          buildAuditMessageForFailure(SCMAction.SORT_DATANODE, auditMap, ex)
       );
       throw ex;
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, null)
+            buildAuditMessageForSuccess(SCMAction.SORT_DATANODE, auditMap)
         );
       }
     }
+  }
+
+  private Node getClientNode(String clientMachine) {
+    List<DatanodeDetails> datanodes = scm.getScmNodeManager()
+        .getNodesByAddress(clientMachine);
+    return !datanodes.isEmpty() ? datanodes.get(0) :
+        getOtherNode(clientMachine);
+  }
+
+  private Node getOtherNode(String clientMachine) {
+    try {
+      String clientLocation = scm.resolveNodeLocation(clientMachine);
+      if (clientLocation != null) {
+        Node rack = scm.getClusterMap().getNode(clientLocation);
+        if (rack instanceof InnerNode) {
+          return new NodeImpl(clientMachine, clientLocation,
+              (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Could not resolve client {}: {}",
+          clientMachine, e.getMessage());
+    }
+    return null;
   }
 
   @Override

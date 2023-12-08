@@ -25,10 +25,15 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +43,9 @@ import java.util.Set;
  * Class to create pipelines for EC containers.
  */
 public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECPipelineProvider.class);
 
   // TODO - EC Placement Policy. Standard Network Aware topology will not work
   //        for EC as it stands. We may want an "as many racks as possible"
@@ -96,11 +104,24 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       Set<ContainerReplica> replicas) {
     Map<DatanodeDetails, Integer> map = new HashMap<>();
     List<DatanodeDetails> dns = new ArrayList<>(replicas.size());
+    Map<DatanodeDetails, NodeStatus> nodeStatusMap = new HashMap<>();
 
     for (ContainerReplica r : replicas) {
-      map.put(r.getDatanodeDetails(), r.getReplicaIndex());
-      dns.add(r.getDatanodeDetails());
+      DatanodeDetails dn = r.getDatanodeDetails();
+      try {
+        NodeStatus nodeStatus = getNodeManager().getNodeStatus(dn);
+        if (!nodeStatus.isDead()) {
+          map.put(dn, r.getReplicaIndex());
+          dns.add(dn);
+          nodeStatusMap.put(dn, nodeStatus);
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.error("Node not found", e);
+      }
     }
+
+    dns.sort(Comparator.comparing(nodeStatusMap::get));
+
     return createPipelineInternal(replicationConfig, dns, map);
   }
 

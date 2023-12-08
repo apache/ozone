@@ -57,8 +57,8 @@ Find Jars Dir
     Set Environment Variable    HDDS_LIB_JARS_DIR    ${dir}
 
 Create Key
-    [arguments]    ${key}    ${file}
-    ${output} =    Execute          ozone sh key put ${key} ${file}
+    [arguments]    ${key}    ${file}    ${args}=${EMPTY}
+    ${output} =    Execute          ozone sh key put ${args} ${key} ${file}
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
 

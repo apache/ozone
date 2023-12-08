@@ -23,57 +23,61 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.junit.Assert.fail;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests SCM Safe mode with pipeline rules.
  */
 
-@Ignore
 public class TestSCMSafeModeWithPipelineRules {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
-  private MiniOzoneCluster.Builder clusterBuilder;
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   public void setup(int numDatanodes) throws Exception {
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        temporaryFolder.newFolder().toString());
+    conf = new OzoneConfiguration();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+        100, TimeUnit.MILLISECONDS);
     conf.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         true);
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "10s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
-    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 50);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 1, SECONDS);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS, true);
+    conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+        SCMContainerPlacementCapacity.class, PlacementPolicy.class);
 
-    clusterBuilder = MiniOzoneCluster.newBuilder(conf)
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDatanodes)
-        .setHbInterval(1000)
-        .setHbProcessorInterval(1000);
-
-    cluster = clusterBuilder.build();
+        .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
@@ -82,10 +86,8 @@ public class TestSCMSafeModeWithPipelineRules {
 
   @Test
   public void testScmSafeMode() throws Exception {
-
     int datanodeCount = 6;
     setup(datanodeCount);
-
     waitForRatis3NodePipelines(datanodeCount / 3);
     waitForRatis1NodePipelines(datanodeCount);
 
@@ -116,7 +118,7 @@ public class TestSCMSafeModeWithPipelineRules {
         cluster.getStorageContainerManager().getScmSafeModeManager();
 
 
-    // Ceil(0.1 * 2) is 1, as one pipeline is healthy healthy pipeline rule is
+    // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
 
     GenericTestUtils.waitFor(() ->
@@ -129,7 +131,7 @@ public class TestSCMSafeModeWithPipelineRules {
         !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
             .validate(), 1000, 60000);
 
-    Assert.assertTrue(cluster.getStorageContainerManager().isInSafeMode());
+    Assertions.assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
     DatanodeDetails restartedDatanode = pipelineList.get(1).getFirstNode();
     // Now restart one datanode from the 2nd pipeline
@@ -139,50 +141,37 @@ public class TestSCMSafeModeWithPipelineRules {
       fail("Datanode restart failed");
     }
 
-
     GenericTestUtils.waitFor(() ->
         scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
             .validate(), 1000, 60000);
 
+    // All safeMode preChecks are now satisfied, SCM should be out of safe mode.
+
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 1000,
         60000);
 
-    // As after safemode wait time is not completed, we should have total
+    // As after safeMode wait time is not completed, we should have total
     // pipeline's as original count 6(1 node pipelines) + 2 (3 node pipeline)
-    Assert.assertEquals(totalPipelineCount,
+    Assertions.assertEquals(totalPipelineCount,
         pipelineManager.getPipelines().size());
+
+    // The below check calls pipelineManager.getPipelines()
+    // which is a call to the SCM to get the list of pipeline infos.
+    // This is independent of DN reports or whether any number of DataNodes are
+    // alive as the pipeline info is persisted to SCM upon creation and loaded
+    // back upon restart.
+
+    waitForRatis1NodePipelines(datanodeCount);
+    waitForRatis3NodePipelines(datanodeCount / 3);
 
     ReplicationManager replicationManager =
         cluster.getStorageContainerManager().getReplicationManager();
 
     GenericTestUtils.waitFor(() ->
         replicationManager.isRunning(), 1000, 60000);
-
-
-    // As 4 datanodes are reported, 4 single node pipeline and 1 3 node
-    // pipeline.
-
-    waitForRatis1NodePipelines(4);
-    waitForRatis3NodePipelines(1);
-
-    // Restart other datanodes in the pipeline, and after some time we should
-    // have same count as original.
-    pipelineList.get(1).getNodes().forEach(datanodeDetails -> {
-      try {
-        if (!restartedDatanode.equals(datanodeDetails)) {
-          cluster.restartHddsDatanode(datanodeDetails, false);
-        }
-      } catch (Exception ex) {
-        fail("Datanode restart failed");
-      }
-    });
-
-    waitForRatis1NodePipelines(datanodeCount);
-    waitForRatis3NodePipelines(datanodeCount / 3);
-
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (cluster != null) {
       cluster.shutdown();

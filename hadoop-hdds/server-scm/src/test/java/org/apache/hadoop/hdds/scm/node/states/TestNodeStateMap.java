@@ -27,12 +27,13 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
-import static junit.framework.TestCase.assertEquals;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test the NodeStateMap class, which is an internal class used by
@@ -43,12 +44,12 @@ public class TestNodeStateMap {
 
   private NodeStateMap map;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     map = new NodeStateMap();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
   }
 
@@ -105,7 +106,7 @@ public class TestNodeStateMap {
       }
     }
     NodeStatus requestedState = NodeStatus.inServiceStale();
-    List<UUID> nodes = map.getNodes(requestedState);
+    List<DatanodeInfo> nodes = map.getDatanodeInfos(requestedState);
     assertEquals(1, nodes.size());
     assertEquals(1, map.getNodeCount(requestedState));
     assertEquals(nodeCount, map.getTotalNodeCount());

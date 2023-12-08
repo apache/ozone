@@ -30,20 +30,17 @@ import java.io.IOException;
  * locking mechanism at runtime.
  */
 public interface OzoneLockStrategy {
-  boolean acquireWriteLock(OMMetadataManager omMetadataManager,
-                           OzoneManagerLock.Resource resource,
+  OMLockDetails acquireWriteLock(OMMetadataManager omMetadataManager,
                            String volumeName, String bucketName, String keyName)
       throws IOException;
 
-  void releaseWriteLock(OMMetadataManager omMetadataManager,
-                        OzoneManagerLock.Resource resource, String volumeName,
-                        String bucketName, String keyName) throws IOException;
+  OMLockDetails releaseWriteLock(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName);
 
-  boolean acquireReadLock(OMMetadataManager omMetadataManager,
-                          OzoneManagerLock.Resource resource, String volumeName,
-                          String bucketName, String keyName) throws IOException;
+  OMLockDetails acquireReadLock(OMMetadataManager omMetadataManager,
+                          String volumeName, String bucketName, String keyName)
+      throws IOException;
 
-  void releaseReadLock(OMMetadataManager omMetadataManager,
-                       OzoneManagerLock.Resource resource, String volumeName,
-                       String bucketName, String keyName) throws IOException;
+  OMLockDetails releaseReadLock(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName);
 }

@@ -18,19 +18,19 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSortedSet;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .FAILED_TO_CHANGE_CONTAINER_STATE;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
 
 /**
  * Each Attribute that we manage for a container is maintained as a map.
@@ -65,7 +65,7 @@ public class ContainerAttribute<T> {
 
   private final Map<T, NavigableSet<ContainerID>> attributeMap;
   private static final NavigableSet<ContainerID> EMPTY_SET =  Collections
-      .unmodifiableNavigableSet(new TreeSet<>());
+      .unmodifiableNavigableSet(new ConcurrentSkipListSet<>());
 
   /**
    * Creates a Container Attribute map from an existing Map.
@@ -80,7 +80,7 @@ public class ContainerAttribute<T> {
    * Create an empty Container Attribute map.
    */
   public ContainerAttribute() {
-    this.attributeMap = new HashMap<>();
+    this.attributeMap = new ConcurrentHashMap<>();
   }
 
   /**
@@ -94,7 +94,8 @@ public class ContainerAttribute<T> {
   public boolean insert(T key, ContainerID value) throws SCMException {
     Preconditions.checkNotNull(key);
     Preconditions.checkNotNull(value);
-    attributeMap.computeIfAbsent(key, any -> new TreeSet<>()).add(value);
+    attributeMap.computeIfAbsent(key, any ->
+        new ConcurrentSkipListSet<>()).add(value);
     return true;
   }
 
@@ -189,7 +190,7 @@ public class ContainerAttribute<T> {
     Preconditions.checkNotNull(key);
 
     if (this.attributeMap.containsKey(key)) {
-      return Collections.unmodifiableNavigableSet(this.attributeMap.get(key));
+      return ImmutableSortedSet.copyOf(this.attributeMap.get(key));
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("No such Key. Key {}", key);

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * DB transaction that buffers SCM DB transactions. Call the flush method
@@ -38,7 +39,11 @@ public interface SCMHADBTransactionBuffer
 
   void setLatestSnapshot(SnapshotInfo latestSnapshot);
 
+  AtomicReference<SnapshotInfo> getLatestSnapshotRef();
+
   void flush() throws IOException;
+  
+  boolean shouldFlush(long snapshotWaitTime);
 
   void init() throws IOException;
 }

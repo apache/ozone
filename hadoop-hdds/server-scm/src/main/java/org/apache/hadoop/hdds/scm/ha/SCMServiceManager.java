@@ -69,8 +69,12 @@ public final class SCMServiceManager {
    */
   public synchronized void start() {
     for (SCMService service : services) {
-      LOG.debug("Stopping service:{}.", service.getServiceName());
-      service.start();
+      LOG.debug("Starting service:{}.", service.getServiceName());
+      try {
+        service.start();
+      } catch (SCMServiceException e) {
+        LOG.warn("Could not start " + service.getServiceName(), e);
+      }
     }
   }
 

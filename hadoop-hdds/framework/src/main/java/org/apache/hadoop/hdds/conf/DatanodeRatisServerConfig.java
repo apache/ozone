@@ -23,6 +23,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import java.time.Duration;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATASTREAM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
@@ -123,6 +124,40 @@ public class DatanodeRatisServerConfig {
     this.leaderNumPendingRequests = leaderNumPendingRequests;
   }
 
+  @Config(key = "datastream.request.threads",
+      defaultValue = "20",
+      type = ConfigType.INT,
+      tags = {OZONE, DATANODE, RATIS, DATASTREAM},
+      description = "Maximum number of threads in the thread pool for " +
+          "datastream request."
+  )
+  private int streamRequestThreads;
+
+  public int getStreamRequestThreads() {
+    return streamRequestThreads;
+  }
+
+  public void setStreamRequestThreads(int streamRequestThreads) {
+    this.streamRequestThreads = streamRequestThreads;
+  }
+
+  @Config(key = "datastream.client.pool.size",
+      defaultValue = "10",
+      type = ConfigType.INT,
+      tags = {OZONE, DATANODE, RATIS, DATASTREAM},
+      description = "Maximum number of client proxy in NettyServerStreamRpc " +
+          "for datastream write."
+  )
+  private int clientPoolSize;
+
+  public int getClientPoolSize() {
+    return clientPoolSize;
+  }
+
+  public void setClientPoolSize(int clientPoolSize) {
+    this.clientPoolSize = clientPoolSize;
+  }
+
   @Config(key = "delete.ratis.log.directory",
           defaultValue = "true",
           type = ConfigType.BOOLEAN,
@@ -141,12 +176,12 @@ public class DatanodeRatisServerConfig {
   }
 
   @Config(key = "leaderelection.pre-vote",
-      defaultValue = "false",
+      defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = {OZONE, DATANODE, RATIS},
       description = "Flag to enable/disable ratis election pre-vote."
   )
-  private boolean preVoteEnabled;
+  private boolean preVoteEnabled = true;
 
   public boolean isPreVoteEnabled() {
     return preVoteEnabled;
@@ -154,5 +189,26 @@ public class DatanodeRatisServerConfig {
 
   public void setPreVote(boolean preVote) {
     this.preVoteEnabled = preVote;
+  }
+
+  /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
+  @Config(key = "log.appender.wait-time.min",
+      defaultValue = "0us",
+      type = ConfigType.TIME,
+      tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
+      description = "The minimum wait time between two appendEntries calls. " +
+          "In some error conditions, the leader may keep retrying " +
+          "appendEntries. If it happens, increasing this value to, say, " +
+          "5us (microseconds) can help avoid the leader being too busy " +
+          "retrying."
+  )
+  private long logAppenderWaitTimeMin;
+
+  public long getLogAppenderWaitTimeMin() {
+    return logAppenderWaitTimeMin;
+  }
+
+  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
+    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
   }
 }

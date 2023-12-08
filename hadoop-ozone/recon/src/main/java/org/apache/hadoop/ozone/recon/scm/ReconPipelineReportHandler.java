@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -57,7 +58,8 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
 
   @Override
   protected void processPipelineReport(PipelineReport report,
-      DatanodeDetails dn, EventPublisher publisher) throws IOException {
+      DatanodeDetails dn, EventPublisher publisher)
+      throws IOException, TimeoutException {
     ReconPipelineManager reconPipelineManager =
         (ReconPipelineManager)getPipelineManager();
 

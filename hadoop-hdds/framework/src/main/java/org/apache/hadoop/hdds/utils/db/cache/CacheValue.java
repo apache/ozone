@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,24 +20,46 @@ package org.apache.hadoop.hdds.utils.db.cache;
 
 import com.google.common.base.Optional;
 
+import java.util.Objects;
+
 /**
  * CacheValue for the RocksDB Table.
  * @param <VALUE>
  */
 public class CacheValue<VALUE> {
+  /** @return a {@link CacheValue} with a non-null value. */
+  public static <V> CacheValue<V> get(long epoch, V value) {
+    Objects.requireNonNull(value, "value == null");
+    return new CacheValue<>(epoch, value);
+  }
 
-  private Optional<VALUE> value;
+  /** @return a {@link CacheValue} with a null value. */
+  public static <V> CacheValue<V> get(long epoch) {
+    return new CacheValue<>(epoch, null);
+  }
+
+  private final VALUE value;
   // This value is used for evict entries from cache.
   // This value is set with ratis transaction context log entry index.
-  private long epoch;
+  private final long epoch;
 
-  public CacheValue(Optional<VALUE> value, long epoch) {
+  private CacheValue(long epoch, VALUE value) {
     this.value = value;
     this.epoch = epoch;
   }
 
+  /**
+   * @deprecated
+   * use {@link #get(long, Object)} or {@link #get(long)}.
+   */
+  @Deprecated
+  public CacheValue(Optional<VALUE> value, long epoch) {
+    this.value = value.orNull();
+    this.epoch = epoch;
+  }
+
   public VALUE getCacheValue() {
-    return value.orNull();
+    return value;
   }
 
   public long getEpoch() {

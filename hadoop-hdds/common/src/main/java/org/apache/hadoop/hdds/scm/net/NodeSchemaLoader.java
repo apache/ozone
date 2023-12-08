@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.hadoop.hdds.server.YamlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -42,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 
 import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
-import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.commons.collections.EnumerationUtils.toList;
 
@@ -227,10 +227,9 @@ public final class NodeSchemaLoader {
     NodeSchemaLoadResult finalSchema;
 
     try {
-      Yaml yaml = new Yaml();
       NodeSchema nodeTree;
 
-      nodeTree = yaml.loadAs(schemaFile, NodeSchema.class);
+      nodeTree = YamlUtils.loadAs(schemaFile, NodeSchema.class);
 
       List<NodeSchema> schemaList = new ArrayList<>();
       if (nodeTree.getType() != LayerType.ROOT) {

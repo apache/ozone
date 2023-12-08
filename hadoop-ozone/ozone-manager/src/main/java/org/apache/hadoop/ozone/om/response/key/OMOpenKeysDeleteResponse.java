@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -31,22 +31,26 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Handles responses to move open keys from the open key table to the delete
  * table. Modifies the open key table and delete table databases.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, OPEN_FILE_TABLE,
+    DELETED_TABLE, BUCKET_TABLE})
 public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private Map<String, OmKeyInfo> keysToDelete;
 
   public OMOpenKeysDeleteResponse(
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @Nonnull Map<String, OmKeyInfo> keysToDelete, boolean isRatisEnabled) {
+      @Nonnull OMResponse omResponse,
+      @Nonnull Map<String, OmKeyInfo> keysToDelete,
+      boolean isRatisEnabled,
+      @Nonnull BucketLayout bucketLayout) {
 
-    super(omResponse, isRatisEnabled);
+    super(omResponse, isRatisEnabled, bucketLayout);
     this.keysToDelete = keysToDelete;
   }
 
@@ -55,8 +59,8 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
    * For a successful request, the other constructor should be used.
    */
   public OMOpenKeysDeleteResponse(
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse, @Nonnull
-      BucketLayout bucketLayout) {
+      @Nonnull OMResponse omResponse,
+      @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, bucketLayout);
   }

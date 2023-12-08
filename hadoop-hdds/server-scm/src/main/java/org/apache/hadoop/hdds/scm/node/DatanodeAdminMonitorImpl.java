@@ -21,12 +21,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics.ContainerStateInWorkflow;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -36,10 +38,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -74,12 +79,21 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private Queue<DatanodeDetails> pendingNodes = new ArrayDeque();
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
   private Set<DatanodeDetails> trackedNodes = new HashSet<>();
+  private NodeDecommissionMetrics metrics;
+  private long pipelinesWaitingToClose = 0;
+  private long sufficientlyReplicatedContainers = 0;
+  private long trackedDecomMaintenance = 0;
+  private long trackedRecommission = 0;
+  private long unhealthyContainers = 0;
+  private long underReplicatedContainers = 0;
+
+  private Map<String, ContainerStateInWorkflow> containerStateByHost;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
   // The number of containers for each of under replicated and unhealthy
   // that will be logged in detail each time a node is checked.
-  private static final int CONTAINER_DETAILS_LOGGING_LIMIT = 5;
+  private final int containerDetailsLoggingLimit;
 
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
@@ -90,6 +104,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
+    containerDetailsLoggingLimit = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT,
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT_DEFAULT);
+    containerStateByHost = new HashMap<>();
   }
 
   /**
@@ -117,6 +135,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     cancelledNodes.add(dn);
   }
 
+  public synchronized void setMetrics(NodeDecommissionMetrics metrics) {
+    this.metrics = metrics;
+  }
+
   /**
    * Get the set of nodes which are currently tracked in the decommissioned
    * and maintenance workflow.
@@ -139,16 +161,20 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   @Override
   public void run() {
     try {
+      containerStateByHost.clear();
       synchronized (this) {
+        trackedRecommission = getCancelledCount();
         processCancelledNodes();
         processPendingNodes();
+        trackedDecomMaintenance = getTrackedNodeCount();
       }
       processTransitioningNodes();
       if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
         LOG.info("There are {} nodes tracked for decommission and " +
-                "maintenance. {} pending nodes.",
+            "maintenance.  {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
       }
+      setMetricsToGauge();
     } catch (Exception e) {
       LOG.error("Caught an error in the DatanodeAdminMonitor", e);
       // Intentionally do not re-throw, as if we do the monitor thread
@@ -166,6 +192,28 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   public int getTrackedNodeCount() {
     return trackedNodes.size();
+  }
+
+  synchronized void setMetricsToGauge() {
+    synchronized (metrics) {
+      metrics.setContainersUnhealthyTotal(unhealthyContainers);
+      metrics.setRecommissionNodesTotal(trackedRecommission);
+      metrics.setDecommissioningMaintenanceNodesTotal(
+          trackedDecomMaintenance);
+      metrics.setContainersUnderReplicatedTotal(
+          underReplicatedContainers);
+      metrics.setContainersSufficientlyReplicatedTotal(
+          sufficientlyReplicatedContainers);
+      metrics.setPipelinesWaitingToCloseTotal(pipelinesWaitingToClose);
+      metrics.metricRecordOfContainerStateByHost(containerStateByHost);
+    }
+  }
+
+  void resetContainerMetrics() {
+    pipelinesWaitingToClose = 0;
+    sufficientlyReplicatedContainers = 0;
+    unhealthyContainers = 0;
+    underReplicatedContainers = 0;
   }
 
   private void processCancelledNodes() {
@@ -188,7 +236,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   }
 
   private void processTransitioningNodes() {
+    resetContainerMetrics();
     Iterator<DatanodeDetails> iterator = trackedNodes.iterator();
+
     while (iterator.hasNext()) {
       DatanodeDetails dn = iterator.next();
       try {
@@ -256,8 +306,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       NodeStatus nodeStatus) {
     if (!nodeStatus.isDecommission() && !nodeStatus.isMaintenance()) {
       LOG.warn("Datanode {} has an operational state of {} when it should " +
-              "be undergoing decommission or maintenance. Aborting admin for " +
-              "this node.", dn, nodeStatus.getOperationalState());
+          "be undergoing decommission or maintenance. Aborting admin for " +
+          "this node.", dn, nodeStatus.getOperationalState());
       return false;
     }
     if (nodeStatus.isDead() && !nodeStatus.isInMaintenance()) {
@@ -278,6 +328,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     } else {
       LOG.info("Waiting for pipelines to close for {}. There are {} " +
           "pipelines", dn, pipelines.size());
+      containerStateByHost.put(dn.getHostName(),
+        new ContainerStateInWorkflow(dn.getHostName(), 0L, 0L, 0L,
+            pipelines.size()));
+      pipelinesWaitingToClose += pipelines.size();
       return false;
     }
   }
@@ -285,6 +339,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private boolean checkContainersReplicatedOnNode(DatanodeDetails dn)
       throws NodeNotFoundException {
     int sufficientlyReplicated = 0;
+    int deleting = 0;
     int underReplicated = 0;
     int unhealthy = 0;
     List<ContainerID> underReplicatedIDs = new ArrayList<>();
@@ -295,27 +350,52 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
-        if (replicaSet.isSufficientlyReplicated()) {
+
+        // If a container is deleted or deleting, and we have a replica on this
+        // datanode, just ignore it. It should not block decommission.
+        HddsProtos.LifeCycleState containerState
+            = replicaSet.getContainer().getState();
+        if (containerState == HddsProtos.LifeCycleState.DELETED
+            || containerState == HddsProtos.LifeCycleState.DELETING) {
+          deleting++;
+          continue;
+        }
+
+        if (replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager)) {
           sufficientlyReplicated++;
         } else {
           if (LOG.isDebugEnabled()) {
             underReplicatedIDs.add(cid);
           }
-          if (underReplicated < CONTAINER_DETAILS_LOGGING_LIMIT
+          if (underReplicated < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           underReplicated++;
         }
-        if (!replicaSet.isHealthy()) {
+
+        boolean isHealthy;
+        /*
+        If LegacyReplicationManager is enabled, then use the
+        isHealthyEnoughForOffline API. ReplicationManager doesn't support this
+        API yet.
+         */
+        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
+            ".legacy", false);
+        if (legacyEnabled) {
+          isHealthy = replicaSet.isHealthyEnoughForOffline();
+        } else {
+          isHealthy = replicaSet.isHealthy();
+        }
+        if (!isHealthy) {
           if (LOG.isDebugEnabled()) {
             unhealthyIDs.add(cid);
           }
-          if (unhealthy < CONTAINER_DETAILS_LOGGING_LIMIT
+          if (unhealthy < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Unhealthy Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplica()));
+                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           unhealthy++;
         }
@@ -324,9 +404,18 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
             "in containerManager", cid, dn);
       }
     }
-    LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
-        "unhealthy containers",
-        dn, sufficientlyReplicated, underReplicated, unhealthy);
+    LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
+            "underReplicated and {} unhealthy containers",
+        dn, sufficientlyReplicated, deleting, underReplicated, unhealthy);
+    containerStateByHost.put(dn.getHostName(),
+        new ContainerStateInWorkflow(dn.getHostName(),
+            sufficientlyReplicated,
+            underReplicated,
+            unhealthy,
+            0L));
+    sufficientlyReplicatedContainers += sufficientlyReplicated;
+    underReplicatedContainers += underReplicated;
+    unhealthyContainers += unhealthy;
     if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
         unhealthyIDs.size() < 10000) {
       LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
@@ -339,7 +428,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return underReplicated == 0 && unhealthy == 0;
   }
 
-  private String replicaDetails(Set<ContainerReplica> replicas) {
+  private String replicaDetails(Collection<ContainerReplica> replicas) {
     StringBuilder sb = new StringBuilder();
     sb.append("Replicas{");
     sb.append(replicas.stream()

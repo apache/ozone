@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -41,7 +42,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -66,7 +67,6 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
-@Flaky("HDDS-2961")
 public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;
@@ -101,7 +101,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
    * Verifies container placement metric.
    */
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
-  public void test() throws IOException {
+  public void test() throws IOException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -159,6 +159,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
   @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(ozClient);
     cluster.shutdown();
   }
 }

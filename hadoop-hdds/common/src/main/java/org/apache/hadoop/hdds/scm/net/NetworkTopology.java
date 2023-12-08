@@ -40,6 +40,14 @@ public interface NetworkTopology {
   void add(Node node);
 
   /**
+   * Update a node. This will be called when a datanode needs to be updated.
+   * If the old datanode does not exist, then just add the new datanode.
+   * @param oldNode node to be updated; can be null
+   * @param newNode node to update to; cannot be null
+   */
+  void update(Node oldNode, Node newNode);
+
+  /**
    * Remove a node from the network topology. This will be called when a
    * existing datanode is removed from the system.
    * @param node node to be removed; cannot be null
@@ -231,7 +239,11 @@ public interface NetworkTopology {
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
    * @param activeLen Number of active nodes at the front of the array
+   *
+   * @return list of sorted nodes if reader is not null,
+   * or shuffled input nodes otherwise. The size of returned list is limited
+   * by activeLen parameter.
    */
-  List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen);
+  <N extends Node> List<N> sortByDistanceCost(Node reader,
+      List<N> nodes, int activeLen);
 }

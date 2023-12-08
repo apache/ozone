@@ -19,9 +19,10 @@
  */
 package org.apache.hadoop.ozone.s3.commontypes;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.junit.jupiter.api.Test;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 /**
  * Testing on object key name serialization.
@@ -29,15 +30,22 @@ import javax.xml.bind.annotation.adapters.XmlAdapter;
 public class TestObjectKeyNameAdapter {
   @Test
   public void testEncodeResult() throws Exception {
-    Assert.assertEquals("abc/",
-        getAdapter().marshal("abc/"));
-    Assert.assertEquals("a+b+c/",
-        getAdapter().marshal("a b c/"));
-    Assert.assertEquals("a%2Bb%2Bc/",
-        getAdapter().marshal("a+b+c/"));
+    assertEquals("abc/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("abc/", ENCODING_TYPE)));
+    assertEquals("a+b+c/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a b c/", ENCODING_TYPE)));
+    assertEquals("a%2Bb%2Bc/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a+b+c/", ENCODING_TYPE)));
+
+    assertEquals("abc/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("abc/", null)));
+    assertEquals("a b c/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a b c/", null)));
+    assertEquals("a+b+c/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a+b+c/", null)));
   }
 
-  private XmlAdapter<String, String> getAdapter() {
+  private XmlAdapter<String, EncodingTypeObject> getAdapter() {
     return (new ObjectKeyNameAdapter());
   }
 }

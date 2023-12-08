@@ -40,7 +40,7 @@ public class FileSizeDistributionResponse {
 
   public FileSizeDistributionResponse() {
     this.status = ResponseStatus.OK;
-    this.fileSizeDist = new int[ReconConstants.NUM_OF_BINS];
+    this.fileSizeDist = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
   }
 
   public ResponseStatus getStatus() {
@@ -48,7 +48,8 @@ public class FileSizeDistributionResponse {
   }
 
   public int[] getFileSizeDist() {
-    return Arrays.copyOf(this.fileSizeDist, ReconConstants.NUM_OF_BINS);
+    return Arrays.copyOf(this.fileSizeDist,
+        ReconConstants.NUM_OF_FILE_SIZE_BINS);
   }
 
   public void setStatus(ResponseStatus status) {
@@ -56,6 +57,7 @@ public class FileSizeDistributionResponse {
   }
 
   public void setFileSizeDist(int[] fileSizeDist) {
-    this.fileSizeDist = Arrays.copyOf(fileSizeDist, ReconConstants.NUM_OF_BINS);
+    this.fileSizeDist =
+        Arrays.copyOf(fileSizeDist, ReconConstants.NUM_OF_FILE_SIZE_BINS);
   }
 }

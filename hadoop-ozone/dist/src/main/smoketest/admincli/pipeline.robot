@@ -36,9 +36,19 @@ List pipelines
     ${output} =         Execute          ozone admin pipeline list
                         Should contain   ${output}   STANDALONE/ONE
 
+List pipeline with json option
+    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
+
+    Should be true      $output
+
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
                         Should contain   ${output}   STANDALONE/ONE
+
+List pipelines with explicit host and json option
+    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
+
+    Should be true      $output
 
 Deactivate pipeline
                         Execute          ozone admin pipeline deactivate "${PIPELINE}"
@@ -52,8 +62,9 @@ Activate pipeline
 
 Close pipeline
                         Execute          ozone admin pipeline close "${PIPELINE}"
-    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
-                        Should contain   ${output}   CLOSED
+    ${output} =         Execute          ozone admin pipeline list
+                        Pass Execution If     '${PIPELINE}' not in '''${output}'''    Pipeline already scrubbed
+                        Should Match Regexp   ${output}   ${PIPELINE}.*CLOSED
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin pipeline

@@ -20,12 +20,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -34,34 +36,27 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.junit.Assert.assertEquals;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests the versioning of blocks from OM side.
  */
+@Timeout(300)
 public class TestOmBlockVersioning {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static OzoneConfiguration conf;
   private static OzoneManager ozoneManager;
   private static OzoneManagerProtocol writeClient;
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -70,21 +65,23 @@ public class TestOmBlockVersioning {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     ozoneManager = cluster.getOzoneManager();
-    writeClient = cluster.getRpcClient().getObjectStore()
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -97,7 +94,7 @@ public class TestOmBlockVersioning {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+        TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
     // Versioning isn't supported currently, but just preserving old behaviour
     bucket.setVersioning(true);
 
@@ -106,7 +103,6 @@ public class TestOmBlockVersioning {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(1000)
-        .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
         .build();
@@ -148,7 +144,7 @@ public class TestOmBlockVersioning {
     List<OmKeyLocationInfo> locationInfoList =
         openKey.getKeyInfo().getLatestVersionLocations()
             .getBlocksLatestVersionOnly();
-    Assert.assertTrue(locationInfoList.size() == 1);
+    assertTrue(locationInfoList.size() == 1);
     locationInfoList.add(locationInfo);
     keyArgs.setLocationInfoList(locationInfoList);
     writeClient.commitKey(keyArgs, openKey.getId());
@@ -179,14 +175,13 @@ public class TestOmBlockVersioning {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+        TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
 
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(1000)
-        .setRefreshPipeline(true)
         .build();
 
     String dataString = RandomStringUtils.randomAlphabetic(100);

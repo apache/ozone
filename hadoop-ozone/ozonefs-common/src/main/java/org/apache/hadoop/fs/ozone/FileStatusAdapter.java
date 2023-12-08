@@ -20,7 +20,10 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.Path;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 
 /**
  * Class to hold the internal information of a FileStatus.
@@ -35,6 +38,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 public final class FileStatusAdapter {
 
   private final long length;
+  private final long diskConsumed;
   private final Path path;
   private final boolean isdir;
   private final short blockReplication;
@@ -45,14 +49,21 @@ public final class FileStatusAdapter {
   private final String owner;
   private final String group;
   private final Path symlink;
-  private final BlockLocation[] blockLocations;
+  private final List<BlockLocation> blockLocations;
+
+  private final boolean isEncrypted;
+
+  private final boolean isErasureCoded;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public FileStatusAdapter(long length, Path path, boolean isdir,
-      short blockReplication, long blocksize, long modificationTime,
-      long accessTime, short permission, String owner,
-      String group, Path symlink, BlockLocation[] locations) {
+  public FileStatusAdapter(long length, long diskConsumed, Path path,
+      boolean isdir, short blockReplication, long blocksize,
+      long modificationTime, long accessTime, short permission,
+      String owner, String group, Path symlink,
+      BlockLocation[] locations, boolean isEncrypted,
+      boolean isErasureCoded) {
     this.length = length;
+    this.diskConsumed = diskConsumed;
     this.path = path;
     this.isdir = isdir;
     this.blockReplication = blockReplication;
@@ -63,7 +74,9 @@ public final class FileStatusAdapter {
     this.owner = owner;
     this.group = group;
     this.symlink = symlink;
-    this.blockLocations = locations.clone();
+    this.blockLocations = new ArrayList<>(Arrays.asList(locations));
+    this.isEncrypted = isEncrypted;
+    this.isErasureCoded = isErasureCoded;
   }
 
 
@@ -73,6 +86,10 @@ public final class FileStatusAdapter {
 
   public boolean isDir() {
     return isdir;
+  }
+
+  public boolean isFile() {
+    return !isdir;
   }
 
   public short getBlockReplication() {
@@ -111,9 +128,43 @@ public final class FileStatusAdapter {
     return length;
   }
 
-  @SuppressFBWarnings("EI_EXPOSE_REP")
+  public long getDiskConsumed() {
+    return diskConsumed;
+  }
+
+  public boolean isEncrypted() {
+    return isEncrypted;
+  }
+
+  public boolean isErasureCoded() {
+    return isErasureCoded;
+  }
+
   public BlockLocation[] getBlockLocations() {
-    return blockLocations;
+    return blockLocations.toArray(new BlockLocation[0]);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getClass().getSimpleName())
+        .append("{")
+        .append("path=").append(path)
+        .append("; isDirectory=").append(isdir);
+    if (isFile()) {
+      sb.append("; length=").append(length)
+              .append("; diskConsumed= ").append(getDiskConsumed())
+          .append("; blockReplication=").append(blockReplication)
+          .append("; blocksize=").append(blocksize);
+    }
+    sb.append("; accessTime=").append(accessTime)
+        .append("; owner=").append(owner)
+        .append("; group=").append(group)
+        .append("; permission=").append(permission)
+        .append("; isSymlink=").append(getSymlink())
+        .append("}");
+    
+    return sb.toString();
   }
 
 }

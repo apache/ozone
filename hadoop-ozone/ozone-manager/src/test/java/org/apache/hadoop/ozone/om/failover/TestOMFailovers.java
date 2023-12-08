@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.failover;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -29,15 +30,16 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
 
 /**
@@ -54,9 +56,9 @@ public class TestOMFailovers {
 
     testException = new AccessControlException();
 
-    GenericTestUtils.setLogLevel(OMFailoverProxyProvider.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMFailoverProxyProvider.LOG);
+        .captureLogs(OMFailoverProxyProviderBase.LOG);
 
     MockFailoverProxyProvider failoverProxyProvider =
         new MockFailoverProxyProvider(conf);
@@ -68,22 +70,22 @@ public class TestOMFailovers {
 
     try {
       proxy.submitRequest(null, null);
-      Assert.fail("Request should fail with AccessControlException");
+      Assertions.fail("Request should fail with AccessControlException");
     } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof ServiceException);
+      Assertions.assertTrue(ex instanceof ServiceException);
 
       // Request should try all OMs one be one and fail when the last OM also
       // throws AccessControlException.
       GenericTestUtils.assertExceptionContains("ServiceException of " +
           "type class org.apache.hadoop.security.AccessControlException for " +
           "om3", ex);
-      Assert.assertTrue(ex.getCause() instanceof AccessControlException);
+      Assertions.assertTrue(ex.getCause() instanceof AccessControlException);
 
-      Assert.assertTrue(
+      Assertions.assertTrue(
           logCapturer.getOutput().contains(getRetryProxyDebugMsg("om1")));
-      Assert.assertTrue(
+      Assertions.assertTrue(
           logCapturer.getOutput().contains(getRetryProxyDebugMsg("om2")));
-      Assert.assertTrue(
+      Assertions.assertTrue(
           logCapturer.getOutput().contains(getRetryProxyDebugMsg("om3")));
     }
   }
@@ -114,7 +116,7 @@ public class TestOMFailovers {
   }
 
   private final class MockFailoverProxyProvider
-      extends OMFailoverProxyProvider {
+      extends HadoopRpcOMFailoverProxyProvider {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
@@ -135,6 +137,7 @@ public class TestOMFailovers {
       HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
           new HashMap<>();
       HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();
+      HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
@@ -142,8 +145,10 @@ public class TestOMFailovers {
         omProxies.put(nodeId, null);
         omProxyInfos.put(nodeId, null);
         omNodeIDList.add(nodeId);
+        omNodeAddressMap.put(nodeId, null);
       }
-      setProxies(omProxies, omProxyInfos, omNodeIDList);
+      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList,
+          omNodeAddressMap);
     }
 
     @Override

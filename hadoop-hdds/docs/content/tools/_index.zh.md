@@ -49,7 +49,6 @@ Ozone 有一系列管理 Ozone 的命令行工具。
    * **dtutil**    - 进行和 token 有关的操作。
    * **envvars** - 列出 Hadoop 的环境变量。
    * **getconf** -  从 Ozone 配置中读取特定配置值。
-   * **jmxget**  - 从 Ozone 服务中获取 JMX 导出的值。
    * **scmcli** -  SCM 的命令行接口，仅供开发者使用。
    Container Manager.
    * **genconf** -  生成 Ozone 所需的最小配置，并输出到 ozone-site.xml 中。

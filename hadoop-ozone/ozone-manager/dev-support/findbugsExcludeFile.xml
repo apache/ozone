@@ -46,6 +46,10 @@
     <Bug pattern="URF_UNREAD_FIELD" />
   </Match>
   <Match>
+    <Class name="org.apache.hadoop.ozone.om.ratis.TestOzoneManagerDoubleBufferWithDummyResponse"/>
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.om.request.TestNormalizePaths"/>
     <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
   </Match>
@@ -58,8 +62,8 @@
     <Bug pattern="UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.om.request.volume.TestOMVolumeCreateRequest"/>
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+    <Class name="org.apache.hadoop.ozone.om.snapshot.TestSnapshotDiffManager" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.security.TestOzoneManagerBlockToken"/>
@@ -76,6 +80,10 @@
   <Match>
     <Class name="org.apache.hadoop.ozone.security.TestOzoneTokenIdentifier"/>
     <Bug pattern="UC_USELESS_OBJECT" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.om.snapshot.TestFSODirectoryPathResolver"/>
+    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.om.upgrade.TestOMLayoutFeatureAspect"/>

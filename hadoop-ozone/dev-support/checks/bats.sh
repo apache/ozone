@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#checks:basic
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
@@ -33,6 +35,7 @@ rm -f "${REPORT_DIR}/output.log"
 find * \( \
     -path '*/src/test/shell/*' -name '*.bats' \
     -or -path dev-support/ci/selective_ci_checks.bats \
+    -or -path dev-support/ci/pr_title_check.bats \
     \) -print0 \
   | xargs -0 -n1 bats --formatter tap \
   | tee -a "${REPORT_DIR}/output.log"

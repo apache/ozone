@@ -33,7 +33,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.util.Preconditions;
-import org.junit.Assert;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -46,7 +45,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.function.Function;
-import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Utility class providing methods useful in EC tests.
@@ -152,8 +152,8 @@ public final class ECStreamTestUtil {
     int i = 0;
     while (b.hasRemaining()) {
       i++;
-      Assert.assertEquals("Failed on iteration " + i,
-          (byte)rand.nextInt(255), b.get());
+      assertEquals((byte) rand.nextInt(255), b.get(),
+          "Failed on iteration " + i);
     }
   }
 
@@ -224,13 +224,13 @@ public final class ECStreamTestUtil {
         new LinkedHashMap<>();
     private List<ByteBuffer> blockStreamData;
     // List of EC indexes that should fail immediately on read
-    private List<Integer> failIndexes = new ArrayList<>();
+    private final List<Integer> failIndexes = new ArrayList<>();
 
     private Pipeline currentPipeline;
 
     public synchronized
         List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
-      return blockStreams.values().stream().collect(Collectors.toList());
+      return new ArrayList<>(blockStreams.values());
     }
 
     public synchronized Set<Integer> getStreamIndexes() {
@@ -250,8 +250,9 @@ public final class ECStreamTestUtil {
       this.currentPipeline = pipeline;
     }
 
-    public synchronized void setFailIndexes(List<Integer> fail) {
-      failIndexes.addAll(fail);
+    // fail each index in the list once
+    public synchronized void setFailIndexes(Integer... fail) {
+      failIndexes.addAll(Arrays.asList(fail));
     }
 
     public synchronized BlockExtendedInputStream create(
@@ -259,13 +260,13 @@ public final class ECStreamTestUtil {
         BlockLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
-        Function<BlockID, Pipeline> refreshFunction) {
+        Function<BlockID, BlockLocationInfo> refreshFunction) {
 
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
           blockStreamData.get(repInd - 1), repInd);
-      if (failIndexes.contains(repInd)) {
+      if (failIndexes.remove(Integer.valueOf(repInd))) {
         stream.setShouldError(true);
       }
       blockStreams.put(repInd, stream);
@@ -335,11 +336,6 @@ public final class ECStreamTestUtil {
     @Override
     public long getLength() {
       return length;
-    }
-
-    @Override
-    public long getRemaining() {
-      return getLength() - getPos();
     }
 
     @Override

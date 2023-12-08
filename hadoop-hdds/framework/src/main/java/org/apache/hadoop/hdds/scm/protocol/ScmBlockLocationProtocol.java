@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * ScmBlockLocationProtocol is used by an HDFS node to find the set of nodes
@@ -63,7 +64,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
   @Deprecated
   default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationType type, ReplicationFactor factor, String owner,
-      ExcludeList excludeList) throws IOException {
+      ExcludeList excludeList) throws IOException, TimeoutException {
     return allocateBlock(size, numBlocks, ReplicationConfig
         .fromProtoTypeAndFactor(type, factor), owner, excludeList);
   }
@@ -82,9 +83,33 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
+  default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
+       ReplicationConfig replicationConfig, String owner,
+       ExcludeList excludeList) throws IOException {
+    return allocateBlock(size, numBlocks, replicationConfig, owner,
+        excludeList, null);
+  }
+
+  /**
+   * Asks SCM where a block should be allocated. SCM responds with the
+   * set of datanodes that should be used creating this block, sorted
+   * based on the client address.
+   *
+   * @param size              - size of the block.
+   * @param numBlocks         - number of blocks.
+   * @param replicationConfig - replicationConfiguration
+   * @param owner             - service owner of the new block
+   * @param excludeList       List of datanodes/containers to exclude during
+   *                          block
+   *                          allocation.
+   * @param clientMachine client address, depends, can be hostname or
+   *                      ipaddress.
+   * @return allocated block accessing info (key, pipeline).
+   * @throws IOException
+   */
   List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationConfig replicationConfig, String owner,
-      ExcludeList excludeList) throws IOException;
+      ExcludeList excludeList, String clientMachine) throws IOException;
 
   /**
    * Delete blocks for a set of object keys.

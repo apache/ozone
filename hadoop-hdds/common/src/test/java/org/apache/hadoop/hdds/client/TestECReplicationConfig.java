@@ -18,23 +18,25 @@
 package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.XOR;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Unit test for ECReplicationConfig.
  */
-public class TestECReplicationConfig {
+class TestECReplicationConfig {
 
   @Test
-  public void testSuccessfulStringParsing() {
+  void testSuccessfulStringParsing() {
     Map<String, ECReplicationConfig> valid = new HashMap();
     valid.put("rs-3-2-1024", new ECReplicationConfig(3, 2, RS, 1024));
     valid.put("RS-3-2-1024", new ECReplicationConfig(3, 2, RS, 1024));
@@ -45,47 +47,34 @@ public class TestECReplicationConfig {
 
     for (Map.Entry<String, ECReplicationConfig> e : valid.entrySet()) {
       ECReplicationConfig ec = new ECReplicationConfig(e.getKey());
-      Assert.assertEquals(e.getValue().getData(), ec.getData());
-      Assert.assertEquals(e.getValue().getParity(), ec.getParity());
-      Assert.assertEquals(e.getValue().getCodec(), ec.getCodec());
-      Assert.assertEquals(e.getValue().getEcChunkSize(), ec.getEcChunkSize());
+      assertEquals(e.getValue().getData(), ec.getData());
+      assertEquals(e.getValue().getParity(), ec.getParity());
+      assertEquals(e.getValue().getCodec(), ec.getCodec());
+      assertEquals(e.getValue().getEcChunkSize(), ec.getEcChunkSize());
     }
   }
 
-  @Test
-  public void testUnsuccessfulStringParsing() {
-    String[] invalid = {
-        "3-2-1024",
-        "rss-3-2-1024",
-        "rs-3-0-1024",
-        "rs-3-2-0k",
-        "rs-3-2",
-        "x3-2"
-    };
-    for (String s : invalid) {
-      try {
-        new ECReplicationConfig(s);
-        fail(s + " should not parse correctly");
-      } catch (IllegalArgumentException e) {
-        // ignore, this expected
-      }
-    }
+  @ParameterizedTest
+  @ValueSource(strings = {"3-2-1024", "rss-3-2-1024", "rs-3-0-1024",
+      "rs-3-2-0k", "rs-3-2", "x3-2"})
+  void testUnsuccessfulStringParsing(String invalidValue) {
+    assertThrows(IllegalArgumentException.class,
+            () -> new ECReplicationConfig(invalidValue));
   }
 
-
   @Test
-  public void testSerializeToProtoAndBack() {
+  void testSerializeToProtoAndBack() {
     ECReplicationConfig orig = new ECReplicationConfig(6, 3,
         ECReplicationConfig.EcCodec.XOR, 1024);
 
     HddsProtos.ECReplicationConfig proto = orig.toProto();
 
     ECReplicationConfig recovered = new ECReplicationConfig(proto);
-    Assert.assertEquals(orig.getData(), recovered.getData());
-    Assert.assertEquals(orig.getParity(), recovered.getParity());
-    Assert.assertEquals(orig.getCodec(), recovered.getCodec());
-    Assert.assertEquals(orig.getEcChunkSize(), recovered.getEcChunkSize());
-    Assert.assertTrue(orig.equals(recovered));
+    assertEquals(orig.getData(), recovered.getData());
+    assertEquals(orig.getParity(), recovered.getParity());
+    assertEquals(orig.getCodec(), recovered.getCodec());
+    assertEquals(orig.getEcChunkSize(), recovered.getEcChunkSize());
+    assertEquals(orig, recovered);
   }
 
 }

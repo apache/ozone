@@ -37,6 +37,7 @@ Daemon commands:
    stopped.
    * **s3g** - Start the S3 compatible REST gateway
    * **recon** - The Web UI service of Ozone can be started with this command.
+   * **httpfs** - Start the HttpFS gateway
    
 Client commands:
 
@@ -55,7 +56,6 @@ Admin commands:
    * **dtutil**    - Operations related to delegation tokens
    * **envvars** - Display computed Hadoop environment variables.
    * **getconf** -  Reads ozone config values from configuration.
-   * **jmxget**  - Get JMX exported values from NameNode or DataNode.
    * **genconf** -  Generate minimally required ozone configs and output to
    ozone-site.xml.
 

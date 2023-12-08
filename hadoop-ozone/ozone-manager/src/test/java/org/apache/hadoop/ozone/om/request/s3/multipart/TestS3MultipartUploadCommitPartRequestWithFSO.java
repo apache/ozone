@@ -27,8 +27,9 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -63,11 +64,11 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
   @Override
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
-    long txnLogId = 10000;
+    long txnLogId = 0L;
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
             bucketName, keyName, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, parentID + 1, parentID,
-            txnLogId, Time.now());
+            txnLogId, Time.now(), true);
     String fileName = OzoneFSUtils.getFileName(keyName);
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);
@@ -75,17 +76,24 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
 
   @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     String fileName = StringUtils.substringAfter(keyName, dirName);
-    return omMetadataManager.getMultipartKey(parentID, fileName,
-            multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
   }
 
   @Override
   protected String getOpenKey(String volumeName, String bucketName,
-      String keyName, long clientID) {
+      String keyName, long clientID) throws IOException {
     String fileName = StringUtils.substringAfter(keyName, dirName);
-    return omMetadataManager.getOpenFileName(parentID, fileName, clientID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
+            parentID, fileName, clientID);
   }
 
   @Override
@@ -102,11 +110,11 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
     OMRequest modifiedRequest =
             s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
 
-    Assert.assertNotEquals(omRequest, modifiedRequest);
-    Assert.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
-    Assert.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
+    Assertions.assertNotEquals(omRequest, modifiedRequest);
+    Assertions.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
+    Assertions.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
-    Assert.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
+    Assertions.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getModificationTime() > 0);
 
     return modifiedRequest;

@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
+import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -64,10 +65,13 @@ public class TestS3MultipartUploadAbortRequestWithFSO
 
   @Override
   protected String getMultipartOpenKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) {
+      String keyName, String multipartUploadID) throws IOException {
     String fileName = StringUtils.substringAfter(keyName, dirName);
-    return omMetadataManager.getMultipartKey(parentID, fileName,
-        multipartUploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentID, fileName, multipartUploadID);
   }
 
   @Override

@@ -39,19 +39,20 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.UUID;
 
 /**
  * Verifies the statics in NodeManager.
@@ -61,12 +62,10 @@ public class TestStatisticsUpdate {
   private NodeManager nodeManager;
   private NodeReportHandler nodeReportHandler;
 
-  @Before
-  public void setup() throws IOException, AuthenticationException {
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    final String storageDir = GenericTestUtils.getTempPath(
-        TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+  @BeforeEach
+  void setup(@TempDir File testDir)
+      throws IOException, AuthenticationException {
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     conf.set(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, "100ms");
     conf.set(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, "50ms");
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
@@ -87,15 +86,10 @@ public class TestStatisticsUpdate {
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
 
-    String storagePath1 = GenericTestUtils.getRandomizedTempPath()
-        .concat("/" + datanode1.getUuidString());
-    String storagePath2 = GenericTestUtils.getRandomizedTempPath()
-        .concat("/" + datanode2.getUuidString());
-
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
-        datanode1.getUuid(), storagePath1, 100, 10, 90, null);
+        datanode1.getUuid(), datanode1.getUuidString(), 100, 10, 90, null);
     StorageReportProto storageTwo = HddsTestUtils.createStorageReport(
-        datanode2.getUuid(), storagePath2, 200, 20, 180, null);
+        datanode2.getUuid(), datanode2.getUuidString(), 200, 20, 180, null);
 
     nodeManager.register(datanode1,
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),
@@ -117,14 +111,14 @@ public class TestStatisticsUpdate {
         Mockito.mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
-    Assert.assertEquals(300L, stat.getCapacity().get().longValue());
-    Assert.assertEquals(270L, stat.getRemaining().get().longValue());
-    Assert.assertEquals(30L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(300L, stat.getCapacity().get());
+    Assertions.assertEquals(270L, stat.getRemaining().get());
+    Assertions.assertEquals(30L, stat.getScmUsed().get());
 
     SCMNodeMetric nodeStat = nodeManager.getNodeStat(datanode1);
-    Assert.assertEquals(100L, nodeStat.get().getCapacity().get().longValue());
-    Assert.assertEquals(90L, nodeStat.get().getRemaining().get().longValue());
-    Assert.assertEquals(10L, nodeStat.get().getScmUsed().get().longValue());
+    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get());
+    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get());
+    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get());
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
@@ -143,10 +137,10 @@ public class TestStatisticsUpdate {
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
-    Assert.assertEquals(200L, stat.getCapacity().get().longValue());
-    Assert.assertEquals(180L,
-        stat.getRemaining().get().longValue());
-    Assert.assertEquals(20L, stat.getScmUsed().get().longValue());
+    Assertions.assertEquals(200L, stat.getCapacity().get());
+    Assertions.assertEquals(180L,
+        stat.getRemaining().get());
+    Assertions.assertEquals(20L, stat.getScmUsed().get());
   }
 
 }

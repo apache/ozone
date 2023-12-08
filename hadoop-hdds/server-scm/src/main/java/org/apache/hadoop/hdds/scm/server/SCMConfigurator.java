@@ -31,8 +31,11 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.security.x509.certificate.authority
     .CertificateServer;
+import org.apache.hadoop.ozone.lease.LeaseManager;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * This class acts as an SCM builder Class. This class is important for us
@@ -75,6 +78,9 @@ public final class SCMConfigurator {
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
   private WritableContainerFactory writableContainerFactory;
+  private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      finalizationExecutor;
+  private LeaseManager<Object> leaseManager;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -184,6 +190,23 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to set the executor for upgrade finalization.
+   * @param executor - Finalization executor to use.
+   */
+  public void setUpgradeFinalizationExecutor(
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
+    this.finalizationExecutor = executor;
+  }
+
+  /**
+   * Allows user to specify a custom version lease manager.
+   * @param leaseManager - lease Manager.
+   */
+  public void setLeaseManager(LeaseManager<Object> leaseManager) {
+    this.leaseManager = leaseManager;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -279,4 +302,20 @@ public final class SCMConfigurator {
     return writableContainerFactory;
   }
 
+  /**
+   * Get the upgrade finalization executor.
+   * @return UpgradeFinalizationExecutor.
+   */
+  public UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+      getUpgradeFinalizationExecutor() {
+    return finalizationExecutor;
+  }
+
+  /**
+   * Get the lease manager.
+   * @return LeaseManager
+   */
+  public LeaseManager<Object> getLeaseManager() {
+    return leaseManager;
+  }
 }

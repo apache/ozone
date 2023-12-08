@@ -25,7 +25,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.util.Time;
@@ -36,9 +36,10 @@ import org.apache.hadoop.util.Time;
 @Metrics(about = "Closed container replication metrics", context = "dfs")
 public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
-  private static final String NAME = ContainerReplicator.class.toString();
+  private static final String NAME = ContainerReplicator.class.getSimpleName();
 
   private final ContainerReplicator delegate;
+  private final String name;
 
   @Metric(about = "Number of successful replication tasks")
   private MutableCounterLong success;
@@ -61,10 +62,15 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @Metric(about = "Bytes transferred for successful replication tasks")
   private MutableGaugeLong transferredBytes;
 
-  public MeasuredReplicator(ContainerReplicator delegate) {
+  public MeasuredReplicator(ContainerReplicator delegate, String name) {
     this.delegate = delegate;
-    DefaultMetricsSystem.instance()
-        .register(NAME, "Closed container replication", this);
+    this.name = name;
+    DefaultMetricsSystem.instance().register(metricsName(),
+        "Closed container " + name + " replication metrics", this);
+  }
+
+  private String metricsName() {
+    return NAME + "/" + name;
   }
 
   @Override
@@ -89,7 +95,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    DefaultMetricsSystem.instance().unregisterSource(NAME);
+    DefaultMetricsSystem.instance().unregisterSource(metricsName());
   }
 
   @VisibleForTesting
@@ -127,4 +133,9 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
     return failureBytes;
   }
 
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "{" + name + "}@"
+        + Integer.toHexString(hashCode());
+  }
 }

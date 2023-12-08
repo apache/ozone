@@ -79,6 +79,8 @@ public final class OzoneVersionInfo {
         "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum());
     System.out.println(
         "With Apache Ratis: " + RATIS_VERSION_INFO.getBuildVersion());
+    System.out.println(
+        "Compiled on platform " + OZONE_VERSION_INFO.getCompilePlatform());
     System.out.println();
     LOG.debug("This command was run using " +
         ClassUtil.findContainingJar(OzoneVersionInfo.class));

@@ -20,11 +20,15 @@ package org.apache.hadoop.hdds.conf;
 /**
  * Example configuration to test inherited configuration injection.
  */
-public class ConfigurationExampleGrandParent {
+public class ConfigurationExampleGrandParent extends ReconfigurableConfig {
 
   @Config(key = "number", defaultValue = "2", description = "Example numeric "
       + "configuration", tags = ConfigTag.MANAGEMENT)
   private int number = 1;
+
+  @Config(key = "grandpa.dyna", reconfigurable = true, defaultValue = "x",
+      description = "Test inherited dynamic property", tags = {})
+  private String grandpaDynamic;
 
   public int getNumber() {
     return number;

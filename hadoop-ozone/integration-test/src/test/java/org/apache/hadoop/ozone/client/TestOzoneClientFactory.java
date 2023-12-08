@@ -58,11 +58,11 @@ public class TestOzoneClientFactory {
         @Override
         public Void run() throws IOException {
           conf.set("ozone.security.enabled", "true");
-          OzoneClient ozoneClient =
+          try (OzoneClient ozoneClient =
               OzoneClientFactory.getRpcClient("localhost",
-                  Integer.parseInt(omPort),
-                  conf);
-          ozoneClient.getObjectStore().listVolumes("/");
+                  Integer.parseInt(omPort), conf)) {
+            ozoneClient.getObjectStore().listVolumes("/");
+          }
           return null;
         }
       });

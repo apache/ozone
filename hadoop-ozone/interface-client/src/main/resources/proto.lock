@@ -1,6 +1,173 @@
 {
   "definitions": [
     {
+      "protopath": "OMAdminProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "NodeState",
+            "enum_fields": [
+              {
+                "name": "ACTIVE",
+                "integer": 1
+              },
+              {
+                "name": "DECOMMISSIONED",
+                "integer": 2
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "OMConfigurationRequest"
+          },
+          {
+            "name": "OMConfigurationResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "errorMsg",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "nodesInMemory",
+                "type": "OMNodeInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "nodesInNewConf",
+                "type": "OMNodeInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "OMNodeInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeID",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "hostAddress",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "rpcPort",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "ratisPort",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "nodeState",
+                "type": "NodeState",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "ACTIVE"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "DecommissionOMRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "nodeAddress",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DecommissionOMResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "errorMsg",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "OzoneManagerAdminService",
+            "rpcs": [
+              {
+                "name": "getOMConfiguration",
+                "in_type": "OMConfigurationRequest",
+                "out_type": "OMConfigurationResponse"
+              },
+              {
+                "name": "decommission",
+                "in_type": "DecommissionOMRequest",
+                "out_type": "DecommissionOMResponse"
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.ozone"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ozone.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "OzoneManagerAdminProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
       "protopath": "OmClientProtocol.proto",
       "def": {
         "enums": [
@@ -214,6 +381,70 @@
               {
                 "name": "PurgePaths",
                 "integer": 94
+              },
+              {
+                "name": "PurgeDirectories",
+                "integer": 95
+              },
+              {
+                "name": "CreateTenant",
+                "integer": 96
+              },
+              {
+                "name": "DeleteTenant",
+                "integer": 97
+              },
+              {
+                "name": "ListTenant",
+                "integer": 98
+              },
+              {
+                "name": "TenantGetUserInfo",
+                "integer": 99
+              },
+              {
+                "name": "TenantAssignUserAccessId",
+                "integer": 100
+              },
+              {
+                "name": "TenantRevokeUserAccessId",
+                "integer": 101
+              },
+              {
+                "name": "TenantAssignAdmin",
+                "integer": 102
+              },
+              {
+                "name": "TenantRevokeAdmin",
+                "integer": 103
+              },
+              {
+                "name": "GetS3VolumeContext",
+                "integer": 104
+              },
+              {
+                "name": "TenantListUser",
+                "integer": 105
+              },
+              {
+                "name": "SetS3Secret",
+                "integer": 106
+              },
+              {
+                "name": "SetRangerServiceVersion",
+                "integer": 107
+              },
+              {
+                "name": "RangerBGSync",
+                "integer": 109
+              },
+              {
+                "name": "EchoRPC",
+                "integer": 110
+              },
+              {
+                "name": "GetKeyInfo",
+                "integer": 111
               }
             ]
           },
@@ -503,6 +734,54 @@
               {
                 "name": "NOT_SUPPORTED_OPERATION_WHEN_PREPARED",
                 "integer": 74
+              },
+              {
+                "name": "NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION",
+                "integer": 75
+              },
+              {
+                "name": "TENANT_NOT_FOUND",
+                "integer": 76
+              },
+              {
+                "name": "TENANT_ALREADY_EXISTS",
+                "integer": 77
+              },
+              {
+                "name": "INVALID_TENANT_ID",
+                "integer": 78
+              },
+              {
+                "name": "ACCESS_ID_NOT_FOUND",
+                "integer": 79
+              },
+              {
+                "name": "TENANT_USER_ACCESS_ID_ALREADY_EXISTS",
+                "integer": 80
+              },
+              {
+                "name": "INVALID_TENANT_USERNAME",
+                "integer": 81
+              },
+              {
+                "name": "INVALID_ACCESS_ID",
+                "integer": 82
+              },
+              {
+                "name": "TENANT_AUTHORIZER_ERROR",
+                "integer": 83
+              },
+              {
+                "name": "VOLUME_IS_REFERENCED",
+                "integer": 84
+              },
+              {
+                "name": "TENANT_NOT_EMPTY",
+                "integer": 85
+              },
+              {
+                "name": "FEATURE_NOT_ENABLED",
+                "integer": 86
               }
             ]
           },
@@ -659,6 +938,35 @@
             ]
           },
           {
+            "name": "ChecksumTypeProto",
+            "enum_fields": [
+              {
+                "name": "CHECKSUM_NULL"
+              },
+              {
+                "name": "CHECKSUM_CRC32",
+                "integer": 1
+              },
+              {
+                "name": "CHECKSUM_CRC32C",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "FileChecksumTypeProto",
+            "enum_fields": [
+              {
+                "name": "MD5CRC",
+                "integer": 1
+              },
+              {
+                "name": "COMPOSITE_CRC",
+                "integer": 2
+              }
+            ]
+          },
+          {
             "name": "OMTokenProto.Type",
             "enum_fields": [
               {
@@ -717,307 +1025,476 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "clientId",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "userInfo",
-                "type": "UserInfo"
+                "type": "UserInfo",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "version",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "layoutVersion",
-                "type": "LayoutVersion"
+                "type": "LayoutVersion",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "createVolumeRequest",
-                "type": "CreateVolumeRequest"
+                "type": "CreateVolumeRequest",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "setVolumePropertyRequest",
-                "type": "SetVolumePropertyRequest"
+                "type": "SetVolumePropertyRequest",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "checkVolumeAccessRequest",
-                "type": "CheckVolumeAccessRequest"
+                "type": "CheckVolumeAccessRequest",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "infoVolumeRequest",
-                "type": "InfoVolumeRequest"
+                "type": "InfoVolumeRequest",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "deleteVolumeRequest",
-                "type": "DeleteVolumeRequest"
+                "type": "DeleteVolumeRequest",
+                "optional": true
               },
               {
                 "id": 16,
                 "name": "listVolumeRequest",
-                "type": "ListVolumeRequest"
+                "type": "ListVolumeRequest",
+                "optional": true
               },
               {
                 "id": 21,
                 "name": "createBucketRequest",
-                "type": "CreateBucketRequest"
+                "type": "CreateBucketRequest",
+                "optional": true
               },
               {
                 "id": 22,
                 "name": "infoBucketRequest",
-                "type": "InfoBucketRequest"
+                "type": "InfoBucketRequest",
+                "optional": true
               },
               {
                 "id": 23,
                 "name": "setBucketPropertyRequest",
-                "type": "SetBucketPropertyRequest"
+                "type": "SetBucketPropertyRequest",
+                "optional": true
               },
               {
                 "id": 24,
                 "name": "deleteBucketRequest",
-                "type": "DeleteBucketRequest"
+                "type": "DeleteBucketRequest",
+                "optional": true
               },
               {
                 "id": 25,
                 "name": "listBucketsRequest",
-                "type": "ListBucketsRequest"
+                "type": "ListBucketsRequest",
+                "optional": true
               },
               {
                 "id": 31,
                 "name": "createKeyRequest",
-                "type": "CreateKeyRequest"
+                "type": "CreateKeyRequest",
+                "optional": true
               },
               {
                 "id": 32,
                 "name": "lookupKeyRequest",
-                "type": "LookupKeyRequest"
+                "type": "LookupKeyRequest",
+                "optional": true
               },
               {
                 "id": 33,
                 "name": "renameKeyRequest",
-                "type": "RenameKeyRequest"
+                "type": "RenameKeyRequest",
+                "optional": true
               },
               {
                 "id": 34,
                 "name": "deleteKeyRequest",
-                "type": "DeleteKeyRequest"
+                "type": "DeleteKeyRequest",
+                "optional": true
               },
               {
                 "id": 35,
                 "name": "listKeysRequest",
-                "type": "ListKeysRequest"
+                "type": "ListKeysRequest",
+                "optional": true
               },
               {
                 "id": 36,
                 "name": "commitKeyRequest",
-                "type": "CommitKeyRequest"
+                "type": "CommitKeyRequest",
+                "optional": true
               },
               {
                 "id": 37,
                 "name": "allocateBlockRequest",
-                "type": "AllocateBlockRequest"
+                "type": "AllocateBlockRequest",
+                "optional": true
               },
               {
                 "id": 38,
                 "name": "deleteKeysRequest",
-                "type": "DeleteKeysRequest"
+                "type": "DeleteKeysRequest",
+                "optional": true
               },
               {
                 "id": 39,
                 "name": "renameKeysRequest",
-                "type": "RenameKeysRequest"
+                "type": "RenameKeysRequest",
+                "optional": true
               },
               {
                 "id": 40,
                 "name": "deleteOpenKeysRequest",
-                "type": "DeleteOpenKeysRequest"
+                "type": "DeleteOpenKeysRequest",
+                "optional": true
               },
               {
                 "id": 45,
                 "name": "initiateMultiPartUploadRequest",
-                "type": "MultipartInfoInitiateRequest"
+                "type": "MultipartInfoInitiateRequest",
+                "optional": true
               },
               {
                 "id": 46,
                 "name": "commitMultiPartUploadRequest",
-                "type": "MultipartCommitUploadPartRequest"
+                "type": "MultipartCommitUploadPartRequest",
+                "optional": true
               },
               {
                 "id": 47,
                 "name": "completeMultiPartUploadRequest",
-                "type": "MultipartUploadCompleteRequest"
+                "type": "MultipartUploadCompleteRequest",
+                "optional": true
               },
               {
                 "id": 48,
                 "name": "abortMultiPartUploadRequest",
-                "type": "MultipartUploadAbortRequest"
+                "type": "MultipartUploadAbortRequest",
+                "optional": true
               },
               {
                 "id": 49,
                 "name": "getS3SecretRequest",
-                "type": "GetS3SecretRequest"
+                "type": "GetS3SecretRequest",
+                "optional": true
               },
               {
                 "id": 50,
                 "name": "listMultipartUploadPartsRequest",
-                "type": "MultipartUploadListPartsRequest"
+                "type": "MultipartUploadListPartsRequest",
+                "optional": true
               },
               {
                 "id": 51,
                 "name": "serviceListRequest",
-                "type": "ServiceListRequest"
+                "type": "ServiceListRequest",
+                "optional": true
               },
               {
                 "id": 53,
                 "name": "dbUpdatesRequest",
-                "type": "DBUpdatesRequest"
+                "type": "DBUpdatesRequest",
+                "optional": true
               },
               {
                 "id": 54,
                 "name": "finalizeUpgradeRequest",
-                "type": "FinalizeUpgradeRequest"
+                "type": "FinalizeUpgradeRequest",
+                "optional": true
               },
               {
                 "id": 55,
                 "name": "finalizeUpgradeProgressRequest",
-                "type": "FinalizeUpgradeProgressRequest"
+                "type": "FinalizeUpgradeProgressRequest",
+                "optional": true
               },
               {
                 "id": 56,
                 "name": "prepareRequest",
-                "type": "PrepareRequest"
+                "type": "PrepareRequest",
+                "optional": true
               },
               {
                 "id": 57,
                 "name": "prepareStatusRequest",
-                "type": "PrepareStatusRequest"
+                "type": "PrepareStatusRequest",
+                "optional": true
               },
               {
                 "id": 58,
                 "name": "cancelPrepareRequest",
-                "type": "CancelPrepareRequest"
+                "type": "CancelPrepareRequest",
+                "optional": true
               },
               {
                 "id": 61,
                 "name": "getDelegationTokenRequest",
-                "type": "hadoop.common.GetDelegationTokenRequestProto"
+                "type": "hadoop.common.GetDelegationTokenRequestProto",
+                "optional": true
               },
               {
                 "id": 62,
                 "name": "renewDelegationTokenRequest",
-                "type": "hadoop.common.RenewDelegationTokenRequestProto"
+                "type": "hadoop.common.RenewDelegationTokenRequestProto",
+                "optional": true
               },
               {
                 "id": 63,
                 "name": "cancelDelegationTokenRequest",
-                "type": "hadoop.common.CancelDelegationTokenRequestProto"
+                "type": "hadoop.common.CancelDelegationTokenRequestProto",
+                "optional": true
               },
               {
                 "id": 64,
                 "name": "updateGetDelegationTokenRequest",
-                "type": "UpdateGetDelegationTokenRequest"
+                "type": "UpdateGetDelegationTokenRequest",
+                "optional": true
               },
               {
                 "id": 65,
                 "name": "updatedRenewDelegationTokenRequest",
-                "type": "UpdateRenewDelegationTokenRequest"
+                "type": "UpdateRenewDelegationTokenRequest",
+                "optional": true
               },
               {
                 "id": 70,
                 "name": "getFileStatusRequest",
-                "type": "GetFileStatusRequest"
+                "type": "GetFileStatusRequest",
+                "optional": true
               },
               {
                 "id": 71,
                 "name": "createDirectoryRequest",
-                "type": "CreateDirectoryRequest"
+                "type": "CreateDirectoryRequest",
+                "optional": true
               },
               {
                 "id": 72,
                 "name": "createFileRequest",
-                "type": "CreateFileRequest"
+                "type": "CreateFileRequest",
+                "optional": true
               },
               {
                 "id": 73,
                 "name": "lookupFileRequest",
-                "type": "LookupFileRequest"
+                "type": "LookupFileRequest",
+                "optional": true
               },
               {
                 "id": 74,
                 "name": "listStatusRequest",
-                "type": "ListStatusRequest"
+                "type": "ListStatusRequest",
+                "optional": true
               },
               {
                 "id": 75,
                 "name": "addAclRequest",
-                "type": "AddAclRequest"
+                "type": "AddAclRequest",
+                "optional": true
               },
               {
                 "id": 76,
                 "name": "removeAclRequest",
-                "type": "RemoveAclRequest"
+                "type": "RemoveAclRequest",
+                "optional": true
               },
               {
                 "id": 77,
                 "name": "setAclRequest",
-                "type": "SetAclRequest"
+                "type": "SetAclRequest",
+                "optional": true
               },
               {
                 "id": 78,
                 "name": "getAclRequest",
-                "type": "GetAclRequest"
+                "type": "GetAclRequest",
+                "optional": true
               },
               {
                 "id": 81,
                 "name": "purgeKeysRequest",
-                "type": "PurgeKeysRequest"
+                "type": "PurgeKeysRequest",
+                "optional": true
               },
               {
                 "id": 82,
                 "name": "updateGetS3SecretRequest",
-                "type": "UpdateGetS3SecretRequest"
+                "type": "UpdateGetS3SecretRequest",
+                "optional": true
               },
               {
                 "id": 83,
                 "name": "listMultipartUploadsRequest",
-                "type": "ListMultipartUploadsRequest"
+                "type": "ListMultipartUploadsRequest",
+                "optional": true
               },
               {
                 "id": 91,
                 "name": "listTrashRequest",
-                "type": "ListTrashRequest"
+                "type": "ListTrashRequest",
+                "optional": true
               },
               {
                 "id": 92,
                 "name": "RecoverTrashRequest",
-                "type": "RecoverTrashRequest"
+                "type": "RecoverTrashRequest",
+                "optional": true
               },
               {
                 "id": 93,
                 "name": "RevokeS3SecretRequest",
-                "type": "RevokeS3SecretRequest"
+                "type": "RevokeS3SecretRequest",
+                "optional": true
               },
               {
                 "id": 94,
                 "name": "purgePathsRequest",
-                "type": "PurgePathsRequest"
+                "type": "PurgePathsRequest",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 108,
+                "name": "purgeDirectoriesRequest",
+                "type": "PurgeDirectoriesRequest",
+                "optional": true
+              },
+              {
+                "id": 95,
+                "name": "s3Authentication",
+                "type": "S3Authentication",
+                "optional": true
+              },
+              {
+                "id": 96,
+                "name": "CreateTenantRequest",
+                "type": "CreateTenantRequest",
+                "optional": true
+              },
+              {
+                "id": 97,
+                "name": "DeleteTenantRequest",
+                "type": "DeleteTenantRequest",
+                "optional": true
+              },
+              {
+                "id": 98,
+                "name": "ListTenantRequest",
+                "type": "ListTenantRequest",
+                "optional": true
+              },
+              {
+                "id": 99,
+                "name": "TenantGetUserInfoRequest",
+                "type": "TenantGetUserInfoRequest",
+                "optional": true
+              },
+              {
+                "id": 100,
+                "name": "TenantAssignUserAccessIdRequest",
+                "type": "TenantAssignUserAccessIdRequest",
+                "optional": true
+              },
+              {
+                "id": 101,
+                "name": "TenantRevokeUserAccessIdRequest",
+                "type": "TenantRevokeUserAccessIdRequest",
+                "optional": true
+              },
+              {
+                "id": 102,
+                "name": "TenantAssignAdminRequest",
+                "type": "TenantAssignAdminRequest",
+                "optional": true
+              },
+              {
+                "id": 103,
+                "name": "TenantRevokeAdminRequest",
+                "type": "TenantRevokeAdminRequest",
+                "optional": true
+              },
+              {
+                "id": 104,
+                "name": "getS3VolumeContextRequest",
+                "type": "GetS3VolumeContextRequest",
+                "optional": true
+              },
+              {
+                "id": 105,
+                "name": "tenantListUserRequest",
+                "type": "TenantListUserRequest",
+                "optional": true
+              },
+              {
+                "id": 106,
+                "name": "SetS3SecretRequest",
+                "type": "SetS3SecretRequest",
+                "optional": true
+              },
+              {
+                "id": 107,
+                "name": "SetRangerServiceVersionRequest",
+                "type": "SetRangerServiceVersionRequest",
+                "optional": true
+              },
+              {
+                "id": 109,
+                "name": "RangerBGSyncRequest",
+                "type": "RangerBGSyncRequest",
+                "optional": true
+              },
+              {
+                "id": 110,
+                "name": "EchoRPCRequest",
+                "type": "EchoRPCRequest",
+                "optional": true
+              },
+              {
+                "id": 111,
+                "name": "GetKeyInfoRequest",
+                "type": "GetKeyInfoRequest",
+                "optional": true
               }
             ]
           },
@@ -1027,17 +1504,20 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "success",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1048,267 +1528,422 @@
               {
                 "id": 4,
                 "name": "message",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "status",
-                "type": "Status"
+                "type": "Status",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "leaderOMNodeId",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "createVolumeResponse",
-                "type": "CreateVolumeResponse"
+                "type": "CreateVolumeResponse",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "setVolumePropertyResponse",
-                "type": "SetVolumePropertyResponse"
+                "type": "SetVolumePropertyResponse",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "checkVolumeAccessResponse",
-                "type": "CheckVolumeAccessResponse"
+                "type": "CheckVolumeAccessResponse",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "infoVolumeResponse",
-                "type": "InfoVolumeResponse"
+                "type": "InfoVolumeResponse",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "deleteVolumeResponse",
-                "type": "DeleteVolumeResponse"
+                "type": "DeleteVolumeResponse",
+                "optional": true
               },
               {
                 "id": 16,
                 "name": "listVolumeResponse",
-                "type": "ListVolumeResponse"
+                "type": "ListVolumeResponse",
+                "optional": true
               },
               {
                 "id": 21,
                 "name": "createBucketResponse",
-                "type": "CreateBucketResponse"
+                "type": "CreateBucketResponse",
+                "optional": true
               },
               {
                 "id": 22,
                 "name": "infoBucketResponse",
-                "type": "InfoBucketResponse"
+                "type": "InfoBucketResponse",
+                "optional": true
               },
               {
                 "id": 23,
                 "name": "setBucketPropertyResponse",
-                "type": "SetBucketPropertyResponse"
+                "type": "SetBucketPropertyResponse",
+                "optional": true
               },
               {
                 "id": 24,
                 "name": "deleteBucketResponse",
-                "type": "DeleteBucketResponse"
+                "type": "DeleteBucketResponse",
+                "optional": true
               },
               {
                 "id": 25,
                 "name": "listBucketsResponse",
-                "type": "ListBucketsResponse"
+                "type": "ListBucketsResponse",
+                "optional": true
               },
               {
                 "id": 31,
                 "name": "createKeyResponse",
-                "type": "CreateKeyResponse"
+                "type": "CreateKeyResponse",
+                "optional": true
               },
               {
                 "id": 32,
                 "name": "lookupKeyResponse",
-                "type": "LookupKeyResponse"
+                "type": "LookupKeyResponse",
+                "optional": true
               },
               {
                 "id": 33,
                 "name": "renameKeyResponse",
-                "type": "RenameKeyResponse"
+                "type": "RenameKeyResponse",
+                "optional": true
               },
               {
                 "id": 34,
                 "name": "deleteKeyResponse",
-                "type": "DeleteKeyResponse"
+                "type": "DeleteKeyResponse",
+                "optional": true
               },
               {
                 "id": 35,
                 "name": "listKeysResponse",
-                "type": "ListKeysResponse"
+                "type": "ListKeysResponse",
+                "optional": true
               },
               {
                 "id": 36,
                 "name": "commitKeyResponse",
-                "type": "CommitKeyResponse"
+                "type": "CommitKeyResponse",
+                "optional": true
               },
               {
                 "id": 37,
                 "name": "allocateBlockResponse",
-                "type": "AllocateBlockResponse"
+                "type": "AllocateBlockResponse",
+                "optional": true
               },
               {
                 "id": 38,
                 "name": "deleteKeysResponse",
-                "type": "DeleteKeysResponse"
+                "type": "DeleteKeysResponse",
+                "optional": true
               },
               {
                 "id": 39,
                 "name": "renameKeysResponse",
-                "type": "RenameKeysResponse"
+                "type": "RenameKeysResponse",
+                "optional": true
               },
               {
                 "id": 45,
                 "name": "initiateMultiPartUploadResponse",
-                "type": "MultipartInfoInitiateResponse"
+                "type": "MultipartInfoInitiateResponse",
+                "optional": true
               },
               {
                 "id": 46,
                 "name": "commitMultiPartUploadResponse",
-                "type": "MultipartCommitUploadPartResponse"
+                "type": "MultipartCommitUploadPartResponse",
+                "optional": true
               },
               {
                 "id": 47,
                 "name": "completeMultiPartUploadResponse",
-                "type": "MultipartUploadCompleteResponse"
+                "type": "MultipartUploadCompleteResponse",
+                "optional": true
               },
               {
                 "id": 48,
                 "name": "abortMultiPartUploadResponse",
-                "type": "MultipartUploadAbortResponse"
+                "type": "MultipartUploadAbortResponse",
+                "optional": true
               },
               {
                 "id": 49,
                 "name": "getS3SecretResponse",
-                "type": "GetS3SecretResponse"
+                "type": "GetS3SecretResponse",
+                "optional": true
               },
               {
                 "id": 50,
                 "name": "listMultipartUploadPartsResponse",
-                "type": "MultipartUploadListPartsResponse"
+                "type": "MultipartUploadListPartsResponse",
+                "optional": true
               },
               {
                 "id": 51,
                 "name": "ServiceListResponse",
-                "type": "ServiceListResponse"
+                "type": "ServiceListResponse",
+                "optional": true
               },
               {
                 "id": 52,
                 "name": "dbUpdatesResponse",
-                "type": "DBUpdatesResponse"
+                "type": "DBUpdatesResponse",
+                "optional": true
               },
               {
                 "id": 54,
                 "name": "finalizeUpgradeResponse",
-                "type": "FinalizeUpgradeResponse"
+                "type": "FinalizeUpgradeResponse",
+                "optional": true
               },
               {
                 "id": 55,
                 "name": "finalizeUpgradeProgressResponse",
-                "type": "FinalizeUpgradeProgressResponse"
+                "type": "FinalizeUpgradeProgressResponse",
+                "optional": true
               },
               {
                 "id": 56,
                 "name": "prepareResponse",
-                "type": "PrepareResponse"
+                "type": "PrepareResponse",
+                "optional": true
               },
               {
                 "id": 57,
                 "name": "prepareStatusResponse",
-                "type": "PrepareStatusResponse"
+                "type": "PrepareStatusResponse",
+                "optional": true
               },
               {
                 "id": 58,
                 "name": "cancelPrepareResponse",
-                "type": "CancelPrepareResponse"
+                "type": "CancelPrepareResponse",
+                "optional": true
               },
               {
                 "id": 61,
                 "name": "getDelegationTokenResponse",
-                "type": "GetDelegationTokenResponseProto"
+                "type": "GetDelegationTokenResponseProto",
+                "optional": true
               },
               {
                 "id": 62,
                 "name": "renewDelegationTokenResponse",
-                "type": "RenewDelegationTokenResponseProto"
+                "type": "RenewDelegationTokenResponseProto",
+                "optional": true
               },
               {
                 "id": 63,
                 "name": "cancelDelegationTokenResponse",
-                "type": "CancelDelegationTokenResponseProto"
+                "type": "CancelDelegationTokenResponseProto",
+                "optional": true
               },
               {
                 "id": 70,
                 "name": "getFileStatusResponse",
-                "type": "GetFileStatusResponse"
+                "type": "GetFileStatusResponse",
+                "optional": true
               },
               {
                 "id": 71,
                 "name": "createDirectoryResponse",
-                "type": "CreateDirectoryResponse"
+                "type": "CreateDirectoryResponse",
+                "optional": true
               },
               {
                 "id": 72,
                 "name": "createFileResponse",
-                "type": "CreateFileResponse"
+                "type": "CreateFileResponse",
+                "optional": true
               },
               {
                 "id": 73,
                 "name": "lookupFileResponse",
-                "type": "LookupFileResponse"
+                "type": "LookupFileResponse",
+                "optional": true
               },
               {
                 "id": 74,
                 "name": "listStatusResponse",
-                "type": "ListStatusResponse"
+                "type": "ListStatusResponse",
+                "optional": true
               },
               {
                 "id": 75,
                 "name": "addAclResponse",
-                "type": "AddAclResponse"
+                "type": "AddAclResponse",
+                "optional": true
               },
               {
                 "id": 76,
                 "name": "removeAclResponse",
-                "type": "RemoveAclResponse"
+                "type": "RemoveAclResponse",
+                "optional": true
               },
               {
                 "id": 77,
                 "name": "setAclResponse",
-                "type": "SetAclResponse"
+                "type": "SetAclResponse",
+                "optional": true
               },
               {
                 "id": 78,
                 "name": "getAclResponse",
-                "type": "GetAclResponse"
+                "type": "GetAclResponse",
+                "optional": true
               },
               {
                 "id": 81,
                 "name": "purgeKeysResponse",
-                "type": "PurgeKeysResponse"
+                "type": "PurgeKeysResponse",
+                "optional": true
               },
               {
                 "id": 82,
                 "name": "listMultipartUploadsResponse",
-                "type": "ListMultipartUploadsResponse"
+                "type": "ListMultipartUploadsResponse",
+                "optional": true
               },
               {
                 "id": 91,
                 "name": "listTrashResponse",
-                "type": "ListTrashResponse"
+                "type": "ListTrashResponse",
+                "optional": true
               },
               {
                 "id": 92,
                 "name": "RecoverTrashResponse",
-                "type": "RecoverTrashResponse"
+                "type": "RecoverTrashResponse",
+                "optional": true
               },
               {
                 "id": 93,
                 "name": "purgePathsResponse",
-                "type": "PurgePathsResponse"
+                "type": "PurgePathsResponse",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 108,
+                "name": "purgeDirectoriesResponse",
+                "type": "PurgeDirectoriesResponse",
+                "optional": true
+              },
+              {
+                "id": 96,
+                "name": "CreateTenantResponse",
+                "type": "CreateTenantResponse",
+                "optional": true
+              },
+              {
+                "id": 97,
+                "name": "DeleteTenantResponse",
+                "type": "DeleteTenantResponse",
+                "optional": true
+              },
+              {
+                "id": 98,
+                "name": "ListTenantResponse",
+                "type": "ListTenantResponse",
+                "optional": true
+              },
+              {
+                "id": 99,
+                "name": "TenantGetUserInfoResponse",
+                "type": "TenantGetUserInfoResponse",
+                "optional": true
+              },
+              {
+                "id": 100,
+                "name": "TenantAssignUserAccessIdResponse",
+                "type": "TenantAssignUserAccessIdResponse",
+                "optional": true
+              },
+              {
+                "id": 101,
+                "name": "TenantRevokeUserAccessIdResponse",
+                "type": "TenantRevokeUserAccessIdResponse",
+                "optional": true
+              },
+              {
+                "id": 102,
+                "name": "TenantAssignAdminResponse",
+                "type": "TenantAssignAdminResponse",
+                "optional": true
+              },
+              {
+                "id": 103,
+                "name": "TenantRevokeAdminResponse",
+                "type": "TenantRevokeAdminResponse",
+                "optional": true
+              },
+              {
+                "id": 104,
+                "name": "getS3VolumeContextResponse",
+                "type": "GetS3VolumeContextResponse",
+                "optional": true
+              },
+              {
+                "id": 105,
+                "name": "tenantListUserResponse",
+                "type": "TenantListUserResponse",
+                "optional": true
+              },
+              {
+                "id": 106,
+                "name": "SetS3SecretResponse",
+                "type": "SetS3SecretResponse",
+                "optional": true
+              },
+              {
+                "id": 107,
+                "name": "SetRangerServiceVersionResponse",
+                "type": "SetRangerServiceVersionResponse",
+                "optional": true
+              },
+              {
+                "id": 109,
+                "name": "RangerBGSyncResponse",
+                "type": "RangerBGSyncResponse",
+                "optional": true
+              },
+              {
+                "id": 110,
+                "name": "EchoRPCResponse",
+                "type": "EchoRPCResponse",
+                "optional": true
+              },
+              {
+                "id": 111,
+                "name": "GetKeyInfoResponse",
+                "type": "GetKeyInfoResponse",
+                "optional": true
               }
             ]
           },
@@ -1318,27 +1953,32 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "startKeyName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "keyPrefix",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "maxKeys",
-                "type": "int32"
+                "type": "int32",
+                "optional": true
               }
             ]
           },
@@ -1359,22 +1999,26 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "destinationBucket",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -1384,7 +2028,8 @@
               {
                 "id": 1,
                 "name": "response",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               }
             ]
           },
@@ -1394,22 +2039,26 @@
               {
                 "id": 1,
                 "name": "adminName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "ownerName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "volume",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "quotaInBytes",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 5,
@@ -1426,27 +2075,32 @@
               {
                 "id": 7,
                 "name": "creationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "quotaInNamespace",
                 "type": "int64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1457,7 +2111,14 @@
               {
                 "id": 12,
                 "name": "usedNamespace",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "refCount",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -1467,17 +2128,20 @@
               {
                 "id": 1,
                 "name": "userName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "remoteAddress",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "hostName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -1487,12 +2151,14 @@
               {
                 "id": 1,
                 "name": "getDelegationTokenResponse",
-                "type": "GetDelegationTokenResponseProto"
+                "type": "GetDelegationTokenResponseProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "tokenRenewInterval",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -1502,12 +2168,14 @@
               {
                 "id": 1,
                 "name": "renewDelegationTokenRequest",
-                "type": "hadoop.common.RenewDelegationTokenRequestProto"
+                "type": "hadoop.common.RenewDelegationTokenRequestProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "renewDelegationTokenResponse",
-                "type": "RenewDelegationTokenResponseProto"
+                "type": "RenewDelegationTokenResponseProto",
+                "required": true
               }
             ]
           },
@@ -1517,7 +2185,8 @@
               {
                 "id": 1,
                 "name": "volumeInfo",
-                "type": "VolumeInfo"
+                "type": "VolumeInfo",
+                "required": true
               }
             ]
           },
@@ -1536,12 +2205,14 @@
               {
                 "id": 2,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -1551,27 +2222,32 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "ownerName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "quotaInBytes",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "quotaInNamespace",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -1581,7 +2257,8 @@
               {
                 "id": 1,
                 "name": "response",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -1591,12 +2268,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "userAcl",
-                "type": "OzoneAclInfo"
+                "type": "OzoneAclInfo",
+                "required": true
               }
             ]
           },
@@ -1609,7 +2288,8 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -1619,7 +2299,8 @@
               {
                 "id": 2,
                 "name": "volumeInfo",
-                "type": "VolumeInfo"
+                "type": "VolumeInfo",
+                "optional": true
               }
             ]
           },
@@ -1629,7 +2310,8 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -1642,27 +2324,32 @@
               {
                 "id": 1,
                 "name": "scope",
-                "type": "Scope"
+                "type": "Scope",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "userName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "prefix",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "prevKey",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "maxKeys",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               }
             ]
           },
@@ -1683,12 +2370,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
@@ -1700,6 +2389,7 @@
                 "id": 4,
                 "name": "isVersionEnabled",
                 "type": "bool",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
@@ -1711,6 +2401,7 @@
                 "id": 5,
                 "name": "storageType",
                 "type": "StorageTypeProto",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
@@ -1721,7 +2412,8 @@
               {
                 "id": 6,
                 "name": "creationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 7,
@@ -1732,42 +2424,50 @@
               {
                 "id": 8,
                 "name": "beinfo",
-                "type": "BucketEncryptionInfoProto"
+                "type": "BucketEncryptionInfoProto",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "sourceVolume",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "sourceBucket",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "usedBytes",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "quotaInBytes",
                 "type": "int64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1779,6 +2479,7 @@
                 "id": 16,
                 "name": "quotaInNamespace",
                 "type": "int64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1789,12 +2490,26 @@
               {
                 "id": 17,
                 "name": "usedNamespace",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 18,
                 "name": "bucketLayout",
-                "type": "BucketLayoutProto"
+                "type": "BucketLayoutProto",
+                "optional": true
+              },
+              {
+                "id": 19,
+                "name": "owner",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "defaultReplicationConfig",
+                "type": "hadoop.hdds.DefaultReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -1804,17 +2519,20 @@
               {
                 "id": 1,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "suite",
-                "type": "CipherSuiteProto"
+                "type": "CipherSuiteProto",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "cryptoProtocolVersion",
-                "type": "CryptoProtocolVersionProto"
+                "type": "CryptoProtocolVersionProto",
+                "optional": true
               }
             ]
           },
@@ -1824,32 +2542,38 @@
               {
                 "id": 1,
                 "name": "suite",
-                "type": "CipherSuiteProto"
+                "type": "CipherSuiteProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "cryptoProtocolVersion",
-                "type": "CryptoProtocolVersionProto"
+                "type": "CryptoProtocolVersionProto",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "key",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "iv",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "ezKeyVersionName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -1859,17 +2583,20 @@
               {
                 "id": 1,
                 "name": "key",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "iv",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "ezKeyVersionName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -1879,27 +2606,32 @@
               {
                 "id": 1,
                 "name": "keyId",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "nonce",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "encryptionKey",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "expiryDate",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "encryptionAlgorithm",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -1909,22 +2641,26 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "isVersionEnabled",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "storageType",
-                "type": "StorageTypeProto"
+                "type": "StorageTypeProto",
+                "optional": true
               },
               {
                 "id": 7,
@@ -1935,12 +2671,26 @@
               {
                 "id": 8,
                 "name": "quotaInBytes",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "quotaInNamespace",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "ownerName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "defaultReplicationConfig",
+                "type": "hadoop.hdds.DefaultReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -1950,7 +2700,8 @@
               {
                 "id": 1,
                 "name": "name",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -1967,12 +2718,14 @@
               {
                 "id": 4,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -1982,12 +2735,14 @@
               {
                 "id": 1,
                 "name": "resType",
-                "type": "ObjectType"
+                "type": "ObjectType",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "storeType",
                 "type": "StoreType",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
@@ -1998,7 +2753,8 @@
               {
                 "id": 3,
                 "name": "path",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2008,22 +2764,26 @@
               {
                 "id": 1,
                 "name": "type",
-                "type": "OzoneAclType"
+                "type": "OzoneAclType",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "name",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "rights",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "aclScope",
                 "type": "OzoneAclScope",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
@@ -2039,7 +2799,8 @@
               {
                 "id": 1,
                 "name": "obj",
-                "type": "OzoneObj"
+                "type": "OzoneObj",
+                "required": true
               }
             ]
           },
@@ -2060,17 +2821,20 @@
               {
                 "id": 1,
                 "name": "obj",
-                "type": "OzoneObj"
+                "type": "OzoneObj",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "acl",
-                "type": "OzoneAclInfo"
+                "type": "OzoneAclInfo",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2080,7 +2844,8 @@
               {
                 "id": 1,
                 "name": "response",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               }
             ]
           },
@@ -2090,17 +2855,20 @@
               {
                 "id": 1,
                 "name": "obj",
-                "type": "OzoneObj"
+                "type": "OzoneObj",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "acl",
-                "type": "OzoneAclInfo"
+                "type": "OzoneAclInfo",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2110,7 +2878,8 @@
               {
                 "id": 1,
                 "name": "response",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               }
             ]
           },
@@ -2120,7 +2889,8 @@
               {
                 "id": 1,
                 "name": "obj",
-                "type": "OzoneObj"
+                "type": "OzoneObj",
+                "required": true
               },
               {
                 "id": 2,
@@ -2131,7 +2901,8 @@
               {
                 "id": 3,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2141,7 +2912,8 @@
               {
                 "id": 1,
                 "name": "response",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               }
             ]
           },
@@ -2151,7 +2923,8 @@
               {
                 "id": 1,
                 "name": "bucketInfo",
-                "type": "BucketInfo"
+                "type": "BucketInfo",
+                "required": true
               }
             ]
           },
@@ -2164,12 +2937,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2179,7 +2954,8 @@
               {
                 "id": 2,
                 "name": "bucketInfo",
-                "type": "BucketInfo"
+                "type": "BucketInfo",
+                "optional": true
               }
             ]
           },
@@ -2189,17 +2965,27 @@
               {
                 "id": 1,
                 "name": "bucketArgs",
-                "type": "BucketArgs"
+                "type": "BucketArgs",
+                "optional": true
               },
               {
                 "id": 2,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
           {
-            "name": "SetBucketPropertyResponse"
+            "name": "SetBucketPropertyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "DeleteBucketRequest",
@@ -2207,12 +2993,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2225,22 +3013,26 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "startKey",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "prefix",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "count",
-                "type": "int32"
+                "type": "int32",
+                "optional": true
               }
             ]
           },
@@ -2261,32 +3053,50 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "dataSize",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "type",
-                "type": "hadoop.hdds.ReplicationType"
+                "type": "hadoop.hdds.ReplicationType",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "NONE"
+                  }
+                ]
               },
               {
                 "id": 6,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor"
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "ZERO"
+                  }
+                ]
               },
               {
                 "id": 7,
@@ -2297,17 +3107,20 @@
               {
                 "id": 8,
                 "name": "isMultipartKey",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "multipartUploadID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "multipartNumber",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 11,
@@ -2324,32 +3137,50 @@
               {
                 "id": 13,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "sortDatanodes",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "fileEncryptionInfo",
-                "type": "FileEncryptionInfoProto"
+                "type": "FileEncryptionInfoProto",
+                "optional": true
               },
               {
                 "id": 16,
                 "name": "latestVersionLocation",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 17,
                 "name": "recursive",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 18,
                 "name": "headOp",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 19,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "forceUpdateContainerCacheFromSCM",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -2359,37 +3190,44 @@
               {
                 "id": 1,
                 "name": "blockID",
-                "type": "hadoop.hdds.BlockID"
+                "type": "hadoop.hdds.BlockID",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "offset",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "length",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "createVersion",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "token",
-                "type": "hadoop.common.TokenProto"
+                "type": "hadoop.common.TokenProto",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "pipeline",
-                "type": "hadoop.hdds.Pipeline"
+                "type": "hadoop.hdds.Pipeline",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "partNumber",
                 "type": "int32",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -2405,7 +3243,8 @@
               {
                 "id": 1,
                 "name": "version",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 2,
@@ -2416,12 +3255,14 @@
               {
                 "id": 3,
                 "name": "fileEncryptionInfo",
-                "type": "FileEncryptionInfoProto"
+                "type": "FileEncryptionInfoProto",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "isMultipartKey",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -2432,37 +3273,124 @@
             ]
           },
           {
+            "name": "CompositeCrcFileChecksumProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "checksumType",
+                "type": "ChecksumTypeProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bytesPerCrc",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "crc",
+                "type": "uint32",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "MD5MD5Crc32FileChecksumProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "checksumType",
+                "type": "ChecksumTypeProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bytesPerCRC",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "crcPerBlock",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "md5",
+                "type": "bytes",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "FileChecksumProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "checksumType",
+                "type": "FileChecksumTypeProto",
+                "required": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "COMPOSITE_CRC"
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "name": "compositeCrc",
+                "type": "CompositeCrcFileChecksumProto",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "md5Crc",
+                "type": "MD5MD5Crc32FileChecksumProto",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "KeyInfo",
             "fields": [
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "dataSize",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "type",
-                "type": "hadoop.hdds.ReplicationType"
+                "type": "hadoop.hdds.ReplicationType",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor"
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
               },
               {
                 "id": 7,
@@ -2473,17 +3401,20 @@
               {
                 "id": 8,
                 "name": "creationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 9,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 10,
                 "name": "latestVersion",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 11,
@@ -2494,7 +3425,8 @@
               {
                 "id": 12,
                 "name": "fileEncryptionInfo",
-                "type": "FileEncryptionInfoProto"
+                "type": "FileEncryptionInfoProto",
+                "optional": true
               },
               {
                 "id": 13,
@@ -2505,17 +3437,32 @@
               {
                 "id": 14,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 16,
                 "name": "parentID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
+              },
+              {
+                "id": 18,
+                "name": "fileChecksum",
+                "type": "FileChecksumProto",
+                "optional": true
               }
             ]
           },
@@ -2525,17 +3472,20 @@
               {
                 "id": 1,
                 "name": "name",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "creationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 4,
@@ -2552,17 +3502,20 @@
               {
                 "id": 6,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 7,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 8,
                 "name": "parentID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -2583,17 +3536,20 @@
               {
                 "id": 2,
                 "name": "keyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "blockSize",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "isDirectory",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -2603,7 +3559,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -2613,7 +3570,8 @@
               {
                 "id": 1,
                 "name": "status",
-                "type": "OzoneFileStatusProto"
+                "type": "OzoneFileStatusProto",
+                "required": true
               }
             ]
           },
@@ -2623,7 +3581,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -2636,22 +3595,26 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "isRecursive",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "isOverwrite",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "clientID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2661,17 +3624,20 @@
               {
                 "id": 1,
                 "name": "keyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "optional": true
               },
               {
                 "id": 2,
                 "name": "ID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "openVersion",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2681,7 +3647,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -2691,7 +3658,8 @@
               {
                 "id": 1,
                 "name": "keyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "optional": true
               }
             ]
           },
@@ -2701,22 +3669,32 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "recursive",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "startKey",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "numEntries",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "allowPartialPrefix",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -2737,12 +3715,14 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "clientID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2752,17 +3732,20 @@
               {
                 "id": 2,
                 "name": "keyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "ID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "openVersion",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2772,7 +3755,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -2782,17 +3766,60 @@
               {
                 "id": 2,
                 "name": "keyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "ID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "openVersion",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetKeyInfoRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "assumeS3Context",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetKeyInfoResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyInfo",
+                "type": "KeyInfo",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "volumeInfo",
+                "type": "VolumeInfo",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "UserPrincipal",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -2802,7 +3829,8 @@
               {
                 "id": 1,
                 "name": "renameKeysArgs",
-                "type": "RenameKeysArgs"
+                "type": "RenameKeysArgs",
+                "required": true
               }
             ]
           },
@@ -2812,12 +3840,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
@@ -2833,12 +3863,14 @@
               {
                 "id": 1,
                 "name": "fromKeyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "toKeyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2854,7 +3886,8 @@
               {
                 "id": 2,
                 "name": "status",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -2864,12 +3897,14 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "toKeyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2882,7 +3917,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -2892,7 +3928,8 @@
               {
                 "id": 1,
                 "name": "deleteKeys",
-                "type": "DeleteKeyArgs"
+                "type": "DeleteKeyArgs",
+                "optional": true
               }
             ]
           },
@@ -2902,12 +3939,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
@@ -2923,12 +3962,14 @@
               {
                 "id": 1,
                 "name": "unDeletedKeys",
-                "type": "DeleteKeyArgs"
+                "type": "DeleteKeyArgs",
+                "optional": true
               },
               {
                 "id": 2,
                 "name": "status",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -2938,17 +3979,20 @@
               {
                 "id": 2,
                 "name": "keyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "ID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "openVersion",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2958,12 +4002,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
@@ -3014,6 +4060,55 @@
             "name": "PurgePathsResponse"
           },
           {
+            "name": "PurgeDirectoriesRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedPath",
+                "type": "PurgePathRequest",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PurgeDirectoriesResponse"
+          },
+          {
+            "name": "PurgePathRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeId",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bucketId",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "deletedDir",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "deletedSubFiles",
+                "type": "KeyInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "markDeletedSubDirs",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "DeleteOpenKeysRequest",
             "fields": [
               {
@@ -3021,6 +4116,12 @@
                 "name": "openKeysPerBucket",
                 "type": "OpenKeyBucket",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "bucketLayout",
+                "type": "BucketLayoutProto",
+                "optional": true
               }
             ]
           },
@@ -3030,12 +4131,14 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
@@ -3051,12 +4154,20 @@
               {
                 "id": 1,
                 "name": "name",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "clientID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -3066,77 +4177,92 @@
               {
                 "id": 1,
                 "name": "type",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "version",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "owner",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "renewer",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "realUser",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "issueDate",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "maxDate",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "sequenceNumber",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "masterKeyId",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "expiryDate",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "omCertSerialId",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "accessKeyId",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "signature",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "strToSign",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "omServiceId",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -3146,22 +4272,26 @@
               {
                 "id": 1,
                 "name": "keyId",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "expiryDate",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "privateKeyBytes",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "publicKeyBytes",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               }
             ]
           },
@@ -3171,27 +4301,32 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "startKey",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "prefix",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "count",
-                "type": "int32"
+                "type": "int32",
+                "optional": true
               }
             ]
           },
@@ -3212,12 +4347,14 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "clientID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -3230,22 +4367,26 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "clientID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "excludeList",
-                "type": "hadoop.hdds.ExcludeListProto"
+                "type": "hadoop.hdds.ExcludeListProto",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "keyLocation",
-                "type": "KeyLocation"
+                "type": "KeyLocation",
+                "optional": true
               }
             ]
           },
@@ -3255,7 +4396,8 @@
               {
                 "id": 2,
                 "name": "keyLocation",
-                "type": "KeyLocation"
+                "type": "KeyLocation",
+                "optional": true
               }
             ]
           },
@@ -3268,7 +4410,14 @@
               {
                 "id": 1,
                 "name": "sequenceNumber",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "limitCount",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -3284,7 +4433,8 @@
               {
                 "id": 3,
                 "name": "caCertificate",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
@@ -3300,13 +4450,42 @@
               {
                 "id": 1,
                 "name": "sequenceNumber",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "data",
                 "type": "bytes",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "latestSequenceNumber",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RangerBGSyncRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "noWait",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RangerBGSyncResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "runSuccess",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -3316,7 +4495,8 @@
               {
                 "id": 1,
                 "name": "upgradeClientId",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -3326,7 +4506,8 @@
               {
                 "id": 1,
                 "name": "status",
-                "type": "hadoop.hdds.UpgradeFinalizationStatus"
+                "type": "hadoop.hdds.UpgradeFinalizationStatus",
+                "required": true
               }
             ]
           },
@@ -3336,17 +4517,20 @@
               {
                 "id": 1,
                 "name": "upgradeClientId",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "takeover",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "readonly",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -3356,7 +4540,8 @@
               {
                 "id": 1,
                 "name": "status",
-                "type": "hadoop.hdds.UpgradeFinalizationStatus"
+                "type": "hadoop.hdds.UpgradeFinalizationStatus",
+                "required": true
               }
             ]
           },
@@ -3366,7 +4551,8 @@
               {
                 "id": 1,
                 "name": "args",
-                "type": "PrepareRequestArgs"
+                "type": "PrepareRequestArgs",
+                "required": true
               }
             ]
           },
@@ -3377,6 +4563,7 @@
                 "id": 1,
                 "name": "txnApplyWaitTimeoutSeconds",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -3388,6 +4575,7 @@
                 "id": 2,
                 "name": "txnApplyCheckIntervalSeconds",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -3403,7 +4591,8 @@
               {
                 "id": 1,
                 "name": "txnID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -3413,7 +4602,8 @@
               {
                 "id": 1,
                 "name": "txnID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -3423,12 +4613,14 @@
               {
                 "id": 1,
                 "name": "status",
-                "type": "PrepareStatus"
+                "type": "PrepareStatus",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "currentTxnIndex",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -3444,12 +4636,14 @@
               {
                 "id": 1,
                 "name": "type",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "value",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               }
             ]
           },
@@ -3459,12 +4653,14 @@
               {
                 "id": 1,
                 "name": "nodeId",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "serverRole",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -3474,12 +4670,14 @@
               {
                 "id": 1,
                 "name": "nodeType",
-                "type": "hadoop.hdds.NodeType"
+                "type": "hadoop.hdds.NodeType",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "hostname",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
@@ -3490,7 +4688,20 @@
               {
                 "id": 4,
                 "name": "omRole",
-                "type": "OMRoleInfo"
+                "type": "OMRoleInfo",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "OMVersion",
+                "type": "int32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
               }
             ]
           },
@@ -3500,7 +4711,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -3510,22 +4722,26 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "multipartUploadID",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -3535,22 +4751,26 @@
               {
                 "id": 1,
                 "name": "uploadID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "creationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "type",
-                "type": "hadoop.hdds.ReplicationType"
+                "type": "hadoop.hdds.ReplicationType",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor"
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
               },
               {
                 "id": 5,
@@ -3561,17 +4781,26 @@
               {
                 "id": 6,
                 "name": "objectID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "updateID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "parentID",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -3581,17 +4810,20 @@
               {
                 "id": 1,
                 "name": "partName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "partNumber",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "partKeyInfo",
-                "type": "KeyInfo"
+                "type": "KeyInfo",
+                "required": true
               }
             ]
           },
@@ -3601,12 +4833,14 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "clientID",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -3616,7 +4850,8 @@
               {
                 "id": 1,
                 "name": "partName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -3626,7 +4861,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               },
               {
                 "id": 2,
@@ -3642,22 +4878,26 @@
               {
                 "id": 1,
                 "name": "volume",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 2,
                 "name": "bucket",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "key",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "hash",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -3667,12 +4907,14 @@
               {
                 "id": 1,
                 "name": "partNumber",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "partName",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -3682,7 +4924,8 @@
               {
                 "id": 1,
                 "name": "keyArgs",
-                "type": "KeyArgs"
+                "type": "KeyArgs",
+                "required": true
               }
             ]
           },
@@ -3695,32 +4938,38 @@
               {
                 "id": 1,
                 "name": "volume",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucket",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "key",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "uploadID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "partNumbermarker",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "maxParts",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               }
             ]
           },
@@ -3730,28 +4979,38 @@
               {
                 "id": 2,
                 "name": "type",
-                "type": "hadoop.hdds.ReplicationType"
+                "type": "hadoop.hdds.ReplicationType",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor"
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "nextPartNumberMarker",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "isTruncated",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "partsList",
                 "type": "PartInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 7,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -3761,17 +5020,20 @@
               {
                 "id": 1,
                 "name": "volume",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucket",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "prefix",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -3781,7 +5043,8 @@
               {
                 "id": 1,
                 "name": "isTruncated",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               },
               {
                 "id": 2,
@@ -3797,37 +5060,50 @@
               {
                 "id": 1,
                 "name": "volumeName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "bucketName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "keyName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "uploadId",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "creationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "type",
-                "type": "hadoop.hdds.ReplicationType"
+                "type": "hadoop.hdds.ReplicationType",
+                "required": true
               },
               {
                 "id": 7,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor"
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -3837,22 +5113,54 @@
               {
                 "id": 1,
                 "name": "partNumber",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "partName",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "modificationTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "size",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "EchoRPCRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "payloadReq",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "payloadSizeResp",
+                "type": "int32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "EchoRPCResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "payload",
+                "type": "bytes",
+                "optional": true
               }
             ]
           },
@@ -3862,7 +5170,8 @@
               {
                 "id": 2,
                 "name": "response",
-                "type": "hadoop.common.GetDelegationTokenResponseProto"
+                "type": "hadoop.common.GetDelegationTokenResponseProto",
+                "optional": true
               }
             ]
           },
@@ -3872,7 +5181,8 @@
               {
                 "id": 2,
                 "name": "response",
-                "type": "hadoop.common.RenewDelegationTokenResponseProto"
+                "type": "hadoop.common.RenewDelegationTokenResponseProto",
+                "optional": true
               }
             ]
           },
@@ -3882,7 +5192,8 @@
               {
                 "id": 2,
                 "name": "response",
-                "type": "hadoop.common.CancelDelegationTokenResponseProto"
+                "type": "hadoop.common.CancelDelegationTokenResponseProto",
+                "optional": true
               }
             ]
           },
@@ -3892,12 +5203,14 @@
               {
                 "id": 1,
                 "name": "kerberosID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "awsSecret",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -3907,7 +5220,14 @@
               {
                 "id": 1,
                 "name": "kerberosID",
-                "type": "string"
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "createIfNotExist",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -3917,7 +5237,210 @@
               {
                 "id": 2,
                 "name": "s3Secret",
-                "type": "S3Secret"
+                "type": "S3Secret",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SetS3SecretRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "secretKey",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SetS3SecretResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "secretKey",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantState",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketNamespaceName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "userRoleName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "adminRoleName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "bucketNamespacePolicyName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "bucketPolicyName",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantUserPrincipalInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessIds",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "UserAccessIdInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userPrincipal",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ExtendedUserAccessIdInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userPrincipal",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "isAdmin",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "isDelegatedAdmin",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListTenantRequest"
+          },
+          {
+            "name": "ListTenantResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tenantState",
+                "type": "TenantState",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "TenantListUserRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "prefix",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantListUserResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userAccessIdInfo",
+                "type": "UserAccessIdInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "TenantGetUserInfoRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userPrincipal",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantGetUserInfoResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessIdInfo",
+                "type": "ExtendedUserAccessIdInfo",
+                "is_repeated": true
               }
             ]
           },
@@ -3927,7 +5450,8 @@
               {
                 "id": 1,
                 "name": "version",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -3937,7 +5461,202 @@
               {
                 "id": 1,
                 "name": "kerberosID",
-                "type": "string"
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "CreateTenantRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "userRoleName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "adminRoleName",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SetRangerServiceVersionRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "rangerServiceVersion",
+                "type": "uint64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteTenantRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantAssignUserAccessIdRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userPrincipal",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantRevokeUserAccessIdRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantAssignAdminRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "delegated",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantRevokeAdminRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "tenantId",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetS3VolumeContextRequest"
+          },
+          {
+            "name": "CreateTenantResponse"
+          },
+          {
+            "name": "SetRangerServiceVersionResponse"
+          },
+          {
+            "name": "DeleteTenantResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "volRefCount",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantAssignUserAccessIdResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "s3Secret",
+                "type": "S3Secret",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "TenantRevokeUserAccessIdResponse"
+          },
+          {
+            "name": "TenantAssignAdminResponse"
+          },
+          {
+            "name": "TenantRevokeAdminResponse"
+          },
+          {
+            "name": "GetS3VolumeContextResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeInfo",
+                "type": "VolumeInfo",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "userPrincipal",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -3947,12 +5666,37 @@
               {
                 "id": 1,
                 "name": "kerberosID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "awsSecret",
-                "type": "string"
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "S3Authentication",
+            "fields": [
+              {
+                "id": 1,
+                "name": "stringToSign",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "signature",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "accessId",
+                "type": "string",
+                "optional": true
               }
             ]
           }
@@ -4037,17 +5781,20 @@
               {
                 "id": 1,
                 "name": "nodeId",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "hostAddress",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "ratisPort",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               }
             ]
           },
@@ -4057,17 +5804,20 @@
               {
                 "id": 1,
                 "name": "success",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "errorCode",
-                "type": "ErrorCode"
+                "type": "ErrorCode",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "errorMsg",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           }
@@ -4117,22 +5867,26 @@
               {
                 "id": 1,
                 "name": "identifier",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "password",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "kind",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "service",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -4142,17 +5896,20 @@
               {
                 "id": 1,
                 "name": "alias",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "token",
-                "type": "hadoop.common.TokenProto"
+                "type": "hadoop.common.TokenProto",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "secret",
-                "type": "bytes"
+                "type": "bytes",
+                "optional": true
               }
             ]
           },
@@ -4179,7 +5936,8 @@
               {
                 "id": 1,
                 "name": "renewer",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -4189,7 +5947,8 @@
               {
                 "id": 1,
                 "name": "token",
-                "type": "hadoop.common.TokenProto"
+                "type": "hadoop.common.TokenProto",
+                "optional": true
               }
             ]
           },
@@ -4199,7 +5958,8 @@
               {
                 "id": 1,
                 "name": "token",
-                "type": "hadoop.common.TokenProto"
+                "type": "hadoop.common.TokenProto",
+                "required": true
               }
             ]
           },
@@ -4209,7 +5969,8 @@
               {
                 "id": 1,
                 "name": "newExpiryTime",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               }
             ]
           },
@@ -4219,7 +5980,8 @@
               {
                 "id": 1,
                 "name": "token",
-                "type": "hadoop.common.TokenProto"
+                "type": "hadoop.common.TokenProto",
+                "required": true
               }
             ]
           },

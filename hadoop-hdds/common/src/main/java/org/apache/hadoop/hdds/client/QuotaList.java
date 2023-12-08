@@ -19,19 +19,20 @@
 package org.apache.hadoop.hdds.client;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  *This class contains arraylist for storage constant used in OzoneQuota.
  */
 public class QuotaList {
-  private ArrayList<String> ozoneQuota;
-  private ArrayList<OzoneQuota.Units> unitQuota;
-  private ArrayList<Long> sizeQuota;
+  private final ArrayList<String> ozoneQuota;
+  private final ArrayList<OzoneQuota.Units> unitQuota;
+  private final ArrayList<Long> sizeQuota;
 
   public QuotaList() {
-    ozoneQuota = new ArrayList<String>();
-    unitQuota = new ArrayList<OzoneQuota.Units>();
-    sizeQuota = new ArrayList<Long>();
+    ozoneQuota = new ArrayList<>();
+    unitQuota = new ArrayList<>();
+    sizeQuota = new ArrayList<>();
   }
 
   public void addQuotaList(
@@ -41,15 +42,15 @@ public class QuotaList {
     sizeQuota.add(sQuota);
   }
 
-  public ArrayList<String> getOzoneQuotaArray() {
+  public List<String> getOzoneQuotaArray() {
     return this.ozoneQuota;
   }
 
-  public ArrayList<Long> getSizeQuotaArray() {
+  public List<Long> getSizeQuotaArray() {
     return this.sizeQuota;
   }
 
-  public ArrayList<OzoneQuota.Units> getUnitQuotaArray() {
+  public List<OzoneQuota.Units> getUnitQuotaArray() {
     return this.unitQuota;
   }
 

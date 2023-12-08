@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -47,6 +49,7 @@ public final class SCMContext {
    * term equals INVALID_TERM indicates current SCM is running without Ratis.
    */
   public static final long INVALID_TERM = -1;
+  private final String threadNamePrefix;
 
   /**
    * Used by non-HA mode SCM, Recon and Unit Tests.
@@ -70,14 +73,22 @@ public final class SCMContext {
   private final OzoneStorageContainerManager scm;
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
+  /**
+   * Tracks the last crossed SCM upgrade finalization checkpoint.
+   */
+  private volatile FinalizationCheckpoint finalizationCheckpoint;
+
   private SCMContext(boolean isLeader, long term,
       final SafeModeStatus safeModeStatus,
-      final OzoneStorageContainerManager scm) {
+      final FinalizationCheckpoint finalizationCheckpoint,
+      final OzoneStorageContainerManager scm, String threadNamePrefix) {
     this.isLeader = isLeader;
     this.term = term;
     this.safeModeStatus = safeModeStatus;
+    this.finalizationCheckpoint = finalizationCheckpoint;
     this.scm = scm;
     this.isLeaderReady = false;
+    this.threadNamePrefix = threadNamePrefix;
   }
 
   /**
@@ -123,6 +134,15 @@ public final class SCMContext {
     }
   }
 
+  public void setFinalizationCheckpoint(FinalizationCheckpoint checkpoint) {
+    lock.writeLock().lock();
+    try {
+      this.finalizationCheckpoint = checkpoint;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
   /**
    * Check whether current SCM is leader or not.
    *
@@ -144,7 +164,6 @@ public final class SCMContext {
       lock.readLock().unlock();
     }
   }
-
 
   /**
    * Check whether current SCM is leader ready.
@@ -233,11 +252,24 @@ public final class SCMContext {
     }
   }
 
+  public FinalizationCheckpoint getFinalizationCheckpoint() {
+    lock.readLock().lock();
+    try {
+      return this.finalizationCheckpoint;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
   /**
    * @return StorageContainerManager
    */
   public OzoneStorageContainerManager getScm() {
     return scm;
+  }
+
+  public String threadNamePrefix() {
+    return threadNamePrefix;
   }
 
   /**
@@ -253,6 +285,8 @@ public final class SCMContext {
     private boolean isInSafeMode = false;
     private boolean isPreCheckComplete = true;
     private OzoneStorageContainerManager scm = null;
+    private FinalizationCheckpoint finalizationCheckpoint;
+    private String threadNamePrefix = "";
 
     public Builder setLeader(boolean leader) {
       this.isLeader = leader;
@@ -280,6 +314,17 @@ public final class SCMContext {
       return this;
     }
 
+    public Builder setFinalizationCheckpoint(
+        FinalizationCheckpoint checkpoint) {
+      this.finalizationCheckpoint = checkpoint;
+      return this;
+    }
+
+    public SCMContext.Builder setThreadNamePrefix(String prefix) {
+      this.threadNamePrefix = prefix;
+      return this;
+    }
+
     public SCMContext build() {
       Preconditions.checkNotNull(scm, "scm == null");
       return buildMaybeInvalid();
@@ -294,7 +339,9 @@ public final class SCMContext {
           isLeader,
           term,
           new SafeModeStatus(isInSafeMode, isPreCheckComplete),
-          scm);
+          Optional.ofNullable(finalizationCheckpoint).orElse(
+              FinalizationCheckpoint.FINALIZATION_COMPLETE),
+          scm, threadNamePrefix);
     }
   }
 }

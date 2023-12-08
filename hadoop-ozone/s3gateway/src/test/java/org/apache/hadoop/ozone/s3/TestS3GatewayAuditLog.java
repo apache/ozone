@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.s3;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,9 +33,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for S3Gateway Audit Log.
@@ -69,7 +70,7 @@ public class TestS3GatewayAuditLog {
   private OzoneBucket bucket;
   private Map<String, String> parametersMap = new HashMap<>();
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     parametersMap.clear();
@@ -99,7 +100,7 @@ public class TestS3GatewayAuditLog {
 
   }
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() {
     File file = new File("audit.log");
     if (FileUtils.deleteQuietly(file)) {
@@ -133,8 +134,9 @@ public class TestS3GatewayAuditLog {
   public void testHeadObject() throws Exception {
     String value = RandomStringUtils.randomAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.ONE, new HashMap<>());
+        value.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.ONE), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
 

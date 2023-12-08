@@ -35,7 +35,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
  * Executes set volume quota calls.
  */
 @Command(name = "setquota",
-    description = "Set quota of the volumes")
+    description = "Set quota of the volumes. At least one of the " +
+        "quota set flag is mandatory.")
 public class SetQuotaHandler extends VolumeHandler {
 
   @CommandLine.Mixin
@@ -49,14 +50,22 @@ public class SetQuotaHandler extends VolumeHandler {
 
     long spaceQuota = volume.getQuotaInBytes();
     long namespaceQuota = volume.getQuotaInNamespace();
+    boolean isOptionPresent = false;
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       spaceQuota = OzoneQuota.parseSpaceQuota(
           quotaOptions.getQuotaInBytes()).getQuotaInBytes();
+      isOptionPresent = true;
     }
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
       namespaceQuota = OzoneQuota.parseNameSpaceQuota(
           quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+      isOptionPresent = true;
+    }
+    
+    if (!isOptionPresent) {
+      throw new IOException(
+          "At least one of the quota set flag is required.");
     }
 
     if (volume.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {

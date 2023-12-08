@@ -20,20 +20,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
-import java.math.BigInteger;
-import java.security.KeyPair;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -44,7 +41,7 @@ public class TestReplicationAnnotation {
   private SCMHAInvocationHandler scmhaInvocationHandler;
   private SCMRatisServer scmRatisServer;
 
-  @Before
+  @BeforeEach
   public void setup() {
     scmRatisServer = new SCMRatisServer() {
       @Override
@@ -60,6 +57,11 @@ public class TestReplicationAnnotation {
       public SCMRatisResponse submitRequest(SCMRatisRequest request)
           throws IOException, ExecutionException, InterruptedException {
         throw new IOException("submitRequest is called.");
+      }
+
+      @Override
+      public boolean triggerSnapshot() throws IOException {
+        throw new IOException("submitSnapshotRequest is called.");
       }
 
       @Override
@@ -93,6 +95,11 @@ public class TestReplicationAnnotation {
       }
 
       @Override
+      public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+        return false;
+      }
+
+      @Override
       public SCMStateMachine getSCMStateMachine() {
         return null;
       }
@@ -118,33 +125,10 @@ public class TestReplicationAnnotation {
 
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
-      Assert.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException ignore) {
-      Assert.assertNotNull(ignore.getMessage() != null);
-      Assert.assertEquals("submitRequest is called.",
-          ignore.getMessage());
+      Assertions.fail("Cannot reach here: should have seen a IOException");
+    } catch (IOException e) {
+      Assertions.assertNotNull(e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
     }
-
-    scmhaInvocationHandler = new SCMHAInvocationHandler(
-        RequestType.CERT_STORE, null, scmRatisServer);
-
-    CertificateStore certificateStore =
-        (CertificateStore) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{CertificateStore.class},
-            scmhaInvocationHandler);
-
-    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    try {
-      certificateStore.storeValidCertificate(BigInteger.valueOf(100L),
-          KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
-          "SHA256withRSA"), HddsProtos.NodeType.DATANODE);
-      Assert.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException ignore) {
-      Assert.assertNotNull(ignore.getMessage() != null);
-      Assert.assertEquals("submitRequest is called.",
-          ignore.getMessage());
-    }
-
   }
 }

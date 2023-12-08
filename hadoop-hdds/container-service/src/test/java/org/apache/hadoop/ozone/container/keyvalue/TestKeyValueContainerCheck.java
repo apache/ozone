@@ -25,44 +25,41 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.RandomAccessFile;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 
 /**
  * Basic sanity test for the KeyValueContainerCheck class.
  */
-@RunWith(Parameterized.class)
 public class TestKeyValueContainerCheck
     extends TestKeyValueContainerIntegrityChecks {
-
-  public TestKeyValueContainerCheck(ContainerLayoutTestInfo
-      containerLayoutTestInfo) {
-    super(containerLayoutTestInfo);
-  }
 
   /**
    * Sanity test, when there are no corruptions induced.
    */
-  @Test
-  public void testKeyValueContainerCheckNoCorruption() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testKeyValueContainerCheckNoCorruption(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
     OzoneConfiguration conf = getConf();
-    ContainerScrubberConfiguration c = conf.getObject(
-        ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration c = conf.getObject(
+        ContainerScannerConfiguration.class);
 
     // test Closed Container
     KeyValueContainer container = createContainerWithBlocks(containerID,
@@ -71,31 +68,34 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID);
+            containerID, containerData.getVolume(), container);
 
     // first run checks on a Open Container
-    boolean valid = kvCheck.fastCheck();
+    boolean valid = kvCheck.fastCheck().isHealthy();
     assertTrue(valid);
 
     container.close();
 
     // next run checks on a Closed Container
     valid = kvCheck.fullCheck(new DataTransferThrottler(
-        c.getBandwidthPerVolume()), null);
+        c.getBandwidthPerVolume()), null).isHealthy();
     assertTrue(valid);
   }
 
   /**
    * Sanity test, when there are corruptions induced.
    */
-  @Test
-  public void testKeyValueContainerCheckCorruption() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testKeyValueContainerCheckCorruption(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setUp(versionInfo);
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
     OzoneConfiguration conf = getConf();
-    ContainerScrubberConfiguration sc = conf.getObject(
-        ContainerScrubberConfiguration.class);
+    ContainerScannerConfiguration sc = conf.getObject(
+        ContainerScannerConfiguration.class);
 
     // test Closed Container
     KeyValueContainer container = createContainerWithBlocks(containerID,
@@ -106,16 +106,14 @@ public class TestKeyValueContainerCheck
 
     KeyValueContainerCheck kvCheck =
         new KeyValueContainerCheck(containerData.getMetadataPath(), conf,
-            containerID);
+            containerID, containerData.getVolume(), container);
 
-    File metaDir = new File(containerData.getMetadataPath());
     File dbFile = KeyValueContainerLocationUtil
-        .getContainerDBFile(metaDir, containerID);
+        .getContainerDBFile(containerData);
     containerData.setDbFile(dbFile);
-    try (ReferenceCountedDB ignored =
-            BlockUtils.getDB(containerData, conf);
+    try (DBHandle ignored = BlockUtils.getDB(containerData, conf);
         BlockIterator<BlockData> kvIter =
-                ignored.getStore().getBlockIterator()) {
+                ignored.getStore().getBlockIterator(containerID)) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);
@@ -133,12 +131,12 @@ public class TestKeyValueContainerCheck
     }
 
     // metadata check should pass.
-    boolean valid = kvCheck.fastCheck();
+    boolean valid = kvCheck.fastCheck().isHealthy();
     assertTrue(valid);
 
     // checksum validation should fail.
     valid = kvCheck.fullCheck(new DataTransferThrottler(
-            sc.getBandwidthPerVolume()), null);
+            sc.getBandwidthPerVolume()), null).isHealthy();
     assertFalse(valid);
   }
 }

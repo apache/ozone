@@ -18,6 +18,8 @@ Documentation       Generate data
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Resource            ../s3/commonawslib.robot
+Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -32,5 +34,31 @@ Create a volume and bucket
                         Should not contain  ${output}       Failed
 
 Create key
-    ${output} =         Execute          ozone sh key put /${PREFIX}-volume/${PREFIX}-bucket/${PREFIX}-key /opt/hadoop/NOTICE.txt
+                        Execute and checkrc    echo "${PREFIX}: key created using Ozone Shell" > /tmp/sourcekey    0
+    ${output} =         Execute          ozone sh key put /${PREFIX}-volume/${PREFIX}-bucket/${PREFIX}-key /tmp/sourcekey
                         Should not contain  ${output}       Failed
+                        Execute and checkrc    rm /tmp/sourcekey    0
+
+Create a bucket in s3v volume
+    [Tags]    create-volume-and-bucket
+    ${output} =         Execute          ozone sh bucket create /s3v/${PREFIX}-bucket
+                        Should not contain  ${output}       Failed
+
+Create key in the bucket in s3v volume
+                        Execute and checkrc    echo "${PREFIX}: another key created using Ozone Shell" > /tmp/sourcekey    0
+    ${output} =         Execute          ozone sh key put /s3v/${PREFIX}-bucket/key1-shell /tmp/sourcekey
+                        Should not contain  ${output}       Failed
+                        Execute and checkrc    rm /tmp/sourcekey    0
+
+Try to create a bucket using S3 API
+    [setup]             Setup v4 headers
+    # Note: S3 API returns error if the bucket already exists
+    ${random} =         Generate Ozone String
+    ${output} =         Create bucket with name    ${PREFIX}-bucket-${random}
+                        Should Be Equal    ${output}    ${None}
+
+Create key using S3 API
+                        Execute and checkrc    echo "${PREFIX}: key created using S3 API" > /tmp/sourcekey    0
+    ${output} =         Execute AWSS3APICli and checkrc    put-object --bucket ${PREFIX}-bucket --key key2-s3api --body /tmp/sourcekey    0
+                        Should not contain    ${output}    error
+                        Execute and checkrc    rm /tmp/sourcekey    0

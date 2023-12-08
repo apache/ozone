@@ -24,10 +24,14 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -45,7 +49,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
   @Option(names = {"-v", "--volume"},
-      description = "Name of the bucket which contains the test data. Will be"
+      description = "Name of the volume which contains the test data. Will be"
           + " created if missing.",
       defaultValue = "vol1")
   private String volumeName;
@@ -57,9 +61,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private String bucketName;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated key (in bytes)",
-      defaultValue = "10240")
-  private long keySize;
+      description = "Size of the generated key. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "10KB",
+      converter = StorageSizeConverter.class)
+  private StorageSize keySize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",
@@ -73,6 +79,12 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
   @Mixin
   private FreonReplicationOptions replication;
+
+  @Option(
+      names = {"--enable-streaming", "--stream"},
+      description = "Specify whether the write will be through ratis streaming"
+  )
+  private boolean enableRatisStreaming = false;
 
   private Timer timer;
 
@@ -88,7 +100,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    contentGenerator = new ContentGenerator(keySize, bufferSize);
+    contentGenerator = new ContentGenerator(keySize.toBytes(), bufferSize);
     metadata = new HashMap<>();
 
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
@@ -101,7 +113,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
       timer = getMetrics().timer("key-create");
 
-      runTests(this::createKey);
+      if (enableRatisStreaming) {
+        runTests(this::createStreamKey);
+      } else {
+        runTests(this::createKey);
+      }
     }
     return null;
   }
@@ -110,10 +126,24 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket.createKey(key, keySize,
+      try (OutputStream stream = bucket.createKey(key, keySize.toBytes(),
           replicationConfig, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
+      }
+      return null;
+    });
+  }
+
+  private void createStreamKey(long counter) throws Exception {
+    final ReplicationConfig conf = ReplicationConfig.fromProtoTypeAndFactor(
+        ReplicationType.RATIS, ReplicationFactor.THREE);
+    final String key = generateObjectName(counter);
+
+    timer.time(() -> {
+      try (OzoneDataStreamOutput stream = bucket.createStreamKey(
+          key, keySize.toBytes(), conf, metadata)) {
+        contentGenerator.write(stream);
       }
       return null;
     });

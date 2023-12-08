@@ -20,15 +20,15 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for PipelineStateMap.
@@ -38,12 +38,12 @@ public class TestPipelineStateMap {
 
   private PipelineStateMap map;
 
-  @Before
+  @BeforeEach
   public void setup() {
     map = new PipelineStateMap();
   }
 
-  @After
+  @AfterEach
   public void teardown() throws IOException {
   }
 

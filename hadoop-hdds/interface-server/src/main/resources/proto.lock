@@ -10,7 +10,8 @@
               {
                 "id": 1,
                 "name": "flush",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               }
             ]
           },
@@ -20,32 +21,38 @@
               {
                 "id": 1,
                 "name": "clusterId",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "len",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "eof",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "data",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "readOffset",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 7,
                 "name": "checksum",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               }
             ]
           }
@@ -112,6 +119,14 @@
               {
                 "name": "MOVE",
                 "integer": 6
+              },
+              {
+                "name": "STATEFUL_SERVICE_CONFIG",
+                "integer": 7
+              },
+              {
+                "name": "FINALIZE",
+                "integer": 8
               }
             ]
           }
@@ -123,7 +138,8 @@
               {
                 "id": 1,
                 "name": "name",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -139,12 +155,14 @@
               {
                 "id": 1,
                 "name": "type",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "value",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               }
             ]
           },
@@ -154,7 +172,8 @@
               {
                 "id": 1,
                 "name": "type",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -170,12 +189,14 @@
               {
                 "id": 1,
                 "name": "type",
-                "type": "RequestType"
+                "type": "RequestType",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "method",
-                "type": "Method"
+                "type": "Method",
+                "required": true
               }
             ]
           },
@@ -185,12 +206,14 @@
               {
                 "id": 2,
                 "name": "type",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "value",
-                "type": "bytes"
+                "type": "bytes",
+                "required": true
               }
             ]
           }
@@ -239,17 +262,20 @@
               {
                 "id": 1,
                 "name": "x509CRL",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "creationTimestamp",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "crlSequenceID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               }
             ]
           },
@@ -259,12 +285,14 @@
               {
                 "id": 1,
                 "name": "msb",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "lsb",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               }
             ]
           },
@@ -274,7 +302,8 @@
               {
                 "id": 1,
                 "name": "hostname",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -284,7 +313,8 @@
               {
                 "id": 1,
                 "name": "clientId",
-                "type": "ClientId"
+                "type": "ClientId",
+                "required": true
               }
             ]
           },
@@ -294,22 +324,26 @@
               {
                 "id": 1,
                 "name": "updateType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "clientId",
-                "type": "ClientId"
+                "type": "ClientId",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "crlUpdateRequest",
-                "type": "CRLUpdateRequest"
+                "type": "CRLUpdateRequest",
+                "optional": true
               }
             ]
           },
@@ -319,17 +353,20 @@
               {
                 "id": 1,
                 "name": "updateType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "crlUpdateResponse",
-                "type": "CRLUpdateResponse"
+                "type": "CRLUpdateResponse",
+                "optional": true
               }
             ]
           },
@@ -339,7 +376,8 @@
               {
                 "id": 1,
                 "name": "receivedCrlId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
@@ -355,7 +393,8 @@
               {
                 "id": 1,
                 "name": "crlInfo",
-                "type": "CRLInfoProto"
+                "type": "CRLInfoProto",
+                "optional": true
               }
             ]
           },
@@ -365,7 +404,8 @@
               {
                 "id": 1,
                 "name": "clientId",
-                "type": "ClientId"
+                "type": "ClientId",
+                "required": true
               }
             ]
           },
@@ -594,6 +634,9 @@
             "name": "SCMCommandProto.Type",
             "enum_fields": [
               {
+                "name": "unknownScmCommand"
+              },
+              {
                 "name": "reregisterCommand",
                 "integer": 1
               },
@@ -628,6 +671,14 @@
               {
                 "name": "finalizeNewLayoutVersionCommand",
                 "integer": 9
+              },
+              {
+                "name": "refreshVolumeUsageInfo",
+                "integer": 10
+              },
+              {
+                "name": "reconstructECContainersCommand",
+                "integer": 11
               }
             ]
           }
@@ -639,27 +690,32 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "getVersionRequest",
-                "type": "SCMVersionRequestProto"
+                "type": "SCMVersionRequestProto",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "registerRequest",
-                "type": "SCMRegisterRequestProto"
+                "type": "SCMRegisterRequestProto",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "sendHeartbeatRequest",
-                "type": "SCMHeartbeatRequestProto"
+                "type": "SCMHeartbeatRequestProto",
+                "optional": true
               }
             ]
           },
@@ -669,17 +725,20 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "success",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -690,27 +749,32 @@
               {
                 "id": 4,
                 "name": "message",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "status",
-                "type": "Status"
+                "type": "Status",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "getVersionResponse",
-                "type": "SCMVersionResponseProto"
+                "type": "SCMVersionResponseProto",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "registerResponse",
-                "type": "SCMRegisteredResponseProto"
+                "type": "SCMRegisteredResponseProto",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "sendHeartbeatResponse",
-                "type": "SCMHeartbeatResponseProto"
+                "type": "SCMHeartbeatResponseProto",
+                "optional": true
               }
             ]
           },
@@ -720,12 +784,14 @@
               {
                 "id": 1,
                 "name": "metadataLayoutVersion",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "softwareLayoutVersion",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               }
             ]
           },
@@ -738,7 +804,8 @@
               {
                 "id": 1,
                 "name": "softwareVersion",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 2,
@@ -754,27 +821,32 @@
               {
                 "id": 1,
                 "name": "extendedDatanodeDetails",
-                "type": "ExtendedDatanodeDetailsProto"
+                "type": "ExtendedDatanodeDetailsProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "nodeReport",
-                "type": "NodeReportProto"
+                "type": "NodeReportProto",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "containerReport",
-                "type": "ContainerReportsProto"
+                "type": "ContainerReportsProto",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "pipelineReports",
-                "type": "PipelineReportsProto"
+                "type": "PipelineReportsProto",
+                "required": true
               },
               {
                 "id": 5,
                 "name": "dataNodeLayoutVersion",
-                "type": "LayoutVersionProto"
+                "type": "LayoutVersionProto",
+                "optional": true
               }
             ]
           },
@@ -784,42 +856,50 @@
               {
                 "id": 1,
                 "name": "errorCode",
-                "type": "ErrorCode"
+                "type": "ErrorCode",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "datanodeUUID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "clusterID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "addressList",
-                "type": "SCMNodeAddressList"
+                "type": "SCMNodeAddressList",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "hostname",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "ipAddress",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "networkName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "networkLocation",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -829,17 +909,20 @@
               {
                 "id": 1,
                 "name": "datanodeDetails",
-                "type": "DatanodeDetailsProto"
+                "type": "DatanodeDetailsProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "nodeReport",
-                "type": "NodeReportProto"
+                "type": "NodeReportProto",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "containerReport",
-                "type": "ContainerReportsProto"
+                "type": "ContainerReportsProto",
+                "optional": true
               },
               {
                 "id": 4,
@@ -856,22 +939,49 @@
               {
                 "id": 6,
                 "name": "containerActions",
-                "type": "ContainerActionsProto"
+                "type": "ContainerActionsProto",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "pipelineActions",
-                "type": "PipelineActionsProto"
+                "type": "PipelineActionsProto",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "pipelineReports",
-                "type": "PipelineReportsProto"
+                "type": "PipelineReportsProto",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "dataNodeLayoutVersion",
-                "type": "LayoutVersionProto"
+                "type": "LayoutVersionProto",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "commandQueueReport",
+                "type": "CommandQueueReportProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CommandQueueReportProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "command",
+                "type": "SCMCommandProto.Type",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "count",
+                "type": "uint32",
+                "is_repeated": true
               }
             ]
           },
@@ -881,7 +991,8 @@
               {
                 "id": 1,
                 "name": "datanodeUUID",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -916,6 +1027,12 @@
                 "name": "metadataStorageReport",
                 "type": "MetadataStorageReportProto",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "dbStorageReport",
+                "type": "StorageReportProto",
+                "is_repeated": true
               }
             ]
           },
@@ -925,17 +1042,20 @@
               {
                 "id": 1,
                 "name": "storageUuid",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "storageLocation",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "capacity",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -947,6 +1067,7 @@
                 "id": 4,
                 "name": "scmUsed",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -958,6 +1079,7 @@
                 "id": 5,
                 "name": "remaining",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -969,6 +1091,7 @@
                 "id": 6,
                 "name": "storageType",
                 "type": "StorageTypeProto",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -980,6 +1103,7 @@
                 "id": 7,
                 "name": "failed",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -995,12 +1119,14 @@
               {
                 "id": 1,
                 "name": "storageLocation",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "storageType",
                 "type": "StorageTypeProto",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1012,6 +1138,7 @@
                 "id": 3,
                 "name": "capacity",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1023,6 +1150,7 @@
                 "id": 4,
                 "name": "scmUsed",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1034,6 +1162,7 @@
                 "id": 5,
                 "name": "remaining",
                 "type": "uint64",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1045,6 +1174,7 @@
                 "id": 6,
                 "name": "failed",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1082,67 +1212,86 @@
               {
                 "id": 1,
                 "name": "containerID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "state",
-                "type": "State"
+                "type": "State",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "size",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "used",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "keyCount",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "readCount",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "writeCount",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "readBytes",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "writeBytes",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "finalhash",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "deleteTransactionId",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "blockCommitSequenceId",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "originNodeId",
-                "type": "string"
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true
               }
             ]
           },
@@ -1163,12 +1312,14 @@
               {
                 "id": 1,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "status",
                 "type": "Status",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
@@ -1179,17 +1330,20 @@
               {
                 "id": 3,
                 "name": "type",
-                "type": "SCMCommandProto.Type"
+                "type": "SCMCommandProto.Type",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "msg",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "blockDeletionAck",
-                "type": "ContainerBlocksDeletionACKProto"
+                "type": "ContainerBlocksDeletionACKProto",
+                "optional": true
               }
             ]
           },
@@ -1210,17 +1364,20 @@
               {
                 "id": 1,
                 "name": "containerID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "action",
-                "type": "Action"
+                "type": "Action",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "reason",
-                "type": "Reason"
+                "type": "Reason",
+                "optional": true
               }
             ]
           },
@@ -1230,17 +1387,20 @@
               {
                 "id": 1,
                 "name": "pipelineID",
-                "type": "PipelineID"
+                "type": "PipelineID",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "isLeader",
-                "type": "bool"
+                "type": "bool",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "bytesWritten",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -1272,17 +1432,20 @@
               {
                 "id": 1,
                 "name": "pipelineID",
-                "type": "PipelineID"
+                "type": "PipelineID",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "reason",
-                "type": "Reason"
+                "type": "Reason",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "detailedReason",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -1292,12 +1455,14 @@
               {
                 "id": 1,
                 "name": "action",
-                "type": "Action"
+                "type": "Action",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "closePipeline",
-                "type": "ClosePipelineInfo"
+                "type": "ClosePipelineInfo",
+                "optional": true
               }
             ]
           },
@@ -1307,62 +1472,86 @@
               {
                 "id": 1,
                 "name": "commandType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "reregisterCommandProto",
-                "type": "ReregisterCommandProto"
+                "type": "ReregisterCommandProto",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "deleteBlocksCommandProto",
-                "type": "DeleteBlocksCommandProto"
+                "type": "DeleteBlocksCommandProto",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "closeContainerCommandProto",
-                "type": "CloseContainerCommandProto"
+                "type": "CloseContainerCommandProto",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "deleteContainerCommandProto",
-                "type": "DeleteContainerCommandProto"
+                "type": "DeleteContainerCommandProto",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "replicateContainerCommandProto",
-                "type": "ReplicateContainerCommandProto"
+                "type": "ReplicateContainerCommandProto",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "createPipelineCommandProto",
-                "type": "CreatePipelineCommandProto"
+                "type": "CreatePipelineCommandProto",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "closePipelineCommandProto",
-                "type": "ClosePipelineCommandProto"
+                "type": "ClosePipelineCommandProto",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "setNodeOperationalStateCommandProto",
-                "type": "SetNodeOperationalStateCommandProto"
+                "type": "SetNodeOperationalStateCommandProto",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "finalizeNewLayoutVersionCommandProto",
-                "type": "FinalizeNewLayoutVersionCommandProto"
+                "type": "FinalizeNewLayoutVersionCommandProto",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "refreshVolumeUsageCommandProto",
+                "type": "RefreshVolumeUsageCommandProto",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "reconstructECContainersCommandProto",
+                "type": "ReconstructECContainersCommandProto",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "term",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 16,
                 "name": "encodedToken",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -1381,7 +1570,8 @@
               {
                 "id": 3,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               }
             ]
           },
@@ -1391,12 +1581,14 @@
               {
                 "id": 1,
                 "name": "txID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "containerID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 3,
@@ -1407,7 +1599,8 @@
               {
                 "id": 4,
                 "name": "count",
-                "type": "int32"
+                "type": "int32",
+                "required": true
               }
             ]
           },
@@ -1423,7 +1616,8 @@
               {
                 "id": 2,
                 "name": "dnId",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ],
             "messages": [
@@ -1433,17 +1627,20 @@
                   {
                     "id": 1,
                     "name": "txID",
-                    "type": "int64"
+                    "type": "int64",
+                    "required": true
                   },
                   {
                     "id": 2,
                     "name": "containerID",
-                    "type": "int64"
+                    "type": "int64",
+                    "required": true
                   },
                   {
                     "id": 3,
                     "name": "success",
-                    "type": "bool"
+                    "type": "bool",
+                    "required": true
                   }
                 ]
               }
@@ -1455,22 +1652,26 @@
               {
                 "id": 1,
                 "name": "containerID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "pipelineID",
-                "type": "PipelineID"
+                "type": "PipelineID",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "force",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1486,23 +1687,32 @@
               {
                 "id": 1,
                 "name": "containerID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "force",
                 "type": "bool",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
                     "value": "false"
                   }
                 ]
+              },
+              {
+                "id": 4,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true
               }
             ]
           },
@@ -1512,7 +1722,8 @@
               {
                 "id": 1,
                 "name": "containerID",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
@@ -1523,7 +1734,72 @@
               {
                 "id": 3,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReconstructECContainersCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "sources",
+                "type": "DatanodeDetailsAndReplicaIndexProto",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "targets",
+                "type": "DatanodeDetailsProto",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "missingContainerIndexes",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "ecReplicationConfig",
+                "type": "ECReplicationConfig",
+                "required": true
+              },
+              {
+                "id": 6,
+                "name": "cmdId",
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeDetailsAndReplicaIndexProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "replicaIndex",
+                "type": "int32",
+                "required": true
               }
             ]
           },
@@ -1533,17 +1809,20 @@
               {
                 "id": 1,
                 "name": "pipelineID",
-                "type": "PipelineID"
+                "type": "PipelineID",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "type",
-                "type": "ReplicationType"
+                "type": "ReplicationType",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "factor",
-                "type": "ReplicationFactor"
+                "type": "ReplicationFactor",
+                "required": true
               },
               {
                 "id": 4,
@@ -1554,7 +1833,8 @@
               {
                 "id": 5,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 6,
@@ -1570,12 +1850,25 @@
               {
                 "id": 1,
                 "name": "pipelineID",
-                "type": "PipelineID"
+                "type": "PipelineID",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "RefreshVolumeUsageCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdId",
+                "type": "int64",
+                "required": true
               }
             ]
           },
@@ -1585,17 +1878,20 @@
               {
                 "id": 1,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "nodeOperationalState",
-                "type": "NodeOperationalState"
+                "type": "NodeOperationalState",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "stateExpiryEpochSeconds",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               }
             ]
           },
@@ -1605,7 +1901,8 @@
               {
                 "id": 1,
                 "name": "receivedCrlId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               },
               {
                 "id": 2,
@@ -1621,7 +1918,8 @@
               {
                 "id": 1,
                 "name": "crlInfo",
-                "type": "CRLInfoProto"
+                "type": "CRLInfoProto",
+                "required": true
               }
             ]
           },
@@ -1632,6 +1930,7 @@
                 "id": 1,
                 "name": "finalizeNewLayoutVersion",
                 "type": "bool",
+                "required": true,
                 "options": [
                   {
                     "name": "default",
@@ -1642,12 +1941,14 @@
               {
                 "id": 2,
                 "name": "dataNodeLayoutVersion",
-                "type": "LayoutVersionProto"
+                "type": "LayoutVersionProto",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "cmdId",
-                "type": "int64"
+                "type": "int64",
+                "required": true
               }
             ]
           }
@@ -1907,47 +2208,56 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "userInfo",
-                "type": "UserInfo"
+                "type": "UserInfo",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "version",
-                "type": "uint32"
+                "type": "uint32",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "allocateScmBlockRequest",
-                "type": "AllocateScmBlockRequestProto"
+                "type": "AllocateScmBlockRequestProto",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "deleteScmKeyBlocksRequest",
-                "type": "DeleteScmKeyBlocksRequestProto"
+                "type": "DeleteScmKeyBlocksRequestProto",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "getScmInfoRequest",
-                "type": "hadoop.hdds.GetScmInfoRequestProto"
+                "type": "hadoop.hdds.GetScmInfoRequestProto",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "sortDatanodesRequest",
-                "type": "SortDatanodesRequestProto"
+                "type": "SortDatanodesRequestProto",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "addScmRequestProto",
-                "type": "hadoop.hdds.AddScmRequestProto"
+                "type": "hadoop.hdds.AddScmRequestProto",
+                "optional": true
               }
             ]
           },
@@ -1957,17 +2267,20 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "success",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -1978,47 +2291,56 @@
               {
                 "id": 4,
                 "name": "message",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "status",
-                "type": "Status"
+                "type": "Status",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "leaderOMNodeId",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "leaderSCMNodeId",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "allocateScmBlockResponse",
-                "type": "AllocateScmBlockResponseProto"
+                "type": "AllocateScmBlockResponseProto",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "deleteScmKeyBlocksResponse",
-                "type": "DeleteScmKeyBlocksResponseProto"
+                "type": "DeleteScmKeyBlocksResponseProto",
+                "optional": true
               },
               {
                 "id": 13,
                 "name": "getScmInfoResponse",
-                "type": "hadoop.hdds.GetScmInfoResponseProto"
+                "type": "hadoop.hdds.GetScmInfoResponseProto",
+                "optional": true
               },
               {
                 "id": 14,
                 "name": "sortDatanodesResponse",
-                "type": "SortDatanodesResponseProto"
+                "type": "SortDatanodesResponseProto",
+                "optional": true
               },
               {
                 "id": 15,
                 "name": "addScmResponse",
-                "type": "hadoop.hdds.AddScmResponseProto"
+                "type": "hadoop.hdds.AddScmResponseProto",
+                "optional": true
               }
             ]
           },
@@ -2028,12 +2350,14 @@
               {
                 "id": 1,
                 "name": "userName",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "remoteAddress",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -2043,32 +2367,44 @@
               {
                 "id": 1,
                 "name": "size",
-                "type": "uint64"
+                "type": "uint64",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "numBlocks",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "type",
-                "type": "ReplicationType"
+                "type": "ReplicationType",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "factor",
-                "type": "hadoop.hdds.ReplicationFactor"
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "owner",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 7,
                 "name": "excludeList",
-                "type": "ExcludeListProto"
+                "type": "ExcludeListProto",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -2089,7 +2425,8 @@
               {
                 "id": 1,
                 "name": "key",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -2116,7 +2453,8 @@
               {
                 "id": 1,
                 "name": "objectKey",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -2132,12 +2470,14 @@
               {
                 "id": 1,
                 "name": "result",
-                "type": "Result"
+                "type": "Result",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "blockID",
-                "type": "BlockID"
+                "type": "BlockID",
+                "required": true
               }
             ]
           },
@@ -2147,12 +2487,14 @@
               {
                 "id": 1,
                 "name": "containerBlockID",
-                "type": "ContainerBlockID"
+                "type": "ContainerBlockID",
+                "optional": true
               },
               {
                 "id": 2,
                 "name": "pipeline",
-                "type": "hadoop.hdds.Pipeline"
+                "type": "hadoop.hdds.Pipeline",
+                "optional": true
               }
             ]
           },
@@ -2173,7 +2515,8 @@
               {
                 "id": 1,
                 "name": "client",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 2,
@@ -2285,6 +2628,10 @@
               {
                 "name": "RevokeCertificates",
                 "integer": 11
+              },
+              {
+                "name": "GetCert",
+                "integer": 12
               }
             ]
           },
@@ -2443,62 +2790,80 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "getDataNodeCertRequest",
-                "type": "SCMGetDataNodeCertRequestProto"
+                "type": "SCMGetDataNodeCertRequestProto",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "getOMCertRequest",
-                "type": "SCMGetOMCertRequestProto"
+                "type": "SCMGetOMCertRequestProto",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "getCertificateRequest",
-                "type": "SCMGetCertificateRequestProto"
+                "type": "SCMGetCertificateRequestProto",
+                "optional": true
               },
               {
                 "id": 6,
                 "name": "getCACertificateRequest",
-                "type": "SCMGetCACertificateRequestProto"
+                "type": "SCMGetCACertificateRequestProto",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "listCertificateRequest",
-                "type": "SCMListCertificateRequestProto"
+                "type": "SCMListCertificateRequestProto",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "getSCMCertificateRequest",
-                "type": "SCMGetSCMCertRequestProto"
+                "type": "SCMGetSCMCertRequestProto",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "listCACertificateRequestProto",
-                "type": "SCMListCACertificateRequestProto"
+                "type": "SCMListCACertificateRequestProto",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "getCrlsRequest",
-                "type": "SCMGetCrlsRequestProto"
+                "type": "SCMGetCrlsRequestProto",
+                "optional": true
               },
               {
                 "id": 11,
                 "name": "getLatestCrlIdRequest",
-                "type": "SCMGetLatestCrlIdRequestProto"
+                "type": "SCMGetLatestCrlIdRequestProto",
+                "optional": true
               },
               {
                 "id": 12,
                 "name": "revokeCertificatesRequest",
-                "type": "SCMRevokeCertificatesRequestProto"
+                "type": "SCMRevokeCertificatesRequestProto",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "getCertRequest",
+                "type": "SCMGetCertRequestProto",
+                "optional": true
               }
             ]
           },
@@ -2508,17 +2873,20 @@
               {
                 "id": 1,
                 "name": "cmdType",
-                "type": "Type"
+                "type": "Type",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "traceID",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "success",
                 "type": "bool",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -2529,37 +2897,44 @@
               {
                 "id": 4,
                 "name": "message",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 5,
                 "name": "status",
-                "type": "Status"
+                "type": "Status",
+                "required": true
               },
               {
                 "id": 6,
                 "name": "getCertResponseProto",
-                "type": "SCMGetCertResponseProto"
+                "type": "SCMGetCertResponseProto",
+                "optional": true
               },
               {
                 "id": 7,
                 "name": "listCertificateResponseProto",
-                "type": "SCMListCertificateResponseProto"
+                "type": "SCMListCertificateResponseProto",
+                "optional": true
               },
               {
                 "id": 8,
                 "name": "getCrlsResponseProto",
-                "type": "SCMGetCrlsResponseProto"
+                "type": "SCMGetCrlsResponseProto",
+                "optional": true
               },
               {
                 "id": 9,
                 "name": "getLatestCrlIdResponseProto",
-                "type": "SCMGetLatestCrlIdResponseProto"
+                "type": "SCMGetLatestCrlIdResponseProto",
+                "optional": true
               },
               {
                 "id": 10,
                 "name": "revokeCertificatesResponseProto",
-                "type": "SCMRevokeCertificatesResponseProto"
+                "type": "SCMRevokeCertificatesResponseProto",
+                "optional": true
               }
             ]
           },
@@ -2569,12 +2944,14 @@
               {
                 "id": 1,
                 "name": "datanodeDetails",
-                "type": "DatanodeDetailsProto"
+                "type": "DatanodeDetailsProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "CSR",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2584,12 +2961,31 @@
               {
                 "id": 1,
                 "name": "omDetails",
-                "type": "OzoneManagerDetailsProto"
+                "type": "OzoneManagerDetailsProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "CSR",
-                "type": "string"
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCertRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeDetails",
+                "type": "NodeDetailsProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "CSR",
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2599,12 +2995,14 @@
               {
                 "id": 1,
                 "name": "scmDetails",
-                "type": "ScmNodeDetailsProto"
+                "type": "ScmNodeDetailsProto",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "CSR",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2614,7 +3012,8 @@
               {
                 "id": 1,
                 "name": "certSerialId",
-                "type": "string"
+                "type": "string",
+                "required": true
               }
             ]
           },
@@ -2627,22 +3026,26 @@
               {
                 "id": 1,
                 "name": "role",
-                "type": "NodeType"
+                "type": "NodeType",
+                "optional": true
               },
               {
                 "id": 2,
                 "name": "startCertId",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               },
               {
                 "id": 3,
                 "name": "count",
-                "type": "uint32"
+                "type": "uint32",
+                "required": true
               },
               {
                 "id": 4,
                 "name": "isRevoked",
-                "type": "bool"
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -2652,22 +3055,26 @@
               {
                 "id": 1,
                 "name": "responseCode",
-                "type": "ResponseCode"
+                "type": "ResponseCode",
+                "required": true
               },
               {
                 "id": 2,
                 "name": "x509Certificate",
-                "type": "string"
+                "type": "string",
+                "required": true
               },
               {
                 "id": 3,
                 "name": "x509CACertificate",
-                "type": "string"
+                "type": "string",
+                "optional": true
               },
               {
                 "id": 4,
                 "name": "x509RootCACertificate",
-                "type": "string"
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -2677,7 +3084,8 @@
               {
                 "id": 1,
                 "name": "responseCode",
-                "type": "ResponseCode"
+                "type": "ResponseCode",
+                "required": true
               },
               {
                 "id": 2,
@@ -2724,7 +3132,8 @@
               {
                 "id": 1,
                 "name": "crlId",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -2741,6 +3150,7 @@
                 "id": 2,
                 "name": "reason",
                 "type": "Reason",
+                "optional": true,
                 "options": [
                   {
                     "name": "default",
@@ -2751,7 +3161,8 @@
               {
                 "id": 3,
                 "name": "revokeTime",
-                "type": "uint64"
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -2761,7 +3172,8 @@
               {
                 "id": 1,
                 "name": "crlId",
-                "type": "int64"
+                "type": "int64",
+                "optional": true
               }
             ]
           }

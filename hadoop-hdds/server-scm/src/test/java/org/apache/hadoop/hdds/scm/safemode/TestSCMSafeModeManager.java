@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +41,6 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -54,24 +55,23 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.junit.After;
-import org.junit.Assert;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /** Test class for SCMSafeModeManager.
  */
+@Timeout(300)
 public class TestSCMSafeModeManager {
 
   private EventQueue queue;
@@ -81,32 +81,22 @@ public class TestSCMSafeModeManager {
   private OzoneConfiguration config;
   private List<ContainerInfo> containers = Collections.emptyList();
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
-
   private SCMMetadataStore scmMetadataStore;
 
-  @Before
-  public void setUp() {
+  @BeforeEach
+  public void setUp(@TempDir Path tempDir) throws IOException {
     queue = new EventQueue();
     scmContext = SCMContext.emptyContext();
     serviceManager = new SCMServiceManager();
     config = new OzoneConfiguration();
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
-  }
-
-  @Before
-  public void initDbStore() throws IOException {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.newFolder().getAbsolutePath());
+        tempDir.toAbsolutePath().toString());
     scmMetadataStore = new SCMMetadataStoreImpl(config);
   }
 
-  @After
+  @AfterEach
   public void destroyDbStore() throws Exception {
     if (scmMetadataStore.getStore() != null) {
       scmMetadataStore.getStore().close();
@@ -132,9 +122,10 @@ public class TestSCMSafeModeManager {
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(numContainers));
 
-    // Currently only considered containers which are not in open state.
+    // Currently, only considered containers which are not in open state.
     for (ContainerInfo container : containers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, null, queue,
@@ -148,14 +139,13 @@ public class TestSCMSafeModeManager {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT));
 
-    Assert.assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getNumContainerWithOneReplicaReportedThreshold().value());
 
-    GenericTestUtils.waitFor(() -> {
-      return !scmSafeModeManager.getInSafeMode();
-    }, 100, 1000 * 5);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 5);
 
-    Assert.assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
 
   }
@@ -169,6 +159,7 @@ public class TestSCMSafeModeManager {
     // container list
     for (ContainerInfo container : containers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, null, queue,
@@ -178,38 +169,35 @@ public class TestSCMSafeModeManager {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT));
 
-    Assert.assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getNumContainerWithOneReplicaReportedThreshold().value());
 
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     testContainerThreshold(containers.subList(0, 25), 0.25);
-    Assert.assertEquals(25, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(25, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
     assertTrue(scmSafeModeManager.getInSafeMode());
     testContainerThreshold(containers.subList(25, 50), 0.50);
-    Assert.assertEquals(50, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(50, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
     assertTrue(scmSafeModeManager.getInSafeMode());
     testContainerThreshold(containers.subList(50, 75), 0.75);
-    Assert.assertEquals(75, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(75, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
     assertTrue(scmSafeModeManager.getInSafeMode());
     testContainerThreshold(containers.subList(75, 100), 1.0);
-    Assert.assertEquals(100, scmSafeModeManager.getSafeModeMetrics()
+    assertEquals(100, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
 
-    GenericTestUtils.waitFor(() -> {
-      return !scmSafeModeManager.getInSafeMode();
-    }, 100, 1000 * 5);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 5);
   }
 
 
   private OzoneConfiguration createConf(double healthyPercent,
-      double oneReplicaPercent) throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.newFolder().toString());
+      double oneReplicaPercent) {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         true);
@@ -217,7 +205,6 @@ public class TestSCMSafeModeManager {
         HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, healthyPercent);
     conf.setDouble(HddsConfigKeys.
         HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, oneReplicaPercent);
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     return conf;
   }
 
@@ -267,7 +254,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -294,7 +281,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -320,7 +307,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -353,8 +340,8 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
-    PipelineProvider mockRatisProvider =
+            Clock.system(ZoneOffset.UTC));
+    PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
@@ -394,11 +381,11 @@ public class TestSCMSafeModeManager {
         scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
             .getThresholdCount();
 
-    Assert.assertEquals(healthyPipelineThresholdCount,
+    assertEquals(healthyPipelineThresholdCount,
         scmSafeModeManager.getSafeModeMetrics()
             .getNumHealthyPipelinesThreshold().value());
 
-    Assert.assertEquals(oneReplicaThresholdCount,
+    assertEquals(oneReplicaThresholdCount,
         scmSafeModeManager.getSafeModeMetrics()
             .getNumPipelinesWithAtleastOneReplicaReportedThreshold().value());
 
@@ -415,31 +402,30 @@ public class TestSCMSafeModeManager {
 
       if (i < healthyPipelineThresholdCount) {
         checkHealthy(i + 1);
-        Assert.assertEquals(i + 1,
+        assertEquals(i + 1,
             scmSafeModeManager.getSafeModeMetrics()
                 .getCurrentHealthyPipelinesCount().value());
       }
 
       if (i < oneReplicaThresholdCount) {
         checkOpen(i + 1);
-        Assert.assertEquals(i + 1,
+        assertEquals(i + 1,
             scmSafeModeManager.getSafeModeMetrics()
                 .getCurrentPipelinesWithAtleastOneReplicaCount().value());
       }
     }
 
-    Assert.assertEquals(healthyPipelineThresholdCount,
+    assertEquals(healthyPipelineThresholdCount,
         scmSafeModeManager.getSafeModeMetrics()
             .getCurrentHealthyPipelinesCount().value());
 
-    Assert.assertEquals(oneReplicaThresholdCount,
+    assertEquals(oneReplicaThresholdCount,
         scmSafeModeManager.getSafeModeMetrics()
             .getCurrentPipelinesWithAtleastOneReplicaCount().value());
 
 
-    GenericTestUtils.waitFor(() -> {
-      return !scmSafeModeManager.getInSafeMode();
-    }, 100, 1000 * 5);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 5);
   }
 
   private void checkHealthy(int expectedCount) throws Exception {
@@ -486,7 +472,7 @@ public class TestSCMSafeModeManager {
 
 
   @Test
-  public void testDisableSafeMode() throws IOException {
+  public void testDisableSafeMode() {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
@@ -514,13 +500,20 @@ public class TestSCMSafeModeManager {
     containers = new ArrayList<>();
     // Add 100 containers to the list of containers in SCM
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
-    // Assign CLOSED state to first 25 containers and OPEM state to rest
-    // of the containers
+    // Assign CLOSED state to first 25 containers and OPEN state to rest
+    // of the containers. Set container key count = 10 in each container.
     for (ContainerInfo container : containers.subList(0, 25)) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     for (ContainerInfo container : containers.subList(25, 100)) {
       container.setState(HddsProtos.LifeCycleState.OPEN);
+      container.setNumberOfKeys(10);
+    }
+
+    // Set the last 5 closed containers to be empty
+    for (ContainerInfo container : containers.subList(20, 25)) {
+      container.setNumberOfKeys(0);
     }
 
     scmSafeModeManager = new SCMSafeModeManager(
@@ -529,19 +522,19 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     // When 10 CLOSED containers are reported by DNs, the computed container
-    // threshold should be 10/25 as there are only 25 CLOSED containers.
+    // threshold should be 10/20 as there are only 20 CLOSED NON-EMPTY
+    // containers.
     // Containers in OPEN state should not contribute towards list of
     // containers while calculating container threshold in SCMSafeNodeManager
-    testContainerThreshold(containers.subList(0, 10), 0.4);
+    testContainerThreshold(containers.subList(0, 10), 0.5);
     assertTrue(scmSafeModeManager.getInSafeMode());
 
-    // When remaining 15 OPEN containers are reported by DNs, the container
-    // threshold should be (10+15)/25.
+    // When remaining 10 CLOSED NON-EMPTY containers are reported by DNs,
+    // the container threshold should be (10+10)/20.
     testContainerThreshold(containers.subList(10, 25), 1.0);
 
-    GenericTestUtils.waitFor(() -> {
-      return !scmSafeModeManager.getInSafeMode();
-    }, 100, 1000 * 5);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 5);
   }
 
   private void testSafeModeDataNodes(int numOfDns) throws Exception {
@@ -559,21 +552,19 @@ public class TestSCMSafeModeManager {
       queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
           HddsTestUtils.createNodeRegistrationContainerReport(containers));
       assertTrue(scmSafeModeManager.getInSafeMode());
-      assertTrue(scmSafeModeManager.getCurrentContainerThreshold() == 1);
+      assertEquals(1, scmSafeModeManager.getCurrentContainerThreshold());
     }
 
     if (numOfDns == 0) {
-      GenericTestUtils.waitFor(() -> {
-        return scmSafeModeManager.getInSafeMode();
-      }, 10, 1000 * 10);
+      GenericTestUtils.waitFor(() -> scmSafeModeManager.getInSafeMode(),
+          10, 1000 * 10);
       return;
     }
     // Register last DataNode and check that SCM is out of Safe mode.
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
-    GenericTestUtils.waitFor(() -> {
-      return !scmSafeModeManager.getInSafeMode();
-    }, 10, 1000 * 10);
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        10, 1000 * 10);
   }
 
   private void testContainerThreshold(List<ContainerInfo> dnContainers,
@@ -609,9 +600,9 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
-      PipelineProvider mockRatisProvider =
+      PipelineProvider<RatisReplicationConfig> mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
@@ -634,9 +625,8 @@ public class TestSCMSafeModeManager {
 
       firePipelineEvent(pipelineManager, pipeline);
 
-      GenericTestUtils.waitFor(() -> {
-        return !scmSafeModeManager.getInSafeMode();
-      }, 100, 1000 * 10);
+      GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+          100, 1000 * 10);
       pipelineManager.close();
     } finally {
       config.setBoolean(
@@ -647,7 +637,6 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
-  @Ignore("The test is failing, enable after fixing it")
   public void testPipelinesNotCreatedUntilPreCheckPasses()
       throws Exception {
     int numOfDns = 5;
@@ -675,22 +664,24 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
 
-    PipelineProvider mockRatisProvider =
+    PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), config);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
 
-    SafeModeEventHandler smHandler = new SafeModeEventHandler();
-    queue.addHandler(SCMEvents.SAFE_MODE_STATUS, smHandler);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, pipelineManager, queue, serviceManager,
         scmContext);
 
     // Assert SCM is in Safe mode.
     assertTrue(scmSafeModeManager.getInSafeMode());
+
+    // stop background pipeline creator as we manually create
+    // pipeline below
+    pipelineManager.getBackgroundPipelineCreator().stop();
 
     // Register all DataNodes except last one and assert SCM is in safe mode.
     for (int i = 0; i < numOfDns - 1; i++) {
@@ -700,32 +691,18 @@ public class TestSCMSafeModeManager {
       assertFalse(scmSafeModeManager.getPreCheckComplete());
     }
     queue.processAll(5000);
-    Assert.assertEquals(0, smHandler.getInvokedCount());
 
     // Register last DataNode and check that the SafeModeEvent gets fired, but
-    // safemode is still enabled with preCheck completed.
+    // SafeMode is still enabled with preCheck completed.
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
     queue.processAll(5000);
 
-    Assert.assertEquals(1, smHandler.getInvokedCount());
-    Assert.assertEquals(true, smHandler.getPreCheckComplete());
-    Assert.assertEquals(true, smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertTrue(scmSafeModeManager.getInSafeMode());
 
-    /* There is a race condition where the background pipeline creation
-     * task creates the pipeline before the following create call.
-     * So wrapping it with try..catch.
-     */
-    Pipeline pipeline;
-    try {
-      pipeline = pipelineManager.createPipeline(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
-    } catch (SCMException ex) {
-      pipeline = pipelineManager.getPipelines(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE)).get(0);
-    }
+    Pipeline pipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
     // Mark pipeline healthy
     pipeline = pipelineManager.getPipeline(pipeline.getId());
@@ -734,9 +711,8 @@ public class TestSCMSafeModeManager {
     firePipelineEvent(pipelineManager, pipeline);
 
     queue.processAll(5000);
-    Assert.assertEquals(2, smHandler.getInvokedCount());
-    Assert.assertEquals(true, smHandler.getPreCheckComplete());
-    Assert.assertEquals(false, smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertFalse(scmSafeModeManager.getInSafeMode());
   }
 
   private static class SafeModeEventHandler

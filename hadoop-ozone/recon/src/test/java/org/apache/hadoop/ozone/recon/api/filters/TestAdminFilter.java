@@ -27,9 +27,11 @@ import org.apache.hadoop.ozone.recon.api.MetricsProxyEndpoint;
 import org.apache.hadoop.ozone.recon.api.NodeEndpoint;
 import org.apache.hadoop.ozone.recon.api.PipelineEndpoint;
 import org.apache.hadoop.ozone.recon.api.TaskStatusService;
+import org.apache.hadoop.ozone.recon.api.TriggerDBSyncEndpoint;
 import org.apache.hadoop.ozone.recon.api.UtilizationEndpoint;
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -62,7 +64,7 @@ public class TestAdminFilter {
     Set<Class<?>> allEndpoints =
         reflections.getTypesAnnotatedWith(Path.class);
 
-    Assert.assertFalse(allEndpoints.isEmpty());
+    Assertions.assertFalse(allEndpoints.isEmpty());
 
     // If an endpoint is added, it must be explicitly added to this set or be
     // marked with @AdminOnly for this test to pass.
@@ -73,24 +75,23 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(NodeEndpoint.class);
     nonAdminEndpoints.add(PipelineEndpoint.class);
     nonAdminEndpoints.add(TaskStatusService.class);
+    nonAdminEndpoints.add(TriggerDBSyncEndpoint.class);
 
-    Assert.assertTrue(allEndpoints.containsAll(nonAdminEndpoints));
+    Assertions.assertTrue(allEndpoints.containsAll(nonAdminEndpoints));
 
     Set<Class<?>> adminEndpoints = Sets.difference(allEndpoints,
         nonAdminEndpoints);
 
     for (Class<?> endpoint: nonAdminEndpoints) {
-      Assert.assertFalse(String.format("Endpoint class %s has been " +
-              "declared as non admin in this test, but is marked as " +
-              "@AdminOnly.", endpoint),
-          endpoint.isAnnotationPresent(AdminOnly.class));
+      Assertions.assertFalse(endpoint.isAnnotationPresent(AdminOnly.class),
+          String.format("Endpoint class %s has been declared as non admin " +
+              "in this test, but is marked as @AdminOnly.", endpoint));
     }
 
     for (Class<?> endpoint: adminEndpoints) {
-      Assert.assertTrue(String.format("Endpoint class %s must be marked as " +
-              "@AdminOnly or explicitly declared as non admin in this test.",
-          endpoint),
-          endpoint.isAnnotationPresent(AdminOnly.class));
+      Assertions.assertTrue(endpoint.isAnnotationPresent(AdminOnly.class),
+          String.format("Endpoint class %s must be marked as @AdminOnly " +
+              "or explicitly declared as non admin in this test.", endpoint));
     }
   }
 
@@ -104,6 +105,17 @@ public class TestAdminFilter {
     conf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD);
     testAdminFilterWithPrincipal(conf, "other", true);
+
+    UserGroupInformation.createUserForTesting("user1",
+        new String[]{"admingroup"});
+    try {
+      conf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS, "ozone");
+      conf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
+          "admingroup");
+      testAdminFilterWithPrincipal(conf, "user1", true);
+    } finally {
+      UserGroupInformation.reset();
+    }
   }
 
   @Test
@@ -116,6 +128,17 @@ public class TestAdminFilter {
     conf.setStrings(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS,
         OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD);
     testAdminFilterWithPrincipal(conf, "other", true);
+
+    UserGroupInformation.createUserForTesting("user1",
+        new String[]{"reconadmingroup"});
+    try {
+      conf.setStrings(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS, "recon");
+      conf.setStrings(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS,
+          "reconadmingroup");
+      testAdminFilterWithPrincipal(conf, "user1", true);
+    } finally {
+      UserGroupInformation.reset();
+    }
   }
 
   @Test

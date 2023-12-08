@@ -24,7 +24,7 @@
 <div class="container-fluid">
     <div class="row">
         {{ partial "sidebar.html" . }}
-        <div class="col-sm-10 col-sm-offset-2 col-md-10 col-md-offset-2 main">
+        <div class="col-sm-10 col-sm-offset-2 col-md-10 col-md-offset-2 main-content">
             <div class="col-md-9">
 
                 {{ partial "languages.html" .}}
@@ -36,7 +36,8 @@
                 {{ .Content }}
                 {{.Params.card}}
                 {{ if not (eq .Params.cards "false")}}
-                {{ range $page_index, $page_val := .Pages }}
+                {{ $pagesToShow := where .Pages "Params.hideFromSectionPage" "!=" "true" }}
+                {{ range $page_index, $page_val := $pagesToShow }}
 
                 {{ $page_count := len .Pages }}
                 {{if (eq (mod $page_index 2) 0)}}

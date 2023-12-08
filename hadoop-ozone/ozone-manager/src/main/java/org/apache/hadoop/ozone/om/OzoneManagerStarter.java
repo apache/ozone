@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -51,6 +52,8 @@ public class OzoneManagerStarter extends GenericCli {
       LoggerFactory.getLogger(OzoneManagerStarter.class);
 
   public static void main(String[] args) throws Exception {
+    OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+            new OzoneConfiguration());
     new OzoneManagerStarter(
         new OzoneManagerStarter.OMStarterHelper()).run(args);
   }
@@ -170,7 +173,7 @@ public class OzoneManagerStarter extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        OzoneManager.class, originalArgs, LOG);
+        OzoneManager.class, originalArgs, LOG, conf);
   }
 
   /**
@@ -187,8 +190,9 @@ public class OzoneManagerStarter extends GenericCli {
       om.start();
       ShutdownHookManager.get().addShutdownHook(() -> {
         try {
-          om.stop();
-          om.join();
+          if (om.stop()) {
+            om.join();
+          }
         } catch (Exception e) {
           LOG.error("Error during stop OzoneManager.", e);
         }

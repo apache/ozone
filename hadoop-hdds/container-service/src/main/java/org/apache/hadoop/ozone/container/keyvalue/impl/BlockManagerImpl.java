@@ -24,17 +24,13 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -62,7 +58,8 @@ public class BlockManagerImpl implements BlockManager {
       "Unable to find the block.";
 
   // Default Read Buffer capacity when Checksum is not present
-  private final long defaultReadBufferCapacity;
+  private final int defaultReadBufferCapacity;
+  private final int readMappedBufferThreshold;
 
   /**
    * Constructs a Block Manager.
@@ -72,34 +69,19 @@ public class BlockManagerImpl implements BlockManager {
   public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
-    this.defaultReadBufferCapacity = (long) config.getStorageSize(
+    this.defaultReadBufferCapacity = config.getBufferSize(
         ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY,
-        ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT,
-        StorageUnit.BYTES);
+        ScmConfigKeys.OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT);
+    this.readMappedBufferThreshold = config.getBufferSize(
+        ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY,
+        ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT);
   }
 
-  /**
-   * Puts or overwrites a block.
-   *
-   * @param container - Container for which block need to be added.
-   * @param data     - BlockData.
-   * @return length of the block.
-   * @throws IOException
-   */
   @Override
   public long putBlock(Container container, BlockData data) throws IOException {
     return putBlock(container, data, true);
   }
-  /**
-   * Puts or overwrites a block.
-   *
-   * @param container - Container for which block need to be added.
-   * @param data - BlockData.
-   * @param endOfBlock - The last putBlock call for this block (when
-   *                   all the chunks are written and stream is closed)
-   * @return length of the block.
-   * @throws IOException
-   */
+
   @Override
   public long putBlock(Container container, BlockData data,
       boolean endOfBlock) throws IOException {
@@ -117,17 +99,18 @@ public class BlockManagerImpl implements BlockManager {
         "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
         "cannot be negative");
+
+    KeyValueContainerData containerData = container.getContainerData();
+
     // We are not locking the key manager since LevelDb serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
-    try (ReferenceCountedDB db = BlockUtils.
-        getDB(container.getContainerData(), config)) {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
 
       long bcsId = data.getBlockCommitSequenceId();
-      long containerBCSId = container.
-          getContainerData().getBlockCommitSequenceId();
+      long containerBCSId = containerData.getBlockCommitSequenceId();
 
       // default blockCommitSequenceId for any block is 0. It the putBlock
       // request is not coming via Ratis(for test scenarios), it will be 0.
@@ -160,7 +143,7 @@ public class BlockManagerImpl implements BlockManager {
         // If block exists in cache, blockCount should not be incremented.
         if (!isBlockInCache) {
           if (db.getStore().getBlockDataTable().get(
-              Long.toString(localID)) == null) {
+              containerData.getBlockKey(localID)) == null) {
             // Block does not exist in DB => blockCount needs to be
             // incremented when the block is added into DB.
             incrBlockCount = true;
@@ -168,10 +151,10 @@ public class BlockManagerImpl implements BlockManager {
         }
 
         db.getStore().getBlockDataTable().putWithBatch(
-            batch, Long.toString(localID), data);
+            batch, containerData.getBlockKey(localID), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
+              batch, containerData.getBcsIdKey(), bcsId);
         }
 
         // Set Bytes used, this bytes used will be updated for every write and
@@ -181,14 +164,14 @@ public class BlockManagerImpl implements BlockManager {
         // is only used to compute the bytes used. This is done to keep the
         // current behavior and avoid DB write during write chunk operation.
         db.getStore().getMetadataTable().putWithBatch(
-            batch, OzoneConsts.CONTAINER_BYTES_USED,
-            container.getContainerData().getBytesUsed());
+            batch, containerData.getBytesUsedKey(),
+            containerData.getBytesUsed());
 
         // Set Block Count for a container.
         if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.BLOCK_COUNT,
-              container.getContainerData().getBlockCount() + 1);
+              batch, containerData.getBlockCountKey(),
+              containerData.getBlockCount() + 1);
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -201,7 +184,7 @@ public class BlockManagerImpl implements BlockManager {
       // Increment block count and add block to pendingPutBlockCache
       // in-memory after the DB update.
       if (incrBlockCount) {
-        container.getContainerData().incrBlockCount();
+        containerData.incrBlockCount();
       }
 
       // If the Block is not in PendingPutBlockCache (and it is not endOfBlock),
@@ -224,14 +207,6 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  /**
-   * Gets an existing block.
-   *
-   * @param container - Container from which block need to be fetched.
-   * @param blockID - BlockID of the block.
-   * @return Key Data.
-   * @throws IOException
-   */
   @Override
   public BlockData getBlock(Container container, BlockID blockID)
       throws IOException {
@@ -247,15 +222,15 @@ public class BlockManagerImpl implements BlockManager {
     if (containerBCSId < bcsId) {
       throw new StorageContainerException(
           "Unable to find the block with bcsID " + bcsId + " .Container "
-              + container.getContainerData().getContainerID() + " bcsId is "
+              + containerData.getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
     }
 
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      BlockData blockData = getBlockByID(db, blockID);
+      BlockData blockData = getBlockByID(db, blockID, containerData);
       long id = blockData.getBlockID().getBlockCommitSequenceId();
       if (id < bcsId) {
         throw new StorageContainerException(
@@ -266,35 +241,36 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
-  /**
-   * Returns the length of the committed block.
-   *
-   * @param container - Container from which block need to be fetched.
-   * @param blockID - BlockID of the block.
-   * @return length of the block.
-   * @throws IOException in case, the block key does not exist in db.
-   */
   @Override
   public long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      BlockData blockData = getBlockByID(db, blockID);
+      BlockData blockData = getBlockByID(db, blockID, containerData);
       return blockData.getSize();
     }
   }
 
   @Override
-  public long getDefaultReadBufferCapacity() {
+  public int getDefaultReadBufferCapacity() {
     return defaultReadBufferCapacity;
+  }
+
+  public int getReadMappedBufferThreshold() {
+    return readMappedBufferThreshold;
   }
 
   /**
    * Deletes an existing block.
+   * As Deletion is handled by BlockDeletingService,
+   * UnsupportedOperationException is thrown always
+   *
+   * @param container - Container from which block need to be deleted.
+   * @param blockID - ID of the block.
    */
   @Override
   public void deleteBlock(Container container, BlockID blockID) throws
@@ -305,14 +281,6 @@ public class BlockManagerImpl implements BlockManager {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * List blocks in a container.
-   *
-   * @param container - Container from which blocks need to be listed.
-   * @param startLocalID  - Key to start from, 0 to begin.
-   * @param count    - Number of blocks to return.
-   * @return List of Blocks that match the criteria.
-   */
   @Override
   public List<BlockData> listBlock(Container container, long startLocalID, int
       count) throws IOException {
@@ -326,13 +294,14 @@ public class BlockManagerImpl implements BlockManager {
       List<BlockData> result = null;
       KeyValueContainerData cData =
           (KeyValueContainerData) container.getContainerData();
-      try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
+      try (DBHandle db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
+        String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
+            : cData.getBlockKey(startLocalID);
         List<? extends Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
-                .getSequentialRangeKVs(startLocalID == -1 ? null :
-                        Long.toString(startLocalID), count,
-                    MetadataKeyFilters.getUnprefixedKeyFilter());
+                .getSequentialRangeKVs(startKey, count,
+                    cData.containerPrefix(), cData.getUnprefixedKeyFilter());
         for (Table.KeyValue<String, BlockData> entry : range) {
           result.add(entry.getValue());
         }
@@ -348,17 +317,17 @@ public class BlockManagerImpl implements BlockManager {
    */
   @Override
   public void shutdown() {
-    BlockUtils.shutdownCache(ContainerCache.getInstance(config));
+    BlockUtils.shutdownCache(config);
   }
 
-  private BlockData getBlockByID(ReferenceCountedDB db, BlockID blockID)
-      throws IOException {
-    String blockKey = Long.toString(blockID.getLocalID());
+  private BlockData getBlockByID(DBHandle db, BlockID blockID,
+      KeyValueContainerData containerData) throws IOException {
+    String blockKey = containerData.getBlockKey(blockID.getLocalID());
 
     BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
     if (blockData == null) {
-      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
-          NO_SUCH_BLOCK);
+      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG +
+              " BlockID : " + blockID, NO_SUCH_BLOCK);
     }
 
     return blockData;

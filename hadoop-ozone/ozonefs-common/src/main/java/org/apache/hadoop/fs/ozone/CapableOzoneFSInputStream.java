@@ -33,8 +33,8 @@ final class CapableOzoneFSInputStream extends OzoneFSInputStream
   @Override
   public boolean hasCapability(String capability) {
     switch (StringUtils.toLowerCase(capability)) {
-    case OzoneStreamCapabilities.READBYTEBUFFER:
-    case OzoneStreamCapabilities.UNBUFFER:
+    case StreamCapabilities.READBYTEBUFFER:
+    case StreamCapabilities.UNBUFFER:
       return true;
     default:
       return false;

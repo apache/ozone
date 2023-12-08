@@ -18,19 +18,25 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.StandardOutputTestBase;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
 
 import java.io.UnsupportedEncodingException;
 import java.util.UUID;
@@ -50,6 +56,10 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static String volumeName;
   private static String bucketOBS;
   private static String bucketFSO;
+  private static OzoneClient client;
+
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(60));
 
   @BeforeClass
   public static void init() throws Exception {
@@ -59,7 +69,8 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes().includeRecon(true).build();
     cluster.waitForClusterToBeReady();
-    store = cluster.getClient().getObjectStore();
+    client = cluster.newClient();
+    store = client.getObjectStore();
 
     // Client uses server conf for this test
     ozoneAdmin = new OzoneAdmin(conf);
@@ -72,6 +83,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
 
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -102,7 +114,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   /**
    * Test NSSummaryCLI on root path.
    */
-  @Test(timeout = 60000)
+  @Test
   public void testNSSummaryCLIRoot() throws UnsupportedEncodingException {
     // Running on root path.
     String path = "/";
@@ -110,7 +122,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Should throw warning - only buckets can have bucket layout.
     Assert.assertTrue(
         getOutContentString().contains(
-            "[Warning] Namespace CLI is only designed for FSO mode."));
+            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
     Assert.assertTrue(getOutContentString()
         .contains("Put more files into it to visualize DU"));
     Assert.assertTrue(getOutContentString().contains(
@@ -120,7 +132,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   /**
    * Test NSSummaryCLI on FILE_SYSTEM_OPTIMIZED bucket.
    */
-  @Test(timeout = 60000)
+  @Test
   public void testNSSummaryCLIFSO() throws UnsupportedEncodingException {
     // Running on FSO Bucket.
     String path = "/" + volumeName + "/" + bucketFSO;
@@ -128,7 +140,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Should not throw warning, since bucket is in FSO bucket layout.
     Assert.assertFalse(
         getOutContentString().contains(
-            "[Warning] Namespace CLI is only designed for FSO mode."));
+            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
     Assert.assertTrue(getOutContentString()
         .contains("Put more files into it to visualize DU"));
     Assert.assertTrue(getOutContentString().contains(
@@ -138,7 +150,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   /**
    * Test NSSummaryCLI on OBJECT_STORE bucket.
    */
-  @Test(timeout = 60000)
+  @Test
   public void testNSSummaryCLIOBS() throws UnsupportedEncodingException {
     // Running on OBS Bucket.
     String path = "/" + volumeName + "/" + bucketOBS;
@@ -146,7 +158,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     // Should throw warning, since bucket is in OBS bucket layout.
     Assert.assertTrue(
         getOutContentString().contains(
-            "[Warning] Namespace CLI is only designed for FSO mode."));
+            "[Warning] Namespace CLI is not designed for OBS bucket layout."));
     Assert.assertTrue(getOutContentString()
         .contains("Put more files into it to visualize DU"));
     Assert.assertTrue(getOutContentString().contains(

@@ -90,5 +90,9 @@ public class ReconStorageConfig extends SCMStorageConfig {
     return getStorageInfo().getProperty(RECON_CERT_SERIAL_ID);
   }
 
+  public void unsetReconCertSerialId() {
+    getStorageInfo().unsetProperty(RECON_CERT_SERIAL_ID);
+  }
+
 
 }

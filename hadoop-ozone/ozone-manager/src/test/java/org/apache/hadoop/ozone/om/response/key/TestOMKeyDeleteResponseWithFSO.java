@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * Tests OMKeyDeleteResponse - prefix layout.
@@ -33,9 +33,10 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
 
   @Override
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+      OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
-        omKeyInfo, true, getOmBucketInfo(), false);
+        omKeyInfo, true, getOmBucketInfo(), false,
+        omMetadataManager.getVolumeId(volumeName));
   }
 
   @Override
@@ -56,12 +57,15 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
                     parentId, 100, Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             keyName, omKeyInfo, -1, 50, omMetadataManager);
-    return omKeyInfo.getPath();
+    return omMetadataManager.getOzonePathKey(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+           omKeyInfo.getParentObjectID(), keyName);
   }
 
   @Override
   protected OmKeyInfo getOmKeyInfo() {
-    Assert.assertNotNull(getOmBucketInfo());
+    Assertions.assertNotNull(getOmBucketInfo());
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
             getOmBucketInfo().getBucketName(), keyName, replicationType,
             replicationFactor,

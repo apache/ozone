@@ -16,16 +16,22 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting;
 import org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.ValidationListener;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +43,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,38 +61,45 @@ public class TestRequestValidations {
   private final ValidationListenerImpl validationListener =
       new ValidationListenerImpl();
 
-  @Before
+  private OMMetadataManager metadataManager;
+
+  @BeforeEach
   public void setup() {
+    metadataManager = mock(OMMetadataManager.class);
     startValidatorTest();
     validationListener.attach();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     validationListener.detach();
     finishValidatorTest();
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test
   public void testUsingRegistryWithoutLoading() throws Exception {
-    new RequestValidations()
-        .fromPackage(PACKAGE)
-        .withinContext(of(aFinalizedVersionManager()))
-        .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    Assertions.assertThrows(NullPointerException.class, () -> {
+      new RequestValidations()
+          .fromPackage(PACKAGE)
+          .withinContext(of(aFinalizedVersionManager(), metadataManager))
+          .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    });
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test
   public void testUsingRegistryWithoutContext() throws Exception {
-    new RequestValidations()
-        .fromPackage(PACKAGE)
-        .load()
-        .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    Assertions.assertThrows(NullPointerException.class, () -> {
+      new RequestValidations()
+          .fromPackage(PACKAGE)
+          .load()
+          .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    });
   }
 
   @Test
   public void testUsingRegistryWithoutPackage() throws Exception {
     new RequestValidations()
-        .withinContext(of(aFinalizedVersionManager()))
+        .withinContext(of(aFinalizedVersionManager(), metadataManager))
         .load()
         .validateRequest(aCreateKeyRequest(currentClientVersion()));
 
@@ -97,7 +110,7 @@ public class TestRequestValidations {
   public void testNoPreValidationsWithoutValidationMethods()
       throws Exception {
     int omVersion = 0;
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadEmptyValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(omVersion));
@@ -108,7 +121,7 @@ public class TestRequestValidations {
   @Test
   public void testNoPostValidationsWithoutValidationMethods()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadEmptyValidations(ctx);
 
     validations.validateResponse(
@@ -120,7 +133,7 @@ public class TestRequestValidations {
   @Test
   public void testNoPreValidationsRunningForRequestTypeWithoutValidators()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateRequest(aRenameKeyRequest(currentClientVersion()));
@@ -131,7 +144,7 @@ public class TestRequestValidations {
   @Test
   public void testNoPostValidationsAreRunningForRequestTypeWithoutValidators()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
@@ -142,7 +155,7 @@ public class TestRequestValidations {
 
   @Test
   public void testPreProcessorExceptionHandling() throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     try {
@@ -157,7 +170,7 @@ public class TestRequestValidations {
 
   @Test
   public void testPostProcessorExceptionHandling() {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     try {
@@ -174,7 +187,7 @@ public class TestRequestValidations {
   @Test
   public void testOldClientConditionIsRecognizedAndPreValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
@@ -187,7 +200,7 @@ public class TestRequestValidations {
   @Test
   public void testOldClientConditionIsRecognizedAndPostValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(aFinalizedVersionManager());
+    ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
@@ -202,7 +215,7 @@ public class TestRequestValidations {
   @Test
   public void testPreFinalizedWithOldClientConditionPreProcValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(anUnfinalizedVersionManager());
+    ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateRequest(aCreateKeyRequest(olderClientVersion()));
@@ -216,7 +229,7 @@ public class TestRequestValidations {
   @Test
   public void testPreFinalizedWithOldClientConditionPostProcValidatorsApplied()
       throws Exception {
-    ValidationContext ctx = of(anUnfinalizedVersionManager());
+    ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
 
     validations.validateResponse(
@@ -227,6 +240,39 @@ public class TestRequestValidations {
         "preFinalizePostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator",
         "oldClientPostProcessCreateKeyValidator2");
+  }
+
+  /**
+   * Validates the getBucketLayout hook present in the Context object for use
+   * by the validators.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testValidationContextGetBucketLayout()
+      throws Exception {
+    ValidationContext ctx = of(anUnfinalizedVersionManager(), metadataManager);
+
+    String volName = "vol-1";
+    String buckName = "buck-1";
+
+    String buckKey = volName + OzoneConsts.OZONE_URI_DELIMITER + buckName;
+    when(metadataManager.getBucketKey(volName, buckName)).thenReturn(buckKey);
+
+    Table<String, OmBucketInfo> buckTable = mock(Table.class);
+    when(metadataManager.getBucketTable()).thenReturn(buckTable);
+
+    OmBucketInfo buckInfo = mock(OmBucketInfo.class);
+    when(buckTable.get(buckKey)).thenReturn(buckInfo);
+
+    // No need to simulate link bucket for this test.
+    when(buckInfo.isLink()).thenReturn(false);
+
+    when(buckInfo.getBucketLayout())
+        .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    BucketLayout buckLayout = ctx.getBucketLayout("vol-1", "buck-1");
+    Assertions.assertTrue(buckLayout.isFileSystemOptimized());
   }
 
   private RequestValidations loadValidations(ValidationContext ctx) {

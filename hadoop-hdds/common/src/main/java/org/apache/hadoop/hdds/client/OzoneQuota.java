@@ -133,15 +133,6 @@ public final class OzoneQuota {
   }
 
   /**
-   * Constructor for Ozone NameSpace Quota.
-   *
-   * @param quotaInNamespace long value
-   */
-  private OzoneQuota(long quotaInNamespace) {
-    this.quotaInNamespace = quotaInNamespace;
-  }
-
-  /**
    * Constructor for Ozone Quota.
    *
    * @param quotaInNamespace ozone quota in counts
@@ -199,14 +190,13 @@ public final class OzoneQuota {
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-          " that the Quota format is legal(supported values are B," +
-          " KB, MB, GB and TB). And the quota value cannot be greater than " +
-          "Long.MAX_VALUE BYTES");
+      throw new IllegalArgumentException(quotaInBytes + " is invalid. " +
+          "The quota value should be a positive integer " +
+          "with byte numeration(B, KB, MB, GB and TB)");
     }
 
     if (nSize <= 0) {
-      throw new IllegalArgumentException("Invalid values for space quota: "
+      throw new IllegalArgumentException("Invalid value for space quota: "
           + nSize);
     }
 
@@ -226,12 +216,17 @@ public final class OzoneQuota {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
     }
-    long nameSpaceQuota = Long.parseLong(quotaInNamespace);
-    if (nameSpaceQuota <= 0) {
-      throw new IllegalArgumentException(
-          "Invalid values for namespace quota: " + nameSpaceQuota);
+    try {
+      long nameSpaceQuota = Long.parseLong(quotaInNamespace);
+      if (nameSpaceQuota <= 0) {
+        throw new IllegalArgumentException(
+            "Invalid value for namespace quota: " + nameSpaceQuota);
+      }
+      return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(quotaInNamespace + " is invalid. " +
+          "The quota value should be a positive integer");
     }
-    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
   }
 
   /**

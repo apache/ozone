@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -89,7 +90,8 @@ public final class SCMHAUtils {
   // Check if SCM HA is enabled.
   public static boolean isSCMHAEnabled(ConfigurationSource conf) {
     return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+        DefaultConfigManager.getValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT));
   }
 
   public static String getPrimordialSCM(ConfigurationSource conf) {
@@ -142,9 +144,18 @@ public final class SCMHAUtils {
     return scmRatisDirectory;
   }
 
+  public static String getRatisStorageDir(final ConfigurationSource conf) {
+    String storageDir = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+    if (Strings.isNullOrEmpty(storageDir)) {
+      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+      storageDir = (new File(metaDirPath, "scm-ha")).getPath();
+    }
+    return storageDir;
+  }
+
   public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir =
-            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
 
     // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
     if (Strings.isNullOrEmpty(snapshotDir)) {
@@ -196,9 +207,9 @@ public final class SCMHAUtils {
   public static OzoneConfiguration removeSelfId(
       OzoneConfiguration configuration, String selfId) {
     final OzoneConfiguration conf = new OzoneConfiguration(configuration);
-    String scmNodes = conf.get(ConfUtils
-        .addKeySuffixes(ScmConfigKeys.OZONE_SCM_NODES_KEY,
-            getScmServiceId(conf)));
+    String scmNodesKey = ConfUtils.addKeySuffixes(
+        ScmConfigKeys.OZONE_SCM_NODES_KEY, getScmServiceId(conf));
+    String scmNodes = conf.get(scmNodesKey);
     if (scmNodes != null) {
       String[] parts = scmNodes.split(",");
       List<String> partsLeft = new ArrayList<>();
@@ -207,7 +218,7 @@ public final class SCMHAUtils {
           partsLeft.add(part);
         }
       }
-      conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY, String.join(",", partsLeft));
+      conf.set(scmNodesKey, String.join(",", partsLeft));
     }
     return conf;
   }

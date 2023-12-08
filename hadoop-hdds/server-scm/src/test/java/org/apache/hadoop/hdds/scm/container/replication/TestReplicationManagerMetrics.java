@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
@@ -33,10 +35,9 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
  */
 public class TestReplicationManagerMetrics {
 
-  private ReplicationManager replicationManager;
   private ReplicationManagerMetrics metrics;
 
-  @Before
+  @BeforeEach
   public void setup() {
     ReplicationManagerReport report = new ReplicationManagerReport();
 
@@ -54,37 +55,52 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    final LegacyReplicationManager lrm = Mockito.mock(
+        LegacyReplicationManager.class);
+    Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
+        .thenReturn(0);
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager replicationManager =
+        Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    Mockito.when(replicationManager.getLegacyReplicationManager())
+        .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
+    Mockito.when(replicationManager.getContainerReplicaPendingOps())
+        .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
+    Mockito.when(replicationManager.getQueue())
+        .thenReturn(new ReplicationQueue());
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }
 
-  @After
+  @AfterEach
   public void after() {
     metrics.unRegister();
   }
 
   @Test
   public void testLifeCycleStateMetricsPresent() {
-    Assert.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
-        getGauge("NumOpenContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
-        getGauge("NumClosingContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
-        getGauge("NumQuasiClosedContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
-        getGauge("NumClosedContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
-        getGauge("NumDeletingContainers"));
-    Assert.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
-        getGauge("NumDeletedContainers"));
+    Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
+        getGauge("OpenContainers"));
+    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
+        getGauge("ClosingContainers"));
+    Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
+        getGauge("QuasiClosedContainers"));
+    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
+        getGauge("ClosedContainers"));
+    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
+        getGauge("DeletingContainers"));
+    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
+        getGauge("DeletedContainers"));
   }
 
   @Test
   public void testHealthStateMetricsPresent() {
     for (ReplicationManagerReport.HealthState s :
         ReplicationManagerReport.HealthState.values()) {
-      Assert.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
+      Assertions.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
     }
   }
 

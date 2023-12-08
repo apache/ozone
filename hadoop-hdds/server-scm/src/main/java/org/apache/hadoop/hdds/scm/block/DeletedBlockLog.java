@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.block;
 
+import java.util.Set;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
@@ -42,23 +44,28 @@ public interface DeletedBlockLog extends Closeable {
    * Scan entire log once and returns TXs to DatanodeDeletedBlockTransactions.
    * Once DatanodeDeletedBlockTransactions is full, the scan behavior will
    * stop.
+   *
    * @param blockDeletionLimit Maximum number of blocks to fetch
+   * @param dnList healthy dn list
    * @return Mapping from containerId to latest transactionId for the container.
    * @throws IOException
    */
-  DatanodeDeletedBlockTransactions getTransactions(int blockDeletionLimit)
+  DatanodeDeletedBlockTransactions getTransactions(
+      int blockDeletionLimit, Set<DatanodeDetails> dnList)
       throws IOException;
 
   /**
-   * Return all failed transactions in the log. A transaction is considered
-   * to be failed if it has been sent more than MAX_RETRY limit and its
-   * count is reset to -1.
+   * Return the failed transactions in the log. A transaction is
+   * considered to be failed if it has been sent more than MAX_RETRY limit
+   * and its count is reset to -1.
    *
+   * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param startTxId The least transaction id to start with.
    * @return a list of failed deleted block transactions.
    * @throws IOException
    */
-  List<DeletedBlocksTransaction> getFailedTransactions()
-      throws IOException;
+  List<DeletedBlocksTransaction> getFailedTransactions(int count,
+      long startTxId) throws IOException;
 
   /**
    * Increments count for given list of transactions by 1.
@@ -70,6 +77,15 @@ public interface DeletedBlockLog extends Closeable {
    */
   void incrementCount(List<Long> txIDs)
       throws IOException;
+
+
+  /**
+   * Reset DeletedBlock transaction retry count.
+   *
+   * @param txIDs transactionId list to be reset
+   * @return num of successful reset
+   */
+  int resetCount(List<Long> txIDs) throws IOException;
 
   /**
    * Commits a transaction means to delete all footprints of a transaction

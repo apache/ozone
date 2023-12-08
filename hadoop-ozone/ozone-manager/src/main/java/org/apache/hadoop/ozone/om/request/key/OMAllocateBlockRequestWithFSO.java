@@ -50,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -108,7 +109,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
     OMClientResponse omClientResponse = null;
 
     OmKeyInfo openKeyInfo = null;
-    IOException exception = null;
+    Exception exception = null;
     OmBucketInfo omBucketInfo = null;
     boolean acquiredLock = false;
 
@@ -139,8 +140,10 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
               OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedKeySize = newLocationList.size()
@@ -152,7 +155,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       long totalAllocatedSpace = QuotaUtil.getReplicatedSize(
           preAllocatedKeySize, repConfig) + QuotaUtil.getReplicatedSize(
           hadAllocatedKeySize, repConfig);
-      checkBucketQuotaInBytes(omBucketInfo, totalAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          totalAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -168,11 +172,12 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
+      long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse = getOmClientResponse(clientID, omResponse,
-              openKeyInfo, omBucketInfo.copyObject());
+              openKeyInfo, omBucketInfo.copyObject(), volumeId);
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
               volumeName, bucketName, openKeyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponseWithFSO(
@@ -183,8 +188,12 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(
+                BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -205,16 +214,15 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       String keyName, long clientID, OzoneManager ozoneManager)
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    long bucketId = omBucketInfo.getObjectID();
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(
+            volumeName, bucketName);
     String fileName = OzoneFSUtils.getFileName(keyName);
     Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(bucketId, pathComponents,
-            keyName, omMetadataManager);
-    return omMetadataManager.getOpenFileName(parentID, fileName,
-            clientID);
+    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
+            pathComponents, keyName, omMetadataManager);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId, parentID,
+            fileName, clientID);
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
@@ -228,8 +236,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   @NotNull
   private OMClientResponse getOmClientResponse(long clientID,
       OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
-      OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo, long volumeId) {
     return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
-            clientID, getBucketLayout());
+            clientID, getBucketLayout(), volumeId, omBucketInfo.getObjectID());
   }
 }

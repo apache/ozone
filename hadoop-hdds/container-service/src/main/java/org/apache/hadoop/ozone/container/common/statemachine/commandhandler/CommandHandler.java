@@ -63,6 +63,12 @@ public interface CommandHandler {
   long getAverageRunTime();
 
   /**
+   * Returns the total time this function takes to run.
+   * @return  long
+   */
+  long getTotalRunTime();
+
+  /**
    * Default implementation for updating command status.
    */
   default void updateCommandStatus(StateContext context, SCMCommand command,
@@ -82,12 +88,35 @@ public interface CommandHandler {
   }
 
   /**
-   * Returns the queued command count for this handler. Some handlers do not
-   * have an internal queue and hence commands are executed immediately. For
-   * those, the default implementation will return 0.
+   * Returns the queued command count for this handler.
    * @return The number of queued commands inside this handler.
    */
-  default int getQueuedCount() {
-    return 0;
+  int getQueuedCount();
+
+  /**
+   * Returns the maximum number of threads allowed in the thread pool for this
+   * handler. If the subclass does not override this method, the default
+   * implementation will return -1, indicating that the maximum pool size is not
+   * applicable or not defined.
+   *
+   * @return The maximum number of threads allowed in the thread pool,
+   * or -1 if not applicable or not defined.
+   */
+  default int getThreadPoolMaxPoolSize() {
+    return -1;
   }
+
+  /**
+   * Returns the number of threads currently executing tasks in the thread pool
+   * for this handler.If the subclass does not override this method,
+   * the default implementation will return -1, indicating that the number of
+   * active threads is not applicable or not defined.
+   *
+   * @return The number of threads currently executing tasks in the thread pool,
+   * or -1 if not applicable or not defined.
+   */
+  default int getThreadPoolActivePoolSize() {
+    return -1;
+  }
+
 }

@@ -70,7 +70,7 @@ Recon 有其自己的任务框架，可对从 OM 和 SCM 获得的数据进行�
 
 ## Recon 和 Prometheus
 
-Recon 可以与任何配置为收集指标的 Prometheus 实例集成，并且可以在数据节点和 Pipelines 页面的 Recon UI 中显示有用的信息。Recon 还公开了一个代理端点 ([/指标]({{< ref path="interface/ReconApi.zh.md#metrics" >}})) 来查询 Prometheus。可以通过将此配置`ozone.recon.prometheus.http.endpoint`设置为 Prometheus 端点如`ozone.recon.prometheus.http.endpoint=localhost:9090`来启用此集成。
+Recon 可以与任何配置为收集指标的 Prometheus 实例集成，并且可以在数据节点和 Pipelines 页面的 Recon UI 中显示有用的信息。Recon 还公开了一个代理端点 ([/指标]({{< ref path="interface/ReconApi.zh.md#metrics" >}})) 来查询 Prometheus。可以通过将此配置`ozone.recon.prometheus.http.endpoint`设置为 Prometheus 端点如`ozone.recon.prometheus.http.endpoint=http://prometheus:9090`来启用此集成。
 
 ## API 参考
 
@@ -108,6 +108,7 @@ ozone.recon.db.dir | none | Recon Server 存储其元数据的目录。
 ozone.recon.om.db.dir | none | Recon Server 存储其 OM 快照 DB 的目录。
 ozone.recon.om.snapshot<br>.task.interval.delay | 10m | Recon 以分钟间隔请求 OM DB 快照。
 ozone.recon.task<br>.missingcontainer.interval | 300s | 定期检查集群中不健康容器的时间间隔。
+ozone.recon.task<br>.safemode.wait.threshold | 300s | Recon退出safe mode需要等待的最大时间。
 ozone.recon.sql.db.jooq.dialect | DERBY | 请参考 [SQL 方言](https://www.jooq.org/javadoc/latest/org.jooq/org/jooq/SQLDialect.html) 来指定不同的方言。
 ozone.recon.sql.db.jdbc.url | jdbc:derby:${ozone.recon.db.dir}<br>/ozone_recon_derby.db | Recon SQL database 的 jdbc url。
 ozone.recon.sql.db.username | none | Recon SQL数据库的用户名。

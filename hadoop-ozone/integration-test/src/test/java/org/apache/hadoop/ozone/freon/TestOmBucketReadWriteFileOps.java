@@ -21,9 +21,11 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -55,6 +57,7 @@ public class TestOmBucketReadWriteFileOps {
   private ObjectStore store = null;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteFileOps.class);
+  private OzoneClient client;
 
   @Before
   public void setup() {
@@ -70,6 +73,7 @@ public class TestOmBucketReadWriteFileOps {
    * Shutdown MiniDFSCluster.
    */
   private void shutdown() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
       FileUtils.deleteDirectory(new File(path));
@@ -89,7 +93,8 @@ public class TestOmBucketReadWriteFileOps {
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
 
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = OzoneClientFactory.getRpcClient(conf);
+    store = client.getObjectStore();
   }
 
   protected OzoneConfiguration getOzoneConfiguration() {
@@ -124,7 +129,7 @@ public class TestOmBucketReadWriteFileOps {
               .setPrefixFilePath("/dir1/").setTotalThreadCount(10)
               .setNumOfReadOperations(5).setNumOfWriteOperations(3)
               .setFileCountForRead(5).setFileCountForWrite(3).
-              setFileSizeInBytes(64).setBufferSize(16));
+              setFileSize("64B").setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3").setTotalThreadCount(10)
@@ -152,8 +157,8 @@ public class TestOmBucketReadWriteFileOps {
         new String[]{"-conf", confPath, "obrwf", "-P", rootPath,
             "-r", String.valueOf(parameterBuilder.fileCountForRead),
             "-w", String.valueOf(parameterBuilder.fileCountForWrite),
-            "-g", String.valueOf(parameterBuilder.fileSizeInBytes),
-            "-b", String.valueOf(parameterBuilder.bufferSize),
+            "-g", parameterBuilder.fileSize,
+            "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
             "-T", String.valueOf(parameterBuilder.readThreadPercentage),
@@ -252,7 +257,7 @@ public class TestOmBucketReadWriteFileOps {
     private String prefixFilePath = "/dir1/dir2";
     private int fileCountForRead = 100;
     private int fileCountForWrite = 10;
-    private long fileSizeInBytes = 256;
+    private String fileSize = "256B";
     private int bufferSize = 64;
     private int length = 10;
     private int totalThreadCount = 100;
@@ -285,8 +290,8 @@ public class TestOmBucketReadWriteFileOps {
       return this;
     }
 
-    private ParameterBuilder setFileSizeInBytes(long fileSizeInBytesParam) {
-      fileSizeInBytes = fileSizeInBytesParam;
+    private ParameterBuilder setFileSize(String fileSizeParam) {
+      fileSize = fileSizeParam;
       return this;
     }
 

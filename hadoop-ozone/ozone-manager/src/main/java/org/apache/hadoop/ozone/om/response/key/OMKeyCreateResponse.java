@@ -91,6 +91,13 @@ public class OMKeyCreateResponse extends OmKeyResponse {
         omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
+      
+      // namespace quota changes for parent directory
+      String bucketKey = omMetadataManager.getBucketKey(
+          getOmBucketInfo().getVolumeName(),
+          getOmBucketInfo().getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, getOmBucketInfo());
     }
 
     String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),

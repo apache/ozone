@@ -1,0 +1,167 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow runs some acceptance test(s) multiple times concurrently.
+# Specify the test by either:
+# * "Test Suite", which should be ones of the existing suites from regular CI,
+#   e.g. "cert-rotation", or
+# * "Test Filter", which is a regex pattern applied to filter test script's path
+#   (examples: "ozone-csi", "test-vault.sh", "ozone/test-ec.sh", "test-.*-rotation.sh")
+
+name: repeat-acceptance-test
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git Ref (Branch/Commit_ID/Tag)
+        default: master
+        required: true
+      test-suite:
+        description: Test Suite
+        required: false
+      test-filter:
+        description: Test Filter
+        required: false
+      splits:
+        description: Number of splits
+        default: 10
+        required: true
+      fail-fast:
+        description: Stop after first failure
+        default: false
+        required: true
+env:
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  OZONE_ACCEPTANCE_SUITE: ${{ github.event.inputs.test-suite}}
+  OZONE_TEST_SELECTOR: ${{ github.event.inputs.test-filter }}
+  FAIL_FAST: ${{ github.event.inputs.fail-fast }}
+  JAVA_VERSION: 8
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
+jobs:
+  prepare-job:
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{steps.generate.outputs.matrix}}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Verify Test Filter
+        run: |
+          cd hadoop-ozone/dist/src/main/compose
+          source testlib.sh
+          find_tests
+      - id: generate
+        name: Generate test matrix
+        run: |
+          splits=()
+          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+              splits+=("$i")
+          done
+          printf -v x "%s," "${splits[@]}"
+          split_matrix="[${x%,}]"
+          echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
+  build:
+    needs:
+      - prepare-job
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+      - name: Cache for npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Cache for maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ env.JAVA_VERSION }}
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Run a full build
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+      - name: Store binaries for tests
+        uses: actions/upload-artifact@v3
+        with:
+          name: ozone-bin
+          path: |
+            hadoop-ozone/dist/target/ozone-*.tar.gz
+            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
+  acceptance:
+    needs:
+      - prepare-job
+      - build
+    name: Run-Split
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        split: ${{ fromJson(needs.prepare-job.outputs.matrix) }}
+      fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          rm ozone*.tar.gz
+          sudo chmod -R a+rwX hadoop-ozone/dist/target
+      - name: Execute tests
+        run: |
+          pushd hadoop-ozone/dist/target/ozone-*
+          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          popd
+          ./hadoop-ozone/dev-support/checks/acceptance.sh
+        env:
+          KEEP_IMAGE: false
+          OZONE_VOLUME_OWNER: 1000
+        continue-on-error: true
+      - name: Summary of failures
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
+        if: ${{ !cancelled() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: acceptance-${{ matrix.split }}
+          path: target/acceptance
+        continue-on-error: true

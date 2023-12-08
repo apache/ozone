@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
 
@@ -44,14 +45,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
 
   private List<OmKeyInfo> dirsList;
+  private long volumeId;
 
   public OMKeysDeleteResponseWithFSO(
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
       @NotNull List<OmKeyInfo> keyDeleteList,
       @NotNull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
-      @NotNull OmBucketInfo omBucketInfo) {
+      @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
     super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo);
     this.dirsList = dirDeleteList;
+    this.volumeId = volId;
   }
 
   @Override
@@ -60,23 +63,28 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
     Table<String, OmKeyInfo> keyTable =
         omMetadataManager.getKeyTable(getBucketLayout());
 
+    final long bucketId = getOmBucketInfo().getObjectID();
     // remove dirs from DirTable and add to DeletedDirTable
     for (OmKeyInfo omKeyInfo : dirsList) {
-      String ozoneDbKey = omMetadataManager.getOzonePathKey(
+      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
           ozoneDbKey);
+      String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
+          omKeyInfo.getObjectID(), ozoneDbKey);
       omMetadataManager.getDeletedDirTable().putWithBatch(
-          batchOperation, ozoneDbKey, omKeyInfo);
+          batchOperation, ozoneDeleteKey, omKeyInfo);
     }
 
     // remove keys from FileTable and add to DeletedTable
     for (OmKeyInfo omKeyInfo : getOmKeyInfoList()) {
-      String ozoneDbKey = omMetadataManager.getOzonePathKey(
+      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       String deletedKey = omMetadataManager
           .getOzoneKey(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
               omKeyInfo.getKeyName());
+      deletedKey = omMetadataManager.getOzoneDeletePathKey(
+          omKeyInfo.getObjectID(), deletedKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
           ozoneDbKey, deletedKey, omKeyInfo);
     }

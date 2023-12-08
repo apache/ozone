@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token.TrivialRenewer;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -59,16 +60,14 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, BlockID blockId,
-      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
-      long maxLength) {
-    this(ownerId, getTokenService(blockId), modes, expiryDate, omCertSerialId,
+      Set<AccessModeProto> modes, long expiryDate, long maxLength) {
+    this(ownerId, getTokenService(blockId), modes, expiryDate,
         maxLength);
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, String blockId,
-      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
-      long maxLength) {
-    super(ownerId, Instant.ofEpochMilli(expiryDate), omCertSerialId);
+      Set<AccessModeProto> modes, long expiryDate, long maxLength) {
+    super(ownerId, Instant.ofEpochMilli(expiryDate));
     this.blockId = blockId;
     this.modes = modes == null
         ? EnumSet.noneOf(AccessModeProto.class) : EnumSet.copyOf(modes);
@@ -136,7 +135,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
     setOwnerId(token.getOwnerId());
     setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
-    setCertSerialId(token.getOmCertSerialId());
+    setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
     this.blockId = token.getBlockId();
     this.modes = EnumSet.copyOf(token.getModesList());
     this.maxLength = token.getMaxLength();
@@ -147,10 +146,13 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
       throws IOException {
     BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
-    return new OzoneBlockTokenIdentifier(token.getOwnerId(),
-        token.getBlockId(), EnumSet.copyOf(token.getModesList()),
-        token.getExpiryDate(), token.getOmCertSerialId(),
-        token.getMaxLength());
+    OzoneBlockTokenIdentifier tokenId =
+        new OzoneBlockTokenIdentifier(token.getOwnerId(),
+            token.getBlockId(), EnumSet.copyOf(token.getModesList()),
+            token.getExpiryDate(),
+            token.getMaxLength());
+    tokenId.setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
+    return tokenId;
   }
 
   @Override
@@ -158,7 +160,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
         .setBlockId(blockId)
         .setOwnerId(getOwnerId())
-        .setOmCertSerialId(getCertSerialId())
+        .setSecretKeyId(ProtobufUtils.toProtobuf(getSecretKeyId()))
         .setExpiryDate(getExpiryDate())
         .setMaxLength(maxLength);
     // Add access mode allowed

@@ -31,7 +31,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
@@ -47,7 +49,7 @@ public class TestReconScmSnapshot {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(100);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 

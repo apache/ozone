@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB
     .StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.slf4j.Logger;
@@ -56,6 +57,10 @@ public class EndpointStateMachine
   private boolean isPassive;
   private final ExecutorService executorService;
 
+  private static final String RECON_TYPE = "Recon";
+
+  private static final String SCM_TYPE = "SCM";
+
   /**
    * Constructs RPC Endpoints.
    *
@@ -63,7 +68,7 @@ public class EndpointStateMachine
    */
   public EndpointStateMachine(InetSocketAddress address,
       StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, String threadNamePrefix) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
@@ -72,8 +77,8 @@ public class EndpointStateMachine
     this.conf = conf;
     executorService = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder()
-            .setNameFormat("EndpointStateMachine task thread for "
-                + this.address + " - %d ")
+            .setNameFormat(threadNamePrefix + "EndpointStateMachineTaskThread-"
+                + this.address + "-%d ")
             .build());
   }
 
@@ -156,6 +161,7 @@ public class EndpointStateMachine
     if (endPoint != null) {
       endPoint.close();
     }
+    executorService.shutdown();
   }
 
   /**
@@ -340,5 +346,14 @@ public class EndpointStateMachine
   public void setLastSuccessfulHeartbeat(
       ZonedDateTime lastSuccessfulHeartbeat) {
     this.lastSuccessfulHeartbeat = lastSuccessfulHeartbeat;
+  }
+
+  @Override
+  public String getType() {
+    if (endPoint.getUnderlyingProxyObject()
+            instanceof ReconDatanodeProtocolPB) {
+      return RECON_TYPE;
+    }
+    return SCM_TYPE;
   }
 }

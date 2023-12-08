@@ -18,20 +18,24 @@
  */
 package org.apache.hadoop.ozone.recon.scm;
 
+import java.util.Map;
 import java.util.UUID;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
-import org.apache.hadoop.ozone.recon.codec.DatanodeDetailsCodec;
-import org.apache.hadoop.ozone.recon.codec.ReconNodeDBKeyCodec;
 
 /**
  * Recon SCM db file for ozone.
  */
 public class ReconSCMDBDefinition extends SCMDBDefinition {
+  private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
+      StringCodec.get(), UUID::fromString, UUID::toString,
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static final String RECON_SCM_DB_NAME = "recon-scm.db";
 
@@ -40,9 +44,17 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
       new DBColumnFamilyDefinition<UUID, DatanodeDetails>(
           "nodes",
           UUID.class,
-          new ReconNodeDBKeyCodec(),
+          UUID_CODEC,
           DatanodeDetails.class,
-          new DatanodeDetailsCodec());
+          DatanodeDetails.getCodec());
+
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          new SCMDBDefinition().getMap(), NODES);
+
+  public ReconSCMDBDefinition() {
+    super(COLUMN_FAMILIES);
+  }
 
   @Override
   public String getName() {
@@ -52,10 +64,5 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return ArrayUtils.add(super.getColumnFamilies(), NODES);
   }
 }

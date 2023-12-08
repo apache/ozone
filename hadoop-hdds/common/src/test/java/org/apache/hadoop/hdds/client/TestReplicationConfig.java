@@ -23,76 +23,52 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test replicationConfig.
  */
-@RunWith(Parameterized.class)
 public class TestReplicationConfig {
 
   private static final int MB = 1024 * 1024;
   private static final int KB = 1024;
 
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter
-  public String type;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter(1)
-  public String factor;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter(2)
-  public String codec;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter(3)
-  public int data;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter(4)
-  public int parity;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter(5)
-  public int chunkSize;
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  @Parameterized.Parameter(6)
-  public Class<?> replicationConfigClass;
-
-  //NOTE: if a new cunckSize is used/added in the parameters other than KB or MB
+  //NOTE: if a new chunkSize is used/added in the parameters other than KB or MB
   // please revisit the method createECDescriptor, to handle the new chunkSize.
-  @Parameterized.Parameters(name = "{0}/{1}")
-  public static Object[][] parameters() {
-    return new Object[][] {
-        {"RATIS", "ONE", null, 0, 0, 0, RatisReplicationConfig.class },
-        {"RATIS", "THREE", null, 0, 0, 0, RatisReplicationConfig.class},
-        {"STAND_ALONE", "ONE", null, 0, 0, 0,
-            StandaloneReplicationConfig.class},
-        {"STAND_ALONE", "THREE", null, 0, 0, 0,
-            StandaloneReplicationConfig.class},
-        {"EC", "RS-3-2-1024K", "RS", 3, 2, MB, ECReplicationConfig.class},
-        {"EC", "RS-3-2-1024", "RS", 3, 2, KB, ECReplicationConfig.class},
-        {"EC", "RS-6-3-1024K", "RS", 6, 3, MB, ECReplicationConfig.class},
-        {"EC", "RS-6-3-1024", "RS", 6, 3, KB, ECReplicationConfig.class},
-        {"EC", "RS-10-4-1024K", "RS", 10, 4, MB, ECReplicationConfig.class},
-        {"EC", "RS-10-4-1024", "RS", 10, 4, KB, ECReplicationConfig.class},
-    };
+  public static Stream<Arguments> replicaType() {
+    return Stream.of(
+        arguments("RATIS", "ONE", RatisReplicationConfig.class),
+        arguments("RATIS", "THREE", RatisReplicationConfig.class),
+        arguments("STAND_ALONE", "ONE", StandaloneReplicationConfig.class),
+        arguments("STAND_ALONE", "THREE", StandaloneReplicationConfig.class)
+    );
+  }
+
+  public static Stream<Arguments> ecType() {
+    return Stream.of(
+        arguments("RS", 3, 2, MB),
+        arguments("RS", 3, 2, 2 * MB),
+        arguments("RS", 6, 3, MB),
+        arguments("RS", 6, 3, 2 * MB),
+        arguments("RS", 10, 4, MB),
+        arguments("RS", 10, 4, 2 * MB)
+    );
   }
 
   @Test
-  public void testGetDefaultShouldReturnRatisThreeIfNotSetClientSide() {
+  void testGetDefaultShouldReturnRatisThreeIfNotSetClientSide() {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
@@ -102,9 +78,10 @@ public class TestReplicationConfig {
         RatisReplicationConfig.class);
   }
 
-  @Test
-  public void testGetDefaultShouldCreateReplicationConfFromConfValues() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void testGetDefaultShouldCreateReplicationConfFromConfValues(
+      String type, String factor, Class<?> replicationConfigClass) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_REPLICATION_TYPE, type);
     conf.set(OZONE_REPLICATION, factor);
@@ -113,16 +90,17 @@ public class TestReplicationConfig {
 
     validate(replicationConfig,
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor));
+        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor),
+        replicationConfigClass);
   }
 
-  @Test
-  public void testGetDefaultShouldCreateECReplicationConfFromConfValues() {
-    assumeECType();
-
+  @ParameterizedTest
+  @MethodSource("ecType")
+  void testGetDefaultShouldCreateECReplicationConfFromConfValues(
+      String codec, int data, int parity, int chunkSize) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_REPLICATION_TYPE, type);
-    conf.set(OZONE_REPLICATION, ecDescriptor());
+    conf.set(OZONE_REPLICATION_TYPE, "EC");
+    conf.set(OZONE_REPLICATION, ecDescriptor(codec, data, parity, chunkSize));
 
     ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
 
@@ -130,9 +108,10 @@ public class TestReplicationConfig {
         EcCodec.valueOf(codec), data, parity, chunkSize);
   }
 
-  @Test
-  public void deserialize() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void deserialize(String type, String factor,
+      Class<?> replicationConfigClass) {
     final ReplicationConfig replicationConfig =
         ReplicationConfig.fromProtoTypeAndFactor(
             ReplicationType.valueOf(type),
@@ -140,12 +119,13 @@ public class TestReplicationConfig {
 
     validate(replicationConfig,
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor));
+        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor),
+        replicationConfigClass);
   }
 
-  @Test
-  public void deserializeEC() {
-    assumeECType();
+  @ParameterizedTest
+  @MethodSource("ecType")
+  void deserializeEC(String codec, int data, int parity, int chunkSize) {
     HddsProtos.ECReplicationConfig proto =
         HddsProtos.ECReplicationConfig.newBuilder()
             .setCodec(codec)
@@ -160,9 +140,10 @@ public class TestReplicationConfig {
     validate(config, EcCodec.valueOf(codec), data, parity, chunkSize);
   }
 
-  @Test
-  public void testECReplicationConfigGetReplication() {
-    assumeECType();
+  @ParameterizedTest
+  @MethodSource("ecType")
+  void testECReplicationConfigGetReplication(
+      String codec, int data, int parity, int chunkSize) {
     HddsProtos.ECReplicationConfig proto =
         HddsProtos.ECReplicationConfig.newBuilder().setCodec(codec)
             .setData(data).setParity(parity).setEcChunkSize(chunkSize).build();
@@ -170,27 +151,29 @@ public class TestReplicationConfig {
     ReplicationConfig config =
         ReplicationConfig.fromProto(ReplicationType.EC, null, proto);
 
-    Assert.assertEquals(EcCodec.valueOf(
+    assertEquals(EcCodec.valueOf(
         codec) + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + data + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + parity + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
-            + chunkSize, config.getReplication());
+            + chunkSize / 1024 + "k", config.getReplication());
   }
 
-  @Test
-  public void testReplicationConfigGetReplication() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void testReplicationConfigGetReplication(String type, String factor,
+      Class<?> replicationConfigClass) {
     final ReplicationConfig replicationConfig = ReplicationConfig
         .fromTypeAndFactor(
             org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
             org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor));
 
-    Assert.assertEquals(factor, replicationConfig.getReplication());
+    assertEquals(factor, replicationConfig.getReplication());
   }
 
-  @Test
-  public void fromJavaObjects() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void fromJavaObjects(String type, String factor,
+      Class<?> replicationConfigClass) {
     final ReplicationConfig replicationConfig =
         ReplicationConfig.fromTypeAndFactor(
             org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
@@ -198,12 +181,14 @@ public class TestReplicationConfig {
 
     validate(replicationConfig,
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor));
+        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor),
+        replicationConfigClass);
   }
 
-  @Test
-  public void testParseFromTypeAndFactorAsString() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void testParseFromTypeAndFactorAsString(String type, String factor,
+      Class<?> replicationConfigClass) {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.parse(
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
@@ -211,12 +196,14 @@ public class TestReplicationConfig {
 
     validate(replicationConfig,
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor));
+        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor),
+        replicationConfigClass);
   }
 
-  @Test
-  public void testParseFromTypeAndFactorAsStringifiedInteger() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void testParseFromTypeAndFactorAsStringifiedInteger(
+      String type, String factor, Class<?> replicationConfigClass) {
     ConfigurationSource conf = new OzoneConfiguration();
     String f =
         factor.equals("ONE") ? "1"
@@ -229,16 +216,19 @@ public class TestReplicationConfig {
 
     validate(replicationConfig,
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(this.factor));
+        org.apache.hadoop.hdds.client.ReplicationFactor.valueOf(factor),
+        replicationConfigClass);
   }
 
-  @Test
-  public void testParseECReplicationConfigFromString() {
-    assumeECType();
+  @ParameterizedTest
+  @MethodSource("ecType")
+  void testParseECReplicationConfigFromString(
+      String codec, int data, int parity, int chunkSize) {
 
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig repConfig = ReplicationConfig.parse(
-        org.apache.hadoop.hdds.client.ReplicationType.EC, ecDescriptor(), conf);
+        org.apache.hadoop.hdds.client.ReplicationType.EC,
+        ecDescriptor(codec, data, parity, chunkSize), conf);
 
     validate(repConfig, EcCodec.valueOf(codec), data, parity, chunkSize);
   }
@@ -251,9 +241,10 @@ public class TestReplicationConfig {
    * or STAND_ALONE, then replica count can be adjusted with the replication
    * factor.
    */
-  @Test
-  public void testAdjustReplication() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void testAdjustReplication(String type, String factor,
+      Class<?> replicationConfigClass) {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.parse(
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
@@ -262,12 +253,14 @@ public class TestReplicationConfig {
     validate(
         ReplicationConfig.adjustReplication(replicationConfig, (short) 3, conf),
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.THREE);
+        org.apache.hadoop.hdds.client.ReplicationFactor.THREE,
+        replicationConfigClass);
 
     validate(
         ReplicationConfig.adjustReplication(replicationConfig, (short) 1, conf),
         org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-        org.apache.hadoop.hdds.client.ReplicationFactor.ONE);
+        org.apache.hadoop.hdds.client.ReplicationFactor.ONE,
+        replicationConfigClass);
   }
 
   /**
@@ -278,12 +271,14 @@ public class TestReplicationConfig {
    * then the client can not adjust the configuration via the replication
    * factor.
    */
-  @Test
-  public void testAdjustECReplication() {
-    assumeECType();
+  @ParameterizedTest
+  @MethodSource("ecType")
+  void testAdjustECReplication(String codec, int data, int parity,
+      int chunkSize) {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.parse(
-        org.apache.hadoop.hdds.client.ReplicationType.EC, ecDescriptor(), conf);
+        org.apache.hadoop.hdds.client.ReplicationType.EC,
+        ecDescriptor(codec, data, parity, chunkSize), conf);
 
     validate(
         ReplicationConfig.adjustReplication(replicationConfig, (short) 3, conf),
@@ -304,21 +299,23 @@ public class TestReplicationConfig {
    * system there might exist some keys that were created with a now disallowed
    * ReplicationConfig.
    */
-  @Test
-  public void testValidationBasedOnConfig() {
-    assumeRatisOrStandaloneType();
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  void testValidationBasedOnConfig(String type, String factor,
+      Class<?> replicationConfigClass) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_REPLICATION + ".allowed-configs",
         "^STANDALONE/ONE|RATIS/THREE$");
     conf.set(OZONE_REPLICATION, factor);
     conf.set(OZONE_REPLICATION_TYPE, type);
+    org.apache.hadoop.hdds.client.ReplicationType replicationType =
+        org.apache.hadoop.hdds.client.ReplicationType.valueOf(type);
 
     // in case of allowed configurations
     if ((type.equals("RATIS") && factor.equals("THREE"))
         || (type.equals("STAND_ALONE") && factor.equals("ONE"))) {
       ReplicationConfig replicationConfig = ReplicationConfig.parse(
-          org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-          factor, conf);
+              replicationType, factor, conf);
       // check if adjust throws exception when adjusting to a config that is
       // not allowed
       if (type.equals("RATIS")) {
@@ -335,8 +332,7 @@ public class TestReplicationConfig {
       // parse should fail in case of a configuration that is not allowed.
       assertThrows(IllegalArgumentException.class,
           () -> ReplicationConfig.parse(
-              org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-              factor, conf));
+                  replicationType, factor, conf));
       // default can not be a configuration that is not allowed.
       assertThrows(IllegalArgumentException.class,
           () -> ReplicationConfig.getDefault(conf));
@@ -359,26 +355,16 @@ public class TestReplicationConfig {
 
   private void validate(ReplicationConfig replicationConfig,
       org.apache.hadoop.hdds.client.ReplicationType expectedType,
-      org.apache.hadoop.hdds.client.ReplicationFactor expectedFactor) {
-
-    validate(replicationConfig, expectedType, expectedFactor,
-        replicationConfigClass);
-  }
-
-
-  private void validate(ReplicationConfig replicationConfig,
-      org.apache.hadoop.hdds.client.ReplicationType expectedType,
       org.apache.hadoop.hdds.client.ReplicationFactor expectedFactor,
       Class<?> expectedReplicationConfigClass) {
 
-    assertEquals(expectedReplicationConfigClass, replicationConfig.getClass());
+    assertSame(expectedReplicationConfigClass, replicationConfig.getClass());
 
-    assertEquals(
-        expectedType.name(), replicationConfig.getReplicationType().name());
-    assertEquals(
-        expectedFactor.getValue(), replicationConfig.getRequiredNodes());
-    assertEquals(
-        expectedFactor.name(),
+    assertEquals(expectedType.name(),
+        replicationConfig.getReplicationType().name());
+    assertEquals(expectedFactor.getValue(),
+        replicationConfig.getRequiredNodes());
+    assertEquals(expectedFactor.name(),
         ((ReplicatedReplicationConfig) replicationConfig)
             .getReplicationFactor().name());
   }
@@ -387,7 +373,7 @@ public class TestReplicationConfig {
       EcCodec expectedCodec,
       int expectedData, int expectedParity, int expectedChunkSize) {
 
-    assertEquals(ECReplicationConfig.class, replicationConfig.getClass());
+    assertSame(ECReplicationConfig.class, replicationConfig.getClass());
     assertEquals(ReplicationType.EC, replicationConfig.getReplicationType());
 
     ECReplicationConfig ecReplicationConfig =
@@ -402,16 +388,10 @@ public class TestReplicationConfig {
         replicationConfig.getRequiredNodes());
   }
 
-  private String ecDescriptor() {
+  private String ecDescriptor(String codec, int data, int parity,
+      int chunkSize) {
     return codec.toUpperCase() + "-" + data + "-" + parity + "-" +
-        (chunkSize == MB ? "1024K" : "1024");
+        (chunkSize / 1024) + "k";
   }
 
-  private void assumeRatisOrStandaloneType() {
-    Assume.assumeTrue(type.equals("RATIS") || type.equals("STAND_ALONE"));
-  }
-
-  private void assumeECType() {
-    Assume.assumeTrue(type.equals("EC"));
-  }
 }

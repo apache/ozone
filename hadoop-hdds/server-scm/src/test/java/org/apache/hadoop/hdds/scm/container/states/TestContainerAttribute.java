@@ -20,10 +20,8 @@ package org.apache.hadoop.hdds.scm.container.states;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
@@ -33,25 +31,22 @@ import java.util.List;
  */
 public class TestContainerAttribute {
 
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
   @Test
   public void testInsert() throws SCMException {
     ContainerAttribute<Integer> containerAttribute = new ContainerAttribute<>();
     ContainerID id = ContainerID.valueOf(42);
     containerAttribute.insert(1, id);
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         containerAttribute.getCollection(1).size());
-    Assert.assertTrue(containerAttribute.getCollection(1).contains(id));
+    Assertions.assertTrue(containerAttribute.getCollection(1).contains(id));
 
     // Insert again and verify that the new ContainerId is inserted.
     ContainerID newId =
         ContainerID.valueOf(42);
     containerAttribute.insert(1, newId);
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         containerAttribute.getCollection(1).size());
-    Assert.assertTrue(containerAttribute.getCollection(1).contains(newId));
+    Assertions.assertTrue(containerAttribute.getCollection(1).contains(newId));
   }
 
   @Test
@@ -61,12 +56,12 @@ public class TestContainerAttribute {
     for (int x = 1; x < 42; x++) {
       containerAttribute.insert(1, ContainerID.valueOf(x));
     }
-    Assert.assertTrue(containerAttribute.hasKey(1));
+    Assertions.assertTrue(containerAttribute.hasKey(1));
     for (int x = 1; x < 42; x++) {
-      Assert.assertTrue(containerAttribute.hasContainerID(1, x));
+      Assertions.assertTrue(containerAttribute.hasContainerID(1, x));
     }
 
-    Assert.assertFalse(containerAttribute.hasContainerID(1,
+    Assertions.assertFalse(containerAttribute.hasContainerID(1,
         ContainerID.valueOf(42)));
   }
 
@@ -80,11 +75,11 @@ public class TestContainerAttribute {
       }
     }
     for (String k : keyslist) {
-      Assert.assertEquals(100,
+      Assertions.assertEquals(100,
           containerAttribute.getCollection(k).size());
     }
     containerAttribute.clearSet("Key1");
-    Assert.assertEquals(0,
+    Assertions.assertEquals(0,
         containerAttribute.getCollection("Key1").size());
   }
 
@@ -104,17 +99,17 @@ public class TestContainerAttribute {
     }
 
     for (int x = 1; x < 101; x += 2) {
-      Assert.assertFalse(containerAttribute.hasContainerID("Key1",
+      Assertions.assertFalse(containerAttribute.hasContainerID("Key1",
           ContainerID.valueOf(x)));
     }
 
-    Assert.assertEquals(100,
+    Assertions.assertEquals(100,
         containerAttribute.getCollection("Key2").size());
 
-    Assert.assertEquals(100,
+    Assertions.assertEquals(100,
         containerAttribute.getCollection("Key3").size());
 
-    Assert.assertEquals(50,
+    Assertions.assertEquals(50,
         containerAttribute.getCollection("Key1").size());
   }
 
@@ -128,16 +123,16 @@ public class TestContainerAttribute {
     ContainerID id = ContainerID.valueOf(42);
 
     containerAttribute.insert(key1, id);
-    Assert.assertTrue(containerAttribute.hasContainerID(key1, id));
-    Assert.assertFalse(containerAttribute.hasContainerID(key2, id));
+    Assertions.assertTrue(containerAttribute.hasContainerID(key1, id));
+    Assertions.assertFalse(containerAttribute.hasContainerID(key2, id));
 
     // This should move the id from key1 bucket to key2 bucket.
     containerAttribute.update(key1, key2, id);
-    Assert.assertFalse(containerAttribute.hasContainerID(key1, id));
-    Assert.assertTrue(containerAttribute.hasContainerID(key2, id));
+    Assertions.assertFalse(containerAttribute.hasContainerID(key1, id));
+    Assertions.assertTrue(containerAttribute.hasContainerID(key2, id));
 
     // This should fail since we cannot find this id in the key3 bucket.
-    thrown.expect(SCMException.class);
-    containerAttribute.update(key3, key1, id);
+    Assertions.assertThrows(SCMException.class,
+        () -> containerAttribute.update(key3, key1, id));
   }
 }

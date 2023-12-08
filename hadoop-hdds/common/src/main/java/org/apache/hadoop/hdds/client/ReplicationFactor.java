@@ -76,14 +76,18 @@ public enum ReplicationFactor {
     if (replicationFactor == null) {
       return null;
     }
-    switch (replicationFactor) {
+    return replicationFactor.toProto();
+  }
+
+  public HddsProtos.ReplicationFactor toProto() {
+    switch (this) {
     case ONE:
       return HddsProtos.ReplicationFactor.ONE;
     case THREE:
       return HddsProtos.ReplicationFactor.THREE;
     default:
       throw new IllegalArgumentException(
-          "Unsupported ProtoBuf replication factor: " + replicationFactor);
+          "Unsupported ProtoBuf replication factor: " + this);
     }
   }
 

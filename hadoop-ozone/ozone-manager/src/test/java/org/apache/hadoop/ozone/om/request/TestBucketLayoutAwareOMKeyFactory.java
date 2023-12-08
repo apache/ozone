@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.om.request;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
-import org.apache.hadoop.ozone.om.request.key.OMPathsPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFa
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.getRequestInstanceFromMap;
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.OM_KEY_REQUEST_CLASSES;
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.addRequestClass;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Validates functionality of {@link BucketLayoutAwareOMKeyRequestFactory}.
@@ -67,7 +67,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
                       getDummyOMRequest(), k,
                       BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-              Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+              Assertions.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
                   omKeyRequest.getBucketLayout());
               omKeyReqsFSO.add(omKeyRequest);
             } catch (NoSuchMethodException e) {
@@ -85,7 +85,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
                   getRequestInstanceFromMap(
                       getDummyOMRequest(), k, BucketLayout.LEGACY);
 
-              Assert.assertEquals(BucketLayout.LEGACY,
+              Assertions.assertEquals(BucketLayout.LEGACY,
                   omKeyRequest1.getBucketLayout());
               omKeyReqsLegacy.add(omKeyRequest1);
 
@@ -93,7 +93,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
                   getRequestInstanceFromMap(
                       getDummyOMRequest(), k, BucketLayout.OBJECT_STORE);
 
-              Assert.assertEquals(BucketLayout.OBJECT_STORE,
+              Assertions.assertEquals(BucketLayout.OBJECT_STORE,
                   omKeyRequest2.getBucketLayout());
               omKeyReqsOBS.add(omKeyRequest2);
             } catch (NoSuchMethodException e) {
@@ -109,12 +109,12 @@ public class TestBucketLayoutAwareOMKeyFactory {
           LOG.info("Validated request class instantiation for cmdType " + k);
         });
 
-    Assert.assertEquals(12, omKeyReqsFSO.size());
-    Assert.assertEquals(13, omKeyReqsLegacy.size());
-    Assert.assertEquals(13, omKeyReqsOBS.size());
+    Assertions.assertEquals(13, omKeyReqsFSO.size());
+    Assertions.assertEquals(14, omKeyReqsLegacy.size());
+    Assertions.assertEquals(14, omKeyReqsOBS.size());
     // Check if the number of instantiated OMKeyRequest classes is equal to
     // the number of keys in the mapping.
-    Assert.assertEquals(
+    Assertions.assertEquals(
         OM_KEY_REQUEST_CLASSES.size(),
         omKeyReqsFSO.size() + omKeyReqsOBS.size());
   }
@@ -132,8 +132,9 @@ public class TestBucketLayoutAwareOMKeyFactory {
       InstantiationException, IllegalAccessException {
     // Add an OMKeyRequest class that does not have a constructor compatible
     // with the Factory class.
-    addRequestClass(Type.PurgePaths, OMPathsPurgeRequestWithFSO.class,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    addRequestClass(Type.PurgeDirectories,
+            OMDirectoriesPurgeRequestWithFSO.class,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
     try {
       // This should fail, since this class does not have a valid constructor -
       // one that takes an OMRequest and a BucketLayout as parameters.
@@ -142,7 +143,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
               .setCmdType(Type.PurgeKeys)
               .setClientId("xyz")
               .build(),
-          getKey(Type.PurgePaths, BucketLayout.FILE_SYSTEM_OPTIMIZED),
+          getKey(Type.PurgeDirectories, BucketLayout.FILE_SYSTEM_OPTIMIZED),
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
       fail("No exception thrown for invalid OMKeyRequest class");
     } catch (NoSuchMethodException ex) {

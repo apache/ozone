@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.security.KerberosInfo;
@@ -71,7 +72,7 @@ public interface StorageContainerDatanodeProtocol {
    * @throws IOException
    */
   SCMHeartbeatResponseProto sendHeartbeat(SCMHeartbeatRequestProto heartbeat)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Register Datanode.

@@ -21,11 +21,12 @@ package org.apache.hadoop.ozone.container.common.utils;
 import com.google.common.base.Preconditions;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -35,17 +36,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * from caller stack. When JDK9 StackWalker is available, we can switch to
  * StackWalker instead of new Exception().printStackTrace().
  */
-public class ReferenceCountedDB implements Closeable {
+public class ReferenceCountedDB extends DBHandle {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReferenceCountedDB.class);
   private final AtomicInteger referenceCount;
-  private final DatanodeStore store;
-  private final String containerDBPath;
 
   public ReferenceCountedDB(DatanodeStore store, String containerDBPath) {
+    super(store, containerDBPath);
     this.referenceCount = new AtomicInteger(0);
-    this.store = store;
-    this.containerDBPath = containerDBPath;
   }
 
   public long getReferenceCount() {
@@ -55,7 +53,7 @@ public class ReferenceCountedDB implements Closeable {
   public void incrementReference() {
     this.referenceCount.incrementAndGet();
     if (LOG.isTraceEnabled()) {
-      LOG.trace("IncRef {} to refCnt {}, stackTrace: {}", containerDBPath,
+      LOG.trace("IncRef {} to refCnt {}, stackTrace: {}", getContainerDBPath(),
           referenceCount.get(), ExceptionUtils.getStackTrace(new Throwable()));
     }
   }
@@ -64,22 +62,23 @@ public class ReferenceCountedDB implements Closeable {
     int refCount = this.referenceCount.decrementAndGet();
     Preconditions.checkArgument(refCount >= 0, "refCount:", refCount);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("DecRef {} to refCnt {}, stackTrace: {}", containerDBPath,
+      LOG.trace("DecRef {} to refCnt {}, stackTrace: {}", getContainerDBPath(),
           referenceCount.get(), ExceptionUtils.getStackTrace(new Throwable()));
     }
   }
 
   public boolean cleanup() {
-    if (referenceCount.get() == 0 && store != null) {
+    if (getStore() != null && getStore().isClosed()
+        || referenceCount.get() == 0) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Close {} refCnt {}", containerDBPath,
+        LOG.debug("Close {} refCnt {}", getContainerDBPath(),
             referenceCount.get());
       }
       try {
-        store.stop();
+        getStore().stop();
         return true;
       } catch (Exception e) {
-        LOG.error("Error closing DB. Container: " + containerDBPath, e);
+        LOG.error("Error closing DB. Container: " + getContainerDBPath(), e);
         return false;
       }
     } else {
@@ -87,12 +86,16 @@ public class ReferenceCountedDB implements Closeable {
     }
   }
 
-  public DatanodeStore getStore() {
-    return store;
+  @Override
+  public void close() throws IOException {
+    decrementReference();
   }
 
-  @Override
-  public void close() {
-    decrementReference();
+  /**
+   * Returns if the underlying DB is closed. This call is threadsafe.
+   * @return true if the DB is closed.
+   */
+  public boolean isClosed() {
+    return getStore().isClosed();
   }
 }

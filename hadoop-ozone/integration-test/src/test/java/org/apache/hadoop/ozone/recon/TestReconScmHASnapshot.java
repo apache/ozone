@@ -24,7 +24,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 
@@ -37,7 +39,7 @@ public class TestReconScmHASnapshot {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(100);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 

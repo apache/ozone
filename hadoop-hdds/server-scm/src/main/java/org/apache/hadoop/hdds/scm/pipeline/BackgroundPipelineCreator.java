@@ -44,6 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
@@ -64,11 +65,13 @@ public class BackgroundPipelineCreator implements SCMService {
    * SCMService related variables.
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
-   * 2) NewNodeHandler, NonHealthyToHealthyNodeHandler, PreCheckComplete
+   * 2) NewNodeHandler, NodeAddressUpdateHandler,
+   *    NonHealthyToHealthyNodeHandler, PreCheckComplete
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */
   private final Lock serviceLock = new ReentrantLock();
+  private final String threadName;
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
   private final boolean createPipelineInSafeMode;
   private final long waitTimeInMillis;
@@ -108,8 +111,7 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    // start RatisPipelineUtilsThread
-    start();
+    threadName = scmContext.threadNamePrefix() + THREAD_NAME;
   }
 
   /**
@@ -118,18 +120,18 @@ public class BackgroundPipelineCreator implements SCMService {
   @Override
   public void start() {
     if (!running.compareAndSet(false, true)) {
-      LOG.warn("{} is already started, just ignore.", THREAD_NAME);
+      LOG.warn("{} is already started, just ignore.", threadName);
       return;
     }
 
-    LOG.info("Starting {}.", THREAD_NAME);
+    LOG.info("Starting {}.", threadName);
 
     thread = new ThreadFactoryBuilder()
         .setDaemon(false)
-        .setNameFormat(THREAD_NAME + " - %d")
+        .setNameFormat(threadName + "-%d")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate SCM, encounter uncaught exception"
-              + " in RatisPipelineUtilsThread";
+              + " in " + threadName;
           scmContext.getScm().shutDown(message);
         })
         .build()
@@ -143,11 +145,11 @@ public class BackgroundPipelineCreator implements SCMService {
    */
   public void stop() {
     if (!running.compareAndSet(true, false)) {
-      LOG.warn("{} is not running, just ignore.", THREAD_NAME);
+      LOG.warn("{} is not running, just ignore.", threadName);
       return;
     }
 
-    LOG.info("Stopping {}.", THREAD_NAME);
+    LOG.info("Stopping {}.", threadName);
 
     // in case RatisPipelineUtilsThread is sleeping
     thread.interrupt();
@@ -155,9 +157,13 @@ public class BackgroundPipelineCreator implements SCMService {
     try {
       thread.join();
     } catch (InterruptedException e) {
-      LOG.warn("Interrupted during join {}.", THREAD_NAME);
+      LOG.warn("Interrupted during join {}.", threadName);
       Thread.currentThread().interrupt();
     }
+  }
+
+  public boolean isRunning() {
+    return running.get();
   }
 
   private void run() {
@@ -174,7 +180,7 @@ public class BackgroundPipelineCreator implements SCMService {
           }
         }
       } catch (InterruptedException e) {
-        LOG.warn("{} is interrupted.", THREAD_NAME);
+        LOG.warn("{} is interrupted.", threadName);
         running.set(false);
         Thread.currentThread().interrupt();
       }
@@ -226,7 +232,8 @@ public class BackgroundPipelineCreator implements SCMService {
           (ReplicationConfig) it.next();
 
       try {
-        pipelineManager.createPipeline(replicationConfig);
+        Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+        LOG.info("Created new pipeline {}", pipeline);
       } catch (IOException ioe) {
         it.remove();
       } catch (Throwable t) {
@@ -267,9 +274,10 @@ public class BackgroundPipelineCreator implements SCMService {
       return;
     }
     if (event == NEW_NODE_HANDLER_TRIGGERED
-        || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-        || event == PRE_CHECK_COMPLETED) {
-      LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
+            || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
+            || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
+            || event == PRE_CHECK_COMPLETED) {
+      LOG.info("trigger a one-shot run on {}.", threadName);
 
       serviceLock.lock();
       try {

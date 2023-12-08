@@ -37,11 +37,6 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneChaosCluster extends GenericCli {
-  @Override
-  public void execute(String[] argv) {
-    super.execute(argv);
-  }
-
   public static void main(String[] args) {
     new OzoneChaosCluster().run(args);
   }

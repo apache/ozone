@@ -25,9 +25,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,17 +43,22 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
 
-  private List<OmKeyInfo> omKeyInfoList;
-  private List<String> ozoneKeys;
+  private List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
+  private List<String> ozoneKeys = new ArrayList<>();
 
+  protected List<OmKeyInfo> getOmKeyInfoList() {
+    return omKeyInfoList;
+  }
 
-  private void createPreRequisities() throws Exception {
+  protected List<String> getOzoneKeys() {
+    return ozoneKeys;
+  }
+
+  protected void createPreRequisities() throws Exception {
     String parent = "/user";
     String key = "key";
 
-    omKeyInfoList = new ArrayList<>();
-    ozoneKeys = new ArrayList<>();
-    String ozoneKey = "";
+    String ozoneKey;
     for (int i = 0; i < 10; i++) {
       keyName = parent.concat(key + i);
       OMRequestTestUtils.addKeyToTable(false, volumeName,
@@ -77,27 +81,29 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
             .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
                 .setStatus(true)).build();
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
-
-    OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true, omBucketInfo);
+    OMClientResponse omKeysDeleteResponse =
+        getOmKeysDeleteResponse(omResponse, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     for (String ozKey : ozoneKeys) {
-      Assert.assertNull(
+      Assertions.assertNull(
           omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       // ozKey had no block information associated with it, so it should have
       // been removed from the key table but not added to the delete table.
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      Assert.assertNull(repeatedOmKeyInfo);
+      Assertions.assertNull(repeatedOmKeyInfo);
     }
 
+  }
+
+  protected OMClientResponse getOmKeysDeleteResponse(OMResponse omResponse,
+      OmBucketInfo omBucketInfo) {
+    return new OMKeysDeleteResponse(
+        omResponse, omKeyInfoList, true, omBucketInfo);
   }
 
   @Test
@@ -110,22 +116,18 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
             .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
                 .setStatus(false)).build();
 
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setCreationTime(Time.now()).build();
-
-    OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, true, omBucketInfo);
+    OMClientResponse omKeysDeleteResponse
+        = getOmKeysDeleteResponse(omResponse, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     for (String ozKey : ozoneKeys) {
-      Assert.assertNotNull(
+      Assertions.assertNotNull(
           omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      Assert.assertNull(repeatedOmKeyInfo);
+      Assertions.assertNull(repeatedOmKeyInfo);
 
     }
 

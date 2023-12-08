@@ -43,8 +43,13 @@ public interface DeletedBlockLogStateManager {
   void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
       throws IOException;
 
+  @Replicate
+  int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+      throws IOException;
+
   TableIterator<Long,
-      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator();
+      KeyValue<Long, DeletedBlocksTransaction>> getReadOnlyIterator()
+      throws IOException;
 
   void onFlush();
 

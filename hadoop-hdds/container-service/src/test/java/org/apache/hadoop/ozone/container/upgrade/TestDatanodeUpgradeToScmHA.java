@@ -33,16 +33,15 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -69,6 +68,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Tests upgrading a single datanode from pre-SCM HA volume format that used
@@ -192,7 +193,9 @@ public class TestDatanodeUpgradeToScmHA {
     // restarted with SCM HA config and gets a different SCM ID.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     changeScmID();
+
     restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), true);
+
     // Make sure the existing container can be read.
     readChunk(exportWriteChunk2, pipeline);
 
@@ -344,6 +347,7 @@ public class TestDatanodeUpgradeToScmHA {
     changeScmID();
     // A new volume is added that must be formatted.
     File preFinVolume2 = addVolume();
+
     restartDatanode(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), true);
 
     Assert.assertEquals(2,
@@ -378,7 +382,9 @@ public class TestDatanodeUpgradeToScmHA {
     File finVolume = addVolume();
     // Yet another SCM ID is received this time, but it should not matter.
     changeScmID();
+
     restartDatanode(HDDSLayoutFeature.SCM_HA.layoutVersion(), false);
+
     Assert.assertEquals(3,
         dsm.getContainer().getVolumeSet().getVolumesList().size());
     Assert.assertEquals(0,
@@ -510,9 +516,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     // Build and start the datanode.
     DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
-    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd,
-        conf, null, null,
-        null);
+    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd, conf);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
         actualMlv);
@@ -528,9 +532,7 @@ public class TestDatanodeUpgradeToScmHA {
     dsm.close();
 
     // Start new datanode with the same configuration.
-    dsm = new DatanodeStateMachine(dd,
-        conf, null, null,
-        null);
+    dsm = new DatanodeStateMachine(dd, conf);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     if (exactMatch) {
       Assert.assertEquals(expectedMlv, mlv);
@@ -601,7 +603,7 @@ public class TestDatanodeUpgradeToScmHA {
   public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
       long containerID, Pipeline pipeline) throws Exception {
     return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100, null);
+            ContainerTestHelper.getTestBlockID(containerID), 100);
   }
 
   public Pipeline getPipeline() {
@@ -650,7 +652,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     File destination = tempFolder.newFile();
     try (FileOutputStream fos = new FileOutputStream(destination)) {
-      replicationSource.copyData(containerId, fos);
+      replicationSource.copyData(containerId, fos, NO_COMPRESSION);
     }
     return destination;
   }
@@ -660,16 +662,18 @@ public class TestDatanodeUpgradeToScmHA {
    * {@code containerID}.
    */
   public void importContainer(long containerID, File source) throws Exception {
-    DownloadAndImportReplicator replicator =
-        new DownloadAndImportReplicator(dsm.getContainer().getContainerSet(),
+    ContainerImporter replicator =
+        new ContainerImporter(dsm.getConf(),
+            dsm.getContainer().getContainerSet(),
             dsm.getContainer().getController(),
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+            dsm.getContainer().getVolumeSet());
 
-    File tempFile = tempFolder.newFile();
+    File tempFile = tempFolder.newFile(
+        ContainerUtils.getContainerTarName(containerID));
     Files.copy(source.toPath(), tempFile.toPath(),
         StandardCopyOption.REPLACE_EXISTING);
-    replicator.importContainer(containerID, tempFile.toPath());
+    replicator.importContainer(containerID, tempFile.toPath(), null,
+        NO_COMPRESSION);
   }
 
   public void dispatchRequest(

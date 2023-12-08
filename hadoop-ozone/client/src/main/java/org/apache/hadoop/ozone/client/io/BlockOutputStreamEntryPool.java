@@ -19,13 +19,17 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -50,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * entries that represent a writing channel towards DataNodes are the main
  * responsibility of this class.
  */
-public class BlockOutputStreamEntryPool {
+public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
@@ -79,6 +83,7 @@ public class BlockOutputStreamEntryPool {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private final ContainerClientMetrics clientMetrics;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -88,7 +93,8 @@ public class BlockOutputStreamEntryPool {
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
-      XceiverClientFactory xceiverClientFactory, long openID
+      XceiverClientFactory xceiverClientFactory, long openID,
+      ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -110,19 +116,15 @@ public class BlockOutputStreamEntryPool {
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
+    this.clientMetrics = clientMetrics;
   }
 
   ExcludeList createExcludeList() {
-    return new ExcludeList();
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
   }
 
-  /**
-   * A constructor for testing purpose only.
-   *
-   * @see KeyOutputStream#KeyOutputStream()
-   */
-  @VisibleForTesting
-  BlockOutputStreamEntryPool() {
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
@@ -139,7 +141,8 @@ public class BlockOutputStreamEntryPool {
 
     currentStreamIndex = 0;
     openID = -1;
-    excludeList = new ExcludeList();
+    excludeList = createExcludeList();
+    this.clientMetrics = clientMetrics;
   }
 
   /**
@@ -185,6 +188,7 @@ public class BlockOutputStreamEntryPool {
             .setLength(subKeyInfo.getLength())
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
+            .setClientMetrics(clientMetrics)
             .build();
   }
 
@@ -245,6 +249,10 @@ public class BlockOutputStreamEntryPool {
 
   OzoneClientConfig getConfig() {
     return config;
+  }
+
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   /**
@@ -324,7 +332,7 @@ public class BlockOutputStreamEntryPool {
       // in test, this could be null
       long length = getKeyLength();
       Preconditions.checkArgument(offset == length,
-          "Epected offset: " + offset + " expected len: " + length);
+          "Expected offset: " + offset + " expected len: " + length);
       keyArgs.setDataSize(length);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not
@@ -335,6 +343,27 @@ public class BlockOutputStreamEntryPool {
             omClient.commitMultipartUploadPart(keyArgs, openID);
       } else {
         omClient.commitKey(keyArgs, openID);
+      }
+    } else {
+      LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
+  }
+
+  void hsyncKey(long offset) throws IOException {
+    if (keyArgs != null) {
+      // in test, this could be null
+      long length = getKeyLength();
+      Preconditions.checkArgument(offset == length,
+              "Expected offset: " + offset + " expected len: " + length);
+      keyArgs.setDataSize(length);
+      keyArgs.setLocationInfoList(getLocationInfoList());
+      // When the key is multipart upload part file upload, we should not
+      // commit the key, as this is not an actual key, this is a just a
+      // partial key of a large file.
+      if (keyArgs.getIsMultipartKey()) {
+        throw new IOException("Hsync is unsupported for multipart keys.");
+      } else {
+        omClient.hsyncKey(keyArgs, openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
@@ -402,5 +431,17 @@ public class BlockOutputStreamEntryPool {
 
   boolean isEmpty() {
     return streamEntries.isEmpty();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    if (keyArgs != null) {
+      return this.keyArgs.getMetadata();
+    }
+    return null;
+  }
+
+  long getDataSize() {
+    return keyArgs.getDataSize();
   }
 }

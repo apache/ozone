@@ -125,13 +125,15 @@ public class GeneratorOm extends BaseGenerator implements
       long containerId = getContainerIdOffset() + index;
 
       int keyPerContainer = getKeysPerContainer(config);
-      BatchOperation omKeyTableBatchOperation = omDb.initBatchOperation();
-      for (long localId = 0; localId < keyPerContainer; localId++) {
-        BlockID blockId = new BlockID(containerId, localId);
-        writeOmData(localId, blockId, omKeyTableBatchOperation);
+      try (BatchOperation omKeyTableBatchOperation
+               = omDb.initBatchOperation()) {
+        for (long localId = 0; localId < keyPerContainer; localId++) {
+          BlockID blockId = new BlockID(containerId, localId);
+          writeOmData(localId, blockId, omKeyTableBatchOperation);
+        }
+        commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
+        return null;
       }
-      commitAndResetOMKeyTableBatchOperation(omKeyTableBatchOperation);
-      return null;
     });
 
   }

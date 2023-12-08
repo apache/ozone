@@ -25,15 +25,17 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,24 +43,32 @@ import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test operation permission check result.
+ * Test-cases in this class verify that permission denied errors from OM
+ * are handled correctly by S3 endpoints.
  */
 public class TestPermissionCheck {
   private OzoneConfiguration conf;
   private OzoneClient client;
-  private ObjectStore objectStore;
+  private ClientProtocol clientProtocol;
   private OzoneBucket bucket;
+  private ObjectStore objectStore;
   private OzoneVolume volume;
   private OMException exception;
   private HttpHeaders headers;
 
-  @Before
+  @BeforeEach
   public void setup() {
     conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
@@ -67,11 +77,14 @@ public class TestPermissionCheck {
     objectStore = Mockito.mock(ObjectStore.class);
     bucket = Mockito.mock(OzoneBucket.class);
     volume = Mockito.mock(OzoneVolume.class);
+    when(volume.getName()).thenReturn("s3Volume");
     exception = new OMException("Permission Denied",
         OMException.ResultCodes.PERMISSION_DENIED);
     Mockito.when(client.getObjectStore()).thenReturn(objectStore);
     Mockito.when(client.getConfiguration()).thenReturn(conf);
     headers = Mockito.mock(HttpHeaders.class);
+    clientProtocol = Mockito.mock(ClientProtocol.class);
+    Mockito.when(client.getProxy()).thenReturn(clientProtocol);
   }
 
   /**
@@ -79,17 +92,11 @@ public class TestPermissionCheck {
    */
   @Test
   public void testListS3Buckets() throws IOException {
-    doThrow(exception).when(objectStore).getVolume(anyString());
+    doThrow(exception).when(objectStore).getS3Volume();
     RootEndpoint rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(client);
-
-    try {
-      rootEndpoint.get();
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> rootEndpoint.get());
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   /**
@@ -100,14 +107,9 @@ public class TestPermissionCheck {
     doThrow(exception).when(objectStore).getS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
-
-    try {
-      bucketEndpoint.head("bucketName");
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.head("bucketName"));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -116,14 +118,9 @@ public class TestPermissionCheck {
     doThrow(exception).when(objectStore).createS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
-
-    try {
-      bucketEndpoint.put("bucketName", null, null, null);
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.put("bucketName", null, null, null));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -132,13 +129,9 @@ public class TestPermissionCheck {
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 
-    try {
-      bucketEndpoint.delete("bucketName");
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.delete("bucketName"));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
   @Test
   public void testListMultiUpload() throws IOException {
@@ -147,31 +140,24 @@ public class TestPermissionCheck {
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 
-    try {
-      bucketEndpoint.listMultipartUploads("bucketName", "prefix");
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        bucketEndpoint.listMultipartUploads("bucketName", "prefix"));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
   public void testListKey() throws IOException {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listKeys(anyString());
+    doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
+        anyBoolean());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 
-    try {
-      bucketEndpoint.get("bucketName", null, null, null, 1000,
-          null, null, null, null, null, null);
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
+        "bucketName", null, null, null, 1000,
+        null, null, null, null, null, null));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -189,14 +175,14 @@ public class TestPermissionCheck {
 
     MultiDeleteResponse response =
         bucketEndpoint.multiDelete("BucketName", "keyName", request);
-    Assert.assertTrue(response.getErrors().size() == 1);
-    Assert.assertTrue(
+    assertEquals(1, response.getErrors().size());
+    assertTrue(
         response.getErrors().get(0).getCode().equals("PermissionDenied"));
   }
 
   @Test
   public void testGetAcl() throws Exception {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).getAcls();
 
@@ -209,18 +195,15 @@ public class TestPermissionCheck {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
-    try {
-      bucketEndpoint.get("bucketName", null, null, null, 1000,
-          null, null, null, null, "acl", null);
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception &&
-          ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
+        "bucketName", null, null, null, 1000, null, null, null, null, "acl",
+        null), "Expected OS3Exception with FORBIDDEN http code.");
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
   public void testSetAcl() throws Exception {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).addAcl(any());
 
@@ -236,7 +219,7 @@ public class TestPermissionCheck {
     try {
       bucketEndpoint.put("bucketName", "acl", headers, null);
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception &&
+      assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
     }
   }
@@ -246,59 +229,49 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).getKey(anyString());
+    Mockito.when(client.getProxy()).thenReturn(clientProtocol);
+    doThrow(exception).when(clientProtocol)
+        .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setOzoneConfiguration(conf);
 
-    try {
-      objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker",
-          null);
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      e.printStackTrace();
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.get(
+        "bucketName", "keyPath", 0, null, 1000, "marker"));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
   public void testPutKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket)
-        .createKey(anyString(), anyLong(), any(), any());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    Mockito.when(volume.getBucket("bucketName")).thenReturn(bucket);
+    doThrow(exception).when(clientProtocol).createKey(
+            anyString(), anyString(), anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setOzoneConfiguration(conf);
 
-    try {
-      objectEndpoint.put("bucketName", "keyPath", 1024, 0, null, null);
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
+        "bucketName", "keyPath", 1024, 0, null,
+        new ByteArrayInputStream(new byte[]{})));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
   public void testDeleteKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).deleteKey(anyString());
+    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
+        anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setOzoneConfiguration(conf);
 
-    try {
-      objectEndpoint.delete("bucketName", "keyPath", null);
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        objectEndpoint.delete("bucketName", "keyPath", null));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
@@ -310,12 +283,8 @@ public class TestPermissionCheck {
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setOzoneConfiguration(conf);
 
-    try {
-      objectEndpoint.initializeMultipartUpload("bucketName", "keyPath");
-      Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () ->
+        objectEndpoint.initializeMultipartUpload("bucketName", "keyPath"));
+    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 }

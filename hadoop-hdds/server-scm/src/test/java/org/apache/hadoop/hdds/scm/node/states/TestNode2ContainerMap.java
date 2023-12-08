@@ -21,12 +21,9 @@ package org.apache.hadoop.hdds.scm.node.states;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.Random;
@@ -44,9 +41,6 @@ public class TestNode2ContainerMap {
   private final Map<UUID, TreeSet<ContainerID>> testData = new
       ConcurrentHashMap<>();
 
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
   private void generateData() {
     for (int dnIndex = 1; dnIndex <= DATANODE_COUNT; dnIndex++) {
       TreeSet<ContainerID> currentSet = new TreeSet<>();
@@ -62,13 +56,9 @@ public class TestNode2ContainerMap {
     return testData.keySet().iterator().next();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     generateData();
-  }
-
-  @After
-  public void tearDown() throws Exception {
   }
 
   @Test
@@ -78,10 +68,10 @@ public class TestNode2ContainerMap {
     UUID unknownNode = UUID.randomUUID();
     Set<ContainerID> containerIDs = testData.get(knownNode);
     map.insertNewDatanode(knownNode, containerIDs);
-    Assert.assertTrue("Not able to detect a known node",
-        map.isKnownDatanode(knownNode));
-    Assert.assertFalse("Unknown node detected",
-        map.isKnownDatanode(unknownNode));
+    Assertions.assertTrue(map.isKnownDatanode(knownNode),
+        "Not able to detect a known node");
+    Assertions.assertFalse(map.isKnownDatanode(unknownNode),
+        "Unknown node detected");
   }
 
   @Test
@@ -95,12 +85,12 @@ public class TestNode2ContainerMap {
     // Assert that all elements are present in the set that we read back from
     // node map.
     Set newSet = new TreeSet((readSet));
-    Assert.assertTrue(newSet.removeAll(containerIDs));
-    Assert.assertTrue(newSet.size() == 0);
+    Assertions.assertTrue(newSet.removeAll(containerIDs));
+    Assertions.assertEquals(0, newSet.size());
 
-    thrown.expect(SCMException.class);
-    thrown.expectMessage("already exists");
-    map.insertNewDatanode(knownNode, containerIDs);
+    Throwable t = Assertions.assertThrows(SCMException.class,
+        () -> map.insertNewDatanode(knownNode, containerIDs));
+    Assertions.assertEquals("Node already exists in the map", t.getMessage());
 
     map.removeDatanode(knownNode);
     map.insertNewDatanode(knownNode, containerIDs);
@@ -113,9 +103,9 @@ public class TestNode2ContainerMap {
     Set<ContainerID> values = testData.get(key);
     Node2ContainerMap map = new Node2ContainerMap();
     map.insertNewDatanode(key, values);
-    Assert.assertTrue(map.isKnownDatanode(key));
+    Assertions.assertTrue(map.isKnownDatanode(key));
     ReportResult result = map.processReport(key, values);
-    Assert.assertEquals(ReportResult.ReportStatus.ALL_IS_WELL,
+    Assertions.assertEquals(ReportResult.ReportStatus.ALL_IS_WELL,
         result.getStatus());
   }
 
@@ -125,18 +115,22 @@ public class TestNode2ContainerMap {
     Set<ContainerID> values = testData.get(datanodeId);
     Node2ContainerMap map = new Node2ContainerMap();
     map.insertNewDatanode(datanodeId, values);
-    Assert.assertTrue(map.isKnownDatanode(datanodeId));
-    Assert.assertEquals(CONTAINER_COUNT, map.getContainers(datanodeId).size());
+    Assertions.assertTrue(map.isKnownDatanode(datanodeId));
+    Assertions.assertEquals(CONTAINER_COUNT,
+        map.getContainers(datanodeId).size());
 
     //remove one container
     values.remove(values.iterator().next());
-    Assert.assertEquals(CONTAINER_COUNT - 1, values.size());
-    Assert.assertEquals(CONTAINER_COUNT, map.getContainers(datanodeId).size());
+    Assertions.assertEquals(CONTAINER_COUNT - 1,
+        values.size());
+    Assertions.assertEquals(CONTAINER_COUNT,
+        map.getContainers(datanodeId).size());
 
     map.setContainersForDatanode(datanodeId, values);
 
-    Assert.assertEquals(values.size(), map.getContainers(datanodeId).size());
-    Assert.assertEquals(values, map.getContainers(datanodeId));
+    Assertions.assertEquals(values.size(),
+        map.getContainers(datanodeId).size());
+    Assertions.assertEquals(values, map.getContainers(datanodeId));
   }
 
   @Test
@@ -148,7 +142,7 @@ public class TestNode2ContainerMap {
     }
     // Assert all Keys are known datanodes.
     for (UUID key : testData.keySet()) {
-      Assert.assertTrue(map.isKnownDatanode(key));
+      Assertions.assertTrue(map.isKnownDatanode(key));
     }
   }
 
@@ -174,16 +168,16 @@ public class TestNode2ContainerMap {
    * @throws SCMException
    */
   @Test
-  public void testProcessReportDetectNewDataNode() throws SCMException {
+  public void testProcessReportDetectNewDataNode() {
     Node2ContainerMap map = new Node2ContainerMap();
     // If we attempt to process a node that is not present in the map,
     // we get a result back that says, NEW_NODE_FOUND.
     UUID key = getFirstKey();
     TreeSet<ContainerID> values = testData.get(key);
     ReportResult result = map.processReport(key, values);
-    Assert.assertEquals(ReportResult.ReportStatus.NEW_DATANODE_FOUND,
+    Assertions.assertEquals(ReportResult.ReportStatus.NEW_DATANODE_FOUND,
         result.getStatus());
-    Assert.assertEquals(result.getNewEntries().size(), values.size());
+    Assertions.assertEquals(result.getNewEntries().size(), values.size());
   }
 
   /**
@@ -216,15 +210,15 @@ public class TestNode2ContainerMap {
     ReportResult result = map.processReport(key, newContainersSet);
 
     //Assert that expected size of missing container is same as addedContainers
-    Assert.assertEquals(ReportResult.ReportStatus.NEW_ENTRIES_FOUND,
+    Assertions.assertEquals(ReportResult.ReportStatus.NEW_ENTRIES_FOUND,
         result.getStatus());
 
-    Assert.assertEquals(addedContainers.size(),
+    Assertions.assertEquals(addedContainers.size(),
         result.getNewEntries().size());
 
     // Assert that the Container IDs are the same as we added new.
-    Assert.assertTrue("All objects are not removed.",
-        result.getNewEntries().removeAll(addedContainers));
+    Assertions.assertTrue(result.getNewEntries().removeAll(addedContainers),
+        "All objects are not removed.");
   }
 
   /**
@@ -261,14 +255,15 @@ public class TestNode2ContainerMap {
 
 
     //Assert that expected size of missing container is same as addedContainers
-    Assert.assertEquals(ReportResult.ReportStatus.MISSING_ENTRIES,
+    Assertions.assertEquals(ReportResult.ReportStatus.MISSING_ENTRIES,
         result.getStatus());
-    Assert.assertEquals(removedContainers.size(),
+    Assertions.assertEquals(removedContainers.size(),
         result.getMissingEntries().size());
 
     // Assert that the Container IDs are the same as we added new.
-    Assert.assertTrue("All missing containers not found.",
-        result.getMissingEntries().removeAll(removedContainers));
+    Assertions.assertTrue(
+        result.getMissingEntries().removeAll(removedContainers),
+        "All missing containers not found.");
   }
 
   @Test
@@ -306,22 +301,23 @@ public class TestNode2ContainerMap {
     ReportResult result = map.processReport(key, newSet);
 
 
-    Assert.assertEquals(
+    Assertions.assertEquals(
             ReportResult.ReportStatus.MISSING_AND_NEW_ENTRIES_FOUND,
         result.getStatus());
-    Assert.assertEquals(removedContainers.size(),
+    Assertions.assertEquals(removedContainers.size(),
         result.getMissingEntries().size());
 
 
     // Assert that the Container IDs are the same as we added new.
-    Assert.assertTrue("All missing containers not found.",
-        result.getMissingEntries().removeAll(removedContainers));
+    Assertions.assertTrue(
+        result.getMissingEntries().removeAll(removedContainers),
+        "All missing containers not found.");
 
-    Assert.assertEquals(insertedSet.size(),
+    Assertions.assertEquals(insertedSet.size(),
         result.getNewEntries().size());
 
     // Assert that the Container IDs are the same as we added new.
-    Assert.assertTrue("All inserted containers are not found.",
-        result.getNewEntries().removeAll(insertedSet));
+    Assertions.assertTrue(result.getNewEntries().removeAll(insertedSet),
+        "All inserted containers are not found.");
   }
 }

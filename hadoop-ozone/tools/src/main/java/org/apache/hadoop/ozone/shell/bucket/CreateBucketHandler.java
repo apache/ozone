@@ -59,28 +59,10 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts {
-    FILE_SYSTEM_OPTIMIZED("FILE_SYSTEM_OPTIMIZED"),
-    OBJECT_STORE("OBJECT_STORE"),
-    DEFAULT("");
-
-    // Assigning a value to each enum
-    private final String layout;
-    AllowedBucketLayouts(String layout) {
-      this.layout = layout;
-    }
-
-    // Overriding toString() method to return the value passed to the
-    // constructor.
-    @Override
-    public String toString() {
-      return this.layout;
-    }
-  }
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
 
   @Option(names = { "--layout", "-l" },
-      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}",
-      defaultValue = "")
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
   private AllowedBucketLayouts allowedBucketLayout;
 
   @CommandLine.Mixin
@@ -100,12 +82,14 @@ public class CreateBucketHandler extends BucketHandler {
       ownerName = UserGroupInformation.getCurrentUser().getShortUserName();
     }
 
-    BucketArgs.Builder bb;
-    BucketLayout bucketLayout =
-        BucketLayout.fromString(allowedBucketLayout.toString());
-    bb = new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
-        .setVersioning(false).setBucketLayout(bucketLayout)
-        .setOwner(ownerName);
+    BucketArgs.Builder bb =
+        new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
+            .setVersioning(false).setOwner(ownerName);
+    if (allowedBucketLayout != null) {
+      BucketLayout bucketLayout =
+          BucketLayout.fromString(allowedBucketLayout.toString());
+      bb.setBucketLayout(bucketLayout);
+    }
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
     if (isGdprEnforced != null) {

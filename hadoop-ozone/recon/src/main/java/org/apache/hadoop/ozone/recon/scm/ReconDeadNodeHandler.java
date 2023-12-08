@@ -28,7 +28,9 @@ import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,15 +42,25 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconDeadNodeHandler.class);
 
-
   private StorageContainerServiceProvider scmClient;
+  private ContainerHealthTask containerHealthTask;
+  private PipelineSyncTask pipelineSyncTask;
+  private ContainerSizeCountTask containerSizeCountTask;
+  private ContainerManager containerManager;
 
   public ReconDeadNodeHandler(NodeManager nodeManager,
                               PipelineManager pipelineManager,
                               ContainerManager containerManager,
-                              StorageContainerServiceProvider scmClient) {
+                              StorageContainerServiceProvider scmClient,
+                              ContainerHealthTask containerHealthTask,
+                              PipelineSyncTask pipelineSyncTask,
+                              ContainerSizeCountTask containerSizeCountTask) {
     super(nodeManager, pipelineManager, containerManager);
     this.scmClient = scmClient;
+    this.containerManager = containerManager;
+    this.containerHealthTask = containerHealthTask;
+    this.pipelineSyncTask = pipelineSyncTask;
+    this.containerSizeCountTask = containerSizeCountTask;
   }
 
   @Override
@@ -71,6 +83,9 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
         LOG.warn("Node {} has reached DEAD state, but SCM does not have " +
             "information about it.", datanodeDetails);
       }
+      containerHealthTask.triggerContainerHealthCheck();
+      pipelineSyncTask.triggerPipelineSyncTask();
+      containerSizeCountTask.process(containerManager.getContainers());
     } catch (Exception ioEx) {
       LOG.error("Error trying to verify Node operational state from SCM.",
           ioEx);

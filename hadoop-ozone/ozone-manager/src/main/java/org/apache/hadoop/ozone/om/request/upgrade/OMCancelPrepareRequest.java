@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +63,10 @@ public class OMCancelPrepareRequest extends OMClientRequest {
     OMClientResponse response = null;
 
     try {
-      String username = getOmRequest().getUserInfo().getUserName();
-      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(username)) {
-        throw new OMException("Access denied for user " + username + ". " +
+      UserGroupInformation ugi = createUGIForApi();
+      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
+        throw new OMException("Access denied for user "
+            + ugi + ". " +
             "Superuser privilege is required to cancel ozone manager " +
             "preparation.",
             OMException.ResultCodes.ACCESS_DENIED);
