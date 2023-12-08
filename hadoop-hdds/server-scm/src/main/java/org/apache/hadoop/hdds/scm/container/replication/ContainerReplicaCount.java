@@ -49,6 +49,8 @@ public interface ContainerReplicaCount {
   boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
       NodeManager nodeManager);
 
+  boolean isUnderReplicated();
+
   boolean isOverReplicated();
 
   int getDecommissionCount();

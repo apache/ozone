@@ -389,6 +389,14 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   /**
+   * @return true if the container is under replicated, false otherwise
+   */
+  @Override
+  public boolean isUnderReplicated() {
+    return !isSufficientlyReplicated();
+  }
+
+  /**
    * If any index has more than one copy that is not in maintenance or
    * decommission, then the container is over replicated. If the
    * includePendingDeletes flag is false we ignore replicas pending delete.

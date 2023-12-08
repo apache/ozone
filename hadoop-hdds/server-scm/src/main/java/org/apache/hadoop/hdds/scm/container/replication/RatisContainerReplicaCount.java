@@ -525,6 +525,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   /**
    * @return true if the container is under replicated, false otherwise
    */
+  @Override
   public boolean isUnderReplicated() {
     return !isSufficientlyReplicated();
   }

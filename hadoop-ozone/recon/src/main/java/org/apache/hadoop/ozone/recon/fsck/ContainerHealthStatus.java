@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 
 import java.io.IOException;
@@ -51,7 +53,7 @@ public class ContainerHealthStatus {
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final int numReplicas;
   private final long numKeys;
-  private final RatisContainerReplicaCount ratisContainerReplicaCount;
+  private final ContainerReplicaCount containerReplicaCount;
 
   ContainerHealthStatus(ContainerInfo container,
                         Set<ContainerReplica> replicas,
@@ -81,10 +83,8 @@ public class ContainerHealthStatus {
     this.numReplicas = replicas.size();
     this.numKeys = getContainerKeyCount(container.getContainerID());
 
-    int minNumMaintenanceReplicas = getMinimumRequiredReplicaNum(conf);
-    this.ratisContainerReplicaCount =
-        new RatisContainerReplicaCount(container, replicas, new ArrayList<>(),
-            minNumMaintenanceReplicas, false);
+    this.containerReplicaCount =
+        getContainerReplicaCountInstance(conf, replicas);
   }
 
   public long getContainerID() {
@@ -100,11 +100,11 @@ public class ContainerHealthStatus {
   }
 
   public boolean isHealthy() {
-    return ratisContainerReplicaCount.isHealthy();
+    return containerReplicaCount.isHealthy();
   }
 
   public boolean isSufficientlyReplicated() {
-    return ratisContainerReplicaCount.isSufficientlyReplicated(false);
+    return containerReplicaCount.isSufficientlyReplicated();
   }
 
   public boolean isProperlyReplicated() {
@@ -117,11 +117,11 @@ public class ContainerHealthStatus {
   }
 
   public boolean isOverReplicated() {
-    return ratisContainerReplicaCount.isOverReplicated();
+    return containerReplicaCount.isOverReplicated();
   }
 
   public boolean isUnderReplicated() {
-    return !isMissing() && ratisContainerReplicaCount.isUnderReplicated();
+    return !isMissing() && containerReplicaCount.isUnderReplicated();
   }
 
   public int replicaDelta() {
@@ -181,13 +181,20 @@ public class ContainerHealthStatus {
     return numKeys;
   }
 
-  private int getMinimumRequiredReplicaNum(OzoneConfiguration conf) {
+  private ContainerReplicaCount getContainerReplicaCountInstance(
+      OzoneConfiguration conf, Set<ContainerReplica> replicas) {
     ReplicationManager.ReplicationManagerConfiguration rmConf = conf.getObject(
         ReplicationManager.ReplicationManagerConfiguration.class);
     boolean isEC = container.getReplicationConfig()
                        .getReplicationType() == HddsProtos.ReplicationType.EC;
     return isEC ?
-               rmConf.getMaintenanceRemainingRedundancy() :
-               rmConf.getMaintenanceReplicaMinimum();
+               new ECContainerReplicaCount(container,
+                   replicas, new ArrayList<>(),
+                   rmConf.getMaintenanceRemainingRedundancy()) :
+               // This class ignores unhealthy replicas,
+               // therefore set 'considerUnhealthy' to false.
+               new RatisContainerReplicaCount(container,
+                   replicas, new ArrayList<>(),
+                   rmConf.getMaintenanceReplicaMinimum(), false);
   }
 }
