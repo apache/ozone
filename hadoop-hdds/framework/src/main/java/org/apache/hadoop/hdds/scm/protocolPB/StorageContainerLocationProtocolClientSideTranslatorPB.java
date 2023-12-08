@@ -126,6 +126,7 @@ import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSING;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -581,10 +582,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     SCMCloseContainerResponseProto response = submitRequest(Type.CloseContainer,
           builder -> builder.setScmCloseContainerRequest(
             request)).getScmCloseContainerResponse();
-    if (response.hasStatus() && response.getStatus()
-        .equals(CONTAINER_ALREADY_CLOSED)) {
+    if (response.hasStatus() && (response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSED) || response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSING))) {
       String errorMessage =
-          String.format("Container %s already closed", containerID);
+          response.getStatus().equals(CONTAINER_ALREADY_CLOSED) ?
+              String.format("Container %s already closed", containerID) :
+              String.format("Container %s is in closing state", containerID);
       throw new IOException(errorMessage);
     }
   }

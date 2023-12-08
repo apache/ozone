@@ -666,6 +666,9 @@ public class SCMClientProtocolServer implements
         if (state.equals(HddsProtos.LifeCycleState.CLOSED)) {
           resultCode = ResultCodes.CONTAINER_ALREADY_CLOSED;
         }
+        if (state.equals(HddsProtos.LifeCycleState.CLOSING)) {
+          resultCode = ResultCodes.CONTAINER_ALREADY_CLOSING;
+        }
         throw new SCMException("Cannot close a " + state + " container.",
             resultCode);
       }
