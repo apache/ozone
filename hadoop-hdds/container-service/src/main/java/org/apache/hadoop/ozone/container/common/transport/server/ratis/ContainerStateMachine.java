@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,6 +69,7 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
@@ -157,6 +159,31 @@ public class ContainerStateMachine extends BaseStateMachine {
     synchronized void removeIfEmpty(long containerId) {
       map.computeIfPresent(containerId,
           (id, q) -> q.isEmpty() ? null : q);
+    }
+  }
+
+  static class Context {
+    private final ContainerCommandRequestProto requestProto;
+    private final ContainerCommandRequestProto logProto;
+    private final long startTime;
+
+    Context(ContainerCommandRequestProto requestProto,
+        ContainerCommandRequestProto logProto, long startTime) {
+      this.requestProto = requestProto;
+      this.logProto = logProto;
+      this.startTime = startTime;
+    }
+
+    ContainerCommandRequestProto getRequestProto() {
+      return requestProto;
+    }
+
+    ContainerCommandRequestProto getLogProto() {
+      return logProto;
+    }
+
+    long getStartTime() {
+      return startTime;
     }
   }
 
@@ -359,6 +386,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     final ContainerCommandRequestProto proto =
         message2ContainerCommandRequestProto(request.getMessage());
     Preconditions.checkArgument(request.getRaftGroupId().equals(gid));
+
+    final TransactionContext.Builder builder = TransactionContext.newBuilder()
+        .setClientRequest(request)
+        .setStateMachine(this)
+        .setServerRole(RaftPeerRole.LEADER);
+
     try {
       dispatcher.validateContainerCommand(proto);
     } catch (IOException ioe) {
@@ -368,13 +401,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         metrics.incNumStartTransactionVerifyFailures();
         LOG.error("startTransaction validation failed on leader", ioe);
       }
-      TransactionContext ctxt = TransactionContext.newBuilder()
-          .setClientRequest(request)
-          .setStateMachine(this)
-          .setServerRole(RaftPeerRole.LEADER)
-          .build();
-      ctxt.setException(ioe);
-      return ctxt;
+      return builder.build().setException(ioe);
     }
     if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
@@ -389,34 +416,28 @@ public class ContainerStateMachine extends BaseStateMachine {
       ContainerCommandRequestProto commitContainerCommandProto =
           ContainerCommandRequestProto
               .newBuilder(proto)
+              .setPipelineID(gid.getUuid().toString())
               .setWriteChunk(commitWriteChunkProto)
               .setTraceID(proto.getTraceID())
               .build();
       Preconditions.checkArgument(write.hasData());
       Preconditions.checkArgument(!write.getData().isEmpty());
 
-      return TransactionContext.newBuilder()
-          .setClientRequest(request)
-          .setStateMachine(this)
-          .setServerRole(RaftPeerRole.LEADER)
-          .setStateMachineContext(startTime)
+      final Context context = new Context(proto,
+          commitContainerCommandProto, startTime);
+      return builder
+          .setStateMachineContext(context)
           .setStateMachineData(write.getData())
           .setLogData(commitContainerCommandProto.toByteString())
           .build();
     } else {
-      return TransactionContext.newBuilder()
-          .setClientRequest(request)
-          .setStateMachine(this)
-          .setServerRole(RaftPeerRole.LEADER)
-          .setStateMachineContext(startTime)
+      final Context context = new Context(proto, proto, startTime);
+      return builder
+          .setStateMachineContext(context)
           .setLogData(proto.toByteString())
           .build();
     }
 
-  }
-
-  private ByteString getStateMachineData(StateMachineLogEntryProto entryProto) {
-    return entryProto.getStateMachineEntry().getStateMachineData();
   }
 
   private static ContainerCommandRequestProto getContainerCommandRequestProto(
@@ -645,20 +666,14 @@ public class ContainerStateMachine extends BaseStateMachine {
    * and also with applyTransaction.
    */
   @Override
-  public CompletableFuture<Message> write(LogEntryProto entry) {
+  public CompletableFuture<Message> write(LogEntryProto entry,
+      TransactionContext transactionContext) {
     try {
       metrics.incNumWriteStateMachineOps();
       long writeStateMachineStartTime = Time.monotonicNowNanos();
-      ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(gid,
-              entry.getStateMachineLogEntry().getLogData());
-      WriteChunkRequestProto writeChunk =
-          WriteChunkRequestProto.newBuilder(requestProto.getWriteChunk())
-              .setData(getStateMachineData(entry.getStateMachineLogEntry()))
-              .build();
-      requestProto = ContainerCommandRequestProto.newBuilder(requestProto)
-          .setWriteChunk(writeChunk).build();
-      Type cmdType = requestProto.getCmdType();
+      final Context context = (Context)transactionContext.getStateMachineContext();
+      final ContainerCommandRequestProto requestProto = context.getRequestProto();
+      final Type cmdType = requestProto.getCmdType();
 
       // For only writeChunk, there will be writeStateMachineData call.
       // CreateContainer will happen as a part of writeChunk only.
@@ -670,7 +685,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         throw new IllegalStateException("Cmd Type:" + cmdType
             + " should not have state machine data");
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       metrics.incNumWriteStateMachineFails();
       return completeExceptionally(e);
     }
@@ -772,16 +787,34 @@ public class ContainerStateMachine extends BaseStateMachine {
    */
   @Override
   public CompletableFuture<ByteString> read(
-      LogEntryProto entry) {
-    StateMachineLogEntryProto smLogEntryProto = entry.getStateMachineLogEntry();
-    metrics.incNumReadStateMachineOps();
-    if (!getStateMachineData(smLogEntryProto).isEmpty()) {
-      return CompletableFuture.completedFuture(ByteString.EMPTY);
+      LogEntryProto entry, TransactionContext trx) {
+    final ByteString dataInContext = Optional
+        .ofNullable(trx.getStateMachineLogEntry())
+        .map(StateMachineLogEntryProto::getStateMachineEntry)
+        .map(RaftProtos.StateMachineEntryProto::getStateMachineData)
+        .orElse(null);
+    if (dataInContext != null && !dataInContext.isEmpty()) {
+      return CompletableFuture.completedFuture(dataInContext);
     }
+
+    final ByteString dataInLog = entry.getStateMachineLogEntry()
+        .getStateMachineEntry().getStateMachineData();
+    if (dataInLog != null && !dataInLog.isEmpty()) {
+      return CompletableFuture.completedFuture(dataInLog);
+    }
+
+    metrics.incNumReadStateMachineOps();
     try {
-      final ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(gid,
-              entry.getStateMachineLogEntry().getLogData());
+      Context context = (Context) trx.getStateMachineContext();
+      final ContainerCommandRequestProto requestProto;
+      if (context != null) {
+        requestProto = context.getLogProto();
+      } else {
+        requestProto = getContainerCommandRequestProto(gid,
+            entry.getStateMachineLogEntry().getLogData());
+        context = new Context(requestProto, requestProto, 0);
+        trx.setStateMachineContext(context);
+      }
       // readStateMachineData should only be called for "write" to Ratis.
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
       if (requestProto.getCmdType() == Type.WriteChunk) {
@@ -911,7 +944,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       long applyTxnStartTime = Time.monotonicNowNanos();
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
-      ContainerCommandRequestProto requestProto =
+
+      final Context context = (Context) trx.getStateMachineContext();
+      final ContainerCommandRequestProto requestProto = context != null?
+          context.getLogProto() :
           getContainerCommandRequestProto(gid,
               trx.getStateMachineLogEntry().getLogData());
       Type cmdType = requestProto.getCmdType();
@@ -941,9 +977,8 @@ public class ContainerStateMachine extends BaseStateMachine {
       final CompletableFuture<ContainerCommandResponseProto> future =
           applyTransaction(requestProto, builder.build(), exceptionHandler);
       future.thenApply(r -> {
-        if (trx.getServerRole() == RaftPeerRole.LEADER
-            && trx.getStateMachineContext() != null) {
-          long startTime = (long) trx.getStateMachineContext();
+        if (trx.getServerRole() == RaftPeerRole.LEADER) {
+          long startTime = context.getStartTime();
           metrics.incPipelineLatencyMs(cmdType,
               (Time.monotonicNowNanos() - startTime) / 1000000L);
         }
@@ -1002,7 +1037,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumApplyTransactionsFails();
       Thread.currentThread().interrupt();
       return completeExceptionally(e);
-    } catch (IOException e) {
+    } catch (Exception e) {
       metrics.incNumApplyTransactionsFails();
       return completeExceptionally(e);
     }
