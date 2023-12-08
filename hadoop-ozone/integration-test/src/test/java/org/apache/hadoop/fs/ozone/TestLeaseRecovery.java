@@ -32,13 +32,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -60,9 +57,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * Test cases for recoverLease() API.
  */
+@Timeout(300)
 public class TestLeaseRecovery {
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneBucket bucket;
@@ -83,7 +79,7 @@ public class TestLeaseRecovery {
     }
   }
 
-  @Before
+  @BeforeEach
   public void init() throws IOException, InterruptedException,
       TimeoutException {
     final int chunkSize = 16 << 10;
@@ -114,7 +110,7 @@ public class TestLeaseRecovery {
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {

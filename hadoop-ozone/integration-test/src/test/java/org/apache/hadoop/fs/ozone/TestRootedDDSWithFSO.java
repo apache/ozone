@@ -38,11 +38,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +57,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Directory deletion service test cases using rooted ozone filesystem
@@ -78,7 +79,7 @@ public class TestRootedDDSWithFSO {
   private static Path bucketPath;
   private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
@@ -114,7 +115,7 @@ public class TestRootedDDSWithFSO {
     fs = FileSystem.get(conf);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -123,7 +124,7 @@ public class TestRootedDDSWithFSO {
     IOUtils.closeQuietly(fs);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     try {
       Path root = new Path("/");
@@ -191,10 +192,10 @@ public class TestRootedDDSWithFSO {
 
     OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
     long prevDeletes = omMetrics.getNumKeyDeletes();
-    Assert.assertTrue(fs.delete(bucketPath, true));
-    Assert.assertTrue(fs.delete(volumePath, false));
+    assertTrue(fs.delete(bucketPath, true));
+    assertTrue(fs.delete(volumePath, false));
     long deletes = omMetrics.getNumKeyDeletes();
-    Assert.assertEquals(prevDeletes + 1, deletes);
+    assertEquals(prevDeletes + 1, deletes);
 
     // After Delete
     checkPath(volumePath);
@@ -215,8 +216,8 @@ public class TestRootedDDSWithFSO {
       fs.getFileStatus(path);
       fail("testRecursiveDelete failed");
     } catch (IOException ex) {
-      Assert.assertTrue(ex instanceof FileNotFoundException);
-      Assert.assertTrue(ex.getMessage().contains("File not found"));
+      assertTrue(ex instanceof FileNotFoundException);
+      assertTrue(ex.getMessage().contains("File not found"));
     }
   }
 
