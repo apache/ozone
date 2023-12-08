@@ -49,12 +49,15 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -283,5 +286,63 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       }
     }
     assertArrayEquals(data, buffer);
+  }
+
+  @Test
+  public void testParallelDeleteBucketAndCreateKey() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    String keyName = UUID.randomUUID().toString();
+
+    GenericTestUtils.LogCapturer omSMLog = GenericTestUtils.LogCapturer
+        .captureLogs(OzoneManagerStateMachine.LOG);
+
+    Thread thread1 = new Thread(() -> {
+      try {
+        volume.deleteBucket(bucketName);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    Thread thread2 = new Thread(() -> {
+      try {
+        ozClient.getProxy().createKey(volumeName, bucketName, keyName,
+            0, ReplicationType.RATIS, ONE, new HashMap<>());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    OzoneManagerRequestHandler.handle_write_sleep = 5000;
+    thread1.start();
+    thread2.start();
+    try {
+      thread1.join();
+      thread2.join();
+    } catch (InterruptedException ex) {
+      throw new RuntimeException(ex);
+    }
+
+    OzoneManagerRequestHandler.handle_write_sleep = 0;
+    // Generate more write requests to OM
+    String newBucketName = UUID.randomUUID().toString();
+    volume.createBucket(newBucketName);
+    OzoneBucket bucket = volume.getBucket(newBucketName);
+    for (int i = 0; i < 10; i++) {
+      bucket.createKey("key-" + i, value.getBytes(UTF_8).length,
+          ReplicationType.RATIS, ONE, new HashMap<>());
+    }
+
+    shutdownCluster();
+    Assert.assertTrue(
+        omSMLog.getOutput().contains("Failed to write, Exception occurred"));
+    Assert.assertTrue(
+        omSMLog.getOutput().contains("applyTransactionMap size 0"));
   }
 }

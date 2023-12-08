@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -86,7 +88,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  */
 public class OzoneManagerStateMachine extends BaseStateMachine {
 
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
@@ -590,7 +592,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      return createErrorResponse(request, e);
+      return createErrorResponse(request, e, trxLogIndex);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
@@ -600,16 +602,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception) {
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
+      OMRequest omRequest, IOException exception, long trxIndex) {
+    OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
         .setTraceID(omRequest.getTraceID())
         .setSuccess(false);
     if (exception.getMessage() != null) {
-      omResponse.setMessage(exception.getMessage());
+      omResponseBuilder.setMessage(exception.getMessage());
     }
-    return omResponse.build();
+    OMResponse omResponse = omResponseBuilder.build();
+    OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
+    omClientResponse.setFlushFuture(
+        ozoneManagerDoubleBuffer.add(omClientResponse, trxIndex));
+    return omResponse;
   }
 
   /**
@@ -740,6 +746,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    LOG.info("applyTransactionMap size {} ", applyTransactionMap.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("applyTransactionMap {}",
+          applyTransactionMap.keySet().stream().map(Object::toString)
+              .collect(Collectors.joining(",")));
+    }
+    LOG.info("ratisTransactionMap size {}", ratisTransactionMap.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("ratisTransactionMap {}",
+          ratisTransactionMap.keySet().stream().map(Object::toString)
+            .collect(Collectors.joining(",")));
+    }
   }
 
   @VisibleForTesting

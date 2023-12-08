@@ -175,7 +175,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public abstract class TestOzoneRpcClientAbstract {
 
   private static MiniOzoneCluster cluster = null;
-  private static OzoneClient ozClient = null;
+  protected static OzoneClient ozClient = null;
   private static ObjectStore store = null;
   private static OzoneManager ozoneManager;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
