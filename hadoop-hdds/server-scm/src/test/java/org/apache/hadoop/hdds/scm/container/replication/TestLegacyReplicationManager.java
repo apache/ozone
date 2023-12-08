@@ -312,6 +312,35 @@ public class TestLegacyReplicationManager {
       replicationManager.start();
       Assertions.assertTrue(replicationManager.isRunning());
     }
+
+    @Test
+    public void testGetContainerReplicaCount()
+        throws IOException, TimeoutException {
+      ContainerInfo container = createContainer(LifeCycleState.QUASI_CLOSED);
+      addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+      addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+      ContainerReplica decommissioningReplica =
+          addReplica(container, new NodeStatus(DECOMMISSIONING, HEALTHY),
+              UNHEALTHY);
+
+      ContainerReplicaCount replicaCount =
+          replicationManager.getLegacyReplicationManager()
+              .getContainerReplicaCount(container);
+
+      Assertions.assertTrue(
+          replicaCount instanceof LegacyRatisContainerReplicaCount);
+      Assertions.assertFalse(replicaCount.isSufficientlyReplicated());
+      Assertions.assertFalse(replicaCount.isSufficientlyReplicatedForOffline(
+          decommissioningReplica.getDatanodeDetails(), nodeManager));
+
+      addReplica(container, NodeStatus.inServiceHealthy(), UNHEALTHY);
+      replicaCount = replicationManager.getLegacyReplicationManager()
+          .getContainerReplicaCount(container);
+      Assertions.assertTrue(replicaCount.isSufficientlyReplicated());
+      Assertions.assertTrue(replicaCount.isSufficientlyReplicatedForOffline(
+          decommissioningReplica.getDatanodeDetails(), nodeManager));
+      Assertions.assertTrue(replicaCount.isHealthyEnoughForOffline());
+    }
   }
 
   /**

@@ -84,8 +84,8 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @throws IOException
    */
   default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
-      ReplicationConfig replicationConfig, String owner,
-      ExcludeList excludeList) throws IOException {
+       ReplicationConfig replicationConfig, String owner,
+       ExcludeList excludeList) throws IOException {
     return allocateBlock(size, numBlocks, replicationConfig, owner,
         excludeList, null);
   }

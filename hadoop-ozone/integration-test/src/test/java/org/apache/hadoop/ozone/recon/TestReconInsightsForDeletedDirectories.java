@@ -88,9 +88,9 @@ public class TestReconInsightsForDeletedDirectories {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
-    conf.setInt(OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+    conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
+    conf.setInt(OZONE_PATH_DELETING_LIMIT_PER_TASK, 0);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -176,9 +176,7 @@ public class TestReconInsightsForDeletedDirectories {
     assertTableRowCount(omDirTable, 1, false);
 
     // Sync data from Ozone Manager to Recon.
-    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
-    impl.syncDataFromOM();
+    syncDataFromOM();
 
     // Retrieve tables from Recon's OM-DB.
     ReconOMMetadataManager reconOmMetadataManagerInstance =
@@ -222,10 +220,10 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Delete the entire directory dir1.
     fs.delete(dir1, true);
-
-    impl.syncDataFromOM();
+    syncDataFromOM();
     // Check the count of recon directory table and recon deletedDirectory table
     assertTableRowCount(reconDirTable, 0, true);
+
     assertTableRowCount(reconDeletedDirTable, 1, true);
 
     // Create an Instance of OMDBInsightEndpoint.
@@ -243,7 +241,7 @@ public class TestReconInsightsForDeletedDirectories {
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    // Assert the size of deleted directory is 700.
+    // Assert the size of deleted directory is 10.
     Assert.assertEquals(10, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
@@ -290,9 +288,7 @@ public class TestReconInsightsForDeletedDirectories {
     assertTableRowCount(omDirTable, 3, false);
 
     // Sync data from Ozone Manager to Recon.
-    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
-    impl.syncDataFromOM();
+    syncDataFromOM();
 
     // Retrieve tables from Recon's OM-DB.
     ReconOMMetadataManager reconOmMetadataManagerInstance =
@@ -323,7 +319,8 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Delete the entire root directory dir1.
     fs.delete(new Path("/dir1/dir2/dir3"), true);
-    impl.syncDataFromOM();
+    syncDataFromOM();
+
     // Verify the entries in the Recon tables after sync.
     assertTableRowCount(reconFileTable, 3, true);
     assertTableRowCount(reconDirTable, 2, true);
@@ -333,7 +330,7 @@ public class TestReconInsightsForDeletedDirectories {
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    // Assert the size of deleted directory is 1000.
+    // Assert the size of deleted directory is 3.
     Assert.assertEquals(3, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
@@ -378,9 +375,8 @@ public class TestReconInsightsForDeletedDirectories {
     Assertions.assertFalse(fs.exists(rootDir), "Directory was not deleted");
 
     // Sync data from Ozone Manager to Recon.
-    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
-        cluster.getReconServer().getOzoneManagerServiceProvider();
-    impl.syncDataFromOM();
+    syncDataFromOM();
+
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     OzoneStorageContainerManager reconSCM =
         cluster.getReconServer().getReconStorageContainerManager();
@@ -482,6 +478,13 @@ public class TestReconInsightsForDeletedDirectories {
       fail("Test failed with: " + ex);
     }
     return count == expectedCount;
+  }
+
+  private void syncDataFromOM() {
+    // Sync data from Ozone Manager to Recon.
+    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
+        cluster.getReconServer().getOzoneManagerServiceProvider();
+    impl.syncDataFromOM();
   }
 
 

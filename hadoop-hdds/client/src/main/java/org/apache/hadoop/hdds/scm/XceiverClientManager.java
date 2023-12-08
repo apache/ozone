@@ -178,7 +178,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    */
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline,
-         boolean topologyAware) throws IOException {
+      boolean topologyAware) throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
     Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
@@ -235,7 +235,8 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       throws IOException {
     HddsProtos.ReplicationType type = pipeline.getType();
     try {
-      // create different client based on network topology
+      // create different client different pipeline node based on
+      // network topology
       String key = getPipelineCacheKey(pipeline, topologyAware);
       // Append user short name to key to prevent a different user
       // from using same instance of xceiverClient.

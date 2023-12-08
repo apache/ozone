@@ -123,7 +123,7 @@ public class MockXceiverClientFactory
 
   @Override
   public void releaseClient(XceiverClientSpi xceiverClient,
-      boolean invalidateClient, boolean topologyAware) {
+                            boolean invalidateClient, boolean topologyAware) {
 
   }
 

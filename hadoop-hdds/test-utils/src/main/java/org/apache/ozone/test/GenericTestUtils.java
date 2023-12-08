@@ -37,7 +37,7 @@ import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -47,7 +47,6 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
@@ -151,15 +150,15 @@ public abstract class GenericTestUtils {
    * Assert that a given file exists.
    */
   public static void assertExists(File f) {
-    assertTrue("File " + f + " should exist", f.exists());
+    Assertions.assertTrue(f.exists(), "File " + f + " should exist");
   }
 
   /**
    * Assert that a given dir can be created or it already exists.
    */
   public static void assertDirCreation(File f) {
-    assertTrue("Could not create dir " + f + ", nor does it exist",
-        f.mkdirs() || f.exists());
+    Assertions.assertTrue(f.mkdirs() || f.exists(),
+        "Could not create dir " + f + ", nor does it exist");
   }
 
   public static void assertExceptionContains(String expectedText, Throwable t) {
@@ -168,7 +167,7 @@ public abstract class GenericTestUtils {
 
   public static void assertExceptionContains(String expectedText, Throwable t,
       String message) {
-    Assert.assertNotNull("Null Throwable", t);
+    Assertions.assertNotNull(t, "Null Throwable");
     String msg = t.toString();
     if (msg == null) {
       throw new AssertionError("Null Throwable.toString() value", t);

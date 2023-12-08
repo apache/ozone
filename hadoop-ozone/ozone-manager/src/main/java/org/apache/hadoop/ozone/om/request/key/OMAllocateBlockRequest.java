@@ -107,7 +107,6 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-
     UserInfo userInfo = getUserInfo();
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
@@ -121,8 +120,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(),
             ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
-            keyArgs.getSortDatanodes(),
-            userInfo);
+            keyArgs.getSortDatanodes(), userInfo);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =

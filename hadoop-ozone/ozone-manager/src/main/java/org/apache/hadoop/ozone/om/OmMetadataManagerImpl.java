@@ -380,7 +380,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
-    initializeOmTables(false);
+    initializeOmTables(CacheType.PARTIAL_CACHE, false);
   }
 
 
@@ -413,7 +413,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE),
           Optional.of(maxOpenFiles), false, false));
-      initializeOmTables(false);
+      initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
       throw e;
@@ -557,7 +557,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       this.store = loadDB(configuration, metaDir);
 
-      initializeOmTables(true);
+      initializeOmTables(CacheType.FULL_CACHE, true);
     }
 
     snapshotChainManager = new SnapshotChainManager(this);
@@ -634,7 +634,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
         .addCodec(OmBucketInfo.class, OmBucketInfo.getCodec())
         .addCodec(OmVolumeArgs.class, OmVolumeArgs.getCodec())
-        .addProto2Codec(PersistedUserVolumeInfo.class)
+        .addProto2Codec(PersistedUserVolumeInfo.getDefaultInstance())
         .addCodec(OmMultipartKeyInfo.class, OmMultipartKeyInfo.getCodec())
         .addCodec(S3SecretValue.class, S3SecretValue.getCodec())
         .addCodec(OmPrefixInfo.class, OmPrefixInfo.getCodec())
@@ -652,14 +652,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    *
    * @throws IOException
    */
-  protected void initializeOmTables(boolean addCacheMetrics)
+  protected void initializeOmTables(CacheType cacheType,
+                                    boolean addCacheMetrics)
       throws IOException {
     userTable =
         this.store.getTable(USER_TABLE, String.class,
             PersistedUserVolumeInfo.class);
     checkTableStatus(userTable, USER_TABLE, addCacheMetrics);
-
-    CacheType cacheType = CacheType.FULL_CACHE;
 
     volumeTable =
         this.store.getTable(VOLUME_TABLE, String.class, OmVolumeArgs.class,

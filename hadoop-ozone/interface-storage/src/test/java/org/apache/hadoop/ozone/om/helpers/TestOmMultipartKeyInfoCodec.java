@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
@@ -58,7 +58,7 @@ public class TestOmMultipartKeyInfoCodec
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-    Assert.assertNotNull(data);
+    Assertions.assertNotNull(data);
 
     OmMultipartKeyInfo multipartKeyInfo = null;
     try {
@@ -66,7 +66,7 @@ public class TestOmMultipartKeyInfoCodec
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-    Assert.assertEquals(omMultipartKeyInfo, multipartKeyInfo);
+    Assertions.assertEquals(omMultipartKeyInfo, multipartKeyInfo);
 
     // When random byte data passed returns null.
     try {

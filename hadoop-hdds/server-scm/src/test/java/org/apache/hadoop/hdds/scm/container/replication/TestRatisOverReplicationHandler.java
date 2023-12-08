@@ -44,6 +44,7 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -216,6 +217,39 @@ public class TestRatisOverReplicationHandler {
         getOverReplicatedHealthResult(), 0);
   }
 
+  @Test
+  public void testClosedOverReplicatedWithAllUnhealthyReplicas()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        State.UNHEALTHY, 0, 0, 0, 0, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    // 1 replica is already pending delete, so only 1 new command should be
+    // created
+    testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(),
+        1);
+  }
+
+  @Test
+  public void testClosedOverReplicatedWithExcessUnhealthy() throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        State.CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(),
+            1);
+    Pair<DatanodeDetails, SCMCommand<?>> command = commands.iterator().next();
+    assertEquals(unhealthyReplica.getDatanodeDetails(),
+        command.getKey());
+  }
+
   /**
    * Handler should not create any delete commands if removing a replica
    * makes the container mis replicated.
@@ -234,6 +268,46 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
+  }
+
+  @Test
+  public void testOverReplicatedAllUnhealthySameBCSID()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0, 0);
+
+    ContainerReplica shouldDelete = replicas.stream()
+        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
+        .findFirst().get();
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
+    Pair<DatanodeDetails, SCMCommand<?>> commandPair
+        = commands.iterator().next();
+    assertEquals(shouldDelete.getDatanodeDetails(),
+        commandPair.getKey());
+  }
+
+  @Test
+  public void testOverReplicatedAllUnhealthyPicksLowestBCSID()
+      throws IOException {
+    final long sequenceID = 20;
+    Set<ContainerReplica> replicas = new HashSet<>();
+    ContainerReplica lowestSequenceIDReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY, sequenceID);
+    replicas.add(lowestSequenceIDReplica);
+    for (int i = 1; i < 4; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0,
+          IN_SERVICE, State.UNHEALTHY, sequenceID + i));
+    }
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(), 1);
+    Pair<DatanodeDetails, SCMCommand<?>> commandPair
+        = commands.iterator().next();
+    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(),
+        commandPair.getKey());
   }
 
   /**
