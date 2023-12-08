@@ -465,7 +465,7 @@ public final class RatisHelper {
           primaryId = raftPeerId;
         }
       } catch (IOException e) {
-        LOG.error("Can not get ClosestNode from the pipeline: {} with " +
+        LOG.error("Can not get primary node from the pipeline: {} with " +
             "exception: {}", pipeline, e.getLocalizedMessage());
         return null;
       }
