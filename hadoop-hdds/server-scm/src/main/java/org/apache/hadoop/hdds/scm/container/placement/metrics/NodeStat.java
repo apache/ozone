@@ -43,13 +43,19 @@ interface NodeStat {
   LongMetric getRemaining();
 
   /**
+   * Get the committed space of the node.
+   * @return the committed space of the node
+   */
+  LongMetric getCommitted();
+
+  /**
    * Set the total/used/remaining space.
    * @param capacity - total space.
    * @param used - used space.
    * @param remain - remaining space.
    */
   @VisibleForTesting
-  void set(long capacity, long used, long remain);
+  void set(long capacity, long used, long remain, long committed);
 
   /**
    * Adding of the stat.

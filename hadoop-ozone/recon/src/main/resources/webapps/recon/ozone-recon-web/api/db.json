@@ -29,7 +29,8 @@
         "storageReport": {
           "capacity": 62725623808,
           "used": 488288256,
-          "remaining": 21005319168
+          "remaining": 21005319168,
+          "committed": 10240000
         },
         "pipelines": [
           {

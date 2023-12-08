@@ -155,6 +155,8 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         + " B", StringUtils.byteDesc(info.getRemaining()));
     System.out.printf("%-13s: %s %n", "Remaining %",
         PERCENT_FORMAT.format(info.getRemainingRatio()));
+    System.out.printf("%-13s: %s (%s) %n", "Committed", info.getCommitted()
+        + " B", StringUtils.byteDesc(info.getCommitted()));
     System.out.printf("%-13s: %d %n%n", "Container(s)",
             info.getContainerCount());
   }
@@ -181,6 +183,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     private long capacity = 0;
     private long used = 0;
     private long remaining = 0;
+    private long committed = 0;
     private long containerCount = 0;
 
     DatanodeUsage(HddsProtos.DatanodeUsageInfoProto proto) {
@@ -195,6 +198,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       }
       if (proto.hasRemaining()) {
         remaining = proto.getRemaining();
+      }
+      if (proto.hasCommitted()) {
+        committed = proto.getCommitted();
       }
       if (proto.hasContainerCount()) {
         containerCount = proto.getContainerCount();
@@ -219,6 +225,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
     public long getRemaining() {
       return remaining;
+    }
+    public long getCommitted() {
+      return committed;
     }
 
     public long getContainerCount() {
