@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OmGetOpenKey;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponseWithFSO;
@@ -32,9 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 
 /**
  * Handle Multipart upload commit upload part file.
@@ -52,17 +49,13 @@ public class S3MultipartUploadCommitPartRequestWithFSO
       String keyName, OMMetadataManager omMetadataManager, long clientID)
       throws IOException {
 
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
-    long parentID = OMFileRequest
-        .getParentID(volumeId, bucketId, pathComponents, keyName,
-                omMetadataManager);
-
-    return omMetadataManager.getOpenFileName(volumeId, bucketId,
-            parentID, fileName, clientID);
+    return new OmGetOpenKey.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setOmMetadataManager(omMetadataManager)
+          .setClientID(clientID)
+          .build().getKey();
   }
 
   @Override
