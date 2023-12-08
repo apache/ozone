@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -386,7 +385,6 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the replicas used in the test scenarios. It is
    * created by deserializing JSON files.
    */
-  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class TestReplica {
     private ContainerReplicaProto.State state
         = ContainerReplicaProto.State.CLOSED;
@@ -407,6 +405,10 @@ public class TestReplicationManagerScenarios {
     private String origin;
     private UUID originId;
 
+    public void setContainerId(long containerId) {
+      this.containerId = containerId;
+    }
+
     public void setDatanode(String datanode) {
       this.datanode = datanode;
     }
@@ -415,13 +417,33 @@ public class TestReplicationManagerScenarios {
       this.origin = origin;
     }
 
+    public void setIndex(int index) {
+      this.index = index;
+    }
+
+    public void setSequenceId(int sequenceId) {
+      this.sequenceId = sequenceId;
+    }
+
     public void setState(String state) {
       this.state = ContainerReplicaProto.State.valueOf(state);
+    }
+
+    public void setKeys(long keys) {
+      this.keys = keys;
+    }
+
+    public void setUsed(long used) {
+      this.used = used;
     }
 
     public void setHealthState(String healthState) {
       this.healthState = HddsProtos.NodeState.valueOf(
           healthState.toUpperCase());
+    }
+
+    public void setIsEmpty(boolean empty) {
+      isEmpty = empty;
     }
 
     public void setOperationalState(String operationalState) {
@@ -492,7 +514,6 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the expected counts for each health state and
    * queues. It is created by deserializing JSON files.
    */
-  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class Expectation {
 
     private Map<ReplicationManagerReport.HealthState, Integer> stateCounts
