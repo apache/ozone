@@ -203,12 +203,6 @@ public class SCMBlockProtocolServer implements
         AllocatedBlock block = scm.getScmBlockManager()
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
-          if (StringUtils.isNotEmpty(clientMachine)) {
-            List<String> uuidList = HddsUtils.toNodeUuid(
-                block.getPipeline().getNodes());
-            block.getPipeline().setNodesInOrder(
-                sortDatanodes(uuidList, clientMachine));
-          }
           blocks.add(block);
           // Sort the datanodes if client machine is specified
           final Node client = getClientNode(clientMachine);
