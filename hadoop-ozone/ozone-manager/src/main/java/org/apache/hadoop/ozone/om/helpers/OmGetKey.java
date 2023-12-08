@@ -38,8 +38,8 @@ public final class OmGetKey {
   private long clientID;
   private String errMsg;
 
-  private OmGetKey(String volumeName, String bucketName,
-      String keyName, OMMetadataManager omMetadataManager, long clientID, String errMsg) {
+  private OmGetKey(String volumeName, String bucketName, String keyName, 
+      OMMetadataManager omMetadataManager, long clientID, String errMsg) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;

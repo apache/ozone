@@ -213,13 +213,13 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-		return new OmGetKey.Builder()
-					.setVolumeName(volumeName)
-					.setBucketName(bucketName)
-					.setKeyName(keyName)
-					.setOmMetadataManager(omMetadataManager)
-					.setClientID(clientID)
-					.build().getOpenKey();
+    return new OmGetKey.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setOmMetadataManager(omMetadataManager)
+          .setClientID(clientID)
+          .build().getOpenKey();
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
