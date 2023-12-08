@@ -155,9 +155,9 @@ jobs:
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
-            args="$args -Dio.grpc.version=${{ needs.ratis-thirdparty.outputs.grpc-version }}"
-            args="$args -Dnetty.version=${{ needs.ratis-thirdparty.outputs.netty-version }}"
-            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis-thirdparty.outputs.protobuf-version }}"
+            args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
+            args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
+            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
           if [ "$TEST_METHOD" = "ALL" ]; then
