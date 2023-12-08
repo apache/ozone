@@ -20,10 +20,12 @@ on:
         description: Ratis repository
         default: apache/ratis
         required: true
+        type: string
       ref:
         description: Ratis ref (branch, tag or commit SHA)
         default: master
         required: true
+        type: string
     outputs:
       version:
         description: "Ratis Version"
