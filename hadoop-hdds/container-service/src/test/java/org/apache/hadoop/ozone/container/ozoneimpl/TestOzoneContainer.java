@@ -81,7 +81,6 @@ public class TestOzoneContainer {
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
   private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
-  private final int numTestContainers = 10;
 
   private ContainerLayoutVersion layout;
   private String schemaVersion;
@@ -133,6 +132,7 @@ public class TestOzoneContainer {
     }
 
     // Add containers to disk
+    int numTestContainers = 10;
     for (int i = 0; i < numTestContainers; i++) {
       long freeBytes = 0;
       long volCommitBytes;
