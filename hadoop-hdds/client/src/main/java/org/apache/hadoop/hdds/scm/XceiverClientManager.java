@@ -274,16 +274,27 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   private String getPipelineCacheKey(Pipeline pipeline,
                                      boolean topologyAware) {
     String key = pipeline.getId().getId().toString() + pipeline.getType();
-    boolean isEC = pipeline.getReplicationConfig()
-        .getReplicationType() == HddsProtos.ReplicationType.EC;
+    boolean isEC = pipeline.getType() == HddsProtos.ReplicationType.EC;
     if (topologyAware || isEC) {
       try {
-        key += pipeline.getClosestNode().getUuidString();
-        if (isEC) {
-          // Currently EC uses standalone client.
-          key += pipeline.getClosestNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE);
-        }
+        DatanodeDetails closestNode = pipeline.getClosestNode();
+        // Pipeline cache key uses host:port suffix to handle
+        // both EC, Ratis, and Standalone client.
+        //
+        // For EC client, the host:port cache key is needed
+        // so that there is a different cache key for each node in
+        // a block group.
+        //
+        // For Ratis and Standalone client, the host:port cache key is needed
+        // to handle the possibility of two datanodes sharing the same machine.
+        // While normally one machine only hosts one datanode service,
+        // this situation might arise in tests.
+        //
+        // Standalone port is chosen since all datanodes should have a
+        // standalone port regardless of version and this port should not
+        // have any collisions.
+        key += closestNode.getHostName() + closestNode.getPort(
+            DatanodeDetails.Port.Name.STANDALONE);
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());
