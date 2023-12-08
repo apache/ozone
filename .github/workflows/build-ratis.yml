@@ -73,11 +73,11 @@ jobs:
         id: versions
         run: |
           thirdparty_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=ratis.thirdparty.version)"
-          echo "::set-output name=ratis-thirdparty::${thirdparty_version}"
+          echo "ratis-thirdparty=${thirdparty_version}" >> $GITHUB_OUTPUT
 
           ratis_sha=$(git rev-parse --short HEAD)
           ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
-          echo "::set-output name=ratis::${ratis_version}"
+          echo "ratis=${ratis_version}" >> $GITHUB_OUTPUT
       - name: Run a full build
         run: |
           mvn versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
@@ -107,6 +107,6 @@ jobs:
       - name: Get component versions
         id: versions
         run: |
-          echo "::set-output name=grpc-version::$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.grpc.version)"
-          echo "::set-output name=netty-version::$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.netty.version)"
-          echo "::set-output name=protobuf-version::$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.protobuf.version)"
+          echo "grpc-version=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
+          echo "netty-version=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
+          echo "protobuf-version=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
