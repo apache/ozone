@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -127,9 +129,13 @@ public class TestReplicationManagerScenarios {
     return uris;
   }
 
-  private static Scenario[] loadTestsInFile(URI testFile) throws IOException {
+  private static List<Scenario> loadTestsInFile(URI testFile)
+      throws IOException {
+    ObjectReader reader = new ObjectMapper().readerFor(Scenario.class);
     try (InputStream stream = testFile.toURL().openStream()) {
-      return new ObjectMapper().readValue(stream, Scenario[].class);
+      try (MappingIterator<Scenario> iterator = reader.readValues(stream)) {
+        return iterator.readAll();
+      }
     } catch (Exception e) {
       System.out.println("Failed to load test file: " + testFile);
       throw e;
@@ -145,7 +151,7 @@ public class TestReplicationManagerScenarios {
   public static void init() throws IOException, URISyntaxException {
     List<URI> testFiles = getTestFiles();
     for (URI file : testFiles) {
-      Scenario[] scenarios = loadTestsInFile(file);
+      List<Scenario> scenarios = loadTestsInFile(file);
       Set<String> names = new HashSet<>();
       for (Scenario scenario : scenarios) {
         if (!names.add(scenario.getDescription())) {
@@ -154,7 +160,7 @@ public class TestReplicationManagerScenarios {
         }
         scenario.setResourceName(file.toString());
       }
-      Collections.addAll(TEST_SCENARIOS, scenarios);
+      TEST_SCENARIOS.addAll(scenarios);
     }
   }
 
@@ -332,8 +338,8 @@ public class TestReplicationManagerScenarios {
   }
 
   private void assertExpectedCommands(Scenario scenario,
-      ExpectedCommands[] expectedCommands) {
-    Assertions.assertEquals(expectedCommands.length, commandsSent.size(),
+      List<ExpectedCommands> expectedCommands) {
+    Assertions.assertEquals(expectedCommands.size(), commandsSent.size(),
         "Test: " + scenario + ": Unexpected count for commands sent");
     // Iterate the expected commands and check that they were all sent. If we
     // have a target datanode, then we need to check that the command was sent
@@ -401,16 +407,24 @@ public class TestReplicationManagerScenarios {
     private String origin;
     private UUID originId;
 
-    private void setState(String state) {
+    public void setDatanode(String datanode) {
+      this.datanode = datanode;
+    }
+
+    public void setOrigin(String origin) {
+      this.origin = origin;
+    }
+
+    public void setState(String state) {
       this.state = ContainerReplicaProto.State.valueOf(state);
     }
 
-    private void setHealthState(String healthState) {
+    public void setHealthState(String healthState) {
       this.healthState = HddsProtos.NodeState.valueOf(
           healthState.toUpperCase());
     }
 
-    private void setOperationalState(String operationalState) {
+    public void setOperationalState(String operationalState) {
       this.operationalState = HddsProtos.NodeOperationalState.valueOf(
           operationalState.toUpperCase());
     }
@@ -543,12 +557,15 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the expected commands for each replica. It is
    * created by deserializing JSON files.
    */
-  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class ExpectedCommands {
     private SCMCommandProto.Type type;
     private String datanode;
 
-    private void setType(String command) {
+    public void setDatanode(String datanode) {
+      this.datanode = datanode;
+    }
+
+    public void setType(String command) {
       ReplicateContainerCommand replicateContainerCommand;
       this.type = SCMCommandProto.Type.valueOf(command);
     }
@@ -574,13 +591,20 @@ public class TestReplicationManagerScenarios {
    * This class is used to define the pending replicas for the container. It is
    * created by deserializing JSON files.
    */
-  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class PendingReplica {
     private ContainerReplicaOp.PendingOpType type;
     private String datanode;
     private int replicaIndex;
 
-    private void setType(String type) {
+    public void setReplicaIndex(int replicaIndex) {
+      this.replicaIndex = replicaIndex;
+    }
+
+    public void setDatanode(String datanode) {
+      this.datanode = datanode;
+    }
+
+    public void setType(String type) {
       this.type = ContainerReplicaOp.PendingOpType.valueOf(type);
     }
 
@@ -608,7 +632,6 @@ public class TestReplicationManagerScenarios {
    * deserializing JSON files. It defines the base container used for the test,
    * and provides getter for the replicas and expected results.
    */
-  @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
   public static class Scenario {
     private String description;
     private String resourceName;
@@ -623,17 +646,69 @@ public class TestReplicationManagerScenarios {
     private int sequenceId = 0;
     private ReplicationConfig replicationConfig = RatisReplicationConfig
         .getInstance(HddsProtos.ReplicationFactor.THREE);
-    private TestReplica[] replicas = new TestReplica[0];
-    private PendingReplica[] pendingReplicas = new PendingReplica[0];
+    private List<TestReplica> replicas = new ArrayList<>();
+    private List<PendingReplica> pendingReplicas = new ArrayList<>();
     private Expectation expectation = new Expectation();
-    private ExpectedCommands[] checkCommands = new ExpectedCommands[0];
-    private ExpectedCommands[] commands = new ExpectedCommands[0];
+    private List<ExpectedCommands> checkCommands = new ArrayList<>();
+    private List<ExpectedCommands> commands = new ArrayList<>();
 
     public Scenario() {
       ReplicationManager.ReplicationManagerConfiguration conf =
           new ReplicationManager.ReplicationManagerConfiguration();
       ecMaintenanceRedundancy = conf.getMaintenanceRemainingRedundancy();
       ratisMaintenanceMinimum = conf.getMaintenanceReplicaMinimum();
+    }
+
+    public void setDescription(String description) {
+      this.description = description;
+    }
+
+    public void setEcMaintenanceRedundancy(int ecMaintenanceRedundancy) {
+      this.ecMaintenanceRedundancy = ecMaintenanceRedundancy;
+    }
+
+    public void setRatisMaintenanceMinimum(int ratisMaintenanceMinimum) {
+      this.ratisMaintenanceMinimum = ratisMaintenanceMinimum;
+    }
+
+    public void setUsed(long used) {
+      this.used = used;
+    }
+
+    public void setKeys(long keys) {
+      this.keys = keys;
+    }
+
+    public void setId(long id) {
+      this.id = id;
+    }
+
+    public void setOwner(String owner) {
+      this.owner = owner;
+    }
+
+    public void setSequenceId(int sequenceId) {
+      this.sequenceId = sequenceId;
+    }
+
+    public void setReplicas(List<TestReplica> replicas) {
+      this.replicas = replicas;
+    }
+
+    public void setPendingReplicas(List<PendingReplica> pendingReplicas) {
+      this.pendingReplicas = pendingReplicas;
+    }
+
+    public void setExpectation(Expectation expectation) {
+      this.expectation = expectation;
+    }
+
+    public void setCheckCommands(List<ExpectedCommands> checkCommands) {
+      this.checkCommands = checkCommands;
+    }
+
+    public void setCommands(List<ExpectedCommands> commands) {
+      this.commands = commands;
     }
 
     public void setResourceName(String resourceName) {
@@ -652,20 +727,20 @@ public class TestReplicationManagerScenarios {
       return description;
     }
 
-    private void setContainerState(String containerState) {
+    public void setContainerState(String containerState) {
       this.containerState = HddsProtos.LifeCycleState.valueOf(containerState);
     }
 
-    public PendingReplica[] getPendingReplicas() {
-      return this.pendingReplicas.clone();
+    public List<PendingReplica> getPendingReplicas() {
+      return this.pendingReplicas;
     }
 
-    public ExpectedCommands[] getCheckCommands() {
-      return checkCommands.clone();
+    public List<ExpectedCommands> getCheckCommands() {
+      return checkCommands;
     }
 
-    public TestReplica[] getReplicas() {
-      return replicas.clone();
+    public List<TestReplica> getReplicas() {
+      return replicas;
     }
 
     public Expectation getExpectation() {
@@ -678,7 +753,7 @@ public class TestReplicationManagerScenarios {
      *    EC:rs-3-2-1024k
      * @param replicationConfig
      */
-    private void setReplicationConfig(String replicationConfig) {
+    public void setReplicationConfig(String replicationConfig) {
       String[] parts = replicationConfig.split(":");
       if (parts.length != 2) {
         throw new IllegalArgumentException(
@@ -711,8 +786,8 @@ public class TestReplicationManagerScenarios {
       return builder.build();
     }
 
-    public ExpectedCommands[] getCommands() {
-      return commands.clone();
+    public List<ExpectedCommands> getCommands() {
+      return commands;
     }
 
     @Override

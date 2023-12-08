@@ -51,20 +51,4 @@
     <Class name="org.apache.hadoop.hdds.scm.metadata.TestSCMTransactionInfoCodec"/>
     <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
   </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.container.replication.TestReplicationManagerScenarios$ExpectedCommands"/>
-    <Bug pattern="UWF_UNWRITTEN_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.container.replication.TestReplicationManagerScenarios$PendingReplica"/>
-    <Bug pattern="UWF_UNWRITTEN_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.container.replication.TestReplicationManagerScenarios$Scenario"/>
-    <Bug pattern="UWF_UNWRITTEN_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.container.replication.TestReplicationManagerScenarios$TestReplica"/>
-    <Bug pattern="UWF_UNWRITTEN_FIELD" />
-  </Match>
 </FindBugsFilter>
