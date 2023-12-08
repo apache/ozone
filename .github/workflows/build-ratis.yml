@@ -1,0 +1,110 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: build-ratis
+on:
+  workflow_call:
+    inputs:
+      repo:
+        description: Ratis repository
+        default: apache/ratis
+        required: true
+      ref:
+        description: Ratis ref (branch, tag or commit SHA)
+        default: master
+        required: true
+    outputs:
+      version:
+        description: "Ratis Version"
+        value: ${{ jobs.ratis.outputs.version }}
+      thirdparty-version:
+        description: "Ratis Third-Party Version"
+        value: ${{ jobs.ratis.outputs.thirdparty-version }}
+      grpc-version:
+        description: "gRPC Version"
+        value: ${{ jobs.ratis-thirdparty.outputs.grpc-version }}
+      netty-version:
+        description: "Netty Version"
+        value: ${{ jobs.ratis-thirdparty.outputs.netty-version }}
+      protobuf-version:
+        description: "Protobuf Version"
+        value: ${{ jobs.ratis-thirdparty.outputs.protobuf-version }}
+env:
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+jobs:
+  ratis:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.versions.outputs.ratis }}
+      thirdparty-version: ${{ steps.versions.outputs.ratis-thirdparty }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.ref }}
+      - name: Cache for maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+            !~/.m2/repository/org/apache/ratis
+          key: ratis-dependencies-${{ hashFiles('**/pom.xml') }}
+      - name: Setup java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 8
+      - name: Get component versions
+        id: versions
+        run: |
+          thirdparty_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=ratis.thirdparty.version)"
+          echo "::set-output name=ratis-thirdparty::${thirdparty_version}"
+
+          ratis_sha=$(git rev-parse --short HEAD)
+          ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
+          echo "::set-output name=ratis::${ratis_version}"
+      - name: Run a full build
+        run: |
+          mvn versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
+          dev-support/checks/build.sh
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v3
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+          retention-days: 1
+  ratis-thirdparty:
+    runs-on: ubuntu-20.04
+    needs:
+      - ratis
+    timeout-minutes: 30
+    outputs:
+      protobuf-version: ${{ steps.versions.outputs.protobuf }}
+      grpc-version: ${{ steps.versions.outputs.grpc }}
+      netty-version: ${{ steps.versions.outputs.netty }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+        with:
+          repository: apache/ratis-thirdparty
+          ref: ${{ needs.ratis.outputs.thirdparty-version }}
+      - name: Get component versions
+        id: versions
+        run: |
+          echo "::set-output name=grpc-version::$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.grpc.version)"
+          echo "::set-output name=netty-version::$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.netty.version)"
+          echo "::set-output name=protobuf-version::$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.protobuf.version)"
