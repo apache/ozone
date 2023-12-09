@@ -181,8 +181,8 @@ public class SCMBlockDeletingService extends BackgroundService
               processedTxIDs.addAll(dnTxSet);
               DeleteBlocksCommand command = new DeleteBlocksCommand(dnTXs);
               command.setTerm(scmContext.getTermOfLeader());
-              deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-                  .recordTransactionCreated(dnId, command.getId(), dnTxSet);
+              deletedBlockLog.recordTransactionCreated(dnId, command.getId(),
+                  dnTxSet);
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
               metrics.incrBlockDeletionCommandSent();

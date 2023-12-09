@@ -22,16 +22,12 @@ package org.apache.hadoop.hdds.scm.block;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
-import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +46,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
@@ -63,8 +58,7 @@ import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusM
  * the purpose of this class is to reduce the number of duplicate
  * DeletedBlockTransaction sent to the DN.
  */
-public class SCMDeletedBlockTransactionStatusManager
-    implements EventHandler<DeleteBlockStatus> {
+public class SCMDeletedBlockTransactionStatusManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMDeletedBlockTransactionStatusManager.class);
   // Maps txId to set of DNs which are successful in committing the transaction
@@ -77,7 +71,6 @@ public class SCMDeletedBlockTransactionStatusManager
   private final ContainerManager containerManager;
   private final ScmBlockDeletingServiceMetrics metrics;
   private final SCMContext scmContext;
-  private final Lock lock;
   private final long scmCommandTimeoutMs;
 
   /**
@@ -93,14 +86,12 @@ public class SCMDeletedBlockTransactionStatusManager
   public SCMDeletedBlockTransactionStatusManager(
       DeletedBlockLogStateManager deletedBlockLogStateManager,
       ContainerManager containerManager, SCMContext scmContext,
-      ScmBlockDeletingServiceMetrics metrics,
-      Lock lock, long scmCommandTimeoutMs) {
+      ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) {
     // maps transaction to dns which have committed it.
     this.deletedBlockLogStateManager = deletedBlockLogStateManager;
     this.metrics = metrics;
     this.containerManager = containerManager;
     this.scmContext = scmContext;
-    this.lock = lock;
     this.scmCommandTimeoutMs = scmCommandTimeoutMs;
     this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
@@ -537,39 +528,6 @@ public class SCMDeletedBlockTransactionStatusManager
     } catch (IOException e) {
       LOG.warn("Could not commit delete block transactions: "
           + txIDsToBeDeleted, e);
-    }
-  }
-
-  @Override
-  public void onMessage(
-      DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
-    if (!scmContext.isLeader()) {
-      LOG.warn("Skip commit transactions since current SCM is not leader.");
-      return;
-    }
-
-    DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
-    UUID dnId = details.getUuid();
-    for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
-      CommandStatus.Status status = commandStatus.getStatus();
-      lock.lock();
-      try {
-        if (status == CommandStatus.Status.EXECUTED) {
-          ContainerBlocksDeletionACKProto ackProto =
-              commandStatus.getBlockDeletionAck();
-          commitTransactions(ackProto.getResultsList(), dnId);
-          metrics.incrBlockDeletionCommandSuccess();
-        } else if (status == CommandStatus.Status.FAILED) {
-          metrics.incrBlockDeletionCommandFailure();
-        } else {
-          LOG.debug("Delete Block Command {} is not executed on the Datanode" +
-                  " {}.", commandStatus.getCmdId(), dnId);
-        }
-
-        commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId);
-      } finally {
-        lock.unlock();
-      }
     }
   }
 

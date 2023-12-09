@@ -487,12 +487,11 @@ public class TestDeletedBlockLog {
     Set<Long> dnTxSet = command.blocksTobeDeleted()
         .stream().map(DeletedBlocksTransaction::getTxID)
         .collect(Collectors.toSet());
-    deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-        .recordTransactionCreated(dnId, command.getId(), dnTxSet);
+    deletedBlockLog.recordTransactionCreated(dnId, command.getId(), dnTxSet);
   }
 
   private void sendSCMDeleteBlocksCommand(UUID dnId, SCMCommand<?> scmCommand) {
-    deletedBlockLog.getSCMDeletedBlockTransactionStatusManager().onSent(
+    deletedBlockLog.onSent(
         DatanodeDetails.newBuilder().setUuid(dnId).build(), scmCommand);
   }
 

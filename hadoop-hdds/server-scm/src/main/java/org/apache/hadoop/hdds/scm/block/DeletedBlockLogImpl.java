@@ -30,10 +30,14 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -45,6 +49,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
@@ -54,6 +60,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +74,8 @@ import org.slf4j.LoggerFactory;
  * equally same chance to be retrieved which only depends on the nature
  * order of the transaction ID.
  */
-public class DeletedBlockLogImpl implements DeletedBlockLog {
+public class DeletedBlockLogImpl
+    implements DeletedBlockLog, EventHandler<DeleteBlockStatus> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
@@ -114,7 +122,7 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
     this.metrics = metrics;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
-            containerManager, scmContext, metrics, lock, scmCommandTimeoutMs);
+            containerManager, scmContext, metrics, scmCommandTimeoutMs);
   }
 
   @Override
@@ -194,12 +202,6 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
         .addAllLocalID(blocks)
         .setCount(0)
         .build();
-  }
-
-  @Override
-  public SCMDeletedBlockTransactionStatusManager
-      getSCMDeletedBlockTransactionStatusManager() {
-    return transactionStatusManager;
   }
 
   private boolean isTransactionFailed(DeleteBlockTransactionResult result) {
@@ -395,4 +397,61 @@ public class DeletedBlockLogImpl implements DeletedBlockLog {
     this.scmCommandTimeoutMs = scmCommandTimeoutMs;
   }
 
+  @VisibleForTesting
+  public SCMDeletedBlockTransactionStatusManager
+      getSCMDeletedBlockTransactionStatusManager() {
+    return transactionStatusManager;
+  }
+
+  @Override
+  public void recordTransactionCreated(UUID dnId, long scmCmdId,
+      Set<Long> dnTxSet) {
+    getSCMDeletedBlockTransactionStatusManager()
+        .recordTransactionCreated(dnId, scmCmdId, dnTxSet);
+  }
+
+  @Override
+  public void onDatanodeDead(UUID dnId) {
+    getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
+  }
+
+  @Override
+  public void onSent(DatanodeDetails dnId, SCMCommand<?> scmCommand) {
+    getSCMDeletedBlockTransactionStatusManager().onSent(dnId, scmCommand);
+  }
+
+  @Override
+  public void onMessage(
+      DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
+    if (!scmContext.isLeader()) {
+      LOG.warn("Skip commit transactions since current SCM is not leader.");
+      return;
+    }
+
+    DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
+    UUID dnId = details.getUuid();
+    for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
+      CommandStatus.Status status = commandStatus.getStatus();
+      lock.lock();
+      try {
+        if (status == CommandStatus.Status.EXECUTED) {
+          ContainerBlocksDeletionACKProto ackProto =
+              commandStatus.getBlockDeletionAck();
+          getSCMDeletedBlockTransactionStatusManager()
+              .commitTransactions(ackProto.getResultsList(), dnId);
+          metrics.incrBlockDeletionCommandSuccess();
+        } else if (status == CommandStatus.Status.FAILED) {
+          metrics.incrBlockDeletionCommandFailure();
+        } else {
+          LOG.debug("Delete Block Command {} is not executed on the Datanode" +
+              " {}.", commandStatus.getCmdId(), dnId);
+        }
+
+        getSCMDeletedBlockTransactionStatusManager()
+            .commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId);
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
 }

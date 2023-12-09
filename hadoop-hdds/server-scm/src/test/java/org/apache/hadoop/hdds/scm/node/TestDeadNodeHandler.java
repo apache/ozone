@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
-import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -92,8 +91,7 @@ public class TestDeadNodeHandler {
   private EventQueue eventQueue;
   private String storageDir;
   private SCMContext scmContext;
-  private SCMDeletedBlockTransactionStatusManager
-      deleteBlocksCommandStatusManager;
+  private DeletedBlockLog deletedBlockLog;
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
@@ -121,11 +119,7 @@ public class TestDeadNodeHandler {
     pipelineManager.setPipelineProvider(RATIS,
         mockRatisProvider);
     containerManager = scm.getContainerManager();
-    DeletedBlockLog deletedBlockLog = Mockito.mock(DeletedBlockLog.class);
-    deleteBlocksCommandStatusManager =
-        Mockito.mock(SCMDeletedBlockTransactionStatusManager.class);
-    Mockito.when(deletedBlockLog.getSCMDeletedBlockTransactionStatusManager())
-        .thenReturn(deleteBlocksCommandStatusManager);
+    deletedBlockLog = Mockito.mock(DeletedBlockLog.class);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
         Mockito.mock(PipelineManager.class), containerManager, deletedBlockLog);
     healthyReadOnlyNodeHandler =
@@ -243,8 +237,7 @@ public class TestDeadNodeHandler {
     Assertions.assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
-    Mockito.verify(deleteBlocksCommandStatusManager,
-            Mockito.times(0))
+    Mockito.verify(deletedBlockLog, Mockito.times(0))
         .onDatanodeDead(datanode1.getUuid());
 
     Set<ContainerReplica> container1Replicas = containerManager
@@ -274,8 +267,7 @@ public class TestDeadNodeHandler {
     Assertions.assertEquals(0, 
         nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
 
-    Mockito.verify(deleteBlocksCommandStatusManager,
-            Mockito.times(1))
+    Mockito.verify(deletedBlockLog, Mockito.times(1))
         .onDatanodeDead(datanode1.getUuid());
 
     container1Replicas = containerManager

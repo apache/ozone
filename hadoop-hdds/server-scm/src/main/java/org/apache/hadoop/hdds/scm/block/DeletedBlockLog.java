@@ -22,11 +22,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * The DeletedBlockLog is a persisted log in SCM to keep tracking
@@ -84,11 +86,33 @@ public interface DeletedBlockLog extends Closeable {
   int resetCount(List<Long> txIDs) throws IOException;
 
   /**
-   * Get SCMDeletedBlockTransactionStatusManager.
-   * @return an Object of SCMDeletedBlockTransactionStatusManager
+   * Records the creation of a transaction for a DataNode.
+   *
+   * @param dnId The identifier of the DataNode.
+   * @param scmCmdId The ID of the SCM command.
+   * @param dnTxSet Set of transaction IDs for the DataNode.
    */
-  SCMDeletedBlockTransactionStatusManager
-      getSCMDeletedBlockTransactionStatusManager();
+  void recordTransactionCreated(
+      UUID dnId, long scmCmdId, Set<Long> dnTxSet);
+
+  /**
+   * Handles the cleanup process when a DataNode is reported dead. This method
+   * is responsible for updating or cleaning up the transaction records
+   * associated with the dead DataNode.
+   *
+   * @param dnId The identifier of the dead DataNode.
+   */
+  void onDatanodeDead(UUID dnId);
+
+  /**
+   * Records the event of sending a block deletion command to a DataNode. This
+   * method is called when a command is successfully dispatched to a DataNode,
+   * and it helps in tracking the status of the command.
+   *
+   * @param dnId Details of the DataNode.
+   * @param scmCommand The block deletion command sent.
+   */
+  void onSent(DatanodeDetails dnId, SCMCommand<?> scmCommand);
 
   /**
    * Creates block deletion transactions for a set of containers,
