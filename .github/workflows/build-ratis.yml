@@ -27,9 +27,9 @@ on:
         required: true
         type: string
     outputs:
-      version:
+      ratis-version:
         description: "Ratis Version"
-        value: ${{ jobs.ratis.outputs.version }}
+        value: ${{ jobs.ratis.outputs.ratis-version }}
       thirdparty-version:
         description: "Ratis Third-Party Version"
         value: ${{ jobs.ratis.outputs.thirdparty-version }}
@@ -49,8 +49,8 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     outputs:
-      version: ${{ steps.versions.outputs.ratis }}
-      thirdparty-version: ${{ steps.versions.outputs.ratis-thirdparty }}
+      ratis-version: ${{ steps.versions.outputs.ratis }}
+      thirdparty-version: ${{ steps.versions.outputs.thirdparty }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
@@ -73,7 +73,7 @@ jobs:
         id: versions
         run: |
           thirdparty_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=ratis.thirdparty.version)"
-          echo "ratis-thirdparty=${thirdparty_version}" >> $GITHUB_OUTPUT
+          echo "thirdparty=${thirdparty_version}" >> $GITHUB_OUTPUT
 
           ratis_sha=$(git rev-parse --short HEAD)
           ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
@@ -95,9 +95,9 @@ jobs:
       - ratis
     timeout-minutes: 30
     outputs:
-      protobuf-version: ${{ steps.versions.outputs.protobuf }}
       grpc-version: ${{ steps.versions.outputs.grpc }}
       netty-version: ${{ steps.versions.outputs.netty }}
+      protobuf-version: ${{ steps.versions.outputs.protobuf }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
@@ -107,6 +107,19 @@ jobs:
       - name: Get component versions
         id: versions
         run: |
-          echo "grpc-version=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
-          echo "netty-version=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
-          echo "protobuf-version=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
+          echo "grpc=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
+          echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
+          echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
+  debug:
+    runs-on: ubuntu-20.04
+    needs:
+      - ratis
+      - ratis-thirdparty
+    steps:
+      - name: Print versions
+        run: |
+          echo ${{ needs.ratis.outputs.ratis-version }}
+          echo ${{ needs.ratis.outputs.thirdparty-version }}
+          echo ${{ needs.ratis-thirdparty.outputs.grpc-version }}
+          echo ${{ needs.ratis-thirdparty.outputs.netty-version }}
+          echo ${{ needs.ratis-thirdparty.outputs.protobuf-version }}

@@ -153,7 +153,7 @@ jobs:
           fi
 
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
-            args="$args -Dratis.version=${{ needs.ratis.outputs.version }}"
+            args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
             args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
