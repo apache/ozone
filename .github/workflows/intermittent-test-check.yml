@@ -133,6 +133,7 @@ jobs:
             maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Download Ratis repo
+        if: ${{ github.event.inputs.ratis-ref != '' }}
         uses: actions/download-artifact@v3
         with:
           name: ratis-jars
