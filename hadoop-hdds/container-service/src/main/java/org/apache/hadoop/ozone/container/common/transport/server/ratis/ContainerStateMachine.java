@@ -671,8 +671,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     try {
       metrics.incNumWriteStateMachineOps();
       long writeStateMachineStartTime = Time.monotonicNowNanos();
-      final Context context = (Context)transactionContext.getStateMachineContext();
-      final ContainerCommandRequestProto requestProto = context.getRequestProto();
+      Context context = (Context)transactionContext.getStateMachineContext();
+      ContainerCommandRequestProto requestProto = context.getRequestProto();
       final Type cmdType = requestProto.getCmdType();
 
       // For only writeChunk, there will be writeStateMachineData call.
@@ -946,7 +946,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumApplyTransactionsOps();
 
       final Context context = (Context) trx.getStateMachineContext();
-      final ContainerCommandRequestProto requestProto = context != null?
+      final ContainerCommandRequestProto requestProto = context != null ?
           context.getLogProto() :
           getContainerCommandRequestProto(gid,
               trx.getStateMachineLogEntry().getLogData());
