@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,8 +51,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter.hasVolumeEnoughSpace;
 
 /**
  * This policy implements a set of invariants which are common
@@ -312,9 +311,9 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (hasVolumeEnoughSpace(reportProto.getCapacity(),
-            reportProto.getRemaining(), reportProto.getCommitted(),
-            dataSizeRequired, conf)) {
+        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
+              reportProto.getCommitted(), dataSizeRequired,
+              reportProto.getFreeSpaceToSpare())) {
           enoughForData = true;
           break;
         }

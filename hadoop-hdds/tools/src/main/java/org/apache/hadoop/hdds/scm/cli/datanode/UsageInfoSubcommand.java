@@ -155,8 +155,11 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         + " B", StringUtils.byteDesc(info.getRemaining()));
     System.out.printf("%-13s: %s %n", "Remaining %",
         PERCENT_FORMAT.format(info.getRemainingRatio()));
-    System.out.printf("%-13s: %s (%s) %n", "Committed", info.getCommitted()
-        + " B", StringUtils.byteDesc(info.getCommitted()));
+    System.out.printf("%-13s: %s (%s) %n", "Container Pre-allocated",
+        info.getCommitted() + " B", StringUtils.byteDesc(info.getCommitted()));
+    System.out.printf("%-13s: %s (%s) %n", "Remaining Allocatable",
+        (info.getRemaining() - info.getCommitted()) + " B",
+        StringUtils.byteDesc((info.getRemaining() - info.getCommitted())));
     System.out.printf("%-13s: %d %n%n", "Container(s)",
             info.getContainerCount());
   }

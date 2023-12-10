@@ -54,11 +54,11 @@ import java.util.stream.IntStream;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.util.function.Function;
@@ -467,7 +467,7 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
-  public void testDatanodeIsInvalidIsCaseOfIncreasingCommittedBytes() {
+  public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
     NodeManager nodeMngr = mock(NodeManager.class);
     ConfigurationSource confing = mock(ConfigurationSource.class);
     when(confing.isConfigured(eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE)))
@@ -475,7 +475,7 @@ public class TestSCMCommonPlacementPolicy {
     when(confing.getStorageSize(eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE),
             eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT),
             eq(StorageUnit.BYTES))).thenReturn(100000.0);
-    UUID datanodeUuid = spy(UUID.randomUUID());
+    UUID datanodeUuid = UUID.randomUUID();
     DummyPlacementPolicy placementPolicy =
         new DummyPlacementPolicy(nodeMngr, confing, 1);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
@@ -487,29 +487,19 @@ public class TestSCMCommonPlacementPolicy {
     when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
     when(nodeMngr.getNodeByUuid(eq(datanodeUuid))).thenReturn(datanodeInfo);
 
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 500
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
-        StorageContainerDatanodeProtocolProtos.StorageReportProto.newBuilder()
-            .setCommitted(500)
-            .setCapacity(200000)
-            .setRemaining(101000)
-            .setStorageUuid(UUID.randomUUID().toString())
-            .setStorageLocation("/data/hdds")
-            .build();
+        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(500).build();
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
-        StorageContainerDatanodeProtocolProtos.StorageReportProto.newBuilder()
-            .setCommitted(1000)
-            .setCapacity(200000)
-            .setRemaining(101000)
-            .setStorageUuid(UUID.randomUUID().toString())
-            .setStorageLocation("/data/hdds")
-            .build();
+        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(1000).build();
     StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
-        metaReport =
-        StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
-            .newBuilder()
-            .setRemaining(200)
-            .setStorageLocation("/data/metadata")
-            .build();
+        metaReport = HddsTestUtils.createMetadataStorageReport("/data/metadata",
+          200);
     when(datanodeInfo.getStorageReports())
         .thenReturn(Collections.singletonList(storageReport1))
         .thenReturn(Collections.singletonList(storageReport2));
@@ -517,9 +507,23 @@ public class TestSCMCommonPlacementPolicy {
         .thenReturn(Collections.singletonList(metaReport));
 
 
-    // 500 committed bytes
+    // 500 committed bytes:
+    //
+    //   101000       500
+    //     |           |
+    // (remaining - committed) > Math.max(4000,
+    //        VolumeUsage.getMinVolumeFreeSpace(conf,volumeCapacity))
+    //                                                    |
+    //                                                  200000
+    //
+    // VolumeUsage.getMinVolumeFreeSpace(conf,volumeCapacity) == 100000
+    // (take a look to ConfigurationSource mock above)
+    //
+    // Summary: 101000 - 500 > 100000 == true
     assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
-    // 1000 committed bytes
+
+    // 1000 committed bytes:
+    // Summary: 101000 - 1000 > 100000 == false
     assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
   }
 

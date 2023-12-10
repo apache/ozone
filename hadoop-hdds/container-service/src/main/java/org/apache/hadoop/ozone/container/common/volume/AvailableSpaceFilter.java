@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -44,8 +42,10 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     long free = vol.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
-    boolean hasEnoughSpace = hasVolumeEnoughSpace(volumeCapacity, free,
-        committed, requiredSpace, vol.getConf());
+    long volumeFreeSpaceTpSpare =
+        VolumeUsage.getMinVolumeFreeSpace(vol.getConf(), volumeCapacity);
+    boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,
+        requiredSpace, volumeFreeSpaceTpSpare);
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
@@ -68,17 +68,6 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   public String toString() {
     return "required space: " + requiredSpace +
         ", volumes: " + fullVolumes;
-  }
-
-  public static boolean hasVolumeEnoughSpace(long volumeCapacity,
-                                             long volumeAvailableSpace,
-                                             long volumeCommittedBytesCount,
-                                             long requiredSpace,
-                                             ConfigurationSource conf) {
-    long volumeFreeSpace =
-        VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
-    return (volumeAvailableSpace - volumeCommittedBytesCount) >
-        Math.max(requiredSpace, volumeFreeSpace);
   }
 
   private static class AvailableSpace {

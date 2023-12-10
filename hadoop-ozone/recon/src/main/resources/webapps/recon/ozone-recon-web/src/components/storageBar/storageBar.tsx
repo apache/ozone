@@ -56,7 +56,7 @@ class StorageBar extends React.Component<IStorageBarProps> {
         <div><Icon component={FilledIcon} className='ozone-used-bg'/> Ozone Used ({size(used)})</div>
         <div><Icon component={FilledIcon} className='non-ozone-used-bg'/> Non Ozone Used ({size(nonOzoneUsed)})</div>
         <div><Icon component={FilledIcon} className='remaining-bg'/> Remaining ({size(remaining)})</div>
-        <div><Icon component={FilledIcon} className='committed-bg'/> Committed ({size(committed)})</div>
+        <div><Icon component={FilledIcon} className='committed-bg'/> Container Pre-allocated ({size(committed)})</div>
       </div>
     );
     const metaElement = showMeta ? <div>{size(used)} + {size(nonOzoneUsed)} / {size(total)}</div> : null;
