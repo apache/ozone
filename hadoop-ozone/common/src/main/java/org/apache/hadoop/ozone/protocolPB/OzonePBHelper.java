@@ -30,7 +30,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getFixedByteSt
  */
 public final class OzonePBHelper {
   private OzonePBHelper() {
-    /** Hidden constructor */
+    // no instances
   }
 
   public static Token<? extends TokenIdentifier> tokenFromProto(
