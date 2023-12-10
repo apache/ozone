@@ -1,0 +1,284 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.8"
+
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+  env_file:
+    - docker-config
+    - ../../../common/security.conf
+  image: ${OZONE_IMAGE}
+
+x-environment:
+  &environment
+  OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-3}
+  OZONE_UPGRADE_TO: ${OZONE_UPGRADE_TO:-0}
+  OZONE_UPGRADE_FROM: ${OZONE_UPGRADE_FROM:-0}
+  OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+  WAITFOR: kdc:88
+
+x-datanode:
+  &datanode
+  command: ["ozone","datanode"]
+  <<: *common-config
+  environment:
+    <<: *environment
+  ports:
+    - 19864
+    - 9882
+
+x-scm:
+  &scm
+  command: ["ozone","scm"]
+  <<: *common-config
+  ports:
+    - 9876
+
+x-om:
+  &om
+  command: ["ozone","om","${OM_HA_ARGS}"]
+  <<: *common-config
+  environment:
+    ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+    <<: *environment
+  ports:
+    - 9862
+    - 9872
+
+x-volumes:
+    - &keytabs ../../../_keytabs:/etc/security/keytabs
+    - &krb5conf ./krb5.conf:/etc/krb5.conf
+    - &ozone-dir ../../../..:${OZONE_DIR}
+    - &transformation ../../../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+
+services:
+  kdc:
+    command: ["krb5kdc","-n"]
+    hostname: kdc
+    image: ${OZONE_TESTKRB5_IMAGE}
+    networks:
+      net:
+        ipv4_address: 10.9.0.2
+    volumes:
+      - *keytabs
+      - ../../../..:/opt/hadoop
+  kms:
+    command: ["hadoop", "kms"]
+    hostname: kms
+    env_file:
+      - docker-config
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+    image: apache/hadoop:${HADOOP_VERSION}
+    networks:
+      net:
+        ipv4_address: 10.9.0.3
+    ports:
+      - 9600:9600
+    volumes:
+      - ${OZONE_VOLUME}/kms:/data
+      - *keytabs
+      - *krb5conf
+      - ../../../..:/opt/ozone
+      - *transformation
+  om1:
+    <<: *om
+    hostname: om1
+    networks:
+      net:
+        ipv4_address: 10.9.0.11
+    volumes:
+      - ${OZONE_VOLUME}/om1:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  om2:
+    <<: *om
+    hostname: om2
+    networks:
+      net:
+        ipv4_address: 10.9.0.12
+    volumes:
+      - ${OZONE_VOLUME}/om2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  om3:
+    <<: *om
+    hostname: om3
+    networks:
+      net:
+        ipv4_address: 10.9.0.13
+    volumes:
+      - ${OZONE_VOLUME}/om3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+
+  scm1:
+    <<: *scm
+    environment:
+      ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      <<: *environment
+    hostname: scm1.org
+    networks:
+      net:
+        ipv4_address: 10.9.0.14
+    volumes:
+      - ${OZONE_VOLUME}/scm1:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  scm2:
+    <<: *scm
+    environment:
+      WAITFOR: scm1.org:9894
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      <<: *environment
+    hostname: scm2.org
+    networks:
+      net:
+        ipv4_address: 10.9.0.15
+    volumes:
+      - ${OZONE_VOLUME}/scm2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  scm3:
+    <<: *scm
+    environment:
+      WAITFOR: scm2.org:9894
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      <<: *environment
+    hostname: scm3.org
+    networks:
+      net:
+        ipv4_address: 10.9.0.16
+    volumes:
+      - ${OZONE_VOLUME}/scm3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+
+  dn1:
+    <<: *datanode
+    hostname: dn1
+    networks:
+      net:
+        ipv4_address: 10.9.0.17
+    volumes:
+      - ${OZONE_VOLUME}/dn1:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  dn2:
+    <<: *datanode
+    hostname: dn2
+    networks:
+      net:
+        ipv4_address: 10.9.0.18
+    volumes:
+      - ${OZONE_VOLUME}/dn2:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  dn3:
+    <<: *datanode
+    hostname: dn3
+    networks:
+      net:
+        ipv4_address: 10.9.0.19
+    volumes:
+      - ${OZONE_VOLUME}/dn3:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  dn4:
+    <<: *datanode
+    hostname: dn4
+    networks:
+      net:
+        ipv4_address: 10.9.0.20
+    volumes:
+      - ${OZONE_VOLUME}/dn4:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  dn5:
+    <<: *datanode
+    hostname: dn5
+    networks:
+      net:
+        ipv4_address: 10.9.0.21
+    volumes:
+      - ${OZONE_VOLUME}/dn5:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  recon:
+    command: ["ozone","recon"]
+    <<: *common-config
+    environment:
+      <<: *environment
+    hostname: recon
+    networks:
+      net:
+        ipv4_address: 10.9.0.22
+    ports:
+      - 9888:9888
+    volumes:
+      - ${OZONE_VOLUME}/recon:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+  s3g:
+    command: ["ozone","s3g"]
+    <<: *common-config
+    environment:
+      <<: *environment
+    hostname: s3g
+    networks:
+      net:
+        ipv4_address: 10.9.0.23
+    ports:
+      - 9878:9878
+    volumes:
+      - ${OZONE_VOLUME}/s3g:/data
+      - *keytabs
+      - *krb5conf
+      - *ozone-dir
+      - *transformation
+
+networks:
+  net:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 10.9.0.0/16

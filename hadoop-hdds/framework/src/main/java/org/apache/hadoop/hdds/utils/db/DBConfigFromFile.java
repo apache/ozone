@@ -20,9 +20,9 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.DBOptions;
 import org.rocksdb.Env;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 
 /**
  * A Class that controls the standard config options of RocksDB.
@@ -49,7 +51,7 @@ public final class DBConfigFromFile {
   private static final Logger LOG =
       LoggerFactory.getLogger(DBConfigFromFile.class);
 
-  public static final String CONFIG_DIR = "HADOOP_CONF_DIR";
+  public static final String CONFIG_DIR = "OZONE_CONF_DIR";
 
   private DBConfigFromFile() {
   }
@@ -65,13 +67,11 @@ public final class DBConfigFromFile {
 
     if (StringUtil.isBlank(path)) {
       LOG.debug("Unable to find the configuration directory. "
-          + "Please make sure that HADOOP_CONF_DIR is setup correctly.");
-    }
-    if(StringUtil.isBlank(path)){
+          + "Please make sure that " + CONFIG_DIR + " is setup correctly.");
       return null;
     }
-    return new File(path);
 
+    return new File(path);
   }
 
   /**
@@ -105,16 +105,16 @@ public final class DBConfigFromFile {
    * and the user does not need to become an expert in RockDB config.
    * <p>
    * This code assumes the .ini file is placed in the same directory as normal
-   * config files. That is in $HADOOP_DIR/etc/hadoop. For example, if we want to
+   * config files. That is in $OZONE_DIR/etc/hadoop. For example, if we want to
    * control OzoneManager.db configs from a file, we need to create a file
-   * called OzoneManager.db.ini and place that file in $HADOOP_DIR/etc/hadoop.
+   * called OzoneManager.db.ini and place that file in $OZONE_DIR/etc/hadoop.
    *
    * @param dbFileName - The DB File Name, for example, OzoneManager.db.
    * @param cfDescs - ColumnFamily Handles.
    * @return DBOptions, Options to be used for opening/creating the DB.
    * @throws IOException
    */
-  public static DBOptions readFromFile(String dbFileName,
+  public static ManagedDBOptions readFromFile(String dbFileName,
       List<ColumnFamilyDescriptor> cfDescs) throws IOException {
     Preconditions.checkNotNull(dbFileName);
     Preconditions.checkNotNull(cfDescs);
@@ -122,21 +122,21 @@ public final class DBConfigFromFile {
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
     Env env = Env.getDefault();
-    DBOptions options = null;
+    ManagedDBOptions options = null;
     File configLocation = getConfigLocation();
-    if(configLocation != null &&
-        StringUtil.isNotBlank(configLocation.toString())){
+    if (configLocation != null &&
+        StringUtil.isNotBlank(configLocation.toString())) {
       Path optionsFile = Paths.get(configLocation.toString(),
           getOptionsFileNameFromDB(dbFileName));
 
       if (optionsFile.toFile().exists()) {
-        options = new DBOptions();
+        options = new ManagedDBOptions();
         try {
           OptionsUtil.loadOptionsFromFile(optionsFile.toString(),
               env, options, cfDescs, true);
 
         } catch (RocksDBException rdEx) {
-          RDBTable.toIOException("Unable to find/open Options file.", rdEx);
+          toIOException("Unable to find/open Options file.", rdEx);
         }
       }
     }

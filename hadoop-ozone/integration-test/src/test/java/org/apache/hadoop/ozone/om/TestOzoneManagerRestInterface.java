@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -33,35 +32,39 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
 
 /**
  * This class is to test the REST interface exposed by OzoneManager.
  */
+@Timeout(300)
 public class TestOzoneManagerRestInterface {
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -81,7 +84,7 @@ public class TestOzoneManagerRestInterface {
 
     ObjectMapper objectMapper = new ObjectMapper();
     TypeReference<List<ServiceInfo>> serviceInfoReference =
-        new TypeReference<List<ServiceInfo>>() {};
+        new TypeReference<List<ServiceInfo>>() { };
     List<ServiceInfo> serviceInfos = objectMapper.readValue(
         serviceListJson, serviceInfoReference);
     Map<HddsProtos.NodeType, ServiceInfo> serviceMap = new HashMap<>();
@@ -93,43 +96,20 @@ public class TestOzoneManagerRestInterface {
         getOmAddressForClients(conf);
     ServiceInfo omInfo = serviceMap.get(HddsProtos.NodeType.OM);
 
-    Assert.assertEquals(omAddress.getHostName(), omInfo.getHostname());
-    Assert.assertEquals(omAddress.getPort(),
+    assertEquals(omAddress.getHostName(), omInfo.getHostname());
+    assertEquals(omAddress.getPort(),
         omInfo.getPort(ServicePort.Type.RPC));
-    Assert.assertEquals(server.getHttpAddress().getPort(),
+    assertEquals(server.getHttpAddress().getPort(),
         omInfo.getPort(ServicePort.Type.HTTP));
 
+    assertTrue(getScmAddressForClients(conf).iterator().hasNext());
     InetSocketAddress scmAddress =
-        getScmAddressForClients(conf);
+        getScmAddressForClients(conf).iterator().next();
     ServiceInfo scmInfo = serviceMap.get(HddsProtos.NodeType.SCM);
 
-    Assert.assertEquals(scmAddress.getHostName(), scmInfo.getHostname());
-    Assert.assertEquals(scmAddress.getPort(),
+    assertEquals(scmAddress.getHostName(), scmInfo.getHostname());
+    assertEquals(scmAddress.getPort(),
         scmInfo.getPort(ServicePort.Type.RPC));
-
-    ServiceInfo datanodeInfo = serviceMap.get(HddsProtos.NodeType.DATANODE);
-    DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-    Assert.assertEquals(datanodeDetails.getHostName(),
-        datanodeInfo.getHostname());
-
-    Map<ServicePort.Type, Integer> ports = datanodeInfo.getPorts();
-    for(ServicePort.Type type : ports.keySet()) {
-      switch (type) {
-      case HTTP:
-      case HTTPS:
-        Assert.assertEquals(
-            datanodeDetails.getPort(DatanodeDetails.Port.Name.REST).getValue(),
-            ports.get(type));
-        break;
-      default:
-        // OM only sends Datanode's info port details
-        // i.e. HTTP or HTTPS
-        // Other ports are not expected as of now.
-        Assert.fail();
-        break;
-      }
-    }
   }
 
 }

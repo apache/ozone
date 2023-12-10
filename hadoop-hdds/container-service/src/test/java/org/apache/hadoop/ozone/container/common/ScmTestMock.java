@@ -17,7 +17,11 @@
 package org.apache.hadoop.ozone.container.common;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -46,7 +50,12 @@ import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -63,6 +72,11 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public ScmTestMock() {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+  }
+
+  public ScmTestMock(String clusterId, String scmId) {
+    this.clusterId = clusterId;
+    this.scmId = scmId;
   }
 
   // Map of datanode to containers
@@ -122,9 +136,10 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
    * @return - count of reported containers.
    */
   public long getContainerCount() {
-    return nodeContainers.values().parallelStream().mapToLong((containerMap)->{
-      return containerMap.size();
-    }).sum();
+    return nodeContainers.values().parallelStream().mapToLong(
+        (containerMap) -> {
+          return containerMap.size();
+        }).sum();
   }
 
   /**
@@ -132,11 +147,13 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
    * @return - number of keys reported.
    */
   public long getKeyCount() {
-    return nodeContainers.values().parallelStream().mapToLong((containerMap)->{
-      return containerMap.values().parallelStream().mapToLong((container) -> {
-        return container.getKeyCount();
-      }).sum();
-    }).sum();
+    return nodeContainers.values().parallelStream().mapToLong(
+        (containerMap) -> {
+          return containerMap.values().parallelStream().mapToLong(
+              (container) -> {
+                return container.getKeyCount();
+              }).sum();
+        }).sum();
   }
 
   /**
@@ -144,11 +161,13 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
    * @return - number of bytes used.
    */
   public long getBytesUsed() {
-    return nodeContainers.values().parallelStream().mapToLong((containerMap)->{
-      return containerMap.values().parallelStream().mapToLong((container) -> {
-        return container.getUsed();
-      }).sum();
-    }).sum();
+    return nodeContainers.values().parallelStream().mapToLong(
+        (containerMap) -> {
+          return containerMap.values().parallelStream().mapToLong(
+              (container) -> {
+                return container.getUsed();
+              }).sum();
+        }).sum();
   }
 
   /**
@@ -211,17 +230,21 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   /**
    * Register Datanode.
    *
-   * @param datanodeDetailsProto DatanodDetailsProto.
+   * @param extendedDatanodeDetailsProto ExtendedDatanodDetailsProto.
    * @return SCM Command.
    */
   @Override
   public StorageContainerDatanodeProtocolProtos
       .SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReportsProto)
+      ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
+      NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReportsProto,
+      LayoutVersionProto layoutInfo)
       throws IOException {
     rpcCount.incrementAndGet();
+    DatanodeDetailsProto datanodeDetailsProto =
+        extendedDatanodeDetailsProto.getDatanodeDetails();
     updateNodeReport(datanodeDetailsProto, nodeReport);
     updateContainerReport(containerReportsRequestProto, datanodeDetailsProto);
     sleepIfNeeded();
@@ -246,7 +269,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     List<StorageReportProto> storageReports =
         nodeReport.getStorageReportList();
 
-    for(StorageReportProto report : storageReports) {
+    for (StorageReportProto report : storageReports) {
       nodeReportProto.addStorageReport(report);
     }
 
@@ -300,7 +323,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public int getContainerCountsForDatanode(DatanodeDetails datanodeDetails) {
     Map<String, ContainerReplicaProto> cr =
         nodeContainers.get(datanodeDetails);
-    if(cr != null) {
+    if (cr != null) {
       return cr.size();
     }
     return 0;
@@ -337,19 +360,15 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     scmCommandRequests.add(scmCmd);
   }
 
-  /**
-   * Set scmId.
-   * @param id
-   */
-  public void setScmId(String id) {
-    this.scmId = id;
+  public String getClusterId() {
+    return clusterId;
   }
 
-  /**
-   * Set scmId.
-   * @return scmId
-   */
-  public String getScmId() {
-    return scmId;
+  public void setClusterId(String clusterId) {
+    this.clusterId = clusterId;
+  }
+
+  public void setScmId(String scmId) {
+    this.scmId = scmId;
   }
 }

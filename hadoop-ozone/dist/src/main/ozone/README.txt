@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-This is the distribution of Apache Hadoop Ozone.
+This is the distribution of Apache Ozone.
 
 Ozone is a submodule of Hadoop with separated release cycle. For more information, check
 

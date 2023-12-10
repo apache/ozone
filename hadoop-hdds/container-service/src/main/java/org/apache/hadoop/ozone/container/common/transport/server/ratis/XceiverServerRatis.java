@@ -20,11 +20,10 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,18 +31,23 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
@@ -52,17 +56,18 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -71,37 +76,47 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.ratis.RaftConfigKeys;
+import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
-import org.apache.ratis.grpc.GrpcFactory;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
 import org.apache.ratis.protocol.GroupManagementRequest;
-import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.DataStreamServerRpc;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.RaftServerRpc;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
+import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
@@ -111,66 +126,133 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private static final List<Integer> DEFAULT_PRIORITY_LIST =
+      new ArrayList<>(
+          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
   }
 
-  private int port;
+  private int serverPort;
+  private int adminPort;
+  private int clientPort;
+  private int dataStreamPort;
   private final RaftServer server;
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
-  private ClientId clientId = ClientId.randomId();
+  private final ClientId clientId = ClientId.randomId();
   private final StateContext context;
-  private long nodeFailureTimeoutMs;
+  private final long nodeFailureTimeoutMs;
   private boolean isStarted = false;
-  private DatanodeDetails datanodeDetails;
+  private final DatanodeDetails datanodeDetails;
   private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
-  private final Set<RaftGroupId> raftGids = new HashSet<>();
+  private final Set<RaftGroupId> raftGids = ConcurrentHashMap.newKeySet();
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
-  private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
+  private final Map<RaftGroupId, Boolean> groupLeaderMap =
+      new ConcurrentHashMap<>();
   // Timeout used while calling submitRequest directly.
-  private long requestTimeout;
+  private final long requestTimeout;
+  private final boolean shouldDeleteRatisLogDirectory;
+  private final boolean streamEnable;
+  private final DatanodeRatisServerConfig ratisServerConfig;
 
-  private XceiverServerRatis(DatanodeDetails dd, int port,
+  private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
-      StateContext context, GrpcTlsConfig tlsConfig, ConfigurationSource conf)
+      StateContext context, ConfigurationSource conf, Parameters parameters)
       throws IOException {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
-    this.port = port;
+    ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
+    assignPorts();
+    this.streamEnable = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
-    chunkExecutors = createChunkExecutors(conf);
+    String threadNamePrefix = datanodeDetails.threadNamePrefix();
+    chunkExecutors = createChunkExecutors(conf, threadNamePrefix);
+    nodeFailureTimeoutMs = ratisServerConfig.getFollowerSlownessTimeout();
+    shouldDeleteRatisLogDirectory =
+        ratisServerConfig.shouldDeleteRatisLogDirectory();
 
-    RaftServer.Builder builder =
+    this.server =
         RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)
-            .setStateMachineRegistry(this::getStateMachine);
-    if (tlsConfig != null) {
-      builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
-    }
-    this.server = builder.build();
+            .setStateMachineRegistry(this::getStateMachine)
+            .setParameters(parameters)
+            .setOption(RaftStorage.StartupOption.RECOVER)
+            .build();
     this.requestTimeout = conf.getTimeDuration(
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
         HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
   }
 
-  private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutors, this, conf);
+  private void assignPorts() {
+    clientPort = determinePort(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
+
+    if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
+        .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
+      adminPort = determinePort(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
+      serverPort = determinePort(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT);
+    } else {
+      adminPort = clientPort;
+      serverPort = clientPort;
+    }
   }
 
-  private RaftProperties newRaftProperties() {
+  private int determinePort(String key, int defaultValue) {
+    boolean randomPort = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
+    return randomPort ? 0 : conf.getInt(key, defaultValue);
+  }
+
+  private ContainerStateMachine getStateMachine(RaftGroupId gid) {
+    return new ContainerStateMachine(gid, dispatcher, containerController,
+        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
+  }
+
+  private void setUpRatisStream(RaftProperties properties) {
+    // set the datastream config
+    if (conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
+      dataStreamPort = 0;
+    } else {
+      dataStreamPort = conf.getInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
+    }
+    RatisHelper.enableNettyStreaming(properties);
+    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
+    int dataStreamAsyncRequestThreadPoolSize =
+        ratisServerConfig.getStreamRequestThreads();
+    RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
+        dataStreamAsyncRequestThreadPoolSize);
+    int dataStreamClientPoolSize = ratisServerConfig.getClientPoolSize();
+    RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
+        dataStreamClientPoolSize);
+  }
+
+  @SuppressWarnings("checkstyle:methodlength")
+  public RaftProperties newRaftProperties() {
     final RaftProperties properties = new RaftProperties();
 
     // Set rpc type
@@ -180,25 +262,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     setRaftSegmentAndWriteBufferSize(properties);
 
     // set raft segment pre-allocated size
-    final int raftSegmentPreallocatedSize =
+    final long raftSegmentPreallocatedSize =
         setRaftSegmentPreallocatedSize(properties);
 
-    TimeUnit timeUnit;
-    long duration;
+    // setup ratis stream if datastream is enabled
+    if (streamEnable) {
+      setUpRatisStream(properties);
+    }
 
-    // set the configs enable and set the stateMachineData sync timeout
-    RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
-    timeUnit = OzoneConfigKeys.
-        DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
-    duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
-            .getDuration(), timeUnit);
-    final TimeDuration dataSyncTimeout =
-        TimeDuration.valueOf(duration, timeUnit);
-    RaftServerConfigKeys.Log.StateMachineData
-        .setSyncTimeout(properties, dataSyncTimeout);
+    // Set Ratis State Machine Data configurations
+    setStateMachineDataConfigurations(properties);
 
     // set timeout for a retry cache entry
     setTimeoutForRetryCache(properties);
@@ -209,13 +282,17 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     // Set the maximum cache segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
-    // set the node failure timeout
-    setNodeFailureTimeout(properties);
+    // Disable the pre vote feature in Ratis
+    RaftServerConfigKeys.LeaderElection.setPreVote(properties,
+        ratisServerConfig.isPreVoteEnabled());
 
     // Set the ratis storage directory
-    String storageDir = HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
-    RaftServerConfigKeys.setStorageDir(properties,
-        Collections.singletonList(new File(storageDir)));
+    Collection<String> storageDirPaths =
+            HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
+    List<File> storageDirs = new ArrayList<>(storageDirPaths.size());
+    storageDirPaths.forEach(d -> storageDirs.add(new File(d)));
+
+    RaftServerConfigKeys.setStorageDir(properties, storageDirs);
 
     // For grpc set the maximum message size
     GrpcConfigKeys.setMessageSizeMax(properties,
@@ -224,9 +301,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Set the ratis port number
     if (rpc == SupportedRpcType.GRPC) {
-      GrpcConfigKeys.Server.setPort(properties, port);
+      GrpcConfigKeys.Admin.setPort(properties, adminPort);
+      GrpcConfigKeys.Client.setPort(properties, clientPort);
+      GrpcConfigKeys.Server.setPort(properties, serverPort);
     } else if (rpc == SupportedRpcType.NETTY) {
-      NettyConfigKeys.Server.setPort(properties, port);
+      NettyConfigKeys.Server.setPort(properties, serverPort);
     }
 
     long snapshotThreshold =
@@ -243,24 +322,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     int logQueueNumElements =
         conf.getInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS,
             OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT);
-    final int logQueueByteLimit = (int) conf.getStorageSize(
+    final long logQueueByteLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setQueueElementLimit(
         properties, logQueueNumElements);
-    RaftServerConfigKeys.Log.setQueueByteLimit(properties, logQueueByteLimit);
-
-    int numSyncRetries = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT);
-    RaftServerConfigKeys.Log.StateMachineData.setSyncTimeoutRetry(properties,
-        numSyncRetries);
-
-    // Enable the StateMachineCaching
-    RaftServerConfigKeys.Log.StateMachineData.setCachingEnabled(
-        properties, true);
+    RaftServerConfigKeys.Log.setQueueByteLimit(properties,
+        SizeInBytes.valueOf(logQueueByteLimit));
 
     RaftServerConfigKeys.Log.Appender.setInstallSnapshotEnabled(properties,
         false);
@@ -282,13 +351,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RatisHelper.createRaftServerProperties(conf, properties);
 
     return properties;
-  }
-
-  private void setNodeFailureTimeout(RaftProperties properties) {
-    nodeFailureTimeoutMs =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getFollowerSlownessTimeout();
-
   }
 
   private void setRatisLeaderElectionTimeout(RaftProperties properties) {
@@ -328,38 +390,101 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setExpiryTime(properties, retryCacheTimeout);
   }
 
-  private int setRaftSegmentPreallocatedSize(RaftProperties properties) {
-    final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
+  private long setRaftSegmentPreallocatedSize(RaftProperties properties) {
+    final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    int logAppenderQueueNumElements = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
-        OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
-    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-        OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-        StorageUnit.BYTES);
-    RaftServerConfigKeys.Log.Appender
-        .setBufferElementLimit(properties, logAppenderQueueNumElements);
-    RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties,
-        SizeInBytes.valueOf(logAppenderQueueByteLimit));
     RaftServerConfigKeys.Log.setPreallocatedSize(properties,
         SizeInBytes.valueOf(raftSegmentPreallocatedSize));
     return raftSegmentPreallocatedSize;
   }
 
   private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
-    final int raftSegmentSize = (int)conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
+    final int logAppenderQueueNumElements = conf.getInt(
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
+    final int logAppenderQueueByteLimit = (int) conf.getStorageSize(
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
+
+    final long raftSegmentSize = (long) conf.getStorageSize(
+        DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
+        DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    final long raftSegmentBufferSize = logAppenderQueueByteLimit + 8;
+
+    assertTrue(raftSegmentBufferSize <= raftSegmentSize,
+        () -> DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT + " = "
+            + logAppenderQueueByteLimit
+            + " must be <= (" + DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY + " - 8"
+            + " = " + (raftSegmentSize - 8) + ")");
+
+    RaftServerConfigKeys.Log.Appender.setBufferElementLimit(properties,
+        logAppenderQueueNumElements);
+    RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties,
+        SizeInBytes.valueOf(logAppenderQueueByteLimit));
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
     RaftServerConfigKeys.Log.setWriteBufferSize(properties,
-            SizeInBytes.valueOf(raftSegmentSize));
+        SizeInBytes.valueOf(raftSegmentBufferSize));
+  }
+
+  private void setStateMachineDataConfigurations(RaftProperties properties) {
+    // set the configs enable and set the stateMachineData sync timeout
+    RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
+
+    TimeUnit timeUnit = OzoneConfigKeys.
+        DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
+    long duration = conf.getTimeDuration(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
+            .getDuration(), timeUnit);
+    final TimeDuration dataSyncTimeout =
+        TimeDuration.valueOf(duration, timeUnit);
+    RaftServerConfigKeys.Log.StateMachineData
+        .setSyncTimeout(properties, dataSyncTimeout);
+    // typically a pipeline close will be initiated after a node failure
+    // timeout from Ratis in case a follower does not respond.
+    // By this time, all the writeStateMachine calls should be stopped
+    // and IOs should fail.
+    // Even if the leader is not able to complete write calls within
+    // the timeout seconds, it should just fail the operation and trigger
+    // pipeline close. failing the writeStateMachine call with limited retries
+    // will ensure even the leader initiates a pipeline close if its not
+    // able to complete write in the timeout configured.
+
+    // NOTE : the default value for the retry count in ratis is -1,
+    // which means retry indefinitely.
+    int syncTimeoutRetryDefault = (int) nodeFailureTimeoutMs /
+        dataSyncTimeout.toIntExact(TimeUnit.MILLISECONDS);
+    int numSyncRetries = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES,
+        syncTimeoutRetryDefault);
+    RaftServerConfigKeys.Log.StateMachineData.setSyncTimeoutRetry(properties,
+        numSyncRetries);
+
+    // Enable the StateMachineCaching
+    // By enabling caching, the state machine data (e.g. write chunk data)
+    // will not be cached in Ratis log cache. The caching
+    // responsibility is deferred to the StateMachine implementation itself.
+    // ContainerStateMachine contains stateMachineDataCache that stores
+    // write chunk data for each log entry index.
+    //
+    // Note that in Ratis, the state machine data is never stored as
+    // part of the persisted Raft log entry. This means that the state
+    // machine data (in this case, the write chunk data) is only stored in the
+    // stateMachineDataCache until it's persisted in datanode storage
+    // (See ContainerStateMachine#writeStateMachineData)
+    //
+    // This requires ContainerStateMachine to implements additional mechanisms
+    // such as returning the state machine data in StateMachine#read to
+    // read back the state machine data that will be sent to the Ratis
+    // followers.
+    RaftServerConfigKeys.Log.StateMachineData.setCachingEnabled(
+        properties, true);
   }
 
   private RpcType setRpcType(RaftProperties properties) {
@@ -367,85 +492,88 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
-    RaftConfigKeys.Rpc.setType(properties, rpc);
+    RatisHelper.setRpcType(properties, rpc);
     return rpc;
   }
 
   private void setPendingRequestsLimits(RaftProperties properties) {
 
-    final int pendingRequestsByteLimit = (int)conf.getStorageSize(
+    long pendingRequestsBytesLimit = (long) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    RaftServerConfigKeys.Write.setByteLimit(properties,
-        SizeInBytes.valueOf(pendingRequestsByteLimit));
+    final int pendingRequestsMegaBytesLimit =
+        HddsUtils.roundupMb(pendingRequestsBytesLimit);
+    RaftServerConfigKeys.Write.setByteLimit(properties, SizeInBytes
+        .valueOf(pendingRequestsMegaBytesLimit, TraditionalBinaryPrefix.MEGA));
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails datanodeDetails, ConfigurationSource ozoneConf,
       ContainerDispatcher dispatcher, ContainerController containerController,
       CertificateClient caClient, StateContext context) throws IOException {
-    int localPort = ozoneConf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
+    Parameters parameters = createTlsParameters(
+        new SecurityConfig(ozoneConf), caClient);
 
-    // Get an available port on current node and
-    // use that as the container port
-    if (ozoneConf.getBoolean(OzoneConfigKeys
-            .DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT)) {
-      localPort = 0;
-    }
-    GrpcTlsConfig tlsConfig = createTlsServerConfigForDN(
-          new SecurityConfig(ozoneConf), caClient);
-
-    return new XceiverServerRatis(datanodeDetails, localPort, dispatcher,
-        containerController, context, tlsConfig, ozoneConf);
+    return new XceiverServerRatis(datanodeDetails, dispatcher,
+        containerController, context, ozoneConf, parameters);
   }
 
   // For gRPC server running DN container service with gPRC TLS
-  // No mTLS as the channel is shared for for external client, which
-  // does not have SCM CA issued certificates.
   // In summary:
   // authenticate from server to client is via TLS.
   // authenticate from client to server is via block token (or container token).
-  static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
-      CertificateClient caClient) {
+  // DN Ratis server act as both SSL client and server and we must pass TLS
+  // configuration for both.
+  private static Parameters createTlsParameters(SecurityConfig conf,
+      CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      return new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          null, false);
+      KeyStoresFactory managerFactory =
+          caClient.getServerKeyStoresFactory();
+      GrpcTlsConfig serverConfig = new GrpcTlsConfig(
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], true);
+      GrpcTlsConfig clientConfig = new GrpcTlsConfig(
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], false);
+      return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
+
     return null;
   }
 
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
-          server.getId(), getIPCPort());
+      LOG.info("Starting {} {}", getClass().getSimpleName(), server.getId());
       for (ThreadPoolExecutor executor : chunkExecutors) {
         executor.prestartAllCoreThreads();
       }
       server.start();
 
-      int realPort =
-          ((RaftServerProxy) server).getServerRpc().getInetSocketAddress()
-              .getPort();
-
-      if (port == 0) {
-        LOG.info("{} {} is started using port {}", getClass().getSimpleName(),
-            server.getId(), realPort);
-        port = realPort;
+      RaftServerRpc serverRpc = server.getServerRpc();
+      clientPort = getRealPort(serverRpc.getClientServerAddress(),
+          Port.Name.RATIS);
+      adminPort = getRealPort(serverRpc.getAdminServerAddress(),
+          Port.Name.RATIS_ADMIN);
+      serverPort = getRealPort(serverRpc.getInetSocketAddress(),
+          Port.Name.RATIS_SERVER);
+      if (streamEnable) {
+        DataStreamServerRpc dataStreamServerRpc =
+            server.getDataStreamServerRpc();
+        dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+            Port.Name.RATIS_DATASTREAM);
       }
-
-      //register the real port to the datanode details.
-      datanodeDetails.setPort(DatanodeDetails
-          .newPort(DatanodeDetails.Port.Name.RATIS,
-              realPort));
-
       isStarted = true;
     }
+  }
+
+  private int getRealPort(InetSocketAddress address, Port.Name name) {
+    int realPort = address.getPort();
+    datanodeDetails.setPort(DatanodeDetails.newPort(name, realPort));
+    LOG.info("{} {} is started using port {} for {}",
+        getClass().getSimpleName(), server.getId(), realPort, name);
+    return realPort;
   }
 
   @Override
@@ -460,14 +588,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         }
         isStarted = false;
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        LOG.error("XceiverServerRatis Could not be stopped gracefully.", e);
       }
     }
   }
 
   @Override
   public int getIPCPort() {
-    return port;
+    return clientPort;
   }
 
   /**
@@ -483,6 +611,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @VisibleForTesting
   public RaftServer getServer() {
     return server;
+  }
+
+  public RaftServer.Division getServerDivision() throws IOException {
+    return getServerDivision(server.getGroupIds().iterator().next());
+  }
+
+  public RaftServer.Division getServerDivision(RaftGroupId id)
+      throws IOException {
+    return server.getDivision(id);
   }
 
   private void processReply(RaftClientReply reply) throws IOException {
@@ -504,20 +641,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    RaftClientReply reply;
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
 
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
+      RaftClientReply reply;
       try {
         reply = server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
-      } catch (Exception e) {
+      } catch (ExecutionException | TimeoutException e) {
+        throw new IOException(e.getMessage(), e);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new IOException(e.getMessage(), e);
       }
       processReply(reply);
@@ -529,10 +669,16 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private RaftClientRequest createRaftClientRequest(
       ContainerCommandRequestProto request, HddsProtos.PipelineID pipelineID,
       RaftClientRequest.Type type) {
-    return new RaftClientRequest(clientId, server.getId(),
-        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineID).getId()),
-        nextCallId(), ContainerCommandRequestMessage.toMessage(request, null),
-        type, null);
+    return RaftClientRequest.newBuilder()
+        .setClientId(clientId)
+        .setServerId(server.getId())
+        .setGroupId(
+            RaftGroupId.valueOf(
+                PipelineID.getFromProtobuf(pipelineID).getId()))
+        .setCallId(nextCallId())
+        .setMessage(ContainerCommandRequestMessage.toMessage(request, null))
+        .setType(type)
+        .build();
   }
 
   private GroupInfoRequest createGroupInfoRequest(
@@ -551,6 +697,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     case CANDIDATE:
       msg = datanode + " is in candidate state for " +
           roleInfoProto.getCandidateInfo().getLastLeaderElapsedTimeMs() + "ms";
+      break;
+    case FOLLOWER:
+      msg = datanode + " closes pipeline when installSnapshot from leader " +
+          "because leader snapshot doesn't contain any data to replay, " +
+          "all the log entries prior to the snapshot might have been purged." +
+          "So follower should not try to install snapshot from leader but" +
+          "can close the pipeline here. It's in follower state for " +
+          roleInfoProto.getRoleElapsedTimeMs() + "ms";
       break;
     case LEADER:
       StringBuilder sb = new StringBuilder();
@@ -588,10 +742,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setClosePipeline(closePipelineInfo)
         .setAction(PipelineAction.Action.CLOSE)
         .build();
-    context.addPipelineActionIfAbsent(action);
-    // wait for the next HB timeout or right away?
-    if (triggerHB) {
-      context.getParent().triggerHeartbeat();
+    if (context != null) {
+      context.addPipelineActionIfAbsent(action);
+      // wait for the next HB timeout or right away?
+      if (triggerHB) {
+        context.getParent().triggerHeartbeat();
+      }
     }
     LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
             action.getAction(), pipelineID,
@@ -606,10 +762,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
     long bytesWritten = 0;
-    Iterator<org.apache.hadoop.ozone.container.common.interfaces.Container<?>>
-        containerIt = containerController.getContainers();
-    while(containerIt.hasNext()) {
-      ContainerData containerData = containerIt.next().getContainerData();
+    for (Container<?> container : containerController.getContainers()) {
+      ContainerData containerData = container.getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {
         bytesWritten += containerData.getWriteBytes();
@@ -651,29 +805,48 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
-      Collection<DatanodeDetails> peers) throws IOException {
+      List<DatanodeDetails> peers) throws IOException {
+    if (peers.size() == getDefaultPriorityList().size()) {
+      addGroup(pipelineId, peers, getDefaultPriorityList());
+    } else {
+      addGroup(pipelineId, peers,
+          new ArrayList<>(Collections.nCopies(peers.size(), 0)));
+    }
+  }
+
+  @Override
+  public void addGroup(HddsProtos.PipelineID pipelineId,
+      List<DatanodeDetails> peers,
+      List<Integer> priorityList) throws IOException {
     final PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineId);
     final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
-    final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+    final RaftGroup group =
+        RatisHelper.newRaftGroup(groupId, peers, priorityList);
     GroupManagementRequest request = GroupManagementRequest.newAdd(
         clientId, server.getId(), nextCallId(), group);
 
     RaftClientReply reply;
+    LOG.debug("Received addGroup request for pipeline {}", pipelineID);
+
     try {
       reply = server.groupManagement(request);
     } catch (Exception e) {
       throw new IOException(e.getMessage(), e);
     }
     processReply(reply);
+    LOG.info("Created group {}", pipelineID);
   }
 
   @Override
   public void removeGroup(HddsProtos.PipelineID pipelineId)
       throws IOException {
+    // if shouldDeleteRatisLogDirectory is set to false, the raft log
+    // directory will be renamed and kept aside for debugging.
+    // In case, its set to true, the raft log directory will be removed
     GroupManagementRequest request = GroupManagementRequest.newRemove(
         clientId, server.getId(), nextCallId(),
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
-        true);
+        shouldDeleteRatisLogDirectory, !shouldDeleteRatisLogDirectory);
 
     RaftClientReply reply;
     try {
@@ -743,10 +916,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     GroupInfoReply reply = getServer()
         .getGroupInfo(createGroupInfoRequest(pipelineID.getProtobuf()));
     minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
-    return minIndex == null ? -1 : minIndex.longValue();
+    return minIndex == null ? -1 : minIndex;
   }
 
-  void notifyGroupRemove(RaftGroupId gid) {
+  public void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
     // Remove any entries for group leader map
     groupLeaderMap.remove(gid);
@@ -771,27 +944,32 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void sendPipelineReport() {
-    // TODO: Send IncrementalPipelineReport instead of full PipelineReport
-    context.addReport(context.getParent().getContainer().getPipelineReport());
-    context.getParent().triggerHeartbeat();
+    if (context !=  null) {
+      // TODO: Send IncrementalPipelineReport instead of full PipelineReport
+      context.addIncrementalReport(
+          context.getParent().getContainer().getPipelineReport());
+      context.getParent().triggerHeartbeat();
+    }
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
-      ConfigurationSource conf) {
+      ConfigurationSource conf, String threadNamePrefix) {
     // TODO create single pool with N threads if using non-incremental chunks
     final int threadCountPerDisk = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+        OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+        OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
 
     final int numberOfDisks =
-        MutableVolumeSet.getDatanodeStorageDirs(conf).size();
+        HddsServerUtil.getDatanodeStorageDirs(conf).size();
 
     ThreadPoolExecutor[] executors =
         new ThreadPoolExecutor[threadCountPerDisk * numberOfDisks];
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
-          .setNameFormat("ChunkWriter-" + i + "-%d")
+          .setNameFormat(threadNamePrefix + "ChunkWriter-" + i + "-%d")
           .build();
       BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,
@@ -800,4 +978,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return ImmutableList.copyOf(executors);
   }
 
+  /**
+   * @return list of default priority
+   */
+  public static List<Integer> getDefaultPriorityList() {
+    return DEFAULT_PRIORITY_LIST;
+  }
 }

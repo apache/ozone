@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,7 +34,6 @@ public class TestNetUtils {
     assertEquals("/", NetUtils.normalize("/"));
     assertThrows(IllegalArgumentException.class, () -> NetUtils.normalize("x"));
     assertEquals("/a/b/c", NetUtils.normalize("/a/b/c"));
-    assertEquals("/a/b/c", NetUtils.normalize("/a/b/c////"));
     assertEquals("/a/b/c/$", NetUtils.normalize("/a/b/c/$"));
   }
 }

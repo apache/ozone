@@ -24,8 +24,15 @@ if [ ! "$(which hugo)" ]; then
    exit 0
 fi
 
+export OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
+
+ENABLE_GIT_INFO=
+if git -C $(pwd) status >& /dev/null; then
+  ENABLE_GIT_INFO="--enableGitInfo"
+fi
+
 DESTDIR="$DOCDIR/target/classes/docs"
 mkdir -p "$DESTDIR"
 cd "$DOCDIR"
-hugo -d "$DESTDIR" "$@"
+hugo "${ENABLE_GIT_INFO}" -d "$DESTDIR" "$@"
 cd -

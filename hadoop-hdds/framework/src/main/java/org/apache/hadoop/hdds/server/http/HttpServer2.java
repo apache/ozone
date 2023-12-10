@@ -38,6 +38,9 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -48,6 +51,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
@@ -55,6 +59,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.http.FilterContainer;
@@ -62,6 +67,8 @@ import org.apache.hadoop.http.FilterInitializer;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -73,6 +80,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -107,6 +115,8 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterHolder;
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterMapping;
 import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
 
 /**
@@ -149,7 +159,16 @@ public final class HttpServer2 implements FilterContainer {
   // idle timeout in milliseconds
   private static final String HTTP_IDLE_TIMEOUT_MS_KEY =
       "hadoop.http.idle_timeout.ms";
-  private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 10000;
+
+  /**
+   *  This value will never be used because the default value is set in
+   *  core-default.xml from hadoop-common and ozone-default.xml. The value 60k
+   *  here is aligned to the value in ozone-default.xml.
+   *
+   *  TODO: default values for other properties defined here are likely to be
+   *   ignored if defaults are defined in hadoop-common as well.
+   **/
+  private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
   private static final String HTTP_TEMP_DIR_KEY = "hadoop.http.temp.dir";
 
   private static final String FILTER_INITIALIZER_PROPERTY
@@ -182,10 +201,11 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
   private XFrameOption xFrameOption;
+  private HttpServer2Metrics metrics;
   private boolean xFrameOptionIsEnabled;
-  public static final String HTTP_HEADER_PREFIX = "hadoop.http.header.";
+  public static final String HTTP_HEADER_PREFIX = "ozone.http.header.";
   private static final String HTTP_HEADER_REGEX =
-      "hadoop\\.http\\.header\\.([a-zA-Z\\-_]+)";
+      "ozone\\.http\\.header\\.([a-zA-Z\\-_]+)";
   static final String X_XSS_PROTECTION =
       "X-XSS-Protection:1; mode=block";
   static final String X_CONTENT_TYPE_OPTIONS =
@@ -199,7 +219,7 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
-    private ConfigurationSource conf;
+    private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;
     private String[] pathSpecs;
     private AccessControlList adminsAcl;
@@ -298,7 +318,7 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
-    public Builder setConf(ConfigurationSource configuration) {
+    public Builder setConf(MutableConfigurationSource configuration) {
       this.conf = configuration;
       return this;
     }
@@ -572,12 +592,13 @@ public final class HttpServer2 implements FilterContainer {
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
     initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
-        b.authFilterConfigurationPrefix);
+        b.authFilterConfigurationPrefix, b.securityEnabled);
   }
 
   private void initializeWebServer(String name, String hostName,
-      ConfigurationSource conf, String[] pathSpecs,
-      String authFilterConfigPrefix) throws IOException {
+      MutableConfigurationSource conf, String[] pathSpecs,
+      String authFilterConfigPrefix,
+      boolean securityEnabled) throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
 
@@ -591,6 +612,7 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
+    metrics = HttpServer2Metrics.create(threadPool, name);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
@@ -608,20 +630,22 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(name);
     addDefaultApps(contexts, appDir, conf);
     webServer.setHandler(handlers);
-
-    Map<String, String> xFrameParams = setHeaders(conf);
-    addGlobalFilter("safety", QuotingInputFilter.class.getName(), xFrameParams);
+    Map<String, String> config = generateFilterConfiguration(conf);
+    addGlobalFilter("safety", QuotingInputFilter.class.getName(), config);
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
+      org.apache.hadoop.conf.Configuration hadoopConf =
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+      Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
+          authFilterConfigPrefix);
       for (FilterInitializer c : initializers) {
-        //c.initFilter(this, conf) does not work here as it does not take config
-        // prefix key.
-        Map<String, String> filterConfig = getFilterConfigMap(
-            LegacyHadoopConfigurationSource.asHadoopConfiguration(conf),
-            authFilterConfigPrefix);
-        addFilter("authentication", AuthenticationFilter.class.getName(),
-            filterConfig);
+        if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
+          addFilter("authentication",
+              AuthenticationFilter.class.getName(), filterConfig);
+        } else {
+          c.initFilter(this, hadoopConf);
+        }
       }
     }
 
@@ -690,7 +714,7 @@ public final class HttpServer2 implements FilterContainer {
 
   private static void addNoCacheFilter(ServletContextHandler ctxt) {
     defineFilter(ctxt, NO_CACHE_FILTER, NoCacheFilter.class.getName(),
-        Collections.<String, String>emptyMap(), new String[] {"/*"});
+        Collections.emptyMap(), new String[] {"/*"});
   }
 
   /**
@@ -741,7 +765,6 @@ public final class HttpServer2 implements FilterContainer {
       if (conf.getBoolean(
           CommonConfigurationKeys.HADOOP_JETTY_LOGS_SERVE_ALIASES,
           CommonConfigurationKeys.DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
-        @SuppressWarnings("unchecked")
         Map<String, String> params = logContext.getInitParams();
         params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
       }
@@ -760,7 +783,6 @@ public final class HttpServer2 implements FilterContainer {
     staticContext.setResourceBase(appDir + "/static");
     staticContext.addServlet(DefaultServlet.class, "/*");
     staticContext.setDisplayName("static");
-    @SuppressWarnings("unchecked")
     Map<String, String> params = staticContext.getInitParams();
     params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
     params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
@@ -888,6 +910,27 @@ public final class HttpServer2 implements FilterContainer {
     }
     webAppContext.addServlet(holder, pathSpec);
 
+    // Remove any previous filter attached to the removed servlet path to avoid
+    // Kerberos replay error.
+    FilterMapping[] filterMappings = webAppContext.getServletHandler().
+        getFilterMappings();
+    for (int i = 0; i < filterMappings.length; i++) {
+      if (filterMappings[i].getPathSpecs() == null) {
+        LOG.debug("Skip checking {} filterMappings {} without a path spec.",
+            filterMappings[i].getFilterName(), filterMappings[i]);
+        continue;
+      }
+      int oldPathSpecsLen = filterMappings[i].getPathSpecs().length;
+      String[] newPathSpecs =
+          ArrayUtil.removeFromArray(filterMappings[i].getPathSpecs(), pathSpec);
+      if (newPathSpecs.length == 0) {
+        webAppContext.getServletHandler().setFilterMappings(
+            ArrayUtil.removeFromArray(filterMappings, filterMappings[i]));
+      } else if (newPathSpecs.length != oldPathSpecsLen) {
+        filterMappings[i].setPathSpecs(newPathSpecs);
+      }
+    }
+
     if (requireAuth && UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Adding Kerberos (SPNEGO) filter to {}", name);
       ServletHandler handler = webAppContext.getServletHandler();
@@ -962,13 +1005,13 @@ public final class HttpServer2 implements FilterContainer {
   public void addFilter(String name, String classname,
       Map<String, String> parameters) {
 
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
     FilterMapping fmap =
-        getFilterMapping(name, new String[] {"*.html", "*.jsp"});
+        createFilterMapping(name, new String[] {"*.html", "*.jsp"});
     defineFilter(webAppContext, filterHolder, fmap);
     LOG.info("Added filter {} (class={}) to context {}", name, classname,
             webAppContext.getDisplayName());
-    fmap = getFilterMapping(name, new String[] {"/*"});
+    fmap = createFilterMapping(name, new String[] {"/*"});
     for (Map.Entry<ServletContextHandler, Boolean> e
         : defaultContexts.entrySet()) {
       if (e.getValue()) {
@@ -984,8 +1027,8 @@ public final class HttpServer2 implements FilterContainer {
   @Override
   public void addGlobalFilter(String name, String classname,
       Map<String, String> parameters) {
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
-    FilterMapping fmap = getFilterMapping(name, new String[] {"/*"});
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
+    FilterMapping fmap = createFilterMapping(name, new String[] {"/*"});
     defineFilter(webAppContext, filterHolder, fmap);
     for (ServletContextHandler ctx : defaultContexts.keySet()) {
       defineFilter(ctx, filterHolder, fmap);
@@ -998,8 +1041,8 @@ public final class HttpServer2 implements FilterContainer {
    */
   private static void defineFilter(ServletContextHandler ctx, String name,
       String classname, Map<String, String> parameters, String[] urls) {
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
-    FilterMapping fmap = getFilterMapping(name, urls);
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
+    FilterMapping fmap = createFilterMapping(name, urls);
     defineFilter(ctx, filterHolder, fmap);
   }
 
@@ -1010,25 +1053,6 @@ public final class HttpServer2 implements FilterContainer {
       FilterHolder holder, FilterMapping fmap) {
     ServletHandler handler = ctx.getServletHandler();
     handler.addFilter(holder, fmap);
-  }
-
-  private static FilterMapping getFilterMapping(String name, String[] urls) {
-    FilterMapping fmap = new FilterMapping();
-    fmap.setPathSpecs(urls);
-    fmap.setDispatches(FilterMapping.ALL);
-    fmap.setFilterName(name);
-    return fmap;
-  }
-
-  private static FilterHolder getFilterHolder(String name, String classname,
-      Map<String, String> parameters) {
-    FilterHolder holder = new FilterHolder();
-    holder.setName(name);
-    holder.setClassName(classname);
-    if (parameters != null) {
-      holder.setInitParameters(parameters);
-    }
-    return holder;
   }
 
   /**
@@ -1185,6 +1209,7 @@ public final class HttpServer2 implements FilterContainer {
     } catch (IOException e) {
       throw e;
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw (IOException) new InterruptedIOException(
           "Interrupted while starting HTTP server").initCause(e);
     } catch (Exception e) {
@@ -1328,6 +1353,7 @@ public final class HttpServer2 implements FilterContainer {
       // clear & stop webAppContext attributes to avoid memory leaks.
       webAppContext.clearAttributes();
       webAppContext.stop();
+      metrics.unRegister();
     } catch (Exception e) {
       LOG.error("Error while stopping web app context for webapp "
           + webAppContext.getDisplayName(), e);
@@ -1398,7 +1424,7 @@ public final class HttpServer2 implements FilterContainer {
    * @param servletContext the servlet context.
    * @param request the servlet request.
    * @param response the servlet response.
-   * @return TRUE/FALSE based on the logic decribed above.
+   * @return TRUE/FALSE based on the logic described above.
    */
   public static boolean isInstrumentationAccessAllowed(
       ServletContext servletContext, HttpServletRequest request,
@@ -1478,6 +1504,7 @@ public final class HttpServer2 implements FilterContainer {
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
 
+
   /**
    * A very simple servlet to serve up a text representation of the current
    * stack traces. It both returns the stacks to the caller and logs them.
@@ -1496,7 +1523,7 @@ public final class HttpServer2 implements FilterContainer {
       }
       response.setContentType("text/plain; charset=UTF-8");
       try (PrintStream out = new PrintStream(
-          response.getOutputStream(), false, "UTF-8")) {
+          response.getOutputStream(), false, StandardCharsets.UTF_8.name())) {
         ReflectionUtils.printThreadInfo(out, "");
       }
       ReflectionUtils.logThreadInfo(LOG, "jsp requested", 1);
@@ -1528,7 +1555,6 @@ public final class HttpServer2 implements FilterContainer {
       /**
        * Return the set of parameter names, quoting each name.
        */
-      @SuppressWarnings("unchecked")
       @Override
       public Enumeration<String> getParameterNames() {
         return new Enumeration<String>() {
@@ -1569,7 +1595,6 @@ public final class HttpServer2 implements FilterContainer {
         return result;
       }
 
-      @SuppressWarnings("unchecked")
       @Override
       public Map<String, String[]> getParameterMap() {
         Map<String, String[]> result = new HashMap<>();
@@ -1636,7 +1661,7 @@ public final class HttpServer2 implements FilterContainer {
       } else if (mime.startsWith("application/xml")) {
         httpResponse.setContentType("text/xml; charset=utf-8");
       }
-      headerMap.forEach((k, v) -> httpResponse.addHeader(k, v));
+      headerMap.forEach((k, v) -> httpResponse.setHeader(k, v));
       chain.doFilter(quoted, httpResponse);
     }
 
@@ -1704,15 +1729,23 @@ public final class HttpServer2 implements FilterContainer {
     }
   }
 
-  private Map<String, String> setHeaders(ConfigurationSource conf) {
-    Map<String, String> xFrameParams = new HashMap<>();
-
-    xFrameParams.putAll(getDefaultHeaders());
+  /**
+   * Generate the configuration for the Quoting filter used.
+   * @param conf global configuration
+   * @return relevant configuration
+   */
+  private Map<String, String> generateFilterConfiguration(
+      ConfigurationSource conf) {
+    Map<String, String> config = new HashMap<>();
+    // Add headers to the configuration.
+    config.putAll(getDefaultHeaders());
     if (this.xFrameOptionIsEnabled) {
-      xFrameParams.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
+      config.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
           this.xFrameOption.toString());
     }
-    return xFrameParams;
+    // Config overrides default
+    config.putAll(conf.getPropsMatchPrefix(HTTP_HEADER_PREFIX));
+    return config;
   }
 
   private Map<String, String> getDefaultHeaders() {
@@ -1724,5 +1757,38 @@ public final class HttpServer2 implements FilterContainer {
     headers.put(HTTP_HEADER_PREFIX + splitVal[0],
         splitVal[1]);
     return headers;
+  }
+
+  @VisibleForTesting
+  protected List<ServerConnector> getListeners() {
+    return listeners;
+  }
+
+  /**
+   * Utility method to initialize config key ozone.http.basedir and create a
+   * temporary directory under the current working directory if not set.
+   *
+   * @param ozoneConfiguration current configuration.
+   * @throws IOException if unable to create a temp directory.
+   */
+  public static void setHttpBaseDir(OzoneConfiguration ozoneConfiguration)
+          throws IOException {
+    if (org.apache.commons.lang3.StringUtils.isEmpty(ozoneConfiguration.get(
+            OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
+      // Setting ozone.http.basedir to cwd if not set so that server setup
+      // doesn't fail.
+      File tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+              "ozone_http_tmp_base_dir").toFile();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          FileUtils.deleteDirectory(tmpMetaDir);
+        } catch (IOException e) {
+          LOG.error("Failed to cleanup temporary metadata directory {}",
+                  tmpMetaDir.getAbsolutePath(), e);
+        }
+      }, 0);
+      ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+              tmpMetaDir.getAbsolutePath());
+    }
   }
 }

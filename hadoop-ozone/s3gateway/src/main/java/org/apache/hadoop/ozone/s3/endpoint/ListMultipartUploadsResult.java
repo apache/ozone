@@ -38,9 +38,6 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
     "http://s3.amazonaws.com/doc/2006-03-01/")
 public class ListMultipartUploadsResult {
 
-  public static final Owner
-      NOT_SUPPORTED_OWNER = new Owner("NOT-SUPPORTED", "Not Supported");
-
   @XmlElement(name = "Bucket")
   private String bucket;
 
@@ -148,10 +145,10 @@ public class ListMultipartUploadsResult {
     private String uploadId;
 
     @XmlElement(name = "Owner")
-    private Owner owner = NOT_SUPPORTED_OWNER;
+    private S3Owner owner = S3Owner.NOT_SUPPORTED_OWNER;
 
     @XmlElement(name = "Initiator")
-    private Owner initiator = NOT_SUPPORTED_OWNER;
+    private S3Owner initiator = S3Owner.NOT_SUPPORTED_OWNER;
 
     @XmlElement(name = "StorageClass")
     private String storageClass = "STANDARD";
@@ -193,21 +190,21 @@ public class ListMultipartUploadsResult {
       this.uploadId = uploadId;
     }
 
-    public Owner getOwner() {
+    public S3Owner getOwner() {
       return owner;
     }
 
     public void setOwner(
-        Owner owner) {
+        S3Owner owner) {
       this.owner = owner;
     }
 
-    public Owner getInitiator() {
+    public S3Owner getInitiator() {
       return initiator;
     }
 
     public void setInitiator(
-        Owner initiator) {
+        S3Owner initiator) {
       this.initiator = initiator;
     }
 
@@ -225,44 +222,6 @@ public class ListMultipartUploadsResult {
 
     public void setInitiated(Instant initiated) {
       this.initiated = initiated;
-    }
-  }
-
-  /**
-   * Upload information.
-   */
-  @XmlAccessorType(XmlAccessType.FIELD)
-  @XmlRootElement(name = "Owner")
-  public static class Owner {
-
-    @XmlElement(name = "ID")
-    private String id;
-
-    @XmlElement(name = "DisplayName")
-    private String displayName;
-
-    public Owner() {
-    }
-
-    public Owner(String id, String displayName) {
-      this.id = id;
-      this.displayName = displayName;
-    }
-
-    public String getId() {
-      return id;
-    }
-
-    public void setId(String id) {
-      this.id = id;
-    }
-
-    public String getDisplayName() {
-      return displayName;
-    }
-
-    public void setDisplayName(String displayName) {
-      this.displayName = displayName;
     }
   }
 }

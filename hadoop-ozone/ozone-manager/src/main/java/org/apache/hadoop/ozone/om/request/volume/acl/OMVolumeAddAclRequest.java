@@ -19,20 +19,27 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles volume add acl request.
@@ -41,24 +48,35 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMVolumeAddAclRequest.class);
 
-  private static CheckedBiFunction<List<OzoneAcl>,
-      OmVolumeArgs, IOException> volumeAddAclOp;
+  private static final VolumeAclOp VOLUME_ADD_ACL_OP =
+      (acls, volArgs) -> volArgs.addAcl(acls.get(0));
 
-  static {
-    volumeAddAclOp = (acls, volArgs) -> volArgs.addAcl(acls.get(0));
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.AddAclRequest.Builder addAclRequestBuilder =
+        getOmRequest().getAddAclRequest().toBuilder()
+            .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setAddAclRequest(addAclRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
-  private List<OzoneAcl> ozoneAcls;
-  private String volumeName;
+  private final List<OzoneAcl> ozoneAcls;
+  private final String volumeName;
+  private final OzoneObj obj;
 
   public OMVolumeAddAclRequest(OMRequest omRequest) {
-    super(omRequest, volumeAddAclOp);
+    super(omRequest, VOLUME_ADD_ACL_OP);
     OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
         getOmRequest().getAddAclRequest();
     Preconditions.checkNotNull(addAclRequest);
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(addAclRequest.getAcl()));
-    volumeName = addAclRequest.getObj().getPath().substring(1);
+    obj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());
+    volumeName = obj.getPath().substring(1);
   }
 
   @Override
@@ -75,6 +93,10 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
     return ozoneAcls.get(0);
   }
 
+  @Override
+  OzoneObj getObject() {
+    return obj;
+  }
 
   @Override
   OMResponse.Builder onInit() {
@@ -83,7 +105,7 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMClientResponse onSuccess(OMResponse.Builder omResponse,
-      OmVolumeArgs omVolumeArgs, boolean aclApplied){
+      OmVolumeArgs omVolumeArgs, boolean aclApplied) {
     omResponse.setAddAclResponse(OzoneManagerProtocolProtos.AddAclResponse
         .newBuilder().setResponse(aclApplied).build());
     return new OMVolumeAclOpResponse(omResponse.build(), omVolumeArgs);
@@ -91,23 +113,18 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException ex) {
+      Exception ex) {
     return new OMVolumeAclOpResponse(createErrorOMResponse(omResponse, ex));
   }
 
   @Override
-  void onComplete(Result result, IOException ex, long trxnLogIndex) {
+  void onComplete(Result result, Exception ex, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
         LOG.debug("Add acl: {} to volume: {} success!", getAcl(),
             getVolumeName());
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
       }
       break;
     case FAILURE:
@@ -118,5 +135,16 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
       LOG.error("Unrecognized Result for OMVolumeAddAclRequest: {}",
           getOmRequest());
     }
+
+    auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
+        ex, getOmRequest().getUserInfo()));
+  }
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    ozoneManager.getMetrics().incNumAddAcl();
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
+        omDoubleBufferHelper);
   }
 }

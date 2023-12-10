@@ -19,15 +19,17 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -40,19 +42,22 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -62,15 +67,14 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
-@Ignore("HDDS-2961")
 public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;
   private MetricsRecordBuilder metrics;
-  private static OzoneClient ozClient = null;
-  private static ObjectStore store = null;
+  private OzoneClient ozClient = null;
+  private ObjectStore store = null;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -96,8 +100,8 @@ public class TestSCMContainerPlacementPolicyMetrics {
   /**
    * Verifies container placement metric.
    */
-  @Test(timeout = 60000)
-  public void test() throws IOException {
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
+  public void test() throws IOException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -110,21 +114,21 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
         THREE, new HashMap<>())) {
-      out.write(value.getBytes());
+      out.write(value.getBytes(UTF_8));
     }
 
     // close container
     PipelineManager manager =
         cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelines = manager.getPipelines().stream().filter(p ->
-        p.getType() == HddsProtos.ReplicationType.RATIS &&
-            p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+        RatisReplicationConfig
+            .hasFactor(p.getReplicationConfig(), ReplicationFactor.THREE))
         .collect(Collectors.toList());
     Pipeline targetPipeline = pipelines.get(0);
     List<DatanodeDetails> nodes = targetPipeline.getNodes();
-    manager.finalizeAndDestroyPipeline(pipelines.get(0), true);
+    manager.closePipeline(pipelines.get(0), true);
 
     // kill datanode to trigger under-replicated container replication
     cluster.shutdownHddsDatanode(nodes.get(0));
@@ -133,7 +137,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
     } catch (InterruptedException e) {
     }
     cluster.getStorageContainerManager().getReplicationManager()
-        .processContainersNow();
+        .processAll();
     try {
       Thread.sleep(30 * 1000);
     } catch (InterruptedException e) {
@@ -153,8 +157,9 @@ public class TestSCMContainerPlacementPolicyMetrics {
     Assert.assertTrue(compromiseCount == 0);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(ozClient);
     cluster.shutdown();
   }
 }

@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.lease;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -28,6 +25,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
+
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * LeaseManager is someone who can provide you leases based on your
@@ -47,6 +49,7 @@ public class LeaseManager<T> {
   private final String name;
   private final long defaultTimeout;
   private Map<T, Lease<T>> activeLeases;
+  private Semaphore semaphore = new Semaphore(0);
   private LeaseMonitor leaseMonitor;
   private Thread leaseMonitorThread;
   private boolean isRunning;
@@ -60,7 +63,7 @@ public class LeaseManager<T> {
    *        Default timeout in milliseconds to be used for lease creation.
    */
   public LeaseManager(String name, long defaultTimeout) {
-    this.name = name;
+    this.name = name + "LeaseManager";
     this.defaultTimeout = defaultTimeout;
   }
 
@@ -68,11 +71,11 @@ public class LeaseManager<T> {
    * Starts the lease manager service.
    */
   public void start() {
-    LOG.debug("Starting {} LeaseManager service", name);
+    LOG.debug("Starting {} service", name);
     activeLeases = new ConcurrentHashMap<>();
     leaseMonitor = new LeaseMonitor();
     leaseMonitorThread = new Thread(leaseMonitor);
-    leaseMonitorThread.setName(name + "-LeaseManager#LeaseMonitor");
+    leaseMonitorThread.setName(name + "#LeaseMonitor");
     leaseMonitorThread.setDaemon(true);
     leaseMonitorThread.setUncaughtExceptionHandler((thread, throwable) -> {
       // Let us just restart this thread after logging an error.
@@ -81,7 +84,7 @@ public class LeaseManager<T> {
           thread.toString(), throwable);
       leaseMonitorThread.start();
     });
-    LOG.debug("Starting {}-LeaseManager#LeaseMonitor Thread", name);
+    LOG.debug("Starting {} Thread", leaseMonitorThread.getName());
     leaseMonitorThread.start();
     isRunning = true;
   }
@@ -115,13 +118,57 @@ public class LeaseManager<T> {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Acquiring lease on {} for {} milliseconds", resource, timeout);
     }
-    if(activeLeases.containsKey(resource)) {
+    if (activeLeases.containsKey(resource)) {
       throw new LeaseAlreadyExistException(messageForResource(resource));
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
-    leaseMonitorThread.interrupt();
+    semaphore.release();
     return lease;
+  }
+
+  /**
+   * Returns a lease for the specified resource with the timeout provided.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param timeout
+   *        The timeout in milliseconds which has to be set on the lease
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, long timeout, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    checkStatus();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Acquiring lease on {} for {} milliseconds", resource, timeout);
+    }
+    if (activeLeases.containsKey(resource)) {
+      throw new LeaseAlreadyExistException(messageForResource(resource));
+    }
+    Lease<T> lease = new Lease<>(resource, timeout, callback);
+    activeLeases.put(resource, lease);
+    semaphore.release();
+    return lease;
+  }
+
+  /**
+   * Returns a lease for the specified resource with the default timeout.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    return acquire(resource, defaultTimeout, callback);
   }
 
   /**
@@ -135,7 +182,7 @@ public class LeaseManager<T> {
   public Lease<T> get(T resource) throws LeaseNotFoundException {
     checkStatus();
     Lease<T> lease = activeLeases.get(resource);
-    if(lease != null) {
+    if (lease != null) {
       return lease;
     }
     throw new LeaseNotFoundException(messageForResource(resource));
@@ -156,7 +203,7 @@ public class LeaseManager<T> {
       LOG.debug("Releasing lease on {}", resource);
     }
     Lease<T> lease = activeLeases.remove(resource);
-    if(lease == null) {
+    if (lease == null) {
       throw new LeaseNotFoundException(messageForResource(resource));
     }
     lease.invalidate();
@@ -171,11 +218,15 @@ public class LeaseManager<T> {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
+    // added extra release for case when interrupt is called
+    // before going to semaphore's tryAcquire. This will ensure release
+    //  of wait and exit of while loop as leaseMonitor.disable() is done.
+    semaphore.release();
     leaseMonitorThread.interrupt();
-    for(T resource : activeLeases.keySet()) {
+    for (T resource : activeLeases.keySet()) {
       try {
         release(resource);
-      }  catch(LeaseNotFoundException ex) {
+      } catch (LeaseNotFoundException ex) {
         //Ignore the exception, someone might have released the lease
       }
     }
@@ -187,7 +238,7 @@ public class LeaseManager<T> {
    * running.
    */
   private void checkStatus() {
-    if(!isRunning) {
+    if (!isRunning) {
       throw new LeaseManagerNotRunningException("LeaseManager not running.");
     }
   }
@@ -198,8 +249,8 @@ public class LeaseManager<T> {
    */
   private final class LeaseMonitor implements Runnable {
 
-    private volatile boolean monitor = true;
     private final ExecutorService executorService;
+    private volatile boolean running = true;
 
     private LeaseMonitor() {
       this.executorService = Executors.newCachedThreadPool();
@@ -207,7 +258,7 @@ public class LeaseManager<T> {
 
     @Override
     public void run() {
-      while (monitor) {
+      while (running) {
         LOG.debug("{}-LeaseMonitor: checking for lease expiry", name);
         long sleepTime = Long.MAX_VALUE;
 
@@ -230,12 +281,10 @@ public class LeaseManager<T> {
         }
 
         try {
-          if(!Thread.interrupted()) {
-            Thread.sleep(sleepTime);
-          }
+          // ignore return value, just used for wait
+          boolean b = semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-          // This means a new lease is added to activeLeases.
-          LOG.error("Execution was interrupted ", e);
+          LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
         }
       }
@@ -246,7 +295,7 @@ public class LeaseManager<T> {
      * will stop lease monitor.
      */
     public void disable() {
-      monitor = false;
+      running = false;
     }
   }
 

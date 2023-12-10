@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -42,15 +43,26 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.HashMap;
+import org.junit.Rule;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests Hybrid Pipeline Creation and IO on same set of Datanodes.
  */
 public class TestHybridPipelineOnDatanode {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -80,6 +92,7 @@ public class TestHybridPipelineOnDatanode {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -95,7 +108,7 @@ public class TestHybridPipelineOnDatanode {
     String bucketName = UUID.randomUUID().toString();
 
     String value = UUID.randomUUID().toString();
-    byte[] data = value.getBytes();
+    byte[] data = value.getBytes(UTF_8);
     objectStore.createVolume(volumeName);
     OzoneVolume volume = objectStore.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -106,7 +119,7 @@ public class TestHybridPipelineOnDatanode {
     OzoneOutputStream out = bucket
         .createKey(keyName1, data.length, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    out.write(value.getBytes());
+    out.write(value.getBytes(UTF_8));
     out.close();
 
     String keyName2 = UUID.randomUUID().toString();
@@ -115,7 +128,7 @@ public class TestHybridPipelineOnDatanode {
     out = bucket
         .createKey(keyName2, data.length, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes());
+    out.write(value.getBytes(UTF_8));
     out.close();
 
     // We need to find the location of the chunk file corresponding to the
@@ -143,7 +156,7 @@ public class TestHybridPipelineOnDatanode {
     Pipeline pipeline2 =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID2);
-    Assert.assertFalse(pipeline1.getFactor().equals(pipeline2.getFactor()));
+    Assert.assertNotEquals(pipeline1, pipeline2);
     Assert.assertTrue(pipeline1.getType() == HddsProtos.ReplicationType.RATIS);
     Assert.assertTrue(pipeline1.getType() == pipeline2.getType());
     // assert that the pipeline Id1 and pipelineId2 are on the same node

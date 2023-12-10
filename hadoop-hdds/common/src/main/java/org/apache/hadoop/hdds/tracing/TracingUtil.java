@@ -17,12 +17,9 @@
  */
 package org.apache.hadoop.hdds.tracing;
 
-import java.io.IOException;
 import java.lang.reflect.Proxy;
-import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import io.jaegertracing.Configuration;
@@ -32,6 +29,8 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
+import org.apache.ratis.util.function.CheckedRunnable;
+import org.apache.ratis.util.function.CheckedSupplier;
 
 /**
  * Utility class to collect all the tracing helper methods.
@@ -39,6 +38,8 @@ import io.opentracing.util.GlobalTracer;
 public final class TracingUtil {
 
   private static final String NULL_SPAN_AS_STRING = "";
+
+  private static volatile boolean isInit = false;
 
   private TracingUtil() {
   }
@@ -54,7 +55,8 @@ public final class TracingUtil {
           .registerExtractor(StringCodec.FORMAT, new StringCodec())
           .registerInjector(StringCodec.FORMAT, new StringCodec())
           .build();
-      GlobalTracer.register(tracer);
+      GlobalTracer.registerIfAbsent(tracer);
+      isInit = true;
     }
   }
 
@@ -73,7 +75,7 @@ public final class TracingUtil {
    * @return encoded tracing context.
    */
   public static String exportSpan(Span span) {
-    if (span != null) {
+    if (span != null && isInit) {
       StringBuilder builder = new StringBuilder();
       GlobalTracer.get().inject(span.context(), StringCodec.FORMAT, builder);
       return builder.toString();
@@ -116,7 +118,7 @@ public final class TracingUtil {
    * @param <T> the type of the interface
    * @param conf configuration
    *
-   * @return A new interface which implements interfce but delegate all the
+   * @return A new interface which implements interface but delegate all the
    * calls to the delegate and also enables tracing.
    */
   public static <T> T createProxy(
@@ -138,24 +140,32 @@ public final class TracingUtil {
   }
 
   /**
-   * Execute a new function inside an activated span.
+   * Execute {@code supplier} inside an activated new span.
    */
-  public static <R> R executeInNewSpan(String spanName,
-      SupplierWithIOException<R> supplier)
-      throws IOException {
+  public static <R, E extends Exception> R executeInNewSpan(String spanName,
+      CheckedSupplier<R, E> supplier) throws E {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();
     return executeInSpan(span, supplier);
   }
 
   /**
-   * Execute a new function inside an activated span.
+   * Execute a function inside an activated new span.
    */
-  public static <R> R executeInNewSpan(String spanName,
-      Supplier<R> supplier) {
+  public static <E extends Exception> void executeInNewSpan(String spanName,
+      CheckedRunnable<E> runnable) throws E {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    executeInSpan(span, runnable);
+  }
+
+  /**
+   * Execute {@code supplier} in the given {@code span}.
+   * @return the value returned by {@code supplier}
+   */
+  private static <R, E extends Exception> R executeInSpan(Span span,
+      CheckedSupplier<R, E> supplier) throws E {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {
       span.setTag("failed", true);
@@ -166,12 +176,12 @@ public final class TracingUtil {
   }
 
   /**
-   * Execute a new function a given span.
+   * Execute {@code runnable} in the given {@code span}.
    */
-  private static <R> R executeInSpan(Span span,
-      SupplierWithIOException<R> supplier) throws IOException {
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
-      return supplier.get();
+  private static <E extends Exception> void executeInSpan(Span span,
+      CheckedRunnable<E> runnable) throws E {
+    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+      runnable.run();
     } catch (Exception ex) {
       span.setTag("failed", true);
       throw ex;
@@ -183,10 +193,19 @@ public final class TracingUtil {
   /**
    * Execute a new function as a child span of the parent.
    */
-  public static <R> R executeAsChildSpan(String spanName, String parentName,
-      SupplierWithIOException<R> supplier) throws IOException {
+  public static <R, E extends Exception> R executeAsChildSpan(String spanName,
+      String parentName, CheckedSupplier<R, E> supplier) throws E {
     Span span = TracingUtil.importAndCreateSpan(spanName, parentName);
     return executeInSpan(span, supplier);
+  }
+
+  /**
+   * Execute a new function as a child span of the parent.
+   */
+  public static <E extends Exception> void executeAsChildSpan(String spanName,
+      String parentName, CheckedRunnable<E> runnable) throws E {
+    Span span = TracingUtil.importAndCreateSpan(spanName, parentName);
+    executeInSpan(span, runnable);
   }
 
 

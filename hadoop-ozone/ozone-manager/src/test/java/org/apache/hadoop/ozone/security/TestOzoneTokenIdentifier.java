@@ -46,19 +46,21 @@ import java.util.Map;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.TestSSLFactory;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +86,7 @@ public class TestOzoneTokenIdentifier {
           + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
           + "SSL_RSA_WITH_RC4_128_MD5";
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
@@ -101,8 +103,8 @@ public class TestOzoneTokenIdentifier {
     return conf;
   }
 
-  @AfterClass
-  static public void cleanUp() throws Exception {
+  @AfterAll
+  public static void cleanUp() throws Exception {
     FileUtil.fullyDelete(base);
     KeyStoreTestUtil.cleanupSSLConfig(KEYSTORES_DIR, sslConfsDir);
   }
@@ -217,7 +219,7 @@ public class TestOzoneTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with HmacSha256(RSA/1024 key) is {} ns",
-        duration/testTokenCount);
+        duration / testTokenCount);
 
     startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
@@ -225,7 +227,7 @@ public class TestOzoneTokenIdentifier {
     }
     duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token verify time with HmacSha256(RSA/1024 key) "
-        + "is {} ns", duration/testTokenCount);
+        + "is {} ns", duration / testTokenCount);
   }
 
   @Test
@@ -272,7 +274,7 @@ public class TestOzoneTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
-        hmacAlgorithm, keyLen, duration/testTokenCount);
+        hmacAlgorithm, keyLen, duration / testTokenCount);
   }
 
   /*
@@ -293,7 +295,7 @@ public class TestOzoneTokenIdentifier {
     OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
     id2.readFields(dis);
-    Assert.assertEquals(id, id2);
+    Assertions.assertEquals(id, id2);
   }
 
 
@@ -325,6 +327,24 @@ public class TestOzoneTokenIdentifier {
     DataInputStream in = new DataInputStream(buf);
     OzoneTokenIdentifier idDecode = new OzoneTokenIdentifier();
     idDecode.readFields(in);
-    Assert.assertEquals(idEncode, idDecode);
+    Assertions.assertEquals(idEncode, idDecode);
+  }
+
+  @Test
+  public void testTokenPersistence() throws IOException {
+    OzoneTokenIdentifier idWrite = getIdentifierInst();
+    idWrite.setOmServiceId("defaultServiceId");
+
+    byte[] oldIdBytes = idWrite.getBytes();
+    Codec<OzoneTokenIdentifier> idCodec = TokenIdentifierCodec.get();
+
+    OzoneTokenIdentifier idRead = null;
+    try {
+      idRead =  idCodec.fromPersistedFormat(oldIdBytes);
+    } catch (IOException ex) {
+      Assertions.fail("Should not fail to load old token format");
+    }
+    Assertions.assertEquals(idWrite, idRead,
+        "Deserialize Serialized Token should equal.");
   }
 }

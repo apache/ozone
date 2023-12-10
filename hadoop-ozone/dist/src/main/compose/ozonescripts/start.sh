@@ -17,10 +17,10 @@
 set -x
 docker-compose ps | grep datanode | awk '{print $1}' | xargs -n1  docker inspect --format '{{ .Config.Hostname }}' > ../../etc/hadoop/workers
 docker-compose ps | grep ozonescripts | awk '{print $1}' | xargs -I CONTAINER -n1 docker exec CONTAINER cp /opt/hadoop/etc/hadoop/workers /etc/hadoop/workers
-docker-compose exec scm /opt/hadoop/bin/ozone scm --init
-docker-compose exec scm /opt/hadoop/sbin/start-ozone.sh
+docker-compose exec -T scm /opt/hadoop/bin/ozone scm --init
+docker-compose exec -T scm /opt/hadoop/sbin/start-ozone.sh
 #We need a running SCM for om objectstore creation
 #TODO create a utility to wait for the startup
 sleep 10
-docker-compose exec om /opt/hadoop/bin/ozone om --init
-docker-compose exec scm /opt/hadoop/sbin/start-ozone.sh
+docker-compose exec -T om /opt/hadoop/bin/ozone om --init
+docker-compose exec -T scm /opt/hadoop/sbin/start-ozone.sh

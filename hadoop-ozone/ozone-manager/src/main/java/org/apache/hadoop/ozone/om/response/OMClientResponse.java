@@ -23,10 +23,14 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Interface for OM Responses, each OM response should implement this interface.
@@ -35,14 +39,22 @@ public abstract class OMClientResponse {
 
   private OMResponse omResponse;
   private CompletableFuture<Void> flushFuture = null;
+  private OMLockDetails omLockDetails;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientResponse.class);
 
   public OMClientResponse(OMResponse omResponse) {
     Preconditions.checkNotNull(omResponse);
     this.omResponse = omResponse;
   }
 
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
   /**
-   * For error or replay cases, check that the status of omResponse is not OK.
+   * For error case, check that the status of omResponse is not OK.
    */
   public void checkStatusNotOK() {
     Preconditions.checkArgument(!omResponse.getStatus().equals(
@@ -90,5 +102,14 @@ public abstract class OMClientResponse {
     return flushFuture;
   }
 
+
+  public OMLockDetails getOmLockDetails() {
+    return omLockDetails;
+  }
+
+  public void setOmLockDetails(
+      OMLockDetails omLockDetails) {
+    this.omLockDetails = omLockDetails;
+  }
 }
 

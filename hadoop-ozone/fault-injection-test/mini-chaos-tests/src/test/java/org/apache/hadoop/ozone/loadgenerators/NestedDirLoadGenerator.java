@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.loadgenerators;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.ozone.utils.LoadBucket;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

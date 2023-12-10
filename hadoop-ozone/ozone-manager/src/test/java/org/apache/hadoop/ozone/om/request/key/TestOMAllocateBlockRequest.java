@@ -24,12 +24,14 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -53,52 +55,50 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    // Add volume, bucket, key entries to DB.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    addKeyToOpenKeyTable(volumeName, bucketName);
 
     OMRequest modifiedOmRequest =
         doPreExecute(createAllocateBlockRequest());
 
     OMAllocateBlockRequest omAllocateBlockRequest =
-        new OMAllocateBlockRequest(modifiedOmRequest);
-
-
-    // Add volume, bucket, key entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+            getOmAllocateBlockRequest(modifiedOmRequest);
 
     // Check before calling validateAndUpdateCache. As adding DB entry has
     // not added any blocks, so size should be zero.
 
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getOpenKeyTable().get(omMetadataManager.getOpenKey(
-            volumeName, bucketName, keyName, clientID));
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, clientID,
+            true);
 
     List<OmKeyLocationInfo> omKeyLocationInfo =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
-    Assert.assertTrue(omKeyLocationInfo.size() == 0);
+    Assertions.assertEquals(0, omKeyLocationInfo.size());
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omAllocateBlockResponse.getOMResponse().getStatus());
 
     // Check open table whether new block is added or not.
 
-    omKeyInfo =
-        omMetadataManager.getOpenKeyTable().get(omMetadataManager.getOpenKey(
-            volumeName, bucketName, keyName, clientID));
-
+    omKeyInfo = verifyPathInOpenKeyTable(keyName, clientID,
+            true);
 
     // Check modification time
-    Assert.assertEquals(modifiedOmRequest.getAllocateBlockRequest()
+    Assertions.assertEquals(modifiedOmRequest.getAllocateBlockRequest()
         .getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
-    Assert.assertNotEquals(omKeyInfo.getCreationTime(),
-        omKeyInfo.getModificationTime());
+
+    // creationTime was assigned at OMRequestTestUtils.addKeyToTable
+    // modificationTime was assigned at
+    // doPreExecute(createAllocateBlockRequest())
+    Assertions.assertTrue(
+        omKeyInfo.getCreationTime() <= omKeyInfo.getModificationTime());
 
     // Check data of the block
     OzoneManagerProtocolProtos.KeyLocation keyLocation =
@@ -107,14 +107,20 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     omKeyLocationInfo =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
-    Assert.assertTrue(omKeyLocationInfo.size() == 1);
+    Assertions.assertEquals(1, omKeyLocationInfo.size());
 
-    Assert.assertEquals(keyLocation.getBlockID().getContainerBlockID()
+    Assertions.assertEquals(keyLocation.getBlockID().getContainerBlockID()
         .getContainerID(), omKeyLocationInfo.get(0).getContainerID());
 
-    Assert.assertEquals(keyLocation.getBlockID().getContainerBlockID()
+    Assertions.assertEquals(keyLocation.getBlockID().getContainerBlockID()
             .getLocalID(), omKeyLocationInfo.get(0).getLocalID());
 
+  }
+
+  @NotNull
+  protected OMAllocateBlockRequest getOmAllocateBlockRequest(
+          OMRequest modifiedOmRequest) {
+    return new OMAllocateBlockRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 
   @Test
@@ -124,15 +130,15 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         doPreExecute(createAllocateBlockRequest());
 
     OMAllocateBlockRequest omAllocateBlockRequest =
-        new OMAllocateBlockRequest(modifiedOmRequest);
+            getOmAllocateBlockRequest(modifiedOmRequest);
 
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND);
+    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND);
 
   }
 
@@ -143,19 +149,19 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         doPreExecute(createAllocateBlockRequest());
 
     OMAllocateBlockRequest omAllocateBlockRequest =
-        new OMAllocateBlockRequest(modifiedOmRequest);
+            getOmAllocateBlockRequest(modifiedOmRequest);
 
 
     // Added only volume to DB.
-    TestOMRequestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+    OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
         omMetadataManager);
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
+    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
   }
 
@@ -166,19 +172,19 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         doPreExecute(createAllocateBlockRequest());
 
     OMAllocateBlockRequest omAllocateBlockRequest =
-        new OMAllocateBlockRequest(modifiedOmRequest);
+            getOmAllocateBlockRequest(modifiedOmRequest);
 
     // Add volume, bucket entries to DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omAllocateBlockRequest.getBucketLayout());
 
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omAllocateBlockResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
+    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
   }
 
@@ -188,45 +194,46 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
    * @return OMRequest - modified request returned from preExecute.
    * @throws Exception
    */
-  private OMRequest doPreExecute(OMRequest originalOMRequest) throws Exception {
+  protected OMRequest doPreExecute(OMRequest originalOMRequest)
+      throws Exception {
 
     OMAllocateBlockRequest omAllocateBlockRequest =
-        new OMAllocateBlockRequest(originalOMRequest);
+            getOmAllocateBlockRequest(originalOMRequest);
 
     OMRequest modifiedOmRequest =
         omAllocateBlockRequest.preExecute(ozoneManager);
 
 
-    Assert.assertEquals(originalOMRequest.getCmdType(),
+    Assertions.assertEquals(originalOMRequest.getCmdType(),
         modifiedOmRequest.getCmdType());
-    Assert.assertEquals(originalOMRequest.getClientId(),
+    Assertions.assertEquals(originalOMRequest.getClientId(),
         modifiedOmRequest.getClientId());
 
-    Assert.assertTrue(modifiedOmRequest.hasAllocateBlockRequest());
+    Assertions.assertTrue(modifiedOmRequest.hasAllocateBlockRequest());
     AllocateBlockRequest allocateBlockRequest =
         modifiedOmRequest.getAllocateBlockRequest();
     // Time should be set
-    Assert.assertTrue(allocateBlockRequest.getKeyArgs()
+    Assertions.assertTrue(allocateBlockRequest.getKeyArgs()
         .getModificationTime() > 0);
 
     // KeyLocation should be set.
-    Assert.assertTrue(allocateBlockRequest.hasKeyLocation());
-    Assert.assertEquals(containerID,
+    Assertions.assertTrue(allocateBlockRequest.hasKeyLocation());
+    Assertions.assertEquals(CONTAINER_ID,
         allocateBlockRequest.getKeyLocation().getBlockID()
             .getContainerBlockID().getContainerID());
-    Assert.assertEquals(localID,
+    Assertions.assertEquals(LOCAL_ID,
         allocateBlockRequest.getKeyLocation().getBlockID()
             .getContainerBlockID().getLocalID());
-    Assert.assertTrue(allocateBlockRequest.getKeyLocation().hasPipeline());
+    Assertions.assertTrue(allocateBlockRequest.getKeyLocation().hasPipeline());
 
-    Assert.assertEquals(allocateBlockRequest.getClientID(),
+    Assertions.assertEquals(allocateBlockRequest.getClientID(),
         allocateBlockRequest.getClientID());
 
     return modifiedOmRequest;
   }
 
 
-  private OMRequest createAllocateBlockRequest() {
+  protected OMRequest createAllocateBlockRequest() {
 
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -243,5 +250,13 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString())
         .setAllocateBlockRequest(allocateBlockRequest).build();
 
+  }
+
+  protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
+          throws Exception {
+    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
+            keyName, clientID, replicationType, replicationFactor,
+            omMetadataManager);
+    return "";
   }
 }

@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -30,6 +33,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.function.IntSupplier;
 
 /**
  * Storage information file. This Class defines the methods to check
@@ -53,8 +57,8 @@ public abstract class Storage {
   private final File root;
   private final File storageDir;
 
-  private StorageState state;
-  private StorageInfo storageInfo;
+  private final StorageState state;
+  private final StorageInfo storageInfo;
 
 
   /**
@@ -64,7 +68,14 @@ public abstract class Storage {
     NON_EXISTENT, NOT_INITIALIZED, INITIALIZED
   }
 
-  public Storage(NodeType type, File root, String sdName)
+  public Storage(NodeType type, File root, String sdName,
+                 int defaultLayoutVersion)
+      throws IOException {
+    this(type, root, sdName, StorageInfo.newClusterID(), defaultLayoutVersion);
+  }
+
+  public Storage(NodeType type, File root, String sdName,
+                 String id, int defaultLayoutVersion)
       throws IOException {
     this.nodeType = type;
     this.root = root;
@@ -73,8 +84,8 @@ public abstract class Storage {
     if (state == StorageState.INITIALIZED) {
       this.storageInfo = new StorageInfo(type, getVersionFile());
     } else {
-      this.storageInfo = new StorageInfo(
-          nodeType, StorageInfo.newClusterID(), Time.now());
+      this.storageInfo = new StorageInfo(nodeType, id, Time.now(),
+          defaultLayoutVersion);
       setNodeProperties();
     }
   }
@@ -116,6 +127,22 @@ public abstract class Storage {
     }
   }
 
+  public int getLayoutVersion() {
+    return storageInfo.getLayoutVersion();
+  }
+
+  public void setLayoutVersion(int version) {
+    storageInfo.setLayoutVersion(version);
+  }
+
+  public void setFirstUpgradeActionLayoutVersion(int version) {
+    storageInfo.setFirstUpgradeActionLayoutVersion(version);
+  }
+
+  public int getFirstUpgradeActionLayoutVersion() {
+    return storageInfo.getFirstUpgradeActionLayoutVersion();
+  }
+
   /**
    * Retrieves the storageInfo instance to read/write the common
    * version file properties.
@@ -125,10 +152,10 @@ public abstract class Storage {
     return storageInfo;
   }
 
-  abstract protected Properties getNodeProperties();
+  protected abstract Properties getNodeProperties();
 
   /**
-   * Sets the Node properties specific to OM/SCM.
+   * Sets the Node properties specific to OM/SCM/DataNode.
    */
   private void setNodeProperties() {
     Properties nodeProperties = getNodeProperties();
@@ -163,7 +190,7 @@ public abstract class Storage {
    *
    * @return the version file path
    */
-  private File getVersionFile() {
+  public File getVersionFile() {
     return new File(getCurrentDir(), STORAGE_FILE_VERSION);
   }
 
@@ -193,7 +220,6 @@ public abstract class Storage {
    * Check consistency of the storage directory.
    *
    * @return state {@link StorageState} of the storage directory
-   * @throws IOException
    */
   private StorageState getStorageState() throws IOException {
     assert root != null : "root is null";
@@ -233,7 +259,6 @@ public abstract class Storage {
   /**
    * Creates the Version file if not present,
    * otherwise returns with IOException.
-   * @throws IOException
    */
   public void initialize() throws IOException {
     if (state == StorageState.INITIALIZED) {
@@ -246,8 +271,18 @@ public abstract class Storage {
   }
 
   /**
+   * Creates the Version file even if it exists.
+   */
+  public void forceInitialize() throws IOException {
+    if (state != StorageState.INITIALIZED) {
+      initialize();
+    } else {
+      storageInfo.writeTo(getVersionFile());
+    }
+  }
+
+  /**
    * Persists current StorageInfo to file system..
-   * @throws IOException
    */
   public void persistCurrentState() throws IOException {
     if (!getCurrentDir().exists()) {
@@ -257,5 +292,14 @@ public abstract class Storage {
     storageInfo.writeTo(getVersionFile());
   }
 
+  protected static int getInitLayoutVersion(OzoneConfiguration conf,
+      String configKey,
+      IntSupplier defaultLvSupplier) {
+    int lV = conf.getInt(configKey, OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
+    if (lV == OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT) {
+      lV = defaultLvSupplier.getAsInt();
+    }
+    return lV;
+  }
 }
 

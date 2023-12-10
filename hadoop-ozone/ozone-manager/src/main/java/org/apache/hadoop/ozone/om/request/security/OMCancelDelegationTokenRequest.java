@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
-import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -31,8 +32,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.security.proto.SecurityProtos;
-import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -40,6 +41,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.Map;
+
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.buildTokenAuditMap;
 
 /**
  * Handle CancelDelegationToken Request.
@@ -55,12 +60,28 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // We need to populate user info in our request object.
+    OMRequest request =  super.preExecute(ozoneManager);
 
-    // Call OM to cancel token, this does check whether we can cancel token
-    // or not. This does not remove token from DB/in-memory.
-    ozoneManager.cancelDelegationToken(getToken());
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    Map<String, String> auditMap = null;
 
-    return super.preExecute(ozoneManager);
+    try {
+      Token<OzoneTokenIdentifier> token = OMPBHelper.convertToDelegationToken(
+          request.getCancelDelegationTokenRequest().getToken());
+      auditMap = buildTokenAuditMap(token);
+
+      // Call OM to cancel token, this does check whether we can cancel token
+      // or not. This does not remove token from DB/in-memory.
+      ozoneManager.cancelDelegationToken(token);
+      return request;
+
+    } catch (IOException ioe) {
+      auditLog(auditLogger,
+          buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, ioe,
+              request.getUserInfo()));
+      throw ioe;
+    }
   }
 
   @Override
@@ -69,14 +90,20 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    Token<OzoneTokenIdentifier> token = getToken();
+
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    Map<String, String> auditMap = buildTokenAuditMap(token);
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OzoneTokenIdentifier ozoneTokenIdentifier = null;
+    Exception exception = null;
+
     try {
       ozoneTokenIdentifier =
-          OzoneTokenIdentifier.readProtoBuf(getToken().getIdentifier());
+          OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
 
       // Remove token from in-memory.
       ozoneManager.getDelegationTokenMgr().removeToken(ozoneTokenIdentifier);
@@ -84,7 +111,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       // Update Cache.
       omMetadataManager.getDelegationTokenTable().addCacheEntry(
           new CacheKey<>(ozoneTokenIdentifier),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          CacheValue.get(transactionLogIndex));
 
       omClientResponse =
           new OMCancelDelegationTokenResponse(ozoneTokenIdentifier,
@@ -92,14 +119,19 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
                   CancelDelegationTokenResponseProto.newBuilder().setResponse(
                       SecurityProtos.CancelDelegationTokenResponseProto
                           .newBuilder())).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in cancel DelegationToken {}", ozoneTokenIdentifier, ex);
+      exception = ex;
       omClientResponse = new OMCancelDelegationTokenResponse(null,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
     }
+
+    auditLog(auditLogger,
+        buildAuditMessage(OMAction.CANCEL_DELEGATION_TOKEN, auditMap, exception,
+            getOmRequest().getUserInfo()));
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Cancelled delegation token: {}", ozoneTokenIdentifier);
@@ -108,7 +140,6 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     return omClientResponse;
   }
 
-
   public Token<OzoneTokenIdentifier> getToken() {
     CancelDelegationTokenRequestProto cancelDelegationTokenRequest =
         getOmRequest().getCancelDelegationTokenRequest();
@@ -116,4 +147,5 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     return OMPBHelper.convertToDelegationToken(
         cancelDelegationTokenRequest.getToken());
   }
+
 }

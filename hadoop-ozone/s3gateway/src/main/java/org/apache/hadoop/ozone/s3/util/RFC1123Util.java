@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.SignStyle;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import static java.time.temporal.ChronoField.DAY_OF_MONTH;
 import static java.time.temporal.ChronoField.DAY_OF_WEEK;
@@ -92,7 +93,7 @@ public final class RFC1123Util {
         .appendValue(SECOND_OF_MINUTE, 2)
         .optionalEnd()
         .appendLiteral(' ')
-        .appendOffset("+HHMM", "GMT")
+        .appendOffset("+HHMM", OzoneConsts.OZONE_TIME_ZONE)
         .toFormatter();
   }
 }

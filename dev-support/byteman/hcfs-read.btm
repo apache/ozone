@@ -1,0 +1,67 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Measure time spent in HCFS read implementations
+
+RULE hcfs-read-FileSystem.close
+CLASS org.apache.hadoop.fs.FileSystem
+METHOD close
+IF TRUE
+DO
+  System.out.println("Closing file system instance: " + System.identityHashCode($0));
+  System.out.println("   read.call: " + readCounter("read.call"));
+  System.out.println("   read.allTime: " + readCounter("read.allTime"));
+  System.out.println("   readFully.call: " + readCounter("readFully.call"));
+  System.out.println("   readFully.allTime: " + readCounter("readFully.allTime"));  
+ENDRULE
+
+
+RULE FSDataInputStream.Read.Entry
+CLASS org.apache.hadoop.fs.FSDataInputStream
+METHOD read
+AT ENTRY
+IF TRUE
+DO resetTimer("read" + Thread.currentThread().getId());
+   incrementCounter("read.call")
+ENDRULE
+
+RULE FSDataInputStream.Read.Exit
+CLASS org.apache.hadoop.fs.FSDataInputStream
+METHOD read
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer("read" + Thread.currentThread().getId()))
+IF TRUE
+DO
+   incrementCounter("read.allTime", elapsedTime)
+ENDRULE
+
+RULE FSDataInputStream.ReadFully.Entry
+CLASS org.apache.hadoop.fs.FSDataInputStream
+METHOD read
+AT ENTRY
+IF TRUE
+DO resetTimer("readFully" + Thread.currentThread().getId());
+   incrementCounter("readFully.call")
+ENDRULE
+
+RULE FSDataInputStream.ReadFully.Exit
+CLASS org.apache.hadoop.fs.FSDataInputStream
+METHOD read
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer("readFully" + Thread.currentThread().getId()))
+IF TRUE
+DO
+   incrementCounter("readFully.allTime", elapsedTime)
+ENDRULE

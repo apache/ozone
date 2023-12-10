@@ -2,6 +2,9 @@
 title: "数据节点"
 date: "2017-09-14"
 weight: 4
+menu: 
+  main:
+     parent: 概念
 summary: Ozone 支持 Amazon S3 协议，你可以原封不动地在 Ozone 上使用基于 S3 客户端和 S3 SDK 的应用。
 ---
 <!---

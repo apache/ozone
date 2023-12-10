@@ -17,37 +17,51 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import java.util.Optional;
+import java.util.UUID;
+
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * In-memory state of a container replica.
  */
 public final class ContainerReplica implements Comparable<ContainerReplica> {
 
-  final private ContainerID containerID;
-  final private ContainerReplicaProto.State state;
-  final private DatanodeDetails datanodeDetails;
-  final private UUID placeOfBirth;
+  private final ContainerID containerID;
+  private final ContainerReplicaProto.State state;
+  private final DatanodeDetails datanodeDetails;
+  private final UUID placeOfBirth;
+  private final int replicaIndex;
 
   private Long sequenceId;
+  private final long keyCount;
+  private final long bytesUsed;
+  private final boolean isEmpty;
 
-
-  private ContainerReplica(final ContainerID containerID,
-      final ContainerReplicaProto.State state, final DatanodeDetails datanode,
-      final UUID originNodeId) {
+  @SuppressWarnings("parameternumber")
+  private ContainerReplica(
+      final ContainerID containerID,
+      final ContainerReplicaProto.State state,
+      final int replicaIndex,
+      final DatanodeDetails datanode,
+      final UUID originNodeId,
+      long keyNum,
+      long dataSize,
+      boolean isEmpty) {
     this.containerID = containerID;
     this.state = state;
     this.datanodeDetails = datanode;
     this.placeOfBirth = originNodeId;
+    this.keyCount = keyNum;
+    this.bytesUsed = dataSize;
+    this.replicaIndex = replicaIndex;
+    this.isEmpty = isEmpty;
   }
 
   private void setSequenceId(Long seqId) {
@@ -88,6 +102,28 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
    */
   public Long getSequenceId() {
     return sequenceId;
+  }
+
+  /**
+   * Returns the key count of of this replica.
+   *
+   * @return Key count
+   */
+  public long getKeyCount() {
+    return keyCount;
+  }
+
+  /**
+   * Returns the data size of this replica.
+   *
+   * @return Data size
+   */
+  public long getBytesUsed() {
+    return bytesUsed;
+  }
+
+  public boolean isEmpty() {
+    return isEmpty;
   }
 
   @Override
@@ -134,13 +170,32 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return new ContainerReplicaBuilder();
   }
 
+  public ContainerReplicaBuilder toBuilder() {
+    return newBuilder()
+        .setBytesUsed(bytesUsed)
+        .setContainerID(containerID)
+        .setContainerState(state)
+        .setDatanodeDetails(datanodeDetails)
+        .setKeyCount(keyCount)
+        .setOriginNodeId(placeOfBirth)
+        .setReplicaIndex(replicaIndex)
+        .setSequenceId(sequenceId)
+        .setEmpty(isEmpty);
+  }
+
   @Override
   public String toString() {
     return "ContainerReplica{" +
         "containerID=" + containerID +
+        ", state=" + state +
         ", datanodeDetails=" + datanodeDetails +
         ", placeOfBirth=" + placeOfBirth +
         ", sequenceId=" + sequenceId +
+        ", keyCount=" + keyCount +
+        ", bytesUsed=" + bytesUsed + ((replicaIndex > 0) ?
+        ",replicaIndex=" + replicaIndex :
+        "") +
+        ", isEmpty=" + isEmpty +
         '}';
   }
 
@@ -154,6 +209,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private DatanodeDetails datanode;
     private UUID placeOfBirth;
     private Long sequenceId;
+    private long bytesUsed;
+    private long keyCount;
+    private int replicaIndex;
+    private boolean isEmpty;
 
     /**
      * Set Container Id.
@@ -185,6 +244,12 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
+    public ContainerReplicaBuilder setReplicaIndex(
+        int index) {
+      this.replicaIndex = index;
+      return this;
+    }
+
     /**
      * Set replica origin node id.
      *
@@ -207,6 +272,21 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
+    public ContainerReplicaBuilder setKeyCount(long count) {
+      keyCount = count;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setBytesUsed(long used) {
+      bytesUsed = used;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setEmpty(boolean empty) {
+      isEmpty = empty;
+      return this;
+    }
+
     /**
      * Constructs new ContainerReplicaBuilder.
      *
@@ -220,12 +300,15 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       Preconditions.checkNotNull(datanode,
           "DatanodeDetails can't be null");
       ContainerReplica replica = new ContainerReplica(
-          containerID, state, datanode,
-          Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()));
+          containerID, state, replicaIndex, datanode,
+          Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()),
+          keyCount, bytesUsed, isEmpty);
       Optional.ofNullable(sequenceId).ifPresent(replica::setSequenceId);
       return replica;
     }
   }
 
-
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
 }

@@ -18,32 +18,39 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -54,12 +61,12 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for Pipeline Closing.
  */
+@Timeout(300)
 public class TestPipelineClose {
 
   private MiniOzoneCluster cluster;
@@ -75,9 +82,12 @@ public class TestPipelineClose {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
@@ -89,7 +99,8 @@ public class TestPipelineClose {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager
-        .allocateContainer(RATIS, THREE, "testOwner");
+        .allocateContainer(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
     pipelineManager = scm.getPipelineManager();
@@ -101,7 +112,7 @@ public class TestPipelineClose {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -109,7 +120,8 @@ public class TestPipelineClose {
   }
 
   @Test
-  public void testPipelineCloseWithClosedContainer() throws IOException {
+  public void testPipelineCloseWithClosedContainer() throws IOException,
+      InvalidStateTransitionException, TimeoutException {
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 
@@ -128,8 +140,8 @@ public class TestPipelineClose {
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
     Assert.assertEquals(0, setClosed.size());
 
-    pipelineManager
-        .finalizeAndDestroyPipeline(ratisContainer.getPipeline(), false);
+    pipelineManager.closePipeline(ratisContainer.getPipeline().getId());
+    pipelineManager.deletePipeline(ratisContainer.getPipeline().getId());
     for (DatanodeDetails dn : ratisContainer.getPipeline().getNodes()) {
       // Assert that the pipeline has been removed from Node2PipelineMap as well
       Assert.assertFalse(scm.getScmNodeManager().getPipelines(dn)
@@ -145,7 +157,7 @@ public class TestPipelineClose {
     Assert.assertEquals(1, setOpen.size());
 
     pipelineManager
-        .finalizeAndDestroyPipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline(), false);
     GenericTestUtils.waitFor(() -> {
       try {
         return containerManager
@@ -159,39 +171,45 @@ public class TestPipelineClose {
 
   @Test
   public void testPipelineCloseWithPipelineAction() throws Exception {
-    List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
-    PipelineActionsFromDatanode
-        pipelineActionsFromDatanode = TestUtils
-        .getPipelineActionFromDatanode(dns.get(0),
-            ratisContainer.getPipeline().getId());
+    final List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
+    final PipelineID pipelineID = ratisContainer.getPipeline().getId();
+
+    final PipelineActionsFromDatanode pipelineActionsFromDatanode =
+        HddsTestUtils.getPipelineActionFromDatanode(dns.get(0), pipelineID);
+
     // send closing action for pipeline
-    PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, conf);
-    pipelineActionHandler
-        .onMessage(pipelineActionsFromDatanode, new EventQueue());
-    Thread.sleep(5000);
+    final PipelineActionHandler pipelineActionHandler =
+        new PipelineActionHandler(pipelineManager,
+            SCMContext.emptyContext(), conf);
 
-    OzoneContainer ozoneContainer =
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer();
-    List<PipelineReport> pipelineReports =
-        ozoneContainer.getPipelineReport().getPipelineReportList();
-    for (PipelineReport pipelineReport : pipelineReports) {
-      // ensure the pipeline is not reported by any dn
-      Assert.assertNotEquals(
-          PipelineID.getFromProtobuf(pipelineReport.getPipelineID()),
-          ratisContainer.getPipeline().getId());
-    }
+    pipelineActionHandler.onMessage(
+        pipelineActionsFromDatanode, new EventQueue());
 
-    try {
-      pipelineManager.getPipeline(ratisContainer.getPipeline().getId());
-      Assert.fail("Pipeline should not exist in SCM");
-    } catch (PipelineNotFoundException e) {
-    }
+    final OzoneContainer ozoneContainer = cluster.getHddsDatanodes()
+        .get(0).getDatanodeStateMachine().getContainer();
+    final HddsProtos.PipelineID pid = pipelineID.getProtobuf();
+
+    // ensure the pipeline is not reported by the dn
+    GenericTestUtils.waitFor(() -> {
+      final List<PipelineReport> pipelineReports = ozoneContainer
+          .getPipelineReport().getPipelineReportList();
+      for (PipelineReport pipelineReport : pipelineReports) {
+        if (pipelineReport.getPipelineID().equals(pid)) {
+          return false;
+        }
+      }
+      return true;
+    }, 500, 10000);
+
+    assertThrows(PipelineNotFoundException.class, () ->
+            pipelineManager.getPipeline(pipelineID),
+        "Pipeline should not exist in SCM");
   }
 
   @Test
-  public void testPipelineCloseWithLogFailure() throws IOException {
+  @Flaky("HDDS-5604")
+  public void testPipelineCloseWithLogFailure()
+      throws IOException, TimeoutException {
 
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
     PipelineActionHandler pipelineActionTest =
@@ -201,7 +219,8 @@ public class TestPipelineClose {
         ArgumentCaptor.forClass(PipelineActionsFromDatanode.class);
 
     ContainerInfo containerInfo = containerManager
-        .allocateContainer(RATIS, THREE, "testOwner");
+        .allocateContainer(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "testOwner");
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo,
             pipelineManager.getPipeline(containerInfo.getPipelineID()));

@@ -21,26 +21,30 @@ package org.apache.hadoop.ozone.om.response.volume;
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+
 /**
  * Response for DeleteVolume request.
  */
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeDeleteResponse extends OMClientResponse {
   private String volume;
   private String owner;
-  private UserVolumeInfo updatedVolumeList;
+  private PersistedUserVolumeInfo updatedVolumeList;
 
   public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull String volume, @Nonnull String owner,
-      @Nonnull UserVolumeInfo updatedVolumeList) {
+      @Nonnull PersistedUserVolumeInfo updatedVolumeList) {
     super(omResponse);
     this.volume = volume;
     this.owner = owner;
@@ -48,7 +52,7 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse) {
@@ -61,7 +65,7 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     String dbUserKey = omMetadataManager.getUserKey(owner);
-    UserVolumeInfo volumeList = updatedVolumeList;
+    PersistedUserVolumeInfo volumeList = updatedVolumeList;
     if (updatedVolumeList.getVolumeNamesList().size() == 0) {
       omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
           dbUserKey);

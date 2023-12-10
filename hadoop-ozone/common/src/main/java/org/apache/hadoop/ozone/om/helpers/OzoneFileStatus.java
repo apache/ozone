@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.io.IOException;
 import java.util.Objects;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
@@ -93,19 +94,19 @@ public class OzoneFileStatus {
     return !isDirectory();
   }
 
-  public OzoneFileStatusProto getProtobuf() {
-
+  public OzoneFileStatusProto getProtobuf(int clientVersion) {
     Builder builder = OzoneFileStatusProto.newBuilder()
         .setBlockSize(blockSize)
         .setIsDirectory(isDirectory);
     //key info can be null for the fake root entry.
     if (keyInfo != null) {
-      builder.setKeyInfo(keyInfo.getProtobuf());
+      builder.setKeyInfo(keyInfo.getProtobuf(clientVersion));
     }
     return builder.build();
   }
 
-  public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto status) {
+  public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto status)
+      throws IOException {
     return new OzoneFileStatus(
         OmKeyInfo.getFromProtobuf(status.getKeyInfo()),
         status.getBlockSize(),
@@ -130,4 +131,22 @@ public class OzoneFileStatus {
   public int hashCode() {
     return Objects.hash(getTrimmedName());
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getClass().getSimpleName());
+    sb.append("{");
+    if (keyInfo == null) {
+      sb.append("<root>");
+    } else {
+      sb.append(getTrimmedName());
+      if (isDirectory) {
+        sb.append(" (dir)");
+      }
+    }
+    sb.append("}");
+    return sb.toString();
+  }
+
 }

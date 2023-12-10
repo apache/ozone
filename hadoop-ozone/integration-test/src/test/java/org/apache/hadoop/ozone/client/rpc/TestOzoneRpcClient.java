@@ -18,17 +18,20 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 
-import java.io.IOException;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
 
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
+@Timeout(300)
 public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
 
   /**
@@ -38,17 +41,20 @@ public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
+        OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     startCluster(conf);
   }
 
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     shutdownCluster();
   }

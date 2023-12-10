@@ -30,41 +30,26 @@ import com.google.common.base.Strings;
  * An utility class to filter levelDB keys.
  */
 public final class MetadataKeyFilters {
+  private MetadataKeyFilters() { }
 
-  private static KeyPrefixFilter deletingKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
-
-  private static KeyPrefixFilter deletedKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETED_KEY_PREFIX);
-
-  private static KeyPrefixFilter normalKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COUNT, true)
-          .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
-          .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
-
-  private MetadataKeyFilters() {
-  }
-
+  @Deprecated
   public static KeyPrefixFilter getDeletingKeyFilter() {
-    return deletingKeyFilter;
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
   }
 
-  public static KeyPrefixFilter getDeletedKeyFilter() {
-    return deletedKeyFilter;
-  }
-
-  public static KeyPrefixFilter getNormalKeyFilter() {
-    return normalKeyFilter;
+  /**
+   * @return A {@link KeyPrefixFilter} that ignores all keys beginning with
+   * #. This uses the convention that key prefixes are surrounded by
+   * # to ignore keys with any prefix currently used or that will be
+   * added in the future.
+   */
+  public static KeyPrefixFilter getUnprefixedKeyFilter() {
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter("#", true);
   }
   /**
-   * Interface for levelDB key filters.
+   * Interface for RocksDB key filters.
    */
   public interface MetadataKeyFilter {
     /**
@@ -98,7 +83,7 @@ public final class MetadataKeyFilters {
     private int keysScanned = 0;
     private int keysHinted = 0;
 
-    public KeyPrefixFilter() {}
+    public KeyPrefixFilter() { }
 
     /**
      * KeyPrefixFilter constructor. It is made of positive and negative prefix
@@ -120,7 +105,7 @@ public final class MetadataKeyFilters {
 
     public KeyPrefixFilter addFilter(String keyPrefix, boolean negative) {
       Preconditions.checkArgument(!Strings.isNullOrEmpty(keyPrefix),
-          "KeyPrefix is null or empty: " + keyPrefix);
+          "KeyPrefix is null or empty: %s", keyPrefix);
       // keyPrefix which needs to be added should not be prefix of any opposing
       // filter already present. If keyPrefix is a negative filter it should not
       // be a prefix of any positive filter. Nor should any opposing filter be

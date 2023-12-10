@@ -21,20 +21,21 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -66,7 +67,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public Timeout timeout = new Timeout(600_000);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -79,24 +80,28 @@ public class TestKeyValueContainerMarkUnhealthy {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
-  public TestKeyValueContainerMarkUnhealthy(ChunkLayOutVersion layout) {
+  public TestKeyValueContainerMarkUnhealthy(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
-    HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
-        .toString()).build();
+    String dataDir = folder.newFolder("data").getAbsolutePath();
+    HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)
+        .conf(conf)
+        .datanodeUuid(datanodeId.toString())
+        .build();
+    hddsVolume.format(scmId);
+    hddsVolume.createWorkingDir(scmId, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -107,8 +112,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
-    final File metaDir = GenericTestUtils.getRandomizedTestDir();
-    metaDir.mkdirs();
+    final File metaDir = folder.newFolder("meta");
     keyValueContainerData.setMetadataPath(metaDir.getPath());
 
 

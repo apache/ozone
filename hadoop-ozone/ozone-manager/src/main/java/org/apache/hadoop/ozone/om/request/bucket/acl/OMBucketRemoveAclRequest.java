@@ -20,8 +20,16 @@ package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +37,6 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -43,23 +50,32 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  */
 public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMBucketAddAclRequest.class);
+      LoggerFactory.getLogger(OMBucketRemoveAclRequest.class);
 
-  private static BooleanBiFunction<List<OzoneAcl>, OmBucketInfo> bucketAddAclOp;
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
+  private final String path;
+  private final List<OzoneAcl> ozoneAcls;
+  private final OzoneObj obj;
 
-  static {
-    bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
-      return omBucketInfo.removeAcl(ozoneAcls.get(0));
-    };
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
+        = getOmRequest().getRemoveAclRequest().toBuilder()
+            .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setRemoveAclRequest(removeAclRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   public OMBucketRemoveAclRequest(OMRequest omRequest) {
-    super(omRequest, bucketAddAclOp);
+    super(omRequest,
+        (acls, omBucketInfo) -> omBucketInfo.removeAcl(acls.get(0)));
     OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
         getOmRequest().getRemoveAclRequest();
-    path = removeAclRequest.getObj().getPath();
+    obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
+    path = obj.getPath();
     ozoneAcls = Lists.newArrayList(
         OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
   }
@@ -72,6 +88,11 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   @Override
   String getPath() {
     return path;
+  }
+
+  @Override
+  OzoneObj getObject() {
+    return obj;
   }
 
   @Override
@@ -89,15 +110,12 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMBucketAclResponse(
-        createErrorOMResponse(omResponse, exception));
-  }
+  void onComplete(boolean operationResult, Exception exception,
+      OMMetrics omMetrics, AuditLogger auditLogger,
+      Map<String, String> auditMap) {
+    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+        exception, getOmRequest().getUserInfo()));
 
-  @Override
-  void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics) {
     if (operationResult) {
       LOG.debug("Remove acl: {} for path: {} success!", getAcls(), getPath());
     } else {
@@ -112,5 +130,14 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
       }
     }
   }
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    ozoneManager.getMetrics().incNumRemoveAcl();
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
+        omDoubleBufferHelper);
+  }
+
 }
 

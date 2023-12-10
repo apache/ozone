@@ -55,7 +55,7 @@ public abstract class ReconScmTask {
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
       running = true;
-      taskThread = new Thread(this::run);
+      taskThread = new Thread(this::run, "Recon-" + getTaskName());
       taskThread.setName(getTaskName());
       taskThread.setDaemon(true);
       taskThread.start();

@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.parser.model.AuditEntry;
@@ -70,7 +69,7 @@ public final class DatabaseHelper {
 
   private static void loadProperties() {
     Properties props = new Properties();
-    try{
+    try {
       InputStream inputStream = DatabaseHelper.class.getClassLoader()
           .getResourceAsStream(ParserConsts.PROPS_FILE);
       if (inputStream != null) {
@@ -85,7 +84,7 @@ public final class DatabaseHelper {
         throw new FileNotFoundException("property file '"
             + ParserConsts.PROPS_FILE + "' not found in the classpath");
       }
-    } catch(Exception e){
+    } catch (Exception e) {
       LOG.error(e.getMessage());
     }
 
@@ -99,7 +98,6 @@ public final class DatabaseHelper {
     return true;
   }
 
-  @SuppressFBWarnings("REC_CATCH_EXCEPTION")
   private static boolean insertAudits(String dbName, String logs)
       throws Exception {
     try (Connection connection = getConnection(dbName);
@@ -124,8 +122,9 @@ public final class DatabaseHelper {
           preparedStatement.executeBatch();
         }
       }
-      if (!auditEntries.isEmpty()) {
-        preparedStatement.executeBatch(); // insert remaining records
+      if (auditEntries.size() % batchSize != 0) {
+        // insert remaining records
+        preparedStatement.executeBatch();
       }
     }
     return true;
@@ -144,14 +143,14 @@ public final class DatabaseHelper {
       AuditEntry tempEntry = null;
 
       while (true) {
-        if (tempEntry == null){
+        if (tempEntry == null) {
           tempEntry = new AuditEntry();
         }
 
         if (currentLine == null) {
           break;
         } else {
-          if (!currentLine.matches(ParserConsts.DATE_REGEX)){
+          if (!currentLine.matches(ParserConsts.DATE_REGEX)) {
             tempEntry.appendException(currentLine);
           } else {
             entry = StringUtils.stripAll(currentLine.split("\\|"));
@@ -167,11 +166,11 @@ public final class DatabaseHelper {
                 .setParams(ops[1])
                 .setResult(entry[6].substring(entry[6].indexOf('=') + 1))
                 .build();
-            if (entry.length == 8){
+            if (entry.length == 8) {
               tempEntry.setException(entry[7]);
             }
           }
-          if (nextLine == null || nextLine.matches(ParserConsts.DATE_REGEX)){
+          if (nextLine == null || nextLine.matches(ParserConsts.DATE_REGEX)) {
             listResult.add(tempEntry);
             tempEntry = null;
           }
@@ -199,13 +198,13 @@ public final class DatabaseHelper {
     StringBuilder result = new StringBuilder();
     ResultSetMetaData rsm;
     try (Connection connection = getConnection(dbName);
-         Statement st = connection.createStatement();
-         ResultSet rs = st.executeQuery(sql)) {
+        PreparedStatement ps = connection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery()) {
       if (rs != null) {
         rsm = rs.getMetaData();
         int cols = rsm.getColumnCount();
-        while (rs.next()){
-          for (int index = 1; index <= cols; index++){
+        while (rs.next()) {
+          for (int index = 1; index <= cols; index++) {
             result.append(rs.getObject(index));
             result.append("\t");
           }

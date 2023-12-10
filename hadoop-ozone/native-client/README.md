@@ -73,9 +73,9 @@ For example
 
 CLASSPATH is not set. CLASSPATH can be set using the following command:
  
-           export CLASSPATH=$({OZONE_HOME}/hadoop-ozone/dist/target/ozone-0.5.0-SNAPSHOT/bin/ozone classpath hadoop-ozone-filesystem --glob)
+           export CLASSPATH=$({OZONE_HOME}/hadoop-ozone/dist/target/ozone-0.5.0-SNAPSHOT/bin/ozone classpath ozone-filesystem --glob)
 
-           export CLASSPATH=$CLASSPATH:{OZONE_HOME}/hadoop-ozone/dist/target/ozone-0.5.0-SNAPSHOT/share/ozone/lib/hadoop-ozone-filesystem-0.5.0-SNAPSHOT.jar
+           export CLASSPATH=$CLASSPATH:{OZONE_HOME}/hadoop-ozone/dist/target/ozone-0.5.0-SNAPSHOT/share/ozone/lib/ozone-filesystem-0.5.0-SNAPSHOT.jar
 
 LD_LIBRARY_PATH is not set. LD_LIBRARY_PATH can be set using the following command:  
 

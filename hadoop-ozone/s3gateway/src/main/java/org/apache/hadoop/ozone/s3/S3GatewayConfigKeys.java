@@ -52,6 +52,35 @@ public final class S3GatewayConfigKeys {
       OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
   public static final String OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
       OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
+
+  public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_KEY =
+      "ozone.s3g.client.buffer.size";
+  public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT =
+      "4KB";
+
+  // S3G kerberos, principal config
+  public static final String OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY =
+      "ozone.s3g.kerberos.keytab.file";
+  public static final String OZONE_S3G_KERBEROS_PRINCIPAL_KEY =
+      "ozone.s3g.kerberos.principal";
+  /**
+   * Configuration key that enables creation of directory instead of 0 byte
+   * file if bucket layout is FSO.
+   */
+  public static final String OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED =
+      "ozone.s3g.fso.directory.creation";
+  public static final boolean OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT =
+      true;
+
+  /**
+   * Configuration key that enables shallow listing of Keys when results
+   * with delimiter by '/'.
+   */
+  public static final String OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED =
+      "ozone.s3g.list-keys.shallow.enabled";
+  public static final boolean OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT =
+      true;
+
   /**
    * Never constructed.
    */

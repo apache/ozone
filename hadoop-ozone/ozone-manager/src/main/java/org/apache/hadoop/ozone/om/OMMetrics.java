@@ -20,19 +20,19 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about="Ozone Manager Metrics", context="dfs")
-public class OMMetrics {
+@Metrics(about = "Ozone Manager Metrics", context = "dfs")
+public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
@@ -48,10 +48,12 @@ public class OMMetrics {
   private @Metric MutableCounterLong numVolumeInfos;
   private @Metric MutableCounterLong numVolumeCheckAccesses;
   private @Metric MutableCounterLong numBucketCreates;
+  private @Metric MutableCounterLong numFSOBucketCreates;
   private @Metric MutableCounterLong numVolumeDeletes;
   private @Metric MutableCounterLong numBucketInfos;
   private @Metric MutableCounterLong numBucketUpdates;
   private @Metric MutableCounterLong numBucketDeletes;
+  private @Metric MutableCounterLong numFSOBucketDeletes;
   private @Metric MutableCounterLong numKeyAllocate;
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
@@ -61,17 +63,41 @@ public class OMMetrics {
   private @Metric MutableCounterLong numTrashKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
   private @Metric MutableCounterLong numKeyCommits;
+  private @Metric MutableCounterLong numKeyHSyncs;
   private @Metric MutableCounterLong numBlockAllocations;
   private @Metric MutableCounterLong numGetServiceLists;
   private @Metric MutableCounterLong numBucketS3Lists;
   private @Metric MutableCounterLong numInitiateMultipartUploads;
   private @Metric MutableCounterLong numCompleteMultipartUploads;
+  private @Metric MutableCounterLong numSnapshotCreates;
+  private @Metric MutableCounterLong numSnapshotDeletes;
+  private @Metric MutableCounterLong numSnapshotLists;
+  private @Metric MutableCounterLong numSnapshotDiffJobs;
+  private @Metric MutableCounterLong numSnapshotInfos;
 
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
   private @Metric MutableCounterLong numCreateFile;
   private @Metric MutableCounterLong numLookupFile;
   private @Metric MutableCounterLong numListStatus;
+
+  private @Metric MutableCounterLong numOpenKeyDeleteRequests;
+  private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
+  private @Metric MutableCounterLong numOpenKeysDeleted;
+  private @Metric MutableCounterLong numOpenKeysCleaned;
+  private @Metric MutableCounterLong numOpenKeysHSyncCleaned;
+
+  private @Metric MutableCounterLong numExpiredMPUAbortRequests;
+  private @Metric MutableCounterLong numExpiredMPUSubmittedForAbort;
+  private @Metric MutableCounterLong numExpiredMPUAborted;
+  private @Metric MutableCounterLong numExpiredMPUPartsAborted;
+
+  private @Metric MutableCounterLong numAddAcl;
+  private @Metric MutableCounterLong numSetAcl;
+  private @Metric MutableCounterLong numGetAcl;
+  private @Metric MutableCounterLong numRemoveAcl;
+  private @Metric MutableCounterLong numSetTime;
+  private @Metric MutableCounterLong numGetKeyInfo;
 
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
@@ -103,12 +129,59 @@ public class OMMetrics {
   private @Metric MutableCounterLong numAbortMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploadParts;
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
+  private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
+  private @Metric MutableCounterLong numExpiredMPUAbortRequestFails;
+  private @Metric MutableCounterLong numSnapshotCreateFails;
+  private @Metric MutableCounterLong numSnapshotDeleteFails;
+  private @Metric MutableCounterLong numSnapshotListFails;
+  private @Metric MutableCounterLong numSnapshotDiffJobFails;
+  private @Metric MutableCounterLong numSnapshotInfoFails;
+
+  private @Metric MutableCounterLong numSnapshotActive;
+  private @Metric MutableCounterLong numSnapshotDeleted;
+
+  // Number of tenant operations attempted
+  private @Metric MutableCounterLong numTenantOps;
+  // Metrics for a total number of tenants
+  private @Metric MutableCounterLong numTenants;
+  // Metrics for tenant create operation
+  private @Metric MutableCounterLong numTenantCreates;
+  private @Metric MutableCounterLong numTenantCreateFails;
+  // Metrics for tenant delete operation
+  private @Metric MutableCounterLong numTenantDeletes;
+  private @Metric MutableCounterLong numTenantDeleteFails;
+  // Metrics for tenant assign user operation
+  private @Metric MutableCounterLong numTenantAssignUsers;
+  private @Metric MutableCounterLong numTenantAssignUserFails;
+  // Metrics for tenant revoke user operation
+  private @Metric MutableCounterLong numTenantRevokeUsers;
+  private @Metric MutableCounterLong numTenantRevokeUserFails;
+  // Metrics for tenant assign admin operation
+  private @Metric MutableCounterLong numTenantAssignAdmins;
+  private @Metric MutableCounterLong numTenantAssignAdminFails;
+  // Metrics for tenant revoke admin operation
+  private @Metric MutableCounterLong numTenantRevokeAdmins;
+  private @Metric MutableCounterLong numTenantRevokeAdminFails;
+  // Metric for tenant list operation
+  private @Metric MutableCounterLong numTenantLists;
+  // Metric for tenant get user info
+  private @Metric MutableCounterLong numTenantGetUserInfos;
+  // Metric for list users in tenant operation
+  private @Metric MutableCounterLong numTenantTenantUserLists;
+
+  private @Metric MutableCounterLong numRecoverLease;
 
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
+  private @Metric MutableCounterLong getNumGetKeyInfoFails;
+
+  private @Metric MutableCounterLong numRecoverLeaseFails;
+
+  // Metrics for total amount of data written
+  private @Metric MutableCounterLong totalDataCommitted;
 
   // Metrics for total number of volumes, buckets and keys
 
@@ -121,14 +194,6 @@ public class OMMetrics {
   // few minutes before restart may not be included in this count.
   private @Metric MutableCounterLong numKeys;
 
-
-
-  // Metrics to track checkpointing statistics from last run.
-  private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
-  private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
-  private @Metric MutableCounterLong numCheckpoints;
-  private @Metric MutableCounterLong numCheckpointFails;
-
   private @Metric MutableCounterLong numBucketS3Creates;
   private @Metric MutableCounterLong numBucketS3CreateFails;
   private @Metric MutableCounterLong numBucketS3Deletes;
@@ -137,7 +202,38 @@ public class OMMetrics {
   private @Metric MutableCounterLong numListMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploads;
 
+  // Metrics related to OM Trash.
+  private @Metric MutableCounterLong numTrashRenames;
+  private @Metric MutableCounterLong numTrashDeletes;
+  private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashGetFileStatus;
+  private @Metric MutableCounterLong numTrashGetTrashRoots;
+  private @Metric MutableCounterLong numTrashExists;
+  private @Metric MutableCounterLong numTrashWriteRequests;
+  private @Metric MutableCounterLong numTrashFilesRenames;
+  private @Metric MutableCounterLong numTrashFilesDeletes;
+  private @Metric MutableCounterLong numTrashActiveCycles;
+  private @Metric MutableCounterLong numTrashCheckpointsProcessed;
+  private @Metric MutableCounterLong numTrashFails;
+  private @Metric MutableCounterLong numTrashRootsEnqueued;
+  private @Metric MutableCounterLong numTrashRootsProcessed;
+  private @Metric MutableCounterLong numTrashAtomicDirRenames;
+  private @Metric MutableCounterLong numTrashAtomicDirDeletes;
+
+  //FSO Metrics
+  private @Metric MutableCounterLong numDirs;
+  private @Metric MutableCounterLong numFiles;
+
+  //EC Metrics
+  private @Metric MutableCounterLong ecKeyCreateTotal;
+  private @Metric MutableCounterLong ecKeyCreateFailsTotal;
+  private @Metric MutableCounterLong ecBucketCreateTotal;
+  private @Metric MutableCounterLong ecBucketCreateFailsTotal;
+
+  private final DBCheckpointMetrics dbCheckpointMetrics;
+
   public OMMetrics() {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
   }
 
   public static OMMetrics create() {
@@ -145,6 +241,10 @@ public class OMMetrics {
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
         new OMMetrics());
+  }
+
+  public DBCheckpointMetrics getDBCheckpointMetrics() {
+    return dbCheckpointMetrics;
   }
 
   public void incNumS3BucketCreates() {
@@ -166,6 +266,9 @@ public class OMMetrics {
     numBucketS3DeleteFails.incr();
   }
 
+  public void incDataCommittedBytes(long bytesWritten) {
+    totalDataCommitted.incr(bytesWritten);
+  }
 
   public void incNumS3Buckets() {
     numS3Buckets.incr();
@@ -195,6 +298,10 @@ public class OMMetrics {
     numKeys.incr();
   }
 
+  public void incNumKeys(int count) {
+    numKeys.incr(count);
+  }
+
   public void decNumKeys() {
     numKeys.incr(-1);
   }
@@ -211,7 +318,21 @@ public class OMMetrics {
 
   public void setNumKeys(long val) {
     long oldVal = this.numKeys.value();
-    this.numKeys.incr(val- oldVal);
+    this.numKeys.incr(val - oldVal);
+  }
+
+  public void setNumDirs(long val) {
+    long oldVal = this.numDirs.value();
+    this.numDirs.incr(val - oldVal);
+  }
+
+  public void setNumFiles(long val) {
+    long oldVal = this.numDirs.value();
+    this.numDirs.incr(val - oldVal);
+  }
+
+  public void decNumKeys(long val) {
+    this.numKeys.incr(-val);
   }
 
   public long getNumVolumes() {
@@ -257,6 +378,10 @@ public class OMMetrics {
     numBucketCreates.incr();
   }
 
+  public void incNumFSOBucketCreates() {
+    numFSOBucketCreates.incr();
+  }
+
   public void incNumBucketInfos() {
     numBucketOps.incr();
     numBucketInfos.incr();
@@ -272,11 +397,16 @@ public class OMMetrics {
     numBucketDeletes.incr();
   }
 
+  public void incNumFSOBucketDeletes() {
+    numFSOBucketDeletes.incr();
+  }
+
   public void incNumBucketLists() {
     numBucketOps.incr();
     numBucketLists.incr();
   }
 
+  @Override
   public void incNumKeyLists() {
     numKeyOps.incr();
     numKeyLists.incr();
@@ -325,6 +455,71 @@ public class OMMetrics {
     numCompleteMultipartUploads.incr();
   }
 
+  public void incNumSnapshotCreates() {
+    numSnapshotCreates.incr();
+  }
+
+  public void incNumSnapshotCreateFails() {
+    numSnapshotCreateFails.incr();
+  }
+
+  public void incNumSnapshotDeletes() {
+    numSnapshotDeletes.incr();
+  }
+
+  public void incNumSnapshotDeleteFails() {
+    numSnapshotDeleteFails.incr();
+  }
+
+  public void incNumSnapshotLists() {
+    numSnapshotLists.incr();
+  }
+
+  public void incNumSnapshotInfos() {
+    numSnapshotInfos.incr();
+  }
+
+  public void incNumSnapshotDiffJobs() {
+    numSnapshotDiffJobs.incr();
+  }
+
+  public void incNumSnapshotListFails() {
+    numSnapshotListFails.incr();
+  }
+
+  public void incNumSnapshotDiffJobFails() {
+    numSnapshotDiffJobFails.incr();
+  }
+
+  public void incNumSnapshotInfoFails() {
+    numSnapshotInfoFails.incr();
+  }
+  public void setNumSnapshotActive(long num) {
+    long currVal = numSnapshotActive.value();
+    numSnapshotActive.incr(num - currVal);
+  }
+
+  public void incNumSnapshotActive() {
+    numSnapshotActive.incr();
+  }
+
+  public void decNumSnapshotActive() {
+    numSnapshotActive.incr(-1);
+  }
+
+  public void setNumSnapshotDeleted(long num) {
+    long currVal = numSnapshotDeleted.value();
+    numSnapshotDeleted.incr(num - currVal);
+  }
+
+  public void incNumSnapshotDeleted() {
+    numSnapshotDeleted.incr();
+  }
+
+  public void decNumSnapshotDeleted() {
+    numSnapshotDeleted.incr(-1);
+  }
+
   public void incNumCompleteMultipartUploadFails() {
     numCompleteMultipartUploadFails.incr();
   }
@@ -351,12 +546,91 @@ public class OMMetrics {
     numListMultipartUploadParts.incr();
   }
 
+  public void incNumTenants() {
+    numTenants.incr();
+  }
+
+  public void decNumTenants() {
+    numTenants.incr(-1);
+  }
+
+  public void incNumTenantCreates() {
+    numTenantOps.incr();
+    numTenantCreates.incr();
+  }
+
+  public void incNumTenantCreateFails() {
+    numTenantCreateFails.incr();
+  }
+
+  public void incNumTenantDeletes() {
+    numTenantOps.incr();
+    numTenantDeletes.incr();
+  }
+
+  public void incNumTenantDeleteFails() {
+    numTenantDeleteFails.incr();
+  }
+
+  public void incNumTenantAssignUsers() {
+    numTenantOps.incr();
+    numTenantAssignUsers.incr();
+  }
+
+  public void incNumTenantAssignUserFails() {
+    numTenantAssignUserFails.incr();
+  }
+
+  public void incNumTenantRevokeUsers() {
+    numTenantOps.incr();
+    numTenantRevokeUsers.incr();
+  }
+
+  public void incNumTenantRevokeUserFails() {
+    numTenantRevokeUserFails.incr();
+  }
+
+  public void incNumTenantAssignAdmins() {
+    numTenantOps.incr();
+    numTenantAssignAdmins.incr();
+  }
+
+  public void incNumTenantAssignAdminFails() {
+    numTenantAssignAdminFails.incr();
+  }
+
+  public void incNumTenantRevokeAdmins() {
+    numTenantOps.incr();
+    numTenantRevokeAdmins.incr();
+  }
+
+  public void incNumTenantRevokeAdminFails() {
+    numTenantRevokeAdminFails.incr();
+  }
+
+  public void incNumTenantLists() {
+    numTenantOps.incr();
+    numTenantLists.incr();
+  }
+
+  public void incNumTenantGetUserInfos() {
+    numTenantOps.incr();
+    numTenantGetUserInfos.incr();
+  }
+
+  public void incNumTenantUserLists() {
+    numTenantOps.incr();
+    numTenantTenantUserLists.incr();
+  }
+
+  @Override
   public void incNumGetFileStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numGetFileStatus.incr();
   }
 
+  @Override
   public void incNumGetFileStatusFails() {
     numGetFileStatusFails.incr();
   }
@@ -381,22 +655,26 @@ public class OMMetrics {
     numCreateFileFails.incr();
   }
 
+  @Override
   public void incNumLookupFile() {
     numKeyOps.incr();
     numFSOps.incr();
     numLookupFile.incr();
   }
 
+  @Override
   public void incNumLookupFileFails() {
     numLookupFileFails.incr();
   }
 
+  @Override
   public void incNumListStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numListStatus.incr();
   }
 
+  @Override
   public void incNumListStatusFails() {
     numListStatusFails.incr();
   }
@@ -454,11 +732,13 @@ public class OMMetrics {
     numKeyAllocateFails.incr();
   }
 
+  @Override
   public void incNumKeyLookups() {
     numKeyOps.incr();
     numKeyLookup.incr();
   }
 
+  @Override
   public void incNumKeyLookupFails() {
     numKeyLookupFails.incr();
   }
@@ -469,7 +749,6 @@ public class OMMetrics {
   }
 
   public void incNumKeyRenameFails() {
-    numKeyOps.incr();
     numKeyRenameFails.incr();
   }
 
@@ -485,6 +764,11 @@ public class OMMetrics {
   public void incNumKeyCommits() {
     numKeyOps.incr();
     numKeyCommits.incr();
+  }
+
+  public void incNumKeyHSyncs() {
+    numKeyOps.incr();
+    numKeyHSyncs.incr();
   }
 
   public void incNumKeyCommitFails() {
@@ -503,6 +787,7 @@ public class OMMetrics {
     numBucketListFails.incr();
   }
 
+  @Override
   public void incNumKeyListFails() {
     numKeyListFails.incr();
   }
@@ -519,20 +804,80 @@ public class OMMetrics {
     numGetServiceListFails.incr();
   }
 
-  public void setLastCheckpointCreationTimeTaken(long val) {
-    this.lastCheckpointCreationTimeTaken.set(val);
+  public void incNumOpenKeyDeleteRequests() {
+    numOpenKeyDeleteRequests.incr();
   }
 
-  public void setLastCheckpointStreamingTimeTaken(long val) {
-    this.lastCheckpointStreamingTimeTaken.set(val);
+  public void incNumOpenKeysSubmittedForDeletion(long amount) {
+    numOpenKeysSubmittedForDeletion.incr(amount);
   }
 
-  public void incNumCheckpoints() {
-    numCheckpoints.incr();
+  public void incNumOpenKeysDeleted() {
+    numOpenKeysDeleted.incr();
   }
 
-  public void incNumCheckpointFails() {
-    numCheckpointFails.incr();
+  public void incNumOpenKeysCleaned(int delta) {
+    numOpenKeysCleaned.incr(delta);
+  }
+
+  public void incNumOpenKeysHSyncCleaned() {
+    numOpenKeysHSyncCleaned.incr();
+  }
+
+  public void incNumOpenKeyDeleteRequestFails() {
+    numOpenKeyDeleteRequestFails.incr();
+  }
+
+  public void incNumExpiredMPUAbortRequests() {
+    numExpiredMPUAbortRequests.incr();
+  }
+
+  public void incNumExpiredMPUSubmittedForAbort(long amount) {
+    numExpiredMPUSubmittedForAbort.incr(amount);
+  }
+
+  public void incNumExpiredMPUAborted() {
+    numExpiredMPUAborted.incr();
+  }
+
+  public void incNumExpiredMPUPartsAborted(long amount) {
+    numExpiredMPUPartsAborted.incr(amount);
+  }
+
+  public void incNumExpiredMpuAbortRequestFails() {
+    numExpiredMPUAbortRequestFails.incr();
+  }
+
+  public void incNumAddAcl() {
+    numAddAcl.incr();
+  }
+
+  public void incNumSetAcl() {
+    numSetAcl.incr();
+  }
+
+  @Override
+  public void incNumGetAcl() {
+    numGetAcl.incr();
+  }
+
+  public void incNumRemoveAcl() {
+    numRemoveAcl.incr();
+  }
+
+  public void incNumSetTime() {
+    numSetTime.incr();
+  }
+
+  @Override
+  public void incNumGetKeyInfo() {
+    numGetKeyInfo.incr();
+    numKeyOps.incr();
+  }
+
+  @Override
+  public void incNumGetKeyInfoFails() {
+    getNumGetKeyInfoFails.incr();
   }
 
   @VisibleForTesting
@@ -566,6 +911,11 @@ public class OMMetrics {
   }
 
   @VisibleForTesting
+  public long getNumFSOBucketCreates() {
+    return numFSOBucketCreates.value();
+  }
+
+  @VisibleForTesting
   public long getNumBucketInfos() {
     return numBucketInfos.value();
   }
@@ -578,6 +928,11 @@ public class OMMetrics {
   @VisibleForTesting
   public long getNumBucketDeletes() {
     return numBucketDeletes.value();
+  }
+
+  @VisibleForTesting
+  public long getNumFSOBucketDeletes() {
+    return numFSOBucketDeletes.value();
   }
 
   @VisibleForTesting
@@ -731,6 +1086,11 @@ public class OMMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyHSyncs() {
+    return numKeyHSyncs.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyCommitFails() {
     return numKeyCommitFails.value();
   }
@@ -760,6 +1120,11 @@ public class OMMetrics {
     return numBucketS3ListFails.value();
   }
 
+  @VisibleForTesting
+  public long getDataCommittedBytes() {
+    return totalDataCommitted.value();
+  }
+
   public long getNumInitiateMultipartUploads() {
     return numInitiateMultipartUploads.value();
   }
@@ -776,22 +1141,294 @@ public class OMMetrics {
     return numAbortMultipartUploadFails.value();
   }
 
-  @VisibleForTesting
-  public long getLastCheckpointCreationTimeTaken() {
-    return lastCheckpointCreationTimeTaken.value();
+  public long getNumOpenKeyDeleteRequests() {
+    return numOpenKeyDeleteRequests.value();
+  }
+
+  public long getNumOpenKeysSubmittedForDeletion() {
+    return numOpenKeysSubmittedForDeletion.value();
+  }
+
+  public long getNumOpenKeysDeleted() {
+    return numOpenKeysDeleted.value();
+  }
+
+  public long getNumOpenKeysCleaned() {
+    return numOpenKeysCleaned.value();
+  }
+
+  public long getNumOpenKeysHSyncCleaned() {
+    return numOpenKeysHSyncCleaned.value();
+  }
+
+  public long getNumOpenKeyDeleteRequestFails() {
+    return numOpenKeyDeleteRequestFails.value();
   }
 
   @VisibleForTesting
-  public long getNumCheckpoints() {
-    return numCheckpoints.value();
+  public long getNumExpiredMPUAbortRequests() {
+    return numExpiredMPUAbortRequests.value();
   }
 
   @VisibleForTesting
-  public long getLastCheckpointStreamingTimeTaken() {
-    return lastCheckpointStreamingTimeTaken.value();
+  public long getNumExpiredMPUSubmittedForAbort() {
+    return numExpiredMPUSubmittedForAbort.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUAborted() {
+    return numExpiredMPUAborted.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUAbortRequestFails() {
+    return numExpiredMPUAbortRequestFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUPartsAborted() {
+    return numExpiredMPUPartsAborted.value();
+  }
+
+  public long getNumAddAcl() {
+    return numAddAcl.value();
+  }
+
+  public long getNumSetAcl() {
+    return numSetAcl.value();
+  }
+
+  public long getNumGetAcl() {
+    return numGetAcl.value();
+  }
+
+  public long getNumRemoveAcl() {
+    return numRemoveAcl.value();
+  }
+
+  public long getNumTenantOps() {
+    return numTenantOps.value();
+  }
+
+  public long getNumTenants() {
+    return numTenants.value();
+  }
+
+  public long getNumTenantCreates() {
+    return numTenantCreates.value();
+  }
+
+  public long getNumTenantCreateFails() {
+    return numTenantCreateFails.value();
+  }
+
+  public long getNumTenantDeletes() {
+    return numTenantDeletes.value();
+  }
+
+  public long getNumTenantDeleteFails() {
+    return numTenantDeleteFails.value();
+  }
+
+  public long getNumTenantAssignUsers() {
+    return numTenantAssignUsers.value();
+  }
+
+  public long getNumTenantAssignUserFails() {
+    return numTenantAssignUserFails.value();
+  }
+
+  public long getNumTenantRevokeUsers() {
+    return numTenantRevokeUsers.value();
+  }
+
+  public long getNumTenantRevokeUserFails() {
+    return numTenantRevokeUserFails.value();
+  }
+
+  public long getNumTenantAssignAdmins() {
+    return numTenantAssignAdmins.value();
+  }
+
+  public long getNumTenantAssignAdminFails() {
+    return numTenantAssignAdminFails.value();
+  }
+
+  public long getNumTenantRevokeAdmins() {
+    return numTenantRevokeAdmins.value();
+  }
+
+  public long getNumTenantRevokeAdminFails() {
+    return numTenantRevokeAdminFails.value();
+  }
+
+  public long getNumTenantLists() {
+    return numTenantLists.value();
+  }
+
+  public long getNumTenantGetUserInfos() {
+    return numTenantGetUserInfos.value();
+  }
+
+  public long getNumTenantTenantUserLists() {
+    return numTenantTenantUserLists.value();
+  }
+
+  public long getNumSnapshotCreates() {
+    return numSnapshotCreates.value();
+  }
+
+  public long getNumSnapshotDeletes() {
+    return numSnapshotDeletes.value();
+  }
+
+  public long getNumSnapshotLists() {
+    return numSnapshotLists.value();
+  }
+
+  public long getNumSnapshotDiffJobs() {
+    return numSnapshotDiffJobs.value();
+  }
+
+  public long getNumSnapshotCreateFails() {
+    return numSnapshotCreateFails.value();
+  }
+
+  public long getNumSnapshotDeleteFails() {
+    return numSnapshotDeleteFails.value();
+  }
+
+  public long getNumSnapshotListFails() {
+    return numSnapshotListFails.value();
+  }
+
+  public long getNumSnapshotDiffJobFails() {
+    return numSnapshotDiffJobFails.value();
+  }
+
+  public long getNumSnapshotActive() {
+    return numSnapshotActive.value();
+  }
+
+  public long getNumSnapshotDeleted() {
+    return numSnapshotDeleted.value();
+  }
+
+
+  public void incNumTrashRenames() {
+    numTrashRenames.incr();
+  }
+
+  public long getNumTrashRenames() {
+    return numTrashRenames.value();
+  }
+
+  public void incNumTrashDeletes() {
+    numTrashDeletes.incr();
+  }
+
+  public long getNumTrashDeletes() {
+    return numTrashDeletes.value();
+  }
+
+  public void incNumTrashListStatus() {
+    numTrashListStatus.incr();
+  }
+
+  public void incNumTrashGetFileStatus() {
+    numTrashGetFileStatus.incr();
+  }
+
+  public void incNumTrashGetTrashRoots() {
+    numTrashGetTrashRoots.incr();
+  }
+
+  public void incNumTrashExists() {
+    numTrashExists.incr();
+  }
+
+  public void incNumTrashWriteRequests() {
+    numTrashWriteRequests.incr();
+  }
+
+  public void incNumTrashFilesRenames() {
+    numTrashFilesRenames.incr();
+  }
+
+  public long getNumTrashFilesRenames() {
+    return numTrashFilesRenames.value();
+  }
+
+  public void incNumTrashFilesDeletes() {
+    numTrashFilesDeletes.incr();
+  }
+
+  public long getNumTrashFilesDeletes() {
+    return numTrashFilesDeletes.value();
+  }
+
+  public long getNumTrashAtomicDirRenames() {
+    return numTrashAtomicDirRenames.value();
+  }
+
+  public long getNumTrashAtomicDirDeletes() {
+    return numTrashAtomicDirDeletes.value();
+  }
+
+  public void incNumTrashActiveCycles() {
+    numTrashActiveCycles.incr();
+  }
+
+  public void incNumTrashRootsEnqueued() {
+    numTrashRootsEnqueued.incr();
+  }
+
+  public void incNumTrashRootsProcessed() {
+    numTrashRootsProcessed.incr();
+  }
+
+  public void incNumTrashFails() {
+    numTrashFails.incr();
+  }
+
+  public void incNumTrashAtomicDirRenames() {
+    numTrashAtomicDirRenames.incr();
+  }
+
+  public void incNumTrashAtomicDirDeletes() {
+    numTrashAtomicDirDeletes.incr();
+  }
+
+  public void incEcKeysTotal() {
+    ecKeyCreateTotal.incr();
+  }
+
+  public void incEcBucketsTotal() {
+    ecBucketCreateTotal.incr();
+  }
+
+  public void incEcKeyCreateFailsTotal() {
+    ecKeyCreateFailsTotal.incr();
+  }
+
+  public void incEcBucketCreateFailsTotal() {
+    ecBucketCreateFailsTotal.incr();
+  }
+
+  public void incNumRecoverLease() {
+    numKeyOps.incr();
+    numFSOps.incr();
+    numRecoverLease.incr();
+  }
+
+  public void incNumRecoverLeaseFails() {
+    numRecoverLeaseFails.incr();
   }
 
   public void unRegister() {
+    if (dbCheckpointMetrics != null) {
+      dbCheckpointMetrics.unRegister();
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

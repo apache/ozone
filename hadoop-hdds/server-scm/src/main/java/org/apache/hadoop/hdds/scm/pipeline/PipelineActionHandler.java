@@ -23,12 +23,16 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,11 +48,13 @@ public class PipelineActionHandler
       LoggerFactory.getLogger(PipelineActionHandler.class);
 
   private final PipelineManager pipelineManager;
+  private final SCMContext scmContext;
   private final ConfigurationSource ozoneConf;
 
   public PipelineActionHandler(PipelineManager pipelineManager,
-      OzoneConfiguration conf) {
+      SCMContext scmContext, OzoneConfiguration conf) {
     this.pipelineManager = pipelineManager;
+    this.scmContext = scmContext;
     this.ozoneConf = conf;
   }
 
@@ -73,27 +79,56 @@ public class PipelineActionHandler
     final ClosePipelineInfo info = pipelineAction.getClosePipeline();
     final PipelineAction.Action action = pipelineAction.getAction();
     final PipelineID pid = PipelineID.getFromProtobuf(info.getPipelineID());
-    try {
-      LOG.info("Received pipeline action {} for {} from datanode {}. " +
-          "Reason : {}", action, pid, datanode.getUuidString(),
-          info.getDetailedReason());
 
+    final String logMsg = "Received pipeline action " + action + " for " + pid +
+        " from datanode " + datanode.getUuidString() + "." +
+        " Reason : " + info.getDetailedReason();
+
+    // We can skip processing Pipeline Action if the current SCM is not leader.
+    if (!scmContext.isLeader()) {
+      LOG.debug(logMsg);
+      LOG.debug("Cannot process Pipeline Action for pipeline {} as " +
+          "current SCM is not leader.", pid);
+      return;
+    }
+
+    LOG.info(logMsg);
+    try {
       if (action == PipelineAction.Action.CLOSE) {
-        pipelineManager.finalizeAndDestroyPipeline(
-            pipelineManager.getPipeline(pid), true);
+        pipelineManager.closePipeline(pid);
       } else {
-        LOG.error("unknown pipeline action:{}", action);
+        LOG.error("Received unknown pipeline action {}, for pipeline {} ",
+            action, pid);
       }
     } catch (PipelineNotFoundException e) {
-      LOG.warn("Pipeline action {} received for unknown pipeline {}, " +
-          "firing close pipeline event.", action, pid);
-      publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(datanode.getUuid(),
-              new ClosePipelineCommand(pid)));
-    } catch (IOException ioe) {
-      LOG.error("Could not execute pipeline action={} pipeline={}",
-          action, pid, ioe);
+      closeUnknownPipeline(publisher, datanode, pid);
+    }  catch (SCMException e) {
+      if (e.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
+        LOG.info("Cannot process Pipeline Action for pipeline {} as " +
+            "current SCM is not leader anymore.", pid);
+      } else {
+        LOG.error("Exception while processing Pipeline Action for Pipeline {}",
+            pid, e);
+      }
+    } catch (IOException e) {
+      LOG.error("Exception while processing Pipeline Action for Pipeline {}",
+          pid, e);
     }
   }
 
+  private void closeUnknownPipeline(final EventPublisher publisher,
+                                    final DatanodeDetails datanode,
+                                    final PipelineID pid) {
+    try {
+      LOG.warn("Pipeline action received for unknown Pipeline {}, " +
+          "firing close pipeline event.", pid);
+      SCMCommand<?> command = new ClosePipelineCommand(pid);
+      command.setTerm(scmContext.getTermOfLeader());
+      publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+          new CommandForDatanode<>(datanode.getUuid(), command));
+    } catch (NotLeaderException nle) {
+      LOG.info("Cannot process Pipeline Action for pipeline {} as " +
+          "current SCM is not leader anymore.", pid);
+    }
+  }
 }

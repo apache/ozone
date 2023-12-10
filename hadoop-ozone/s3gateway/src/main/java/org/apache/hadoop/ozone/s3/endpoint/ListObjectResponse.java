@@ -22,11 +22,14 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.ozone.s3.commontypes.CommonPrefix;
+import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
+import org.apache.hadoop.ozone.s3.commontypes.ObjectKeyNameAdapter;
 
 /**
  * Response from the ListObject RPC Call.
@@ -40,7 +43,8 @@ public class ListObjectResponse {
   private String name;
 
   @XmlElement(name = "Prefix")
-  private String prefix;
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
+  private EncodingTypeObject prefix;
 
   @XmlElement(name = "Marker")
   private String marker;
@@ -51,17 +55,21 @@ public class ListObjectResponse {
   @XmlElement(name = "KeyCount")
   private int keyCount;
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
   @XmlElement(name = "Delimiter")
-  private String delimiter = "/";
+  private EncodingTypeObject delimiter;
 
   @XmlElement(name = "EncodingType")
-  private String encodingType = "url";
+  private String encodingType;
 
   @XmlElement(name = "IsTruncated")
   private boolean isTruncated;
 
   @XmlElement(name = "NextContinuationToken")
   private String nextToken;
+
+  @XmlElement(name = "NextMarker")
+  private String nextMarker;
 
   @XmlElement(name = "continueToken")
   private String continueToken;
@@ -72,6 +80,10 @@ public class ListObjectResponse {
   @XmlElement(name = "CommonPrefixes")
   private List<CommonPrefix> commonPrefixes = new ArrayList<>();
 
+  @XmlJavaTypeAdapter(ObjectKeyNameAdapter.class)
+  @XmlElement(name = "StartAfter")
+  private EncodingTypeObject startAfter;
+
   public String getName() {
     return name;
   }
@@ -80,11 +92,11 @@ public class ListObjectResponse {
     this.name = name;
   }
 
-  public String getPrefix() {
+  public EncodingTypeObject getPrefix() {
     return prefix;
   }
 
-  public void setPrefix(String prefix) {
+  public void setPrefix(EncodingTypeObject prefix) {
     this.prefix = prefix;
   }
 
@@ -104,11 +116,11 @@ public class ListObjectResponse {
     this.maxKeys = maxKeys;
   }
 
-  public String getDelimiter() {
+  public EncodingTypeObject getDelimiter() {
     return delimiter;
   }
 
-  public void setDelimiter(String delimiter) {
+  public void setDelimiter(EncodingTypeObject delimiter) {
     this.delimiter = delimiter;
   }
 
@@ -150,7 +162,7 @@ public class ListObjectResponse {
     contents.add(keyMetadata);
   }
 
-  public void addPrefix(String relativeKeyName) {
+  public void addPrefix(EncodingTypeObject relativeKeyName) {
     commonPrefixes.add(new CommonPrefix(relativeKeyName));
   }
 
@@ -176,5 +188,21 @@ public class ListObjectResponse {
 
   public void setKeyCount(int keyCount) {
     this.keyCount = keyCount;
+  }
+
+  public void setNextMarker(String nextMarker) {
+    this.nextMarker = nextMarker;
+  }
+
+  public String getNextMarker() {
+    return nextMarker;
+  }
+
+  public void setStartAfter(EncodingTypeObject startAfter) {
+    this.startAfter = startAfter;
+  }
+
+  public EncodingTypeObject getStartAfter() {
+    return startAfter;
   }
 }

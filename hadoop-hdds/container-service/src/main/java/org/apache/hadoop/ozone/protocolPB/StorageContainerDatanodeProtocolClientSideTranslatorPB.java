@@ -18,9 +18,10 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .ExtendedDatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 
@@ -153,23 +154,29 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
   /**
    * Register Datanode.
    *
-   * @param datanodeDetailsProto - Datanode Details
+   * @param extendedDatanodeDetailsProto - extended Datanode Details
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
+   * @param layoutInfo - Layout Version Information.
    * @return SCM Command.
    */
   @Override
   public SCMRegisteredResponseProto register(
-      DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
+      ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
+      NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
-      PipelineReportsProto pipelineReportsProto)
+      PipelineReportsProto pipelineReportsProto,
+      LayoutVersionProto layoutInfo)
       throws IOException {
     SCMRegisterRequestProto.Builder req =
         SCMRegisterRequestProto.newBuilder();
-    req.setDatanodeDetails(datanodeDetailsProto);
+    req.setExtendedDatanodeDetails(extendedDatanodeDetailsProto);
     req.setContainerReport(containerReportsRequestProto);
     req.setPipelineReports(pipelineReportsProto);
     req.setNodeReport(nodeReport);
+    if (layoutInfo != null) {
+      req.setDataNodeLayoutVersion(layoutInfo);
+    }
     return submitRequest(Type.Register,
         (builder) -> builder.setRegisterRequest(req))
         .getRegisterResponse();

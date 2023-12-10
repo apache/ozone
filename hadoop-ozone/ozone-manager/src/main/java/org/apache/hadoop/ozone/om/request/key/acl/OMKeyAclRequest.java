@@ -19,18 +19,24 @@
 package org.apache.hadoop.ozone.om.request.key.acl;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.Map;
 
-import com.google.common.base.Optional;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -38,6 +44,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -46,6 +54,10 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public abstract class OMKeyAclRequest extends OMClientRequest {
 
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OMKeyAclRequest.class);
+
+  private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
   public OMKeyAclRequest(OMRequest omRequest) {
     super(omRequest);
@@ -59,7 +71,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -71,65 +83,77 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
           ObjectType.KEY);
-
-      volume = objectParser.getVolume();
-      bucket = objectParser.getBucket();
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+      volume = resolvedBucket.realVolume();
+      bucket = resolvedBucket.realBucket();
       key = objectParser.getKey();
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
-      lockAcquired =
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
-              bucket);
+              bucket));
+      lockAcquired = getOmLockDetails().isLockAcquired();
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-      omKeyInfo = omMetadataManager.getKeyTable().get(dbKey);
+      omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .get(dbKey);
 
       if (omKeyInfo == null) {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
       }
 
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-        throw new OMReplayException();
-      }
-
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      // Update the modification time when updating ACLs of Key.
+      long modificationTime = omKeyInfo.getModificationTime();
+      if (getOmRequest().getAddAclRequest().hasObj() && operationResult) {
+        modificationTime = getOmRequest().getAddAclRequest()
+            .getModificationTime();
+      } else if (getOmRequest().getSetAclRequest().hasObj()
+          && operationResult) {
+        modificationTime = getOmRequest().getSetAclRequest()
+            .getModificationTime();
+      } else if (getOmRequest().getRemoveAclRequest().hasObj()
+          && operationResult) {
+        modificationTime = getOmRequest().getRemoveAclRequest()
+            .getModificationTime();
+      }
+      omKeyInfo.setModificationTime(modificationTime);
+
       // update cache.
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(dbKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .addCacheEntry(new CacheKey<>(dbKey),
+              CacheValue.get(trxnLogIndex, omKeyInfo));
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;
-    } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = onReplay(omResponse);
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse = onFailure(omResponse, ex);
-      }
+    } catch (IOException | InvalidPathException ex) {
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
-            bucket);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volume, bucket));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
-    onComplete(result, operationResult, exception, trxnLogIndex);
+    OzoneObj obj = getObject();
+    Map<String, String> auditMap = obj.toAuditMap();
+    onComplete(result, operationResult, exception, trxnLogIndex,
+        ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
   }
@@ -139,6 +163,44 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
+
+  public void initializeBucketLayout(OzoneManager ozoneManager) {
+    OmBucketInfo buckInfo;
+    try {
+      ObjectParser objectParser = new ObjectParser(getPath(),
+          OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+
+      String volume = objectParser.getVolume();
+      String bucket = objectParser.getBucket();
+
+      String buckKey =
+          ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+
+      try {
+        buckInfo =
+            ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+        if (buckInfo == null) {
+          LOG.error("Bucket not found: {}/{} ", volume, bucket);
+          // defaulting to BucketLayout.DEFAULT
+          return;
+        }
+        bucketLayout = buckInfo.getBucketLayout();
+      } catch (IOException e) {
+        LOG.error("Failed to get bucket for the key: " + buckKey, e);
+      }
+    } catch (OMException ome) {
+      LOG.error("Invalid Path: " + getPath(), ome);
+      // Handle exception
+      // defaulting to BucketLayout.DEFAULT
+      return;
+    }
+  }
+
+  /**
+   * Get Key object Info from the request.
+   * @return OzoneObjInfo
+   */
+  abstract OzoneObj getObject();
 
   // TODO: Finer grain metrics can be moved to these callbacks. They can also
   // be abstracted into separate interfaces in future.
@@ -166,12 +228,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @return OMClientResponse
    */
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception));
-  }
-
-  OMClientResponse onReplay(OMResponse.Builder omResponse) {
-    return new OMKeyAclResponse(createReplayOMResponse(omResponse));
+      Exception exception) {
+    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception),
+        getBucketLayout());
   }
 
   /**
@@ -181,7 +240,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param exception
    */
   abstract void onComplete(Result result, boolean operationResult,
-      IOException exception, long trxnLogIndex);
+      Exception exception, long trxnLogIndex, AuditLogger auditLogger,
+      Map<String, String> auditMap);
 
   /**
    * Apply the acl operation, if successfully completed returns true,
@@ -190,5 +250,13 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param trxnLogIndex
    */
   abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
+
+  public void setBucketLayout(BucketLayout bucketLayout) {
+    this.bucketLayout = bucketLayout;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
 }
 

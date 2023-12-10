@@ -31,7 +31,7 @@ import java.time.Instant;
  * Copy object Response.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "ListAllMyBucketsResult",
+@XmlRootElement(name = "CopyObjectResult",
     namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
 public class CopyObjectResponse {
 

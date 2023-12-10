@@ -22,7 +22,12 @@ import java.util.concurrent.Callable;
 /**
  * A task thread to run by {@link BackgroundService}.
  */
-public interface BackgroundTask<T> extends Callable<T> {
+public interface BackgroundTask extends Callable<BackgroundTaskResult> {
 
-  int getPriority();
+  @Override
+  BackgroundTaskResult call() throws Exception;
+
+  default int getPriority() {
+    return 0;
+  }
 }

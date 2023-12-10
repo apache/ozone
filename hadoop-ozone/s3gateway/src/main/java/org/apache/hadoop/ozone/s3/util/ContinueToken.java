@@ -38,7 +38,7 @@ public class ContinueToken {
 
   private String lastDir;
 
-  private static final String CONTINUE_TOKEN_SEPERATOR = "-";
+  private static final String CONTINUE_TOKEN_SEPARATOR = "-";
 
   public ContinueToken(String lastKey, String lastDir) {
     Preconditions.checkNotNull(lastKey,
@@ -57,18 +57,21 @@ public class ContinueToken {
   public String encodeToString() {
     if (this.lastKey != null) {
 
-      ByteBuffer buffer = ByteBuffer
-          .allocate(4 + lastKey.length()
-              + (lastDir == null ? 0 : lastDir.length()));
-      buffer.putInt(lastKey.length());
-      buffer.put(lastKey.getBytes(StandardCharsets.UTF_8));
+      byte[] rawLastKey = lastKey.getBytes(StandardCharsets.UTF_8);
+      byte[] rawLastDir = (lastDir == null ? new byte[0] :
+          lastDir.getBytes(StandardCharsets.UTF_8));
+
+      ByteBuffer buffer = ByteBuffer.allocate(
+          4 + rawLastKey.length + rawLastDir.length);
+      buffer.putInt(rawLastKey.length);
+      buffer.put(rawLastKey);
       if (lastDir != null) {
-        buffer.put(lastDir.getBytes(StandardCharsets.UTF_8));
+        buffer.put(rawLastDir);
       }
 
       String hex = Hex.encodeHexString(buffer.array());
       String digest = DigestUtils.sha256Hex(hex);
-      return hex + CONTINUE_TOKEN_SEPERATOR + digest;
+      return hex + CONTINUE_TOKEN_SEPARATOR + digest;
     } else {
       return null;
     }
@@ -83,7 +86,7 @@ public class ContinueToken {
    */
   public static ContinueToken decodeFromString(String key) throws OS3Exception {
     if (key != null) {
-      int indexSeparator = key.indexOf(CONTINUE_TOKEN_SEPERATOR);
+      int indexSeparator = key.indexOf(CONTINUE_TOKEN_SEPARATOR);
       if (indexSeparator == -1) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, key);
       }
@@ -108,7 +111,7 @@ public class ContinueToken {
 
       } catch (DecoderException ex) {
         OS3Exception os3Exception = S3ErrorTable.newError(S3ErrorTable
-            .INVALID_ARGUMENT, key);
+            .INVALID_ARGUMENT, key, ex);
         os3Exception.setErrorMessage("The continuation token provided is " +
             "incorrect");
         throw os3Exception;

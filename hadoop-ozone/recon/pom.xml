@@ -16,13 +16,17 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>ozone</artifactId>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
-  <name>Apache Hadoop Ozone Recon</name>
+  <name>Apache Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>hadoop-ozone-recon</artifactId>
+  <artifactId>ozone-recon</artifactId>
+  <properties>
+    <pnpm.version>7.33.6</pnpm.version>
+    <allow.junit4>false</allow.junit4>
+  </properties>
   <build>
     <resources>
       <resource>
@@ -48,6 +52,7 @@
           <executable>java</executable>
           <classpathScope>compile</classpathScope>
           <mainClass>org.hadoop.ozone.recon.codegen.JooqCodeGenerator</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
           <arguments>
             <argument>${project.build.directory}/generated-sources/java</argument>
           </arguments>
@@ -86,40 +91,72 @@
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
+        <version>${frontend-maven-plugin.version}</version>
         <configuration>
+          <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
         </configuration>
         <executions>
           <execution>
-            <id>Install node and yarn locally to the project</id>
+            <id>Install node and npm locally to the project</id>
             <goals>
-              <goal>install-node-and-yarn</goal>
+              <goal>install-node-and-npm</goal>
             </goals>
             <configuration>
-              <nodeVersion>v12.14.1</nodeVersion>
-              <yarnVersion>v1.22.4</yarnVersion>
+              <nodeVersion>v16.14.2</nodeVersion>
             </configuration>
           </execution>
           <execution>
-            <id>yarn install</id>
+            <id>set pnpm@${pnpm.version} store path</id>
             <goals>
-              <goal>yarn</goal>
+              <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>install</arguments>
+              <arguments>pnpm@${pnpm.version} config set store-dir ~/.pnpm-store</arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>install frontend dependencies</id>
+            <goals>
+              <goal>npx</goal>
+            </goals>
+            <configuration>
+              <arguments>pnpm@${pnpm.version} install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>
             <id>Build frontend</id>
             <goals>
-              <goal>yarn</goal>
+              <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>run build</arguments>
+              <arguments>pnpm@${pnpm.version} run build</arguments>
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>${maven-clean-plugin.version}</version>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web/build</directory>
+              <includes>
+                <include>**</include>
+              </includes>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+            <fileset>
+              <directory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web/node_modules</directory>
+              <includes>
+                <include>**</include>
+              </includes>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+          </filesets>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -155,6 +192,9 @@
                   <filtering>true</filtering>
                 </resource>
               </resources>
+              <nonFilteredFileExtensions>
+                <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
+              </nonFilteredFileExtensions>
             </configuration>
           </execution>
         </executions>
@@ -163,8 +203,8 @@
   </build>
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-common</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-common</artifactId>
       <exclusions>
         <exclusion>
           <artifactId>jersey-server</artifactId>
@@ -181,13 +221,13 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-reconcodegen</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-reconcodegen</artifactId>
       <version>${ozone.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-ozone-manager</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-manager</artifactId>
       <exclusions>
         <exclusion>
           <groupId>com.sun.jersey</groupId>
@@ -196,14 +236,14 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- visible only for ContainerOperationClient -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-tools</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-tools</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -212,8 +252,8 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-server-scm</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-scm</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.inject</groupId>
@@ -248,12 +288,22 @@
       <artifactId>jersey-media-json-jackson</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-jaxb</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.glassfish.jersey.inject</groupId>
       <artifactId>jersey-hk2</artifactId>
     </dependency>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -262,8 +312,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
       <exclusions>
         <exclusion>
@@ -306,7 +356,6 @@
     <dependency>
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
-      <version>10.14.2.0</version>
     </dependency>
     <dependency>
       <groupId>org.xerial</groupId>
@@ -316,15 +365,30 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-jdbc</artifactId>
       <version>${spring.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.springframework</groupId>
+          <artifactId>spring-jcl</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>javax.activation</groupId>
       <artifactId>activation</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs</artifactId>
-      <scope>provided</scope>
+      <groupId>org.javassist</groupId>
+      <artifactId>javassist</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-module-junit4</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-api-mockito2</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

@@ -18,178 +18,158 @@
 
 package org.apache.hadoop.ozone.container;
 
-import java.util.ArrayList;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.time.Duration;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .DatanodeBlockID;
-import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer
-    .writeChunkForContainer;
-
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.event.Level;
 
 /**
  * Tests ozone containers replication.
  */
-@Ignore
-public class TestContainerReplication {
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public Timeout testTimeout = new Timeout(300000);
+@Timeout(300)
+class TestContainerReplication {
 
-  private OzoneConfiguration conf;
-  private MiniOzoneCluster cluster;
+  private static final String VOLUME = "vol1";
+  private static final String BUCKET = "bucket1";
+  private static final String KEY = "key1";
 
-  @Before
-  public void setup() throws Exception {
-    conf = newOzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
-        .setRandomContainerPort(true).build();
-  }
+  private static final List<Class<? extends PlacementPolicy>> POLICIES = asList(
+      SCMContainerPlacementCapacity.class,
+      SCMContainerPlacementRackAware.class,
+      SCMContainerPlacementRandom.class
+  );
 
-  @After
-  public void teardown() {
-    if (cluster != null) {
-      cluster.shutdown();
+  static List<Arguments> containerReplicationArguments() {
+    List<Arguments> arguments = new LinkedList<>();
+    for (Class<? extends PlacementPolicy> policyClass : POLICIES) {
+      String canonicalName = policyClass.getCanonicalName();
+      arguments.add(Arguments.arguments(canonicalName, true));
+      arguments.add(Arguments.arguments(canonicalName, false));
     }
+    return arguments;
   }
 
-  @Test
-  public void testContainerReplication() throws Exception {
-    //GIVEN
-    long containerId = 1L;
-
-    cluster.waitForClusterToBeReady();
-
-    HddsDatanodeService firstDatanode = cluster.getHddsDatanodes().get(0);
-
-    //copy from the first datanode
-    List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
-    sourceDatanodes.add(firstDatanode.getDatanodeDetails());
-
-    Pipeline sourcePipelines =
-        MockPipeline.createPipeline(sourceDatanodes);
-
-    //create a new client
-    XceiverClientSpi client = new XceiverClientGrpc(sourcePipelines, conf);
-    client.connect();
-
-    //New container for testing
-    TestOzoneContainer.createContainerForTesting(client, containerId);
-
-    ContainerCommandRequestProto requestProto =
-        writeChunkForContainer(client, containerId, 1024);
-
-    DatanodeBlockID blockID = requestProto.getWriteChunk().getBlockID();
-
-    // Put Block to the test container
-    ContainerCommandRequestProto putBlockRequest = ContainerTestHelper
-        .getPutBlockRequest(sourcePipelines, requestProto.getWriteChunk());
-
-    ContainerCommandResponseProto response =
-        client.sendCommand(putBlockRequest);
-
-    Assert.assertNotNull(response);
-    Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-    HddsDatanodeService destinationDatanode =
-        chooseDatanodeWithoutContainer(sourcePipelines,
-            cluster.getHddsDatanodes());
-
-    // Close the container
-    ContainerCommandRequestProto closeContainerRequest = ContainerTestHelper
-        .getCloseContainer(sourcePipelines, containerId);
-    response = client.sendCommand(closeContainerRequest);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-    //WHEN: send the order to replicate the container
-    cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(destinationDatanode.getDatanodeDetails().getUuid(),
-            new ReplicateContainerCommand(containerId,
-                sourcePipelines.getNodes()));
-
-    DatanodeStateMachine destinationDatanodeDatanodeStateMachine =
-        destinationDatanode.getDatanodeStateMachine();
-
-    //wait for the replication
-    GenericTestUtils.waitFor(()
-        -> destinationDatanodeDatanodeStateMachine.getSupervisor()
-        .getReplicationRequestCount() > 0, 1000, 20_000);
-
-    OzoneContainer ozoneContainer =
-        destinationDatanodeDatanodeStateMachine.getContainer();
-
-    Container container =
-        ozoneContainer
-            .getContainerSet().getContainer(containerId);
-
-    Assert.assertNotNull(
-        "Container is not replicated to the destination datanode",
-        container);
-
-    Assert.assertNotNull(
-        "ContainerData of the replicated container is null",
-        container.getContainerData());
-
-    KeyValueHandler handler = (KeyValueHandler) ozoneContainer.getDispatcher()
-        .getHandler(ContainerType.KeyValueContainer);
-
-    BlockData key = handler.getBlockManager()
-        .getBlock(container, BlockID.getFromProtobuf(blockID));
-
-    Assert.assertNotNull(key);
-    Assert.assertEquals(1, key.getChunks().size());
-    Assert.assertEquals(requestProto.getWriteChunk().getChunkData(),
-        key.getChunks().get(0));
+  @BeforeAll
+  static void setUp() {
+    setLogLevel(SCMContainerPlacementCapacity.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRackAware.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
   }
 
-  private HddsDatanodeService chooseDatanodeWithoutContainer(Pipeline pipeline,
-      List<HddsDatanodeService> dataNodes) {
-    for (HddsDatanodeService datanode : dataNodes) {
-      if (!pipeline.getNodes().contains(datanode.getDatanodeDetails())) {
-        return datanode;
+  @ParameterizedTest
+  @MethodSource("containerReplicationArguments")
+  void testContainerReplication(
+      String placementPolicyClass, boolean legacyEnabled) throws Exception {
+
+    OzoneConfiguration conf = createConfiguration(legacyEnabled);
+    conf.set(OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, placementPolicyClass);
+    try (MiniOzoneCluster cluster = newCluster(conf)) {
+      cluster.waitForClusterToBeReady();
+      try (OzoneClient client = cluster.newClient()) {
+        createTestData(client);
+
+        List<OmKeyLocationInfo> keyLocations = lookupKey(cluster);
+        assertFalse(keyLocations.isEmpty());
+
+        OmKeyLocationInfo keyLocation = keyLocations.get(0);
+        long containerID = keyLocation.getContainerID();
+        waitForContainerClose(cluster, containerID);
+
+        cluster.shutdownHddsDatanode(keyLocation.getPipeline().getFirstNode());
+        waitForReplicaCount(containerID, 2, cluster);
+
+        waitForReplicaCount(containerID, 3, cluster);
       }
     }
-    throw new AssertionError(
-        "No datanode outside of the pipeline");
   }
 
-  private static OzoneConfiguration newOzoneConfiguration() {
-    return new OzoneConfiguration();
+  private static MiniOzoneCluster newCluster(OzoneConfiguration conf)
+      throws IOException {
+    return MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
+        .build();
+  }
+
+  private static OzoneConfiguration createConfiguration(boolean enableLegacy) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
+
+    ReplicationManagerConfiguration repConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    repConf.setEnableLegacy(enableLegacy);
+    repConf.setInterval(Duration.ofSeconds(1));
+    repConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
+    conf.setFromObject(repConf);
+
+    return conf;
+  }
+
+  // TODO use common helper to create test data
+  private void createTestData(OzoneClient client) throws IOException {
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(VOLUME);
+    OzoneVolume volume = objectStore.getVolume(VOLUME);
+    volume.createBucket(BUCKET);
+
+    OzoneBucket bucket = volume.getBucket(BUCKET);
+
+    try (OutputStream out = bucket.createKey(KEY, 0,
+        RatisReplicationConfig.getInstance(THREE), emptyMap())) {
+      out.write("Hello".getBytes(UTF_8));
+    }
+  }
+
+  private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster cluster)
+      throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME)
+        .setBucketName(BUCKET)
+        .setKeyName(KEY)
+        .build();
+    OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+    OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
+    assertNotNull(locations);
+    return locations.getLocationList();
   }
 
 }

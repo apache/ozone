@@ -4,7 +4,7 @@ summary: Datanodes can be part of multiple independent RAFT groups / pipelines
 date: 2019-05-21
 jira: HDDS-1564
 status: implemented
-author:  
+author: Li Cheng, Sammi Chen
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");

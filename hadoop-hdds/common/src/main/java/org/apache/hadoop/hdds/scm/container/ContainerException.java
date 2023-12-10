@@ -17,20 +17,21 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.IOException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 
 /**
  * Signals that ContainerException of some sort has occurred. This is parent
  * of all the exceptions thrown by ContainerManager.
  */
-public class ContainerException extends IOException {
+public class ContainerException extends SCMException {
 
   /**
    * Constructs an {@code ContainerException} with {@code null}
    * as its error detail message.
+   * @param resultCode ResultCode for the exception
    */
-  public ContainerException() {
-    super();
+  public ContainerException(ResultCodes resultCode) {
+    super(resultCode);
   }
 
   /**
@@ -39,8 +40,9 @@ public class ContainerException extends IOException {
    * @param message
    *        The detail message (which is saved for later retrieval
    *        by the {@link #getMessage()} method)
+   * @param resultCode ResultCode for the exception
    */
-  public ContainerException(String message) {
-    super(message);
+  public ContainerException(String message, ResultCodes resultCode) {
+    super(message, resultCode);
   }
 }

@@ -1,7 +1,10 @@
 ---
 title: "Java API"
 date: "2017-09-14"
-weight: 1
+weight: 5
+menu:
+   main:
+      parent: "Client Interfaces"
 summary: Ozone has a set of Native RPC based APIs. This is the lowest level API's on which all other protocols are built. This is the most performant and feature-full of all Ozone protocols.
 ---
 <!---

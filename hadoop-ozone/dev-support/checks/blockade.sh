@@ -17,7 +17,7 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-OZONE_VERSION=$(grep "<ozone.version>" "$DIR/../../pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
+OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout)
 cd "$DIR/../../dist/target/ozone-$OZONE_VERSION/tests" || exit 1
 
 source ${DIR}/../../dist/target/ozone-${OZONE_VERSION}/compose/ozoneblockade/.env

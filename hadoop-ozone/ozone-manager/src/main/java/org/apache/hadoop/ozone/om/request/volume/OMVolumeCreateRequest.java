@@ -19,16 +19,19 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,10 +53,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .VolumeInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.util.Time;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 
@@ -74,11 +75,16 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     // Verify resource name
-    OmUtils.validateVolumeName(volumeInfo.getVolume());
+    OmUtils.validateVolumeName(volumeInfo.getVolume(),
+        ozoneManager.isStrictS3());
 
-    // Set creation time
+    // Set creation time & set modification time
+    long initialTime = Time.now();
     VolumeInfo updatedVolumeInfo =
-        volumeInfo.toBuilder().setCreationTime(Time.now()).build();
+        volumeInfo.toBuilder()
+            .setCreationTime(initialTime)
+            .setModificationTime(initialTime)
+            .build();
 
     return getOmRequest().toBuilder().setCreateVolumeRequest(
         CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
@@ -110,48 +116,47 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     // Doing this here, so we can do protobuf conversion outside of lock.
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     OmVolumeArgs omVolumeArgs = null;
-    Map<String, String> auditMap = new HashMap<>();
-    Collection<String> ozAdmins = ozoneManager.getOzoneAdmins();
+    Map<String, String> auditMap = null;
     try {
       omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
       omVolumeArgs.setObjectID(
-          OMFileRequest.getObjIDFromTxId(transactionLogIndex));
+          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
 
       auditMap = omVolumeArgs.toAuditMap();
 
-      // check Acl
-      if (ozoneManager.getAclsEnabled() &&
-          !ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-            !ozAdmins.contains(getOmRequest().getUserInfo().getUserName())) {
-        throw new OMException("Only admin users are authorized to create " +
-            "Ozone volumes. User: " +
-            getOmRequest().getUserInfo().getUserName(),
-            OMException.ResultCodes.PERMISSION_DENIED);
+      // check acl
+      if (ozoneManager.getAclsEnabled()) {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
+            null, null);
       }
 
       // acquire lock.
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
-      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
-          owner);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(USER_LOCK, owner));
+      acquiredUserLock = getOmLockDetails().isLockAcquired();
 
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
 
-      OmVolumeArgs dbVolumeArgs =
-          omMetadataManager.getVolumeTable().get(dbVolumeKey);
-
-      UserVolumeInfo volumeList = null;
-      if (dbVolumeArgs == null) {
+      PersistedUserVolumeInfo volumeList = null;
+      if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
+        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+        throw new OMException("Volume already exists",
+            OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+      } else {
         String dbUserKey = omMetadataManager.getUserKey(owner);
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);
         volumeList = addVolumeToOwnerList(volumeList, volume, owner,
@@ -164,23 +169,9 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         omClientResponse = new OMVolumeCreateResponse(omResponse.build(),
             omVolumeArgs, volumeList);
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
-      } else {
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbVolumeArgs, transactionLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, createVolumeRequest);
-          return new OMVolumeCreateResponse(createReplayOMResponse(omResponse));
-        } else {
-          LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
-          throw new OMException("Volume already exists",
-              OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
-        }
       }
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -191,10 +182,15 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
                 transactionLogIndex));
       }
       if (acquiredUserLock) {
-        omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -213,6 +209,11 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       omMetrics.incNumVolumeCreateFails();
     }
     return omClientResponse;
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 }
 

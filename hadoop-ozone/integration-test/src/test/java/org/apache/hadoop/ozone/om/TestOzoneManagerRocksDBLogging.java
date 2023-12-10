@@ -23,14 +23,17 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test RocksDB logging for Ozone Manager.
@@ -38,9 +41,10 @@ import org.junit.rules.Timeout;
 public class TestOzoneManagerRocksDBLogging {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
+  private RocksDBConfiguration dbConf;
 
   @Rule
-  public Timeout timeout = new Timeout(60000);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
 
   private static GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
@@ -48,9 +52,10 @@ public class TestOzoneManagerRocksDBLogging {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    dbConf = conf.getObject(RocksDBConfiguration.class);
     enableRocksDbLogging(false);
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .build();
+        .withoutDatanodes().build();
     cluster.waitForClusterToBeReady();
   }
 
@@ -80,14 +85,15 @@ public class TestOzoneManagerRocksDBLogging {
   }
 
   private void enableRocksDbLogging(boolean b) {
-    conf.setBoolean("hadoop.hdds.db.rocksdb.logging.enabled", b);
+    dbConf.setRocksdbLoggingEnabled(b);
+    conf.setFromObject(dbConf);
   }
 
   private static void waitForRocksDbLog()
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
             .contains("db_impl.cc"),
-        1000, 10000);
+        1000, 30000);
   }
 
 }

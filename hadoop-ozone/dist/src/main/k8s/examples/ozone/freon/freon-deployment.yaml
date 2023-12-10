@@ -40,7 +40,7 @@ spec:
         - freon
         - rk
         - --factor=THREE
-        - --replicationType=RATIS
+        - --replication-type=RATIS
         envFrom:
         - configMapRef:
             name: config

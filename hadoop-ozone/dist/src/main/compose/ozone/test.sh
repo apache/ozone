@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:unsecure
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -26,21 +28,16 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-#Due to the limitation of the current auditparser test, it should be the
-#first test in a clean cluster.
+execute_robot_test scm lib
+execute_robot_test scm ozone-lib
 
-#Disabling for now, audit parser tool during parse getting exception.
-#execute_robot_test om auditparser
+execute_robot_test om auditparser
 
 execute_robot_test scm basic
 
 execute_robot_test scm gdpr
 
-execute_robot_test scm ozonefs/ozonefs.robot
-
 execute_robot_test scm security/ozone-secure-token.robot
-
-execute_robot_test scm s3
 
 execute_robot_test scm recon
 
@@ -48,6 +45,16 @@ execute_robot_test scm om-ratis
 
 execute_robot_test scm freon
 
-stop_docker_env
+execute_robot_test scm cli
+execute_robot_test scm admincli
 
-generate_report
+execute_robot_test scm debug/ozone-debug-lease-recovery.robot
+
+execute_robot_test scm -v USERNAME:httpfs httpfs
+execute_debug_tests
+
+execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
+
+execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
+
+execute_robot_test scm --exclude pre-finalized-snapshot-tests snapshot

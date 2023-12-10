@@ -56,10 +56,6 @@ public class ListVolumeHandler extends Handler {
           + " if list all volumes option is specified.")
   private String userName;
 
-  @Option(names = {"--all", "-a"},
-      description = "List all volumes.")
-  private boolean listAllVolumes;
-
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
     OzoneAddress address = new OzoneAddress(uri);
@@ -72,11 +68,11 @@ public class ListVolumeHandler extends Handler {
       throws IOException {
 
     if (userName == null) {
-      userName = UserGroupInformation.getCurrentUser().getUserName();
+      userName = UserGroupInformation.getCurrentUser().getShortUserName();
     }
 
     Iterator<? extends OzoneVolume> volumeIterator;
-    if (userName != null && !listAllVolumes) {
+    if (userName != null && !listOptions.isAll()) {
       volumeIterator = client.getObjectStore().listVolumesByUser(userName,
           listOptions.getPrefix(), listOptions.getStartItem());
     } else {
@@ -84,15 +80,10 @@ public class ListVolumeHandler extends Handler {
           listOptions.getPrefix(), listOptions.getStartItem());
     }
 
-    int counter = 0;
-    while (listOptions.getLimit() > counter && volumeIterator.hasNext()) {
-      printObjectAsJson(volumeIterator.next());
-      counter++;
-    }
+    int counter = printAsJsonArray(volumeIterator, listOptions.getLimit());
 
     if (isVerbose()) {
-      out().printf("Found : %d volumes for user : %s ", counter,
-          userName);
+      err().printf("Found : %d volumes for user : %s ", counter, userName);
     }
   }
 }

@@ -1,9 +1,9 @@
 ---
 title: Implement new Ozone FileSystem scheme ofs:// 
 summary: A new schema structure for Hadoop compatible file system
-date: 2019-12-05
+date: 2020-06-30
 jira: HDDS-2665
-status: implementing
+status: implemented
 author: Siyao Meng 
 ---
 <!--
@@ -22,12 +22,10 @@ author: Siyao Meng
 
 # Abstract
 
-  Existing scheme: o3fs://bucket.volume/key/../...
+  Scheme: ofs://<Hostname[:Port] or Service ID>/[<volumeName>/<bucketName>/path/to/key]
 
-  Proposed scheme: ofs://omhost/volume/bucket/key/../...
-  
 # Link
 
-Design doc is uploaded to the JIRA:
+Design doc is uploaded to the JIRA HDDS-2665:
 
-https://issues.apache.org/jira/secure/attachment/12987636/Design%20ofs%20v1.pdf
+* https://issues.apache.org/jira/secure/attachment/12987636/Design%20ofs%20v1.pdf

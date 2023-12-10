@@ -26,25 +26,33 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
+import static java.lang.Thread.sleep;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import org.junit.BeforeClass;
-import org.junit.Test;
+
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
@@ -56,20 +64,27 @@ public class TestSCMNodeMetrics {
 
   private static DatanodeDetails registeredDatanode;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
 
     OzoneConfiguration source = new OzoneConfiguration();
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =
         new SCMStorageConfig(NodeType.DATANODE, new File("/tmp"), "storage");
+    HDDSLayoutVersionManager versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
     nodeManager = new SCMNodeManager(source, config, publisher,
-        Mockito.mock(NetworkTopology.class));
+        new NetworkTopologyImpl(source), SCMContext.emptyContext(),
+            versionManager);
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
-        .setUuid(UUID.randomUUID().toString())
+        .setUuid(UUID.randomUUID())
         .build();
 
     nodeManager.register(registeredDatanode, createNodeReport(),
@@ -77,7 +92,7 @@ public class TestSCMNodeMetrics {
 
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() throws IOException {
     nodeManager.close();
   }
@@ -85,18 +100,22 @@ public class TestSCMNodeMetrics {
   /**
    * Verifies heartbeat processing count.
    *
-   * @throws InterruptedException
    */
   @Test
   public void testHBProcessing() throws InterruptedException {
     long hbProcessed = getCounter("NumHBProcessed");
 
-    NodeReportProto nodeReport = createNodeReport();
+    createNodeReport();
 
-    nodeManager.processHeartbeat(registeredDatanode);
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
+    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
 
-    assertEquals("NumHBProcessed", hbProcessed + 1,
-        getCounter("NumHBProcessed"));
+    assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
+        "NumHBProcessed");
   }
 
   /**
@@ -107,11 +126,16 @@ public class TestSCMNodeMetrics {
 
     long hbProcessedFailed = getCounter("NumHBProcessingFailed");
 
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
     nodeManager.processHeartbeat(MockDatanodeDetails
-        .randomDatanodeDetails());
+        .randomDatanodeDetails(), layoutInfo);
 
-    assertEquals("NumHBProcessingFailed", hbProcessedFailed + 1,
-        getCounter("NumHBProcessingFailed"));
+    assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
+        "NumHBProcessingFailed");
   }
 
   /**
@@ -125,15 +149,15 @@ public class TestSCMNodeMetrics {
     long nrProcessed = getCounter("NumNodeReportProcessed");
 
     StorageReportProto storageReport =
-        TestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp", 100,
-            10, 90,
-            null);
+        HddsTestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp",
+            100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
-    Assert.assertEquals("NumNodeReportProcessed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessed"));
+    Assertions.assertEquals(nrProcessed + 1,
+        getCounter("NumNodeReportProcessed"),
+        "NumNodeReportProcessed");
   }
 
   /**
@@ -146,15 +170,15 @@ public class TestSCMNodeMetrics {
     DatanodeDetails randomDatanode =
         MockDatanodeDetails.randomDatanodeDetails();
 
-    StorageReportProto storageReport = TestUtils.createStorageReport(
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         randomDatanode.getUuid(), "/tmp", 100, 10, 90, null);
 
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(randomDatanode, nodeReport);
-    assertEquals("NumNodeReportProcessingFailed", nrProcessed + 1,
-        getCounter("NumNodeReportProcessingFailed"));
+    assertEquals(nrProcessed + 1, getCounter("NumNodeReportProcessingFailed"),
+        "NumNodeReportProcessingFailed");
   }
 
   /**
@@ -164,7 +188,7 @@ public class TestSCMNodeMetrics {
   @Test
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
-    StorageReportProto storageReport = TestUtils.createStorageReport(
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
         registeredDatanode.getUuid(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -173,17 +197,73 @@ public class TestSCMNodeMetrics {
 
     MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
 
-    assertGauge("HealthyNodes", 1, metricsSource);
-    assertGauge("StaleNodes", 0, metricsSource);
-    assertGauge("DeadNodes", 0, metricsSource);
-    assertGauge("DecommissioningNodes", 0, metricsSource);
-    assertGauge("DecommissionedNodes", 0, metricsSource);
-    assertGauge("DiskCapacity", 100L, metricsSource);
-    assertGauge("DiskUsed", 10L, metricsSource);
-    assertGauge("DiskRemaining", 90L, metricsSource);
-    assertGauge("SSDCapacity", 0L, metricsSource);
-    assertGauge("SSDUsed", 0L, metricsSource);
-    assertGauge("SSDRemaining", 0L, metricsSource);
+    assertGauge("InServiceHealthyNodes", 1,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InServiceHealthyReadonlyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InServiceStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InServiceDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissioningHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissioningStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissioningDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("EnteringMaintenanceHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("EnteringMaintenanceStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("EnteringMaintenanceDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InMaintenanceHealthyNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InMaintenanceStaleNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("InMaintenanceDeadNodes", 0,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
+    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
+    sleep(4000);
+    metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
+    assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);
+    assertGauge("InServiceHealthyNodes", 1, metricsSource);
 
   }
 

@@ -19,6 +19,8 @@
 package org.hadoop.ozone.recon.schema;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.jooq.impl.DSL.field;
+import static org.jooq.impl.DSL.name;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -36,11 +38,24 @@ import java.sql.SQLException;
 @Singleton
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
-  public static final String CONTAINER_HISTORY_TABLE_NAME =
-      "CONTAINER_HISTORY";
-  public static final String MISSING_CONTAINERS_TABLE_NAME =
-      "MISSING_CONTAINERS";
+  public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
+      "UNHEALTHY_CONTAINERS";
+
+  /**
+   * ENUM describing the allowed container states which can be stored in the
+   * unhealthy containers table.
+   */
+  public enum UnHealthyContainerStates {
+    MISSING,
+    EMPTY_MISSING,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED,
+    ALL_REPLICAS_UNHEALTHY
+  }
+
   private static final String CONTAINER_ID = "container_id";
+  private static final String CONTAINER_STATE = "container_state";
   private final DataSource dataSource;
   private DSLContext dslContext;
 
@@ -53,37 +68,28 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-    if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_HISTORY_TABLE_NAME)) {
-      createContainerHistoryTable();
+    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      createUnhealthyContainersTable();
     }
-    if (!TABLE_EXISTS_CHECK.test(conn, MISSING_CONTAINERS_TABLE_NAME)) {
-      createMissingContainersTable();
-    }
-  }
-
-  /**
-   * Create the Container History table.
-   */
-  private void createContainerHistoryTable() {
-    dslContext.createTableIfNotExists(CONTAINER_HISTORY_TABLE_NAME)
-        .column(CONTAINER_ID, SQLDataType.BIGINT)
-        .column("datanode_host", SQLDataType.VARCHAR(1024))
-        .column("first_report_timestamp", SQLDataType.BIGINT)
-        .column("last_report_timestamp", SQLDataType.BIGINT)
-        .constraint(DSL.constraint("pk_container_id_datanode_host")
-            .primaryKey(CONTAINER_ID, "datanode_host"))
-        .execute();
   }
 
   /**
    * Create the Missing Containers table.
    */
-  private void createMissingContainersTable() {
-    dslContext.createTableIfNotExists(MISSING_CONTAINERS_TABLE_NAME)
-        .column(CONTAINER_ID, SQLDataType.BIGINT)
-        .column("missing_since", SQLDataType.BIGINT)
+  private void createUnhealthyContainersTable() {
+    dslContext.createTableIfNotExists(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
+        .column(CONTAINER_STATE, SQLDataType.VARCHAR(16).nullable(false))
+        .column("in_state_since", SQLDataType.BIGINT.nullable(false))
+        .column("expected_replica_count", SQLDataType.INTEGER.nullable(false))
+        .column("actual_replica_count", SQLDataType.INTEGER.nullable(false))
+        .column("replica_delta", SQLDataType.INTEGER.nullable(false))
+        .column("reason", SQLDataType.VARCHAR(500).nullable(true))
         .constraint(DSL.constraint("pk_container_id")
-            .primaryKey(CONTAINER_ID))
+            .primaryKey(CONTAINER_ID, CONTAINER_STATE))
+        .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
+            .check(field(name("container_state"))
+                .in(UnHealthyContainerStates.values())))
         .execute();
   }
 

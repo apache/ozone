@@ -19,13 +19,20 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -41,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -65,18 +73,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyRenameRequest.class);
 
-  public OMKeyRenameRequest(OMRequest omRequest) {
-    super(omRequest);
-  }
-
-  /**
-   * Stores the result of request execution for Rename Requests.
-   */
-  private enum Result {
-    SUCCESS,
-    DELETE_FROM_KEY_ONLY,
-    REPLAY,
-    FAILURE,
+  public OMKeyRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -85,15 +83,30 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
 
-    // Set modification time.
-    KeyArgs.Builder newKeyArgs = renameKeyRequest.getKeyArgs().toBuilder()
-            .setModificationTime(Time.now());
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if (checkKeyNameEnabled) {
+      OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
+    }
+
+    KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
+
+    String srcKey = extractSrcKey(renameKeyArgs);
+    String dstKey = extractDstKey(renameKeyRequest);
+
+    // Set modification time & srcKeyName.
+    KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
+        .setModificationTime(Time.now()).setKeyName(srcKey);
 
     return getOmRequest().toBuilder()
-        .setRenameKeyRequest(renameKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).setUserInfo(getUserInfo()).build();
+        .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
+            .setKeyArgs(newKeyArgs))
+        .setUserInfo(getUserIfNotExists(ozoneManager)).build();
 
   }
+
 
   @Override
   @SuppressWarnings("methodlength")
@@ -101,12 +114,13 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
-    OzoneManagerProtocolProtos.KeyArgs renameKeyArgs =
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
         renameKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildAuditMap(keyArgs, renameKeyRequest);
 
-    String volumeName = renameKeyArgs.getVolumeName();
-    String bucketName = renameKeyArgs.getBucketName();
-    String fromKeyName = renameKeyArgs.getKeyName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String fromKeyName = keyArgs.getKeyName();
     String toKeyName = renameKeyRequest.getToKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -114,16 +128,13 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
-    Map<String, String> auditMap =
-        buildAuditMap(renameKeyArgs, renameKeyRequest);
-
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo fromKeyValue = null;
     String toKey = null, fromKey = null;
     Result result = null;
@@ -132,6 +143,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key name is empty",
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
+
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acls to see if user has access to perform delete operation on
       // old key and create operation on new key
       checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
@@ -139,8 +155,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -149,108 +166,65 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           fromKeyName);
       toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-      OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
+      OmKeyInfo toKeyValue =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(toKey);
 
       if (toKeyValue != null) {
-
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, toKeyValue, trxnLogIndex)) {
-
-          // Check if fromKey is still in the DB and created before this
-          // replay.
-          // For example, lets say we have the following sequence of
-          // transactions.
-          //     Trxn 1 : Create Key1
-          //     Trnx 2 : Rename Key1 to Key2 -> Deletes Key1 and Creates Key2
-          // Now if these transactions are replayed:
-          //     Replay Trxn 1 : Creates Key1 again as Key1 does not exist in DB
-          //     Replay Trxn 2 : Key2 is not created as it exists in DB and the
-          //                     request would be deemed a replay. But Key1
-          //                     is still in the DB and needs to be deleted.
-          fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
-          if (fromKeyValue != null) {
-            // Check if this replay transaction was after the fromKey was
-            // created. If so, we have to delete the fromKey.
-            if (ozoneManager.isRatisEnabled() &&
-                trxnLogIndex > fromKeyValue.getUpdateID()) {
-              // Add to cache. Only fromKey should be deleted. ToKey already
-              // exists in DB as this transaction is a replay.
-              result = Result.DELETE_FROM_KEY_ONLY;
-              Table<String, OmKeyInfo> keyTable = omMetadataManager
-                  .getKeyTable();
-              keyTable.addCacheEntry(new CacheKey<>(fromKey),
-                  new CacheValue<>(Optional.absent(), trxnLogIndex));
-
-              omClientResponse = new OMKeyRenameResponse(omResponse
-                  .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-                  fromKeyName, fromKeyValue);
-            }
-          }
-
-          if (result == null) {
-            result = Result.REPLAY;
-            // If toKey exists and fromKey does not, then no further action is
-            // required. Return a dummy OMClientResponse.
-            omClientResponse = new OMKeyRenameResponse(createReplayOMResponse(
-                omResponse));
-          }
-        } else {
-          // This transaction is not a replay. toKeyName should not exist
-          throw new OMException("Key already exists " + toKeyName,
+        throw new OMException("Key already exists " + toKeyName,
               OMException.ResultCodes.KEY_ALREADY_EXISTS);
-        }
-      } else {
-
-        // This transaction is not a replay.
-
-        // fromKeyName should exist
-        fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
-        if (fromKeyValue == null) {
-          // TODO: Add support for renaming open key
-          throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
-        }
-
-        fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-
-        fromKeyValue.setKeyName(toKeyName);
-        //Set modification time
-        fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
-
-        // Add to cache.
-        // fromKey should be deleted, toKey should be added with newly updated
-        // omKeyInfo.
-        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
-
-        keyTable.addCacheEntry(new CacheKey<>(fromKey),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
-
-        keyTable.addCacheEntry(new CacheKey<>(toKey),
-            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
-
-        omClientResponse = new OMKeyRenameResponse(omResponse
-            .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-            fromKeyName, toKeyName, fromKeyValue);
-
-        result = Result.SUCCESS;
       }
-    } catch (IOException ex) {
+
+      // fromKeyName should exist
+      fromKeyValue =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(fromKey);
+      if (fromKeyValue == null) {
+          // TODO: Add support for renaming open key
+        throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
+      }
+
+      fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+
+      fromKeyValue.setKeyName(toKeyName);
+
+      //Set modification time
+      fromKeyValue.setModificationTime(keyArgs.getModificationTime());
+
+      // Add to cache.
+      // fromKey should be deleted, toKey should be added with newly updated
+      // omKeyInfo.
+      Table<String, OmKeyInfo> keyTable =
+          omMetadataManager.getKeyTable(getBucketLayout());
+
+      keyTable.addCacheEntry(new CacheKey<>(fromKey),
+          CacheValue.get(trxnLogIndex));
+
+      keyTable.addCacheEntry(new CacheKey<>(toKey),
+          CacheValue.get(trxnLogIndex, fromKeyValue));
+
+      omClientResponse = new OMKeyRenameResponse(omResponse
+          .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
+          fromKeyName, toKeyName, fromKeyValue, getBucketLayout());
+
+      result = Result.SUCCESS;
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
-    if (result == Result.SUCCESS || result == Result.FAILURE) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
-          exception, getOmRequest().getUserInfo()));
-    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
+        exception, getOmRequest().getUserInfo()));
 
     switch (result) {
     case SUCCESS:
@@ -258,20 +232,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
               " fromKey:{} toKey:{}. ", volumeName, bucketName, fromKeyName,
           toKeyName);
       break;
-    case DELETE_FROM_KEY_ONLY:
-      LOG.debug("Replayed transaction {}: {}. Renamed Key {} already exists. " +
-              "Deleting old key {}.", trxnLogIndex, renameKeyRequest, toKey,
-          fromKey);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          renameKeyRequest);
-      break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
       LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
-              "toKey:{}. Key: {} not found.", volumeName, bucketName,
-          fromKeyName, toKeyName, fromKeyName);
+              "toKey:{}. Exception: {}.", volumeName, bucketName,
+          fromKeyName, toKeyName, exception.getMessage());
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
@@ -287,5 +252,58 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
     auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
     return auditMap;
+  }
+
+
+  /**
+   * Validates rename key requests.
+   * We do not want to allow older clients to rename keys in buckets which use
+   * non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.RenameKey
+  )
+  public static OMRequest blockRenameKeyWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getRenameKeyRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Returns the source key name.
+   *
+   * @param keyArgs
+   * @return source key name
+   * @throws OMException
+   */
+  protected String extractSrcKey(KeyArgs keyArgs) throws OMException {
+    return keyArgs.getKeyName();
+  }
+
+  /**
+   * Returns the destination key name.
+   *
+   * @param renameKeyRequest
+   * @return destination key name
+   * @throws OMException
+   */
+  protected String extractDstKey(RenameKeyRequest renameKeyRequest)
+      throws OMException {
+    return renameKeyRequest.getToKeyName();
   }
 }

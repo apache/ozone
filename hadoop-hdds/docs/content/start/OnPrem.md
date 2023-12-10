@@ -115,6 +115,7 @@ Here is an  example,
 | ozone.scm.client.address       | SCM server name and port     | Used by client-side                                              |
 | ozone.scm.datanode.address     | SCM server name and port     | Used by datanode to talk to SCM                                  |
 | ozone.om.address               | OM server name               | Used by Ozone handler and Ozone file system.                     |
+| hdds.datanode.dir               | file path                | HDDS datanodes store data in this directory.           |
 
 
 ## Startup the cluster
@@ -165,7 +166,7 @@ ozone om --init
 start-ozone.sh
 {{< /highlight >}}
 
-This assumes that you have set up the slaves file correctly and ssh
+This assumes that you have set up the `workers` file correctly and ssh
 configuration that allows ssh-ing to all data nodes. This is the same as the
 HDFS configuration, so please refer to HDFS documentation on how to set this
 up.

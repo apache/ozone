@@ -20,22 +20,41 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.function.BiConsumer;
 
 import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Symmetric Key structure for GDPR.
  */
 public class GDPRSymmetricKey {
+  private static final ThreadLocal<SecureRandom> RANDOM
+      = ThreadLocal.withInitial(SecureRandom::new);
 
-  private SecretKeySpec secretKey;
-  private Cipher cipher;
-  private String algorithm;
-  private String secret;
+  /** @return a new instance with default parameters. */
+  public static GDPRSymmetricKey newDefaultInstance() {
+    try {
+      return new GDPRSymmetricKey(RANDOM.get());
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to create default "
+          + GDPRSymmetricKey.class.getSimpleName(), e);
+    }
+  }
+
+  static String randomSecret(SecureRandom secureRandom) {
+    return RandomStringUtils.random(
+        OzoneConsts.GDPR_DEFAULT_RANDOM_SECRET_LENGTH,
+        0, 0, true, true, null, secureRandom);
+  }
+
+  private final SecretKeySpec secretKey;
+  private final Cipher cipher;
+  private final String algorithm;
+  private final String secret;
 
   public SecretKeySpec getSecretKey() {
     return secretKey;
@@ -46,24 +65,18 @@ public class GDPRSymmetricKey {
   }
 
   /**
-   * Default constructor creates key with default values.
-   * @throws Exception
+   * Construct a key with default algorithm and a random secret.
    */
-  public GDPRSymmetricKey(SecureRandom secureRandom) throws Exception {
-    algorithm = OzoneConsts.GDPR_ALGORITHM_NAME;
-    secret = RandomStringUtils.random(
-        OzoneConsts.GDPR_DEFAULT_RANDOM_SECRET_LENGTH,
-        0, 0, true, true, null, secureRandom);
-    this.secretKey = new SecretKeySpec(
-        secret.getBytes(OzoneConsts.GDPR_CHARSET), algorithm);
-    this.cipher = Cipher.getInstance(algorithm);
+  public GDPRSymmetricKey(SecureRandom secureRandom)
+      throws NoSuchPaddingException, NoSuchAlgorithmException {
+    this(randomSecret(secureRandom), OzoneConsts.GDPR_ALGORITHM_NAME);
   }
 
   /**
-   * Overloaded constructor creates key with specified values.
-   * @throws Exception
+   * Construct a key with the given secret and the given algorithm.
    */
-  public GDPRSymmetricKey(String secret, String algorithm) throws Exception {
+  public GDPRSymmetricKey(String secret, String algorithm)
+      throws NoSuchPaddingException, NoSuchAlgorithmException {
     Preconditions.checkNotNull(secret, "Secret cannot be null");
     //TODO: When we add feature to allow users to customize the secret length,
     // we need to update this length check Precondition
@@ -77,11 +90,8 @@ public class GDPRSymmetricKey {
     this.cipher = Cipher.getInstance(algorithm);
   }
 
-  public Map<String, String> getKeyDetails() {
-    Map<String, String> keyDetail = new HashMap<>();
-    keyDetail.put(OzoneConsts.GDPR_SECRET, this.secret);
-    keyDetail.put(OzoneConsts.GDPR_ALGORITHM, this.algorithm);
-    return keyDetail;
+  public void acceptKeyDetails(BiConsumer<String, String> consumer) {
+    consumer.accept(OzoneConsts.GDPR_SECRET, this.secret);
+    consumer.accept(OzoneConsts.GDPR_ALGORITHM, this.algorithm);
   }
-
 }

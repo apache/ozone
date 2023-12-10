@@ -31,6 +31,10 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
 
+import org.junit.Rule;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.IExceptionHandler2;
@@ -42,6 +46,12 @@ import picocli.CommandLine.RunLast;
  * This test class specified for testing Ozone datanode shell command.
  */
 public class TestOzoneDatanodeShell {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneDatanodeShell.class);
@@ -55,7 +65,7 @@ public class TestOzoneDatanodeShell {
    */
   @BeforeClass
   public static void init() {
-    datanode = new TestHddsDatanodeService(false, new String[] {});
+    datanode = new TestHddsDatanodeService(new String[] {});
   }
   
   private void executeDatanode(HddsDatanodeService hdds, String[] args) {
@@ -122,7 +132,7 @@ public class TestOzoneDatanodeShell {
   @Test
   public void testDatanodeInvalidParamCommand() {
     LOG.info("Running testDatanodeIncompleteCommand");
-    String expectedError = "Unknown option: -invalidParam";
+    String expectedError = "Unknown option: '-invalidParam'";
     //executing 'ozone datanode -invalidParam'
     String[] args = new String[]{"-invalidParam"};
 
@@ -130,8 +140,8 @@ public class TestOzoneDatanodeShell {
   }
 
   private static class TestHddsDatanodeService extends HddsDatanodeService {
-    TestHddsDatanodeService(boolean printBanner, String[] args) {
-      super(printBanner, args);
+    TestHddsDatanodeService(String[] args) {
+      super(args);
     }
 
     @Override

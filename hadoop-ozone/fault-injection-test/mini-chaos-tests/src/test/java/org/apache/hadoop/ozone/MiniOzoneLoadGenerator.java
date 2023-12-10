@@ -19,22 +19,25 @@ package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.loadgenerators.DataBuffer;
 import org.apache.hadoop.ozone.loadgenerators.LoadExecutors;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
-import org.apache.hadoop.ozone.utils.LoadBucket;
+import org.apache.hadoop.ozone.loadgenerators.LoadBucket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
  * A Simple Load generator for testing.
  */
-public class MiniOzoneLoadGenerator {
+public final class MiniOzoneLoadGenerator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneLoadGenerator.class);
@@ -45,18 +48,20 @@ public class MiniOzoneLoadGenerator {
   private final OzoneVolume volume;
   private final OzoneConfiguration conf;
   private final String omServiceID;
+  private final BucketArgs bucketArgs;
 
-  MiniOzoneLoadGenerator(OzoneVolume volume, int numThreads,
+  private MiniOzoneLoadGenerator(OzoneVolume volume, int numThreads,
       int numBuffers, OzoneConfiguration conf, String omServiceId,
-      List<Class<? extends LoadGenerator>> loadGenratorClazzes)
-      throws Exception {
+      BucketArgs bucketArgs, Set<Class<? extends LoadGenerator>>
+      loadGeneratorClazzes) throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadGenerators = new ArrayList<>();
     this.volume = volume;
     this.conf = conf;
     this.omServiceID = omServiceId;
+    this.bucketArgs = bucketArgs;
 
-    for(Class<? extends LoadGenerator> clazz : loadGenratorClazzes) {
+    for (Class<? extends LoadGenerator> clazz : loadGeneratorClazzes) {
       addLoads(clazz, buffer);
     }
 
@@ -66,7 +71,8 @@ public class MiniOzoneLoadGenerator {
   private void addLoads(Class<? extends LoadGenerator> clazz,
                         DataBuffer buffer) throws Exception {
     String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    volume.createBucket(bucketName);
+
+    volume.createBucket(bucketName, bucketArgs);
     LoadBucket ozoneBucket = new LoadBucket(volume.getBucket(bucketName),
         conf, omServiceID);
 
@@ -92,12 +98,13 @@ public class MiniOzoneLoadGenerator {
    * Builder to create Ozone load generator.
    */
   public static class Builder {
-    private List<Class<? extends LoadGenerator>> clazzes = new ArrayList<>();
+    private Set<Class<? extends LoadGenerator>> clazzes = new HashSet<>();
     private String omServiceId;
     private OzoneConfiguration conf;
     private int numBuffers;
     private int numThreads;
     private OzoneVolume volume;
+    private BucketArgs bucketArgs;
 
     public Builder addLoadGenerator(Class<? extends LoadGenerator> clazz) {
       clazzes.add(clazz);
@@ -129,9 +136,14 @@ public class MiniOzoneLoadGenerator {
       return this;
     }
 
+    public Builder setBucketArgs(BucketArgs buckArgs) {
+      this.bucketArgs = buckArgs;
+      return this;
+    }
+
     public MiniOzoneLoadGenerator build() throws Exception {
       return new MiniOzoneLoadGenerator(volume, numThreads, numBuffers,
-          conf, omServiceId, clazzes);
+          conf, omServiceId, bucketArgs, clazzes);
     }
   }
 }

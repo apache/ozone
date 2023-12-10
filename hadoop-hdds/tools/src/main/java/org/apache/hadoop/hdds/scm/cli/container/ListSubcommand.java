@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,9 +19,14 @@ package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
@@ -36,7 +41,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * This is the handler that process container list command.
@@ -46,22 +50,33 @@ import picocli.CommandLine.ParentCommand;
     description = "List containers",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ListSubcommand implements Callable<Void> {
+public class ListSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ListSubcommand.class);
 
-  @ParentCommand
-  private ContainerCommands parent;
-
   @Option(names = {"-s", "--start"},
-      description = "Container id to start the iteration", required = false)
-  private long startId = 0;
+      description = "Container id to start the iteration")
+  private long startId;
 
   @Option(names = {"-c", "--count"},
       description = "Maximum number of containers to list",
       defaultValue = "20", showDefaultValue = Visibility.ALWAYS)
-  private int count = 20;
+  private int count;
+
+  @Option(names = {"--state"},
+      description = "Container state(OPEN, CLOSING, QUASI_CLOSED, CLOSED, " +
+          "DELETING, DELETED)")
+  private HddsProtos.LifeCycleState state;
+
+  @Option(names = {"-t", "--type"},
+      description = "Replication Type (RATIS, STAND_ALONE or EC)")
+  private HddsProtos.ReplicationType type;
+
+  @Option(names = {"-r", "--replication", "--factor"},
+      description = "Container replication (ONE, THREE for Ratis, " +
+          "rs-6-3-1024k for EC)")
+  private String replication;
 
   private static final ObjectWriter WRITER;
 
@@ -83,17 +98,24 @@ public class ListSubcommand implements Callable<Void> {
   }
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
+  public void execute(ScmClient scmClient) throws IOException {
+    if (!Strings.isNullOrEmpty(replication) && type == null) {
+      // Set type to RATIS as that is what any command prior to this change
+      // would have expected.
+      type = HddsProtos.ReplicationType.RATIS;
+    }
+    ReplicationConfig repConfig = null;
+    if (!Strings.isNullOrEmpty(replication)) {
+      repConfig = ReplicationConfig.parse(
+          ReplicationType.fromProto(type),
+          replication, new OzoneConfiguration());
+    }
+    List<ContainerInfo> containerList =
+        scmClient.listContainer(startId, count, state, type, repConfig);
 
-      List<ContainerInfo> containerList =
-          scmClient.listContainer(startId, count);
-
-      // Output data list
-      for (ContainerInfo container : containerList) {
-        outputContainerInfo(container);
-      }
-      return null;
+    // Output data list
+    for (ContainerInfo container : containerList) {
+      outputContainerInfo(container);
     }
   }
 }

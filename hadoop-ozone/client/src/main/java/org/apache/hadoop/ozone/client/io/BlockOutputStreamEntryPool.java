@@ -19,139 +19,130 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * This class manages the stream entries list and handles block allocation
- * from OzoneManager.
+ * A BlockOutputStreamEntryPool manages the communication with OM during writing
+ * a Key to Ozone with {@link KeyOutputStream}.
+ * Block allocation, handling of pre-allocated blocks, and managing stream
+ * entries that represent a writing channel towards DataNodes are the main
+ * responsibility of this class.
  */
-public class BlockOutputStreamEntryPool {
+public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
+  /**
+   * List of stream entries that are used to write a block of data.
+   */
   private final List<BlockOutputStreamEntry> streamEntries;
+  private final OzoneClientConfig config;
+  /**
+   * The actual stream entry we are writing into. Note that a stream entry is
+   * allowed to manage more streams, as for example in the EC write case, where
+   * an entry represents an EC block group.
+   */
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
-  private final XceiverClientManager xceiverClientManager;
-  private final int chunkSize;
+  private final XceiverClientFactory xceiverClientFactory;
   private final String requestID;
-  private final int streamBufferSize;
-  private final long streamBufferFlushSize;
-  private final boolean streamBufferFlushDelay;
-  private final long streamBufferMaxSize;
-  private final long watchTimeout;
-  private final long blockSize;
-  private final int bytesPerChecksum;
-  private final ContainerProtos.ChecksumType checksumType;
+  /**
+   * A {@link BufferPool} shared between all
+   * {@link org.apache.hadoop.hdds.scm.storage.BlockOutputStream}s managed by
+   * the entries in the pool.
+   */
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
+  private final ContainerClientMetrics clientMetrics;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
-      HddsProtos.ReplicationType type,
-      int bufferSize, long bufferFlushSize,
-      boolean bufferFlushDelay, long bufferMaxSize,
-      long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
-      int bytesPerChecksum, String uploadID, int partNumber,
+  public BlockOutputStreamEntryPool(
+      OzoneClientConfig config,
+      OzoneManagerProtocol omClient,
+      String requestId, ReplicationConfig replicationConfig,
+      String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
-      XceiverClientManager xceiverClientManager, long openID) {
+      boolean unsafeByteBufferConversion,
+      XceiverClientFactory xceiverClientFactory, long openID,
+      ContainerClientMetrics clientMetrics
+  ) {
+    this.config = config;
+    this.xceiverClientFactory = xceiverClientFactory;
     streamEntries = new ArrayList<>();
     currentStreamIndex = 0;
     this.omClient = omClient;
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
-        .setType(type).setFactor(factor).setDataSize(info.getDataSize())
+        .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber).build();
-    this.xceiverClientManager = xceiverClientManager;
-    this.chunkSize = chunkSize;
     this.requestID = requestId;
-    this.streamBufferSize = bufferSize;
-    this.streamBufferFlushSize = bufferFlushSize;
-    this.streamBufferFlushDelay = bufferFlushDelay;
-    this.streamBufferMaxSize = bufferMaxSize;
-    this.blockSize = size;
-    this.watchTimeout = watchTimeout;
-    this.bytesPerChecksum = bytesPerChecksum;
-    this.checksumType = checksumType;
     this.openID = openID;
-    this.excludeList = new ExcludeList();
+    this.excludeList = createExcludeList();
 
-    Preconditions.checkState(chunkSize > 0);
-    Preconditions.checkState(streamBufferSize > 0);
-    Preconditions.checkState(streamBufferFlushSize > 0);
-    Preconditions.checkState(streamBufferMaxSize > 0);
-    Preconditions.checkState(blockSize > 0);
-    Preconditions.checkState(blockSize >= streamBufferMaxSize);
-    Preconditions.checkState(streamBufferMaxSize % streamBufferFlushSize == 0,
-        "expected max. buffer size (%s) to be a multiple of flush size (%s)",
-        streamBufferMaxSize, streamBufferFlushSize);
-    Preconditions.checkState(streamBufferFlushSize % streamBufferSize == 0,
-        "expected flush size (%s) to be a multiple of buffer size (%s)",
-        streamBufferFlushSize, streamBufferSize);
-    Preconditions.checkState(chunkSize % streamBufferSize == 0,
-        "expected chunk size (%s) to be a multiple of buffer size (%s)",
-        chunkSize, streamBufferSize);
     this.bufferPool =
-        new BufferPool(streamBufferSize,
-            (int) (streamBufferMaxSize / streamBufferSize),
-            xceiverClientManager.byteBufferToByteStringConversion());
+        new BufferPool(config.getStreamBufferSize(),
+            (int) (config.getStreamBufferMaxSize() / config
+                .getStreamBufferSize()),
+            ByteStringConversion
+                .createByteBufferConversion(unsafeByteBufferConversion));
+    this.clientMetrics = clientMetrics;
   }
 
-  /**
-   * A constructor for testing purpose only.
-   *
-   * @see KeyOutputStream#KeyOutputStream()
-   */
-  @VisibleForTesting
-  BlockOutputStreamEntryPool() {
+  ExcludeList createExcludeList() {
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
+  }
+
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
-    xceiverClientManager = null;
-    chunkSize = 0;
+    xceiverClientFactory = null;
+    config =
+        new OzoneConfiguration().getObject(OzoneClientConfig.class);
+    config.setStreamBufferSize(0);
+    config.setStreamBufferMaxSize(0);
+    config.setStreamBufferFlushSize(0);
+    config.setStreamBufferFlushDelay(false);
     requestID = null;
-    streamBufferSize = 0;
-    streamBufferFlushSize = 0;
-    streamBufferFlushDelay = false;
-    streamBufferMaxSize = 0;
+    int chunkSize = 0;
     bufferPool = new BufferPool(chunkSize, 1);
-    watchTimeout = 0;
-    blockSize = 0;
-    this.checksumType = ContainerProtos.ChecksumType.valueOf(
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE_DEFAULT);
-    this.bytesPerChecksum = OzoneConfigKeys
-        .OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT_BYTES; // Default is 1MB
+
     currentStreamIndex = 0;
     openID = -1;
-    excludeList = new ExcludeList();
+    excludeList = createExcludeList();
+    this.clientMetrics = clientMetrics;
   }
 
   /**
@@ -172,50 +163,69 @@ public class BlockOutputStreamEntryPool {
     // server may return any number of blocks, (0 to any)
     // only the blocks allocated in this open session (block createVersion
     // equals to open session version)
-    for (OmKeyLocationInfo subKeyInfo : version.getLocationList()) {
-      if (subKeyInfo.getCreateVersion() == openVersion) {
-        addKeyLocationInfo(subKeyInfo);
-      }
+    for (OmKeyLocationInfo subKeyInfo : version.getLocationList(openVersion)) {
+      addKeyLocationInfo(subKeyInfo);
     }
   }
 
-  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo)
-      throws IOException {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    UserGroupInformation.getCurrentUser().addToken(subKeyInfo.getToken());
-    BlockOutputStreamEntry.Builder builder =
+  /**
+   * Method to create a stream entry instance based on the
+   * {@link OmKeyLocationInfo}.
+   * If implementations require additional data to create the entry, they need
+   * to get that data before starting to create entries.
+   * @param subKeyInfo the {@link OmKeyLocationInfo} object that describes the
+   *                   key to be written.
+   * @return a BlockOutputStreamEntry instance that handles how data is written.
+   */
+  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
+    return
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
             .setKey(keyArgs.getKeyName())
-            .setXceiverClientManager(xceiverClientManager)
+            .setXceiverClientManager(xceiverClientFactory)
             .setPipeline(subKeyInfo.getPipeline())
-            .setRequestId(requestID)
-            .setChunkSize(chunkSize)
+            .setConfig(config)
             .setLength(subKeyInfo.getLength())
-            .setStreamBufferSize(streamBufferSize)
-            .setStreamBufferFlushSize(streamBufferFlushSize)
-            .setStreamBufferFlushDelay(streamBufferFlushDelay)
-            .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setWatchTimeout(watchTimeout)
-            .setbufferPool(bufferPool)
-            .setChecksumType(checksumType)
-            .setBytesPerChecksum(bytesPerChecksum)
-            .setToken(subKeyInfo.getToken());
-    streamEntries.add(builder.build());
+            .setBufferPool(bufferPool)
+            .setToken(subKeyInfo.getToken())
+            .setClientMetrics(clientMetrics)
+            .build();
   }
 
-  public List<OmKeyLocationInfo> getLocationInfoList()  {
-    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (BlockOutputStreamEntry streamEntry : streamEntries) {
-      long length = streamEntry.getCurrentPosition();
+  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    streamEntries.add(createStreamEntry(subKeyInfo));
+  }
 
+  /**
+   * Returns the list of {@link OmKeyLocationInfo} object that describes to OM
+   * where the blocks of the key have been written.
+   * @return the location info list of written blocks.
+   */
+  @VisibleForTesting
+  public List<OmKeyLocationInfo> getLocationInfoList() {
+    List<OmKeyLocationInfo> locationInfoList;
+    List<OmKeyLocationInfo> currBlocksLocationInfoList =
+        getOmKeyLocationInfos(streamEntries);
+    locationInfoList = currBlocksLocationInfoList;
+    return locationInfoList;
+  }
+
+  private List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      List<BlockOutputStreamEntry> streams) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (BlockOutputStreamEntry streamEntry : streams) {
+      long length = streamEntry.getCurrentPosition();
       // Commit only those blocks to OzoneManager which are not empty
       if (length != 0) {
         OmKeyLocationInfo info =
-            new OmKeyLocationInfo.Builder().setBlockID(streamEntry.getBlockID())
-                .setLength(streamEntry.getCurrentPosition()).setOffset(0)
+            new OmKeyLocationInfo.Builder()
+                .setBlockID(streamEntry.getBlockID())
+                .setLength(streamEntry.getCurrentPosition())
+                .setOffset(0)
                 .setToken(streamEntry.getToken())
-                .setPipeline(streamEntry.getPipeline()).build();
+                .setPipeline(streamEntry.getPipeline())
+                .build();
         locationInfoList.add(info);
       }
       if (LOG.isDebugEnabled()) {
@@ -226,6 +236,23 @@ public class BlockOutputStreamEntryPool {
       }
     }
     return locationInfoList;
+  }
+
+  /**
+   * Retrieves the {@link BufferPool} instance shared between managed block
+   * output stream entries.
+   * @return the shared buffer pool.
+   */
+  public BufferPool getBufferPool() {
+    return this.bufferPool;
+  }
+
+  OzoneClientConfig getConfig() {
+    return config;
+  }
+
+  ContainerClientMetrics getClientMetrics() {
+    return clientMetrics;
   }
 
   /**
@@ -255,12 +282,14 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
+  @VisibleForTesting
   List<BlockOutputStreamEntry> getStreamEntries() {
     return streamEntries;
   }
 
-  XceiverClientManager getXceiverClientManager() {
-    return xceiverClientManager;
+  @VisibleForTesting
+  XceiverClientFactory getXceiverClientFactory() {
+    return xceiverClientFactory;
   }
 
   String getKeyName() {
@@ -268,8 +297,8 @@ public class BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    return streamEntries.stream().mapToLong(
-        BlockOutputStreamEntry::getCurrentPosition).sum();
+    return streamEntries.stream()
+        .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
@@ -281,19 +310,29 @@ public class BlockOutputStreamEntryPool {
    */
   private void allocateNewBlock() throws IOException {
     if (!excludeList.isEmpty()) {
-      LOG.info("Allocating block with {}", excludeList);
+      LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
   }
 
-
+  /**
+   * Commits the keys with Ozone Manager(s).
+   * At the end of the write committing the key from client side lets the OM
+   * know that the data has been written and to where. With this info OM can
+   * register the metadata stored in OM and SCM about the key that was written.
+   * @param offset the offset on which the key writer stands at the time of
+   *               finishing data writes. (Has to be equal and checked against
+   *               the actual length written by the stream entries.)
+   * @throws IOException in case there is an I/O problem during communication.
+   */
   void commitKey(long offset) throws IOException {
     if (keyArgs != null) {
       // in test, this could be null
       long length = getKeyLength();
-      Preconditions.checkArgument(offset == length);
+      Preconditions.checkArgument(offset == length,
+          "Expected offset: " + offset + " expected len: " + length);
       keyArgs.setDataSize(length);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not
@@ -310,7 +349,28 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
-  public BlockOutputStreamEntry getCurrentStreamEntry() {
+  void hsyncKey(long offset) throws IOException {
+    if (keyArgs != null) {
+      // in test, this could be null
+      long length = getKeyLength();
+      Preconditions.checkArgument(offset == length,
+              "Expected offset: " + offset + " expected len: " + length);
+      keyArgs.setDataSize(length);
+      keyArgs.setLocationInfoList(getLocationInfoList());
+      // When the key is multipart upload part file upload, we should not
+      // commit the key, as this is not an actual key, this is a just a
+      // partial key of a large file.
+      if (keyArgs.getIsMultipartKey()) {
+        throw new IOException("Hsync is unsupported for multipart keys.");
+      } else {
+        omClient.hsyncKey(keyArgs, openID);
+      }
+    } else {
+      LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
+  }
+
+  BlockOutputStreamEntry getCurrentStreamEntry() {
     if (streamEntries.isEmpty() || streamEntries.size() <= currentStreamIndex) {
       return null;
     } else {
@@ -318,6 +378,12 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
+  /**
+   * Allocates a new block with OM if the current stream is closed, and new
+   * writes are to be handled.
+   * @return the new current open stream to write to
+   * @throws IOException if the block allocation failed.
+   */
   BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
     if (streamEntry != null && streamEntry.isClosed()) {
@@ -363,11 +429,19 @@ public class BlockOutputStreamEntryPool {
     return excludeList;
   }
 
-  public long getStreamBufferMaxSize() {
-    return streamBufferMaxSize;
-  }
-
   boolean isEmpty() {
     return streamEntries.isEmpty();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    if (keyArgs != null) {
+      return this.keyArgs.getMetadata();
+    }
+    return null;
+  }
+
+  long getDataSize() {
+    return keyArgs.getDataSize();
   }
 }

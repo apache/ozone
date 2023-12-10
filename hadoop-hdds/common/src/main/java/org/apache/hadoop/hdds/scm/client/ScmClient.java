@@ -17,17 +17,28 @@
  */
 package org.apache.hadoop.hdds.scm.client;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The interface to call into underlying container layer.
@@ -64,6 +75,16 @@ public interface ScmClient extends Closeable {
    */
   ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException;
+
+  /**
+   * Gets the list of ReplicaInfo known by SCM for a given container.
+   * @param containerId - The Container ID
+   * @return List of ContainerReplicaInfo for the container or an empty list
+   *         if none.
+   * @throws IOException
+   */
+  List<ContainerReplicaInfo> getContainerReplicas(
+      long containerId) throws IOException;
 
   /**
    * Close a container.
@@ -104,6 +125,22 @@ public interface ScmClient extends Closeable {
       int count) throws IOException;
 
   /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container of this state will be returned.
+   * @param replicationConfig container replication Config.
+   * @return a list of pipeline.
+   * @throws IOException
+   */
+  List<ContainerInfo> listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig)
+      throws IOException;
+
+  /**
    * Read meta data from an existing container.
    * @param containerID - ID of the container.
    * @param pipeline - Pipeline where the container is located.
@@ -142,15 +179,60 @@ public interface ScmClient extends Closeable {
       String owner) throws IOException;
 
   /**
-   * Returns a set of Nodes that meet a query criteria.
-   * @param nodeStatuses - Criteria that we want the node to have.
+   * Returns a set of Nodes that meet a query criteria. Passing null for opState
+   * or nodeState acts like a wild card, returning all nodes in that state.
+   * @param opState - Operational State of the node, eg IN_SERVICE,
+   *                DECOMMISSIONED, etc
+   * @param nodeState - Health of the nodeCriteria that we want the node to
+   *                  have, eg HEALTHY, STALE etc
    * @param queryScope - Query scope - Cluster or pool.
    * @param poolName - if it is pool, a pool name is required.
    * @return A set of nodes that meet the requested criteria.
    * @throws IOException
    */
-  List<HddsProtos.Node> queryNode(HddsProtos.NodeState nodeStatuses,
-      HddsProtos.QueryScope queryScope, String poolName) throws IOException;
+  List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState nodeState, HddsProtos.QueryScope queryScope,
+      String poolName) throws IOException;
+
+  /**
+   * Allows a list of hosts to be decommissioned. The hosts are identified
+   * by their hostname and optionally port in the format foo.com:port.
+   * @param hosts A list of hostnames, optionally with port
+   * @throws IOException
+   * @return A list of DatanodeAdminError for any hosts which failed to
+   *         decommission
+   */
+  List<DatanodeAdminError> decommissionNodes(List<String> hosts)
+      throws IOException;
+
+  /**
+   * Allows a list of hosts in maintenance or decommission states to be placed
+   * back in service. The hosts are identified by their hostname and optionally
+   * port in the format foo.com:port.
+   * @param hosts A list of hostnames, optionally with port
+   * @return A list of DatanodeAdminError for any hosts which failed to
+   *         recommission
+   * @throws IOException
+   */
+  List<DatanodeAdminError> recommissionNodes(List<String> hosts)
+      throws IOException;
+
+  /**
+   * Place the list of datanodes into maintenance mode. If a non-zero endDtm
+   * is passed, the hosts will automatically exit maintenance mode after the
+   * given time has passed. Passing an end time of zero means the hosts will
+   * remain in maintenance indefinitely.
+   * The hosts are identified by their hostname and optionally port in the
+   * format foo.com:port.
+   * @param hosts A list of hostnames, optionally with port
+   * @param endHours The number of hours from now which maintenance will end or
+   *                 zero if maintenance must be manually ended.
+   * @return A list of DatanodeAdminError for any hosts which failed to
+   *         end maintenance.
+   * @throws IOException
+   */
+  List<DatanodeAdminError> startMaintenanceNodes(List<String> hosts,
+      int endHours) throws IOException;
 
   /**
    * Creates a specified replication pipeline.
@@ -211,6 +293,15 @@ public interface ScmClient extends Closeable {
   boolean inSafeMode() throws IOException;
 
   /**
+   * Get the safe mode status of all rules.
+   *
+   * @return map of rule statuses.
+   * @throws IOException
+   */
+  Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+      throws IOException;
+
+  /**
    * Force SCM out of safe mode.
    *
    * @return returns true if operation is successful.
@@ -235,5 +326,111 @@ public interface ScmClient extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
+  /**
+   * Returns the latest container summary report generated by Replication
+   * Manager.
+   * @return The latest ReplicationManagerReport.
+   * @throws IOException
+   */
+  ReplicationManagerReport getReplicationManagerReport() throws IOException;
 
+  /**
+   * Start ContainerBalancer.
+   */
+  StartContainerBalancerResponseProto startContainerBalancer(
+      Optional<Double> threshold,
+      Optional<Integer> iterations,
+      Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
+      Optional<Long> maxSizeToMovePerIterationInGB,
+      Optional<Long> maxSizeEnteringTargetInGB,
+      Optional<Long> maxSizeLeavingSourceInGB) throws IOException;
+
+  /**
+   * Stop ContainerBalancer.
+   */
+  void stopContainerBalancer() throws IOException;
+
+  /**
+   * Returns ContainerBalancer status.
+   *
+   * @return True if ContainerBalancer is running, false otherwise.
+   */
+  boolean getContainerBalancerStatus() throws IOException;
+
+  /**
+   * returns the list of ratis peer roles. Currently only include peer address.
+   */
+  List<String> getScmRatisRoles() throws IOException;
+
+  /**
+   * Force generates new secret keys (rotate).
+   *
+   * @param force boolean flag that forcefully rotates the key on demand
+   * @return
+   * @throws IOException
+   */
+  boolean rotateSecretKeys(boolean force) throws IOException;
+
+  /**
+   * Transfer the raft leadership.
+   *
+   * @param newLeaderId  the newLeaderId of the target expected leader
+   * @throws IOException
+   */
+  void transferLeadership(String newLeaderId) throws IOException;
+
+  /**
+   * Return the failed transactions of the Deleted blocks. A transaction is
+   * considered to be failed if it has been sent more than MAX_RETRY limit
+   * and its count is reset to -1.
+   *
+   * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param startTxId The least transaction id to start with.
+   * @return a list of failed deleted block transactions.
+   * @throws IOException
+   */
+  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException;
+
+  /**
+   * Reset the failed deleted block retry count.
+   * @param txIDs transactionId list to be reset
+   * @throws IOException
+   */
+  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+  /**
+   * Get usage information of datanode by address or uuid.
+   *
+   * @param address datanode address String
+   * @param uuid datanode uuid String
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMused, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(String address,
+                                                               String uuid)
+      throws IOException;
+
+  /**
+   * Get usage information of most or least used datanodes.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @param count Integer number of nodes to get info for
+   * @return List of DatanodeUsageInfoProto. Each element contains info such as
+   * capacity, SCMUsed, and remaining space.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
+      boolean mostUsed, int count) throws IOException;
+
+  StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
+      throws IOException;
+
+  StatusAndMessages queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean force, boolean readonly)
+      throws IOException;
+
+  DecommissionScmResponseProto decommissionScm(
+      String scmId) throws IOException;
 }

@@ -73,7 +73,7 @@ public class LoadExecutors {
 
 
   public void startLoad(long time) throws Exception {
-    LOG.info("Starting {} threads for {} genrators", numThreads,
+    LOG.info("Starting {} threads for {} generators", numThreads,
         generators.size());
     for (LoadGenerator gen : generators) {
       try {

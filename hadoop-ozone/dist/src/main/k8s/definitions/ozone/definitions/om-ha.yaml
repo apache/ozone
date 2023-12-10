@@ -1,0 +1,81 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: ozone/scm-ha
+description: Enable HA for SCM components
+---
+- type: remove
+  trigger:
+    metadata:
+      name: config
+  path:
+    - data
+    - OZONE-SITE.XML_ozone.scm.block.client.address
+- type: remove
+  trigger:
+    metadata:
+      name: config
+  path:
+    - data
+    - OZONE-SITE.XML_ozone.scm.client.address
+- type: remove
+  trigger:
+    metadata:
+      name: config
+  path:
+    - data
+    - OZONE-SITE.XML_ozone.scm.names
+- type: add
+  trigger:
+    metadata:
+      name: config
+  path:
+    - data
+  value:
+    OZONE-SITE.XML_ozone.scm.service.ids: scmservice
+    OZONE-SITE.XML_ozone.scm.nodes.scmservice: scm0,scm1,scm2
+    OZONE-SITE.XML_ozone.scm.address.scmservice.scm0: scm-0.scm.default.svc.cluster.local
+    OZONE-SITE.XML_ozone.scm.address.scmservice.scm1: scm-1.scm.default.svc.cluster.local
+    OZONE-SITE.XML_ozone.scm.address.scmservice.scm2: scm-2.scm.default.svc.cluster.local
+    OZONE-SITE.XML_ozone.scm.ratis.enable: "true"
+    OZONE-SITE.XML_ozone.scm.primordial.node.id: scm0
+- type: add
+  trigger:
+    metadata:
+      name: scm
+  path:
+    - spec
+    - template
+    - spec
+    - initContainers
+  value:
+    - name: bootstrap
+      image: "@docker.image@"
+      args:
+        - ozone
+        - scm
+        - '--bootstrap'
+      envFrom:
+        - configMapRef:
+            name: config
+- type: replace
+  trigger:
+    metadata:
+      name: scm
+    kind: StatefulSet
+  path:
+    - spec
+    - replicas
+  value: 3

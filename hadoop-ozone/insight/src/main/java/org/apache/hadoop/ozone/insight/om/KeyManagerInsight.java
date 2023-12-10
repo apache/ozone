@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.om.KeyManagerImpl;
 public class KeyManagerInsight extends BaseInsightPoint {
 
   @Override
-  public List<MetricGroupDisplay> getMetrics() {
+  public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
     List<MetricGroupDisplay> display = new ArrayList<>();
 
     MetricGroupDisplay state =

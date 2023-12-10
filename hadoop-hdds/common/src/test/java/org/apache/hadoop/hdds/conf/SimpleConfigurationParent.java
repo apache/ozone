@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.conf;
 /**
  * Parent class for the example configuration.
  */
-public class SimpleConfigurationParent {
+public class SimpleConfigurationParent extends ReconfigurableConfig {
 
   @Config(key = "enabled", defaultValue = "true", description = "Example "
       + "boolean config.", tags = ConfigTag.MANAGEMENT)
@@ -28,5 +28,9 @@ public class SimpleConfigurationParent {
 
   public boolean isEnabled() {
     return enabled;
+  }
+
+  public void setEnabled(boolean enabled) {
+    this.enabled = enabled;
   }
 }

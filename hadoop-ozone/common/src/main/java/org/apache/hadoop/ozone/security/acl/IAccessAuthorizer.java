@@ -43,6 +43,13 @@ public interface IAccessAuthorizer {
       throws OMException;
 
   /**
+   * @return true for Ozone-native authorizer
+   */
+  default boolean isNative() {
+    return false;
+  }
+
+  /**
    * ACL rights.
    */
   enum ACLType {
@@ -145,7 +152,6 @@ public interface IAccessAuthorizer {
         throw new IllegalArgumentException("ACL right is not recognized");
       }
     }
-
   }
 
   /**

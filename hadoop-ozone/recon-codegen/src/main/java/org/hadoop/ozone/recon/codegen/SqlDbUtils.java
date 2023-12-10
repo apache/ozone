@@ -37,10 +37,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class SqlDbUtils {
 
-  public final static String DERBY_DRIVER_CLASS =
+  public static final String DERBY_DRIVER_CLASS =
       "org.apache.derby.jdbc.EmbeddedDriver";
-  public final static String SQLITE_DRIVER_CLASS = "org.sqlite.JDBC";
-  public final static String DERBY_DISABLE_LOG_METHOD =
+  public static final String SQLITE_DRIVER_CLASS = "org.sqlite.JDBC";
+  public static final String DERBY_DISABLE_LOG_METHOD =
       SqlDbUtils.class.getName() + ".disableDerbyLogFile";
 
   private static final Logger LOG =
@@ -61,7 +61,7 @@ public final class SqlDbUtils {
     System.setProperty("derby.stream.error.method",
         DERBY_DISABLE_LOG_METHOD);
     Class.forName(DERBY_DRIVER_CLASS);
-    try(Connection connection = DriverManager.getConnection(jdbcUrl
+    try (Connection connection = DriverManager.getConnection(jdbcUrl
         + ";user=" + schemaName
         + ";create=true")) {
       LOG.info("Created derby database at {}.", jdbcUrl);
@@ -72,8 +72,9 @@ public final class SqlDbUtils {
    * Used to suppress embedded derby database logging.
    * @return No-Op output stream.
    */
-  public static OutputStream disableDerbyLogFile(){
+  public static OutputStream disableDerbyLogFile() {
     return new OutputStream() {
+      @Override
       public void write(int b) throws IOException {
         // Ignore all log messages
       }

@@ -19,14 +19,15 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
-import org.apache.hadoop.util.Time;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -40,18 +41,27 @@ import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.PrivateKey;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 
 /**
  * Default Approver used the by the DefaultCA.
  */
 public class DefaultApprover extends BaseApprover {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultApprover.class);
   /**
    * Constructs the Default Approver.
    *
@@ -64,6 +74,7 @@ public class DefaultApprover extends BaseApprover {
 
   /**
    * Sign function signs a Certificate.
+   *
    * @param config - Security Config.
    * @param caPrivate - CAs private Key.
    * @param caCertificate - CA Certificate.
@@ -72,12 +83,14 @@ public class DefaultApprover extends BaseApprover {
    * @param certificationRequest - Certification Request.
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
+   * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
    * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
-  public  X509CertificateHolder sign(
+  @Override
+  public X509CertificateHolder sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509CertificateHolder caCertificate,
@@ -85,7 +98,9 @@ public class DefaultApprover extends BaseApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId) throws IOException, OperatorCreationException {
+      String clusterId,
+      String certSerialId) throws IOException,
+      OperatorCreationException {
 
     AlgorithmIdentifier sigAlgId = new
         DefaultSignatureAlgorithmIdentifierFinder().find(
@@ -104,22 +119,25 @@ public class DefaultApprover extends BaseApprover {
         toASN1Primitive().toString();
     String csrClusterId = x500Name.getRDNs(BCStyle.O)[0].getFirst().getValue().
         toASN1Primitive().toString();
+    String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
+        .toASN1Primitive().toString();
 
-    if (!scmId.equals(csrScmId) || !clusterId.equals(csrClusterId)) {
+    if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&
           csrClusterId.equalsIgnoreCase("null")) {
         // Special case to handle DN certificate generation as DN might not know
         // scmId and clusterId before registration. In secure mode registration
         // will succeed only after datanode has a valid certificate.
-        String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
-            .toASN1Primitive().toString();
-        x500Name = SecurityUtil.getDistinguishedName(cn, scmId, clusterId);
+        csrClusterId = clusterId;
+        csrScmId = scmId;
       } else {
         // Throw exception if scmId and clusterId doesn't match.
         throw new SCMSecurityException("ScmId and ClusterId in CSR subject" +
             " are incorrect.");
       }
     }
+    x500Name = getDistinguishedNameWithSN(cn, csrScmId, csrClusterId,
+        certSerialId);
 
     RSAKeyParameters rsa =
         (RSAKeyParameters) PublicKeyFactory.createKey(keyInfo);
@@ -130,11 +148,26 @@ public class DefaultApprover extends BaseApprover {
     X509v3CertificateBuilder certificateGenerator =
         new X509v3CertificateBuilder(
             caCertificate.getSubject(),
-            // Serial is not sequential but it is monotonically increasing.
-            BigInteger.valueOf(Time.monotonicNowNanos()),
+            new BigInteger(certSerialId),
             validFrom,
             validTill,
             x500Name, keyInfo);
+
+    Extensions exts = getPkcs9Extensions(certificationRequest);
+    LOG.info("Extensions in CSR: {}",
+        Arrays.stream(exts.getExtensionOIDs())
+            .map(ASN1ObjectIdentifier::getId)
+            .collect(Collectors.joining(", ")));
+    LOG.info("Extensions to add to the certificate if they present in CSR: {}",
+        Arrays.stream(getProfile().getSupportedExtensions())
+            .map(oid -> oid == null ? "null" : oid.getId())
+            .collect(Collectors.joining(", ")));
+    for (ASN1ObjectIdentifier extId : getProfile().getSupportedExtensions()) {
+      Extension ext = exts.getExtension(extId);
+      if (ext != null) {
+        certificateGenerator.addExtension(ext);
+      }
+    }
 
     ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
         .build(asymmetricKP);

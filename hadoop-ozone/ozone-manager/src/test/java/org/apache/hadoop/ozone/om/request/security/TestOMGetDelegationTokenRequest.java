@@ -22,7 +22,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import com.google.common.base.Optional;
 import java.util.UUID;
+
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -30,17 +34,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import static org.apache.hadoop.ozone.security.OzoneTokenIdentifier.KIND_NAME;
+
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.io.Text;
 import org.mockito.Mockito;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * The class tests OMGetDelegationTokenRequest.
@@ -55,12 +60,16 @@ public class TestOMGetDelegationTokenRequest extends
   private OMRequest originalRequest;
   private OMRequest modifiedRequest;
   private OMGetDelegationTokenRequest omGetDelegationTokenRequest;
-  final private String checkResponse = "";
+  private static final String CHECK_RESPONSE = "";
 
-  @Before
-  public void setupGetDelegationToken() {
+  @BeforeEach
+  public void setupGetDelegationToken() throws IOException {
     secretManager = Mockito.mock(OzoneDelegationTokenSecretManager.class);
     when(ozoneManager.getDelegationTokenMgr()).thenReturn(secretManager);
+    when(ozoneManager.getAuditLogger()).thenReturn(new AuditLogger(
+        AuditLoggerType.OMLOGGER));
+    when(ozoneManager.getVersionManager()).thenReturn(
+        new OMLayoutVersionManager());
 
     setupToken();
     setupRequest();
@@ -85,10 +94,10 @@ public class TestOMGetDelegationTokenRequest extends
   }
 
   private void verifyUnchangedRequest() {
-    Assert.assertEquals(
+    Assertions.assertEquals(
         originalRequest.getCmdType(),
         modifiedRequest.getCmdType());
-    Assert.assertEquals(
+    Assertions.assertEquals(
         originalRequest.getClientId(),
         modifiedRequest.getClientId());
   }
@@ -132,16 +141,16 @@ public class TestOMGetDelegationTokenRequest extends
         .getTokenRenewInterval();
     long renewInterval = modifiedRequest.getUpdateGetDelegationTokenRequest()
         .getTokenRenewInterval();
-    Assert.assertNotEquals(originalInterval, renewInterval);
-    Assert.assertEquals(tokenRenewInterval, renewInterval);
+    Assertions.assertNotEquals(originalInterval, renewInterval);
+    Assertions.assertEquals(tokenRenewInterval, renewInterval);
 
     /* In preExecute(), if the token is nonNull
      we set GetDelegationTokenResponse with response. */
-    Assert.assertNotEquals(checkResponse,
+    Assertions.assertNotEquals(CHECK_RESPONSE,
         modifiedRequest.getUpdateGetDelegationTokenRequest()
             .getGetDelegationTokenResponse()
             .toString());
-    Assert.assertNotNull(modifiedRequest
+    Assertions.assertNotNull(modifiedRequest
         .getUpdateGetDelegationTokenRequest()
         .getGetDelegationTokenResponse());
   }
@@ -156,7 +165,7 @@ public class TestOMGetDelegationTokenRequest extends
 
     /* In preExecute(), if the token is null
      we do not set GetDelegationTokenResponse with response. */
-    Assert.assertEquals(checkResponse,
+    Assertions.assertEquals(CHECK_RESPONSE,
         modifiedRequest.getUpdateGetDelegationTokenRequest()
             .getGetDelegationTokenResponse()
             .toString());
@@ -179,9 +188,10 @@ public class TestOMGetDelegationTokenRequest extends
 
     Optional<Long> responseRenewTime = Optional.fromNullable(
         omMetadataManager.getDelegationTokenTable().get(identifier));
-    Assert.assertEquals(Optional.of(renewTime), responseRenewTime);
+    Assertions.assertEquals(Optional.of(renewTime), responseRenewTime);
 
-    Assert.assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
+    Assertions.assertEquals(Status.OK, clientResponse.getOMResponse()
+        .getStatus());
   }
 
   @Test
@@ -193,13 +203,14 @@ public class TestOMGetDelegationTokenRequest extends
 
     boolean hasResponse = modifiedRequest.getUpdateGetDelegationTokenRequest()
         .getGetDelegationTokenResponse().hasResponse();
-    Assert.assertFalse(hasResponse);
+    Assertions.assertFalse(hasResponse);
 
     Optional<Long> responseRenewTime = Optional.fromNullable(
         omMetadataManager.getDelegationTokenTable().get(identifier));
-    Assert.assertEquals(Optional.absent(), responseRenewTime);
+    Assertions.assertEquals(Optional.absent(), responseRenewTime);
 
-    Assert.assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
+    Assertions.assertEquals(Status.OK, clientResponse.getOMResponse()
+        .getStatus());
   }
 
   @Test
@@ -213,9 +224,9 @@ public class TestOMGetDelegationTokenRequest extends
 
     boolean hasResponse = modifiedRequest.getUpdateGetDelegationTokenRequest()
         .getGetDelegationTokenResponse().hasResponse();
-    Assert.assertTrue(hasResponse);
+    Assertions.assertTrue(hasResponse);
 
-    Assert.assertNotEquals(Status.OK,
+    Assertions.assertNotEquals(Status.OK,
         clientResponse.getOMResponse().getStatus());
   }
 }

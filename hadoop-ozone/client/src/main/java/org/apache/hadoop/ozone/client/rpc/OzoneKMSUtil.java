@@ -32,9 +32,9 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.Credentials;
@@ -80,7 +80,7 @@ public final class OzoneKMSUtil {
    */
   public static Text getKeyProviderMapKey(URI namespaceUri) {
     return new Text(O3_KMS_PREFIX + namespaceUri.getScheme()
-        +"://" + namespaceUri.getAuthority());
+        + "://" + namespaceUri.getAuthority());
   }
 
   public static String bytes2String(byte[] bytes) {
@@ -124,14 +124,14 @@ public final class OzoneKMSUtil {
     // put back into UGI
     if (keyProviderUri != null && credsKey != null) {
       credentials.addSecretKey(
-          credsKey, DFSUtil.string2Bytes(keyProviderUri.toString()));
+          credsKey, StringUtils.string2Bytes(keyProviderUri.toString()));
     }
 
     return keyProviderUri;
   }
 
   public static KeyProvider getKeyProvider(final ConfigurationSource conf,
-      final URI serverProviderUri) throws IOException{
+      final URI serverProviderUri) throws IOException {
     if (serverProviderUri == null) {
       throw new IOException("KMS serverProviderUri is not configured.");
     }

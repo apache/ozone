@@ -47,7 +47,6 @@ public class DerbyDataSourceProvider implements Provider<DataSource> {
   @Override
   public DataSource get() {
     String jdbcUrl = configuration.getJdbcUrl();
-    LOG.info("JDBC Url for Recon : {} ", jdbcUrl);
     try {
       createNewDerbyDatabase(jdbcUrl, RECON_SCHEMA_NAME);
     } catch (Exception e) {

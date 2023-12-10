@@ -1,8 +1,8 @@
 ---
-title: Concepts
+title: "Architecture"
 date: "2017-10-10"
 menu: main
-weight: 6
+weight: 3
 
 ---
 

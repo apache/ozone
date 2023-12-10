@@ -17,16 +17,17 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -46,16 +47,30 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
+import org.junit.Rule;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
  */
 public class TestMultiBlockWritesWithDnFailures {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -78,29 +93,26 @@ public class TestMultiBlockWritesWithDnFailures {
     conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.
-                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "watch.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
-    conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
-        1, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    conf.setFromObject(ratisServerConfig);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
+    conf.setFromObject(raftClientConfig);
+
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
+    conf.setFromObject(ratisClientConfig);
+
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
@@ -127,6 +139,7 @@ public class TestMultiBlockWritesWithDnFailures {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -140,7 +153,7 @@ public class TestMultiBlockWritesWithDnFailures {
     String data =
         ContainerTestHelper
             .getFixedLengthString(keyString, blockSize + chunkSize);
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
@@ -152,7 +165,7 @@ public class TestMultiBlockWritesWithDnFailures {
     long containerId = locationInfoList.get(1).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
-        .getContainer(ContainerID.valueof(containerId));
+        .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -162,16 +175,18 @@ public class TestMultiBlockWritesWithDnFailures {
 
     // The write will fail but exception will be handled and length will be
     // updated correctly in OzoneManager once the steam is closed
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(2 * data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.concat(data).getBytes());
+    Assert.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
   @Test
@@ -183,7 +198,7 @@ public class TestMultiBlockWritesWithDnFailures {
         createKey(keyName, ReplicationType.RATIS, 6 * blockSize);
     String data = ContainerTestHelper
         .getFixedLengthString(keyString, blockSize + chunkSize);
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
@@ -194,13 +209,12 @@ public class TestMultiBlockWritesWithDnFailures {
 
     // Assert that 6 block will be preallocated
     Assert.assertEquals(6, streamEntryList.size());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
-    BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -209,21 +223,23 @@ public class TestMultiBlockWritesWithDnFailures {
 
     // The write will fail but exception will be handled and length will be
     // updated correctly in OzoneManager once the steam is closed
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
 
     // shutdown the second datanode
     cluster.shutdownHddsDatanode(datanodes.get(1));
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(4 * data.getBytes().length, keyInfo.getDataSize());
+    Assert.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName,
-        data.concat(data).concat(data).concat(data).getBytes());
+        data.concat(data).concat(data).concat(data).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -26,6 +26,7 @@ import javax.sql.DataSource;
 
 import com.google.inject.Singleton;
 
+import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.slf4j.Logger;
@@ -44,11 +45,14 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
       LoggerFactory.getLogger(UtilizationSchemaDefinition.class);
 
   private final DataSource dataSource;
+  private DSLContext dslContext;
 
   public static final String CLUSTER_GROWTH_DAILY_TABLE_NAME =
       "CLUSTER_GROWTH_DAILY";
   public static final String FILE_COUNT_BY_SIZE_TABLE_NAME =
       "FILE_COUNT_BY_SIZE";
+  public static final String CONTAINER_COUNT_BY_SIZE_TABLE_NAME =
+      "CONTAINER_COUNT_BY_SIZE";
 
   @Inject
   UtilizationSchemaDefinition(DataSource dataSource) {
@@ -59,18 +63,22 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   @Transactional
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
+    dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
-      createFileSizeCountTable(conn);
+      createFileSizeCountTable();
     }
     if (!TABLE_EXISTS_CHECK.test(conn, CLUSTER_GROWTH_DAILY_TABLE_NAME)) {
-      createClusterGrowthTable(conn);
+      createClusterGrowthTable();
+    }
+    if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_COUNT_BY_SIZE_TABLE_NAME)) {
+      createContainerSizeCountTable();
     }
   }
 
-  private void createClusterGrowthTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
-        .column("timestamp", SQLDataType.TIMESTAMP)
-        .column("datanode_id", SQLDataType.INTEGER)
+  private void createClusterGrowthTable() {
+    dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
+        .column("timestamp", SQLDataType.TIMESTAMP.nullable(false))
+        .column("datanode_id", SQLDataType.INTEGER.nullable(false))
         .column("datanode_host", SQLDataType.VARCHAR(1024))
         .column("rack_id", SQLDataType.VARCHAR(1024))
         .column("available_size", SQLDataType.BIGINT)
@@ -82,12 +90,32 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  private void createFileSizeCountTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
-        .column("file_size", SQLDataType.BIGINT)
+  private void createFileSizeCountTable() {
+    dslContext.createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
+        .column("volume", SQLDataType.VARCHAR(64).nullable(false))
+        .column("bucket", SQLDataType.VARCHAR(64).nullable(false))
+        .column("file_size", SQLDataType.BIGINT.nullable(false))
         .column("count", SQLDataType.BIGINT)
-        .constraint(DSL.constraint("pk_file_size")
-            .primaryKey("file_size"))
+        .constraint(DSL.constraint("pk_volume_bucket_file_size")
+            .primaryKey("volume", "bucket", "file_size"))
         .execute();
+  }
+
+  private void createContainerSizeCountTable() {
+    dslContext.createTableIfNotExists(CONTAINER_COUNT_BY_SIZE_TABLE_NAME)
+        .column("container_size", SQLDataType.BIGINT.nullable(false))
+        .column("count", SQLDataType.BIGINT)
+        .constraint(DSL.constraint("pk_container_size")
+            .primaryKey("container_size"))
+        .execute();
+  }
+
+  /**
+   * Returns the DSL context.
+   *
+   * @return dslContext
+   */
+  public DSLContext getDSLContext() {
+    return dslContext;
   }
 }

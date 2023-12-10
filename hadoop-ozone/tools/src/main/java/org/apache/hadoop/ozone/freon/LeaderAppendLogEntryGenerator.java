@@ -26,6 +26,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -81,6 +81,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     implements
     Callable<Void> {
@@ -182,7 +183,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     List<DatanodeDetails> datanodes = new ArrayList<>();
 
     datanodes.add(DatanodeDetails.newBuilder()
-        .setUuid(serverId)
+        .setUuid(UUID.fromString(serverId))
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(DatanodeDetails.newPort(Name.RATIS, 9858))
@@ -191,8 +192,8 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.valueOf(UUID.fromString(pipelineId)))
         .setState(PipelineState.OPEN)
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setLeaderId(UUID.fromString(serverId))
         .setNodes(datanodes)
         .build();
@@ -251,18 +252,26 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
         RaftPeerId.getRaftPeerId(serverId);
 
     RaftGroup group = RaftGroup.valueOf(groupId,
-        new RaftPeer(RaftPeerId.valueOf(serverId), serverAddress),
-        new RaftPeer(RaftPeerId.valueOf(FAKE_FOLLOWER_ID1),
-            FAKE_LEADER_ADDDRESS1),
-        new RaftPeer(RaftPeerId.valueOf(FAKE_FOLLOWER_ID1),
-            FAKE_LEADER_ADDDRESS2));
+        RaftPeer.newBuilder()
+            .setId(serverId)
+            .setAddress(serverAddress)
+            .build(),
+        RaftPeer.newBuilder()
+            .setId(RaftPeerId.valueOf(FAKE_FOLLOWER_ID1))
+            .setAddress(FAKE_LEADER_ADDDRESS1)
+            .build(),
+        RaftPeer.newBuilder()
+            .setId(RaftPeerId.valueOf(FAKE_FOLLOWER_ID1))
+            .setAddress(FAKE_LEADER_ADDDRESS2)
+            .build());
     RaftClient client = RaftClient.newBuilder()
         .setClientId(clientId)
-        .setProperties(new RaftProperties(true))
+        .setProperties(new RaftProperties())
         .setRaftGroup(group)
         .build();
 
-    RaftClientReply raftClientReply = client.groupAdd(group, peerId);
+    RaftClientReply raftClientReply = client.getGroupManagementApi(peerId)
+        .add(group);
 
     LOG.info(
         "Group is configured in the RAFT server (with two fake leader leader)"

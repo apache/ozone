@@ -67,32 +67,25 @@ run cp -p "${ROOT}/hadoop-ozone/dist/src/main/license/bin/LICENSE.txt" "LICENSE.
 run cp -pr "${ROOT}/hadoop-ozone/dist/src/main/license/bin/licenses" "licenses"
 run cp -p "${ROOT}/hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/LICENSE" "licenses/LICENSE-ozone-recon.txt"
 run cp -p "${ROOT}/README.md" .
-
-run mkdir -p ./share/hadoop/mapreduce
-run mkdir -p ./share/hadoop/ozone
-run mkdir -p ./share/hadoop/hdds
-run mkdir -p ./share/hadoop/yarn
-run mkdir -p ./share/hadoop/hdfs
-run mkdir -p ./share/hadoop/common
-
-touch ./share/hadoop/mapreduce/.keep
-touch ./share/hadoop/yarn/.keep
-touch ./share/hadoop/hdfs/.keep
-touch ./share/hadoop/common/.keep
-
+run cp -p "${ROOT}/HISTORY.md" .
+run cp -p "${ROOT}/SECURITY.md" .
+run cp -p "${ROOT}/CONTRIBUTING.md" .
 
 run mkdir -p ./share/ozone/web
 run mkdir -p ./bin
 run mkdir -p ./sbin
 run mkdir -p ./etc
 run mkdir -p ./libexec
+run mkdir -p ./log
+run mkdir -p ./temp
 run mkdir -p ./tests
 
 run cp -r "${ROOT}/hadoop-hdds/common/src/main/conf/" "etc/hadoop"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/om-audit-log4j2.properties" "etc/hadoop"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/dn-audit-log4j2.properties" "etc/hadoop"
+run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/dn-container-log4j2.properties" "etc/hadoop"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/scm-audit-log4j2.properties" "etc/hadoop"
-run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/ozone-shell-log4j.properties" "etc/hadoop"
+run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/s3g-audit-log4j2.properties" "etc/hadoop"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/ozone-site.xml" "etc/hadoop"
 run cp -f "${ROOT}/hadoop-ozone/dist/src/shell/conf/log4j.properties" "etc/hadoop"
 run cp "${ROOT}/hadoop-hdds/common/src/main/resources/network-topology-default.xml" "etc/hadoop"
@@ -103,11 +96,10 @@ run cp -r "${ROOT}/hadoop-ozone/dist/src/main/dockerlibexec/." "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone" "bin/"
 
 
-run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-config.sh" "libexec/"
-run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-config.cmd" "libexec/"
-run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-functions.sh" "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone-config.sh" "libexec/"
+run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh" "libexec/"
 run cp -r "${ROOT}/hadoop-ozone/dist/src/shell/shellprofile.d" "libexec/"
+run cp -r "${ROOT}/hadoop-ozone/dist/src/shell/upgrade" "libexec/"
 
 
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-daemons.sh" "sbin/"
@@ -121,6 +113,9 @@ run cp  -r "${ROOT}/hadoop-ozone/fault-injection-test/network-tests/src/test/blo
 # Optional documentation, could be missing
 cp -r "${ROOT}/hadoop-hdds/docs/target/classes/docs" ./
 
+#copy byteman helpers
+run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
+
 #Copy docker compose files
 #compose files are preprocessed: properties (eg. project.version) are replaced first by maven.
 run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
@@ -128,5 +123,9 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/src/main/smoketest" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/k8s" kubernetes
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
+#Copy pre-generated keytabs
+run cp -p -R "${ROOT}/hadoop-ozone/dist/src/main/keytabs" compose/_keytabs
+
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236
 find ./compose -name "*.sh" -exec chmod 755 {} \;
+find ./kubernetes -name "*.sh" -exec chmod 755 {} \;

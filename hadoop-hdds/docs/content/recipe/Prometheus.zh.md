@@ -44,9 +44,9 @@ _注意_: 对于基于 docker-compose 方式的伪集群，在 `docker-config` �
 
 * 重启 OM 和 SCM，检查端点：
 
- * http://scm:9874/prom
+ * http://scm:9876/prom
 
- * http://ozoneManager:9876/prom
+ * http://ozoneManager:9874/prom
 
 * 根据这两个端点，创建 prometheus.yaml 配置文件：
 
@@ -85,9 +85,10 @@ http://localhost:9090/graph?g0.range_input=1h&g0.expr=om_metrics_num_key_allocat
 
 ## 注意事项
 
-Ozone 发行包中包含了一个即开即用的容器化环境来试用 Ozone 和 Prometheus，在 `compose/ozoneperf` 目录下。
+Ozone 发行包中包含了一个即开即用的容器化环境来试用 Ozone 和 Prometheus，在 `compose/ozone` 目录下。
 
 ```bash
-cd compose/ozoneperf
+cd compose/ozone
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml
 docker-compose up -d
 ```

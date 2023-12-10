@@ -20,13 +20,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import javax.ws.rs.core.HttpHeaders;
@@ -37,12 +38,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 
 /**
@@ -51,10 +53,10 @@ import static org.mockito.Mockito.when;
 
 public class TestMultipartUploadComplete {
 
-  private final static ObjectEndpoint REST = new ObjectEndpoint();
-  private final static OzoneClient CLIENT = new OzoneClientStub();
+  private static final ObjectEndpoint REST = new ObjectEndpoint();
+  private static final OzoneClient CLIENT = new OzoneClientStub();
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
 
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
@@ -66,6 +68,7 @@ public class TestMultipartUploadComplete {
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
+    REST.setOzoneConfiguration(new OzoneConfiguration());
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
@@ -85,7 +88,8 @@ public class TestMultipartUploadComplete {
 
   private Part uploadPart(String key, String uploadID, int partNumber, String
       content) throws IOException, OS3Exception {
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
     assertEquals(200, response.getStatus());

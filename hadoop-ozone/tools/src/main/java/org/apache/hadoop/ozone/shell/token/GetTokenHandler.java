@@ -28,6 +28,10 @@ import org.apache.hadoop.ozone.shell.Shell;
 import org.apache.hadoop.security.token.Token;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -45,6 +49,9 @@ public class GetTokenHandler extends Handler {
 
   @CommandLine.Mixin
   private RenewerOption renewer;
+
+  @CommandLine.Mixin
+  private TokenOption tokenFile;
 
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
@@ -66,7 +73,15 @@ public class GetTokenHandler extends Handler {
       err().println("Error: Get delegation token operation failed. " +
           "Check OzoneManager logs for more details.");
     } else {
-      printObjectAsJson(token.encodeToUrlString());
+      out().println("Successfully get token for service " +
+          token.getService());
+      out().println(token.toString());
+      tokenFile.persistToken(token);
     }
+
+    // Set file permission to be readable by only the user who owns the file
+    Path tokenFilePath = Paths.get(tokenFile.getTokenFilePath());
+    Files.setPosixFilePermissions(tokenFilePath,
+        PosixFilePermissions.fromString("rw-------"));
   }
 }

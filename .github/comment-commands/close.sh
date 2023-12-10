@@ -16,14 +16,8 @@
 
 #doc: Close pending pull request temporary
 # shellcheck disable=SC2124
-MESSAGE="Thank you very much for the patch. I am closing this PR __temporarily__ as there was no 
-activity recently and it is waiting for response from its author.
-
-It doesn't mean that this PR is not important or ignored: feel free to reopen the PR at any time.
-
-It only means that attention of committers is not required. We prefer to keep the review queue clean. This ensures PRs in need of review are more visible, which results in faster feedback for all PRs.
-
-If you need ANY help to finish this PR, please [contact the community](https://github.com/apache/hadoop-ozone#contact) on the mailing list or the slack channel."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+MESSAGE=$(cat $SCRIPT_DIR/../closing-message.txt)
 
 set +x #GITHUB_TOKEN
 curl -s -o /dev/null \

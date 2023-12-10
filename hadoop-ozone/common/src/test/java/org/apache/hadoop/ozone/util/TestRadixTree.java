@@ -18,24 +18,26 @@
 
 package org.apache.hadoop.ozone.util;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Ozone Radix tree operations.
  */
 public class TestRadixTree {
 
-  final static RadixTree<Integer> ROOT = new RadixTree<>();
+  static final RadixTree<Integer> ROOT = new RadixTree<>();
 
-  @BeforeClass
+  @BeforeAll
   public static void setupRadixTree() {
     // Test prefix paths with an empty tree
-    assertEquals(true, ROOT.isEmpty());
+    assertTrue(ROOT.isEmpty());
     assertEquals("/", ROOT.getLongestPrefix("/a/b/c"));
     assertEquals("/", RadixTree.radixPathToString(
         ROOT.getLongestPrefixPath("/a/g")));
@@ -80,13 +82,13 @@ public class TestRadixTree {
   public void testGetLongestPrefixPath() {
     List<RadixNode<Integer>> lpp =
         ROOT.getLongestPrefixPath("/a/b/c/d/g/p");
-    RadixNode<Integer> lpn = lpp.get(lpp.size()-1);
+    RadixNode<Integer> lpn = lpp.get(lpp.size() - 1);
     assertEquals("g", lpn.getName());
     lpn.setValue(100);
 
     List<RadixNode<Integer>> lpq =
         ROOT.getLongestPrefixPath("/a/b/c/d/g/q");
-    RadixNode<Integer> lqn = lpp.get(lpq.size()-1);
+    RadixNode<Integer> lqn = lpp.get(lpq.size() - 1);
     System.out.print(RadixTree.radixPathToString(lpq));
     assertEquals(lpn, lqn);
     assertEquals("g", lqn.getName());
@@ -99,7 +101,7 @@ public class TestRadixTree {
 
   @Test
   public void testGetLastNoeInPrefixPath() {
-    assertEquals(null, ROOT.getLastNodeInPrefixPath("/a/g"));
+    assertNull(ROOT.getLastNodeInPrefixPath("/a/g"));
     RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath("/a/b/e/dir1");
     assertEquals("dir1", ln.getName());
   }

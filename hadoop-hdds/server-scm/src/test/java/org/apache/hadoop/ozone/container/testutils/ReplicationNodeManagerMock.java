@@ -17,9 +17,15 @@
 package org.apache.hadoop.ozone.container.testutils;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -41,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,17 +58,17 @@ import java.util.LinkedList;
  * A Node Manager to test replication.
  */
 public class ReplicationNodeManagerMock implements NodeManager {
-  private final Map<DatanodeDetails, NodeState> nodeStateMap;
+  private final Map<DatanodeDetails, NodeStatus> nodeStateMap;
   private final CommandQueue commandQueue;
 
   /**
    * A list of Datanodes and current states.
-   * @param nodeState A node state map.
+   * @param nodeStatus A node state map.
    */
-  public ReplicationNodeManagerMock(Map<DatanodeDetails, NodeState> nodeState,
+  public ReplicationNodeManagerMock(Map<DatanodeDetails, NodeStatus> nodeStatus,
                                     CommandQueue commandQueue) {
-    Preconditions.checkNotNull(nodeState);
-    this.nodeStateMap = nodeState;
+    Preconditions.checkNotNull(nodeStatus);
+    this.nodeStateMap = nodeStatus;
     this.commandQueue = commandQueue;
   }
 
@@ -71,7 +78,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return A state to number of nodes that in this state mapping
    */
   @Override
-  public Map<String, Integer> getNodeCount() {
+  public Map<String, Map<String, Integer>> getNodeCount() {
     return null;
   }
 
@@ -80,25 +87,56 @@ public class ReplicationNodeManagerMock implements NodeManager {
     return null;
   }
 
+  @Override
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
+    return null;
+  }
+
   /**
    * Gets all Live Datanodes that is currently communicating with SCM.
    *
-   * @param nodestate - State of the node
+   * @param nodestatus - State of the node
    * @return List of Datanodes that are Heartbeating SCM.
    */
   @Override
-  public List<DatanodeDetails> getNodes(NodeState nodestate) {
+  public List<DatanodeDetails> getNodes(NodeStatus nodestatus) {
+    return null;
+  }
+
+  /**
+   * Gets all Live Datanodes that is currently communicating with SCM.
+   *
+   * @param opState - Operational state of the node
+   * @param health - Health of the node
+   * @return List of Datanodes that are Heartbeating SCM.
+   */
+  @Override
+  public List<DatanodeDetails> getNodes(
+      HddsProtos.NodeOperationalState opState, NodeState health) {
     return null;
   }
 
   /**
    * Returns the Number of Datanodes that are communicating with SCM.
    *
-   * @param nodestate - State of the node
+   * @param nodestatus - State of the node
    * @return int -- count
    */
   @Override
-  public int getNodeCount(NodeState nodestate) {
+  public int getNodeCount(NodeStatus nodestatus) {
+    return 0;
+  }
+
+  /**
+   * Returns the Number of Datanodes that are communicating with SCM.
+   *
+   * @param opState - Operational state of the node
+   * @param health - Health of the node
+   * @return int -- count
+   */
+  @Override
+  public int getNodeCount(
+      HddsProtos.NodeOperationalState opState, NodeState health) {
     return 0;
   }
 
@@ -133,6 +171,31 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  @Override
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed) {
+    return null;
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
+    return null;
+  }
+
+  /**
    * Return the node stat of the specified datanode.
    *
    * @param dd - datanode details.
@@ -152,8 +215,37 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return Healthy/Stale/Dead.
    */
   @Override
-  public NodeState getNodeState(DatanodeDetails dd) {
+  public NodeStatus getNodeStatus(DatanodeDetails dd) {
     return nodeStateMap.get(dd);
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param dd The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  @Override
+  public void setNodeOperationalState(DatanodeDetails dd,
+      HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+    setNodeOperationalState(dd, newState, 0);
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param dd The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  @Override
+  public void setNodeOperationalState(DatanodeDetails dd,
+      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException {
+    NodeStatus currentStatus = nodeStateMap.get(dd);
+    if (currentStatus != null) {
+      nodeStateMap.put(dd, new NodeStatus(newState, currentStatus.getHealth(),
+          opStateExpiryEpocSec));
+    } else {
+      throw new NodeNotFoundException();
+    }
   }
 
   /**
@@ -198,6 +290,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void addContainer(DatanodeDetails datanodeDetails,
                            ContainerID containerId)
       throws NodeNotFoundException {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 
@@ -259,12 +357,13 @@ public class ReplicationNodeManagerMock implements NodeManager {
    *
    * @param dd DatanodeDetailsProto
    * @param nodeReport NodeReportProto
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(DatanodeDetails dd,
                                     NodeReportProto nodeReport,
-                                    PipelineReportsProto pipelineReportsProto) {
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     return null;
   }
 
@@ -272,17 +371,21 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param dd - Datanode Details.
+   * @param layoutInfo - Layout Version Proto
+   * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails dd) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
+      LayoutVersionProto layoutInfo,
+      CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
 
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return null;
+    return false;
   }
 
   /**
@@ -296,10 +399,10 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * Adds a node to the existing Node manager. This is used only for test
    * purposes.
    * @param id DatanodeDetails
-   * @param state State you want to put that node to.
+   * @param status State you want to put that node to.
    */
-  public void addNode(DatanodeDetails id, NodeState state) {
-    nodeStateMap.put(id, state);
+  public void addNode(DatanodeDetails id, NodeStatus status) {
+    nodeStateMap.put(id, status);
   }
 
   @Override
@@ -307,6 +410,14 @@ public class ReplicationNodeManagerMock implements NodeManager {
     this.commandQueue.addCommand(dnId, command);
   }
 
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
   /**
    * Empty implementation for processNodeReport.
    * @param dnUuid
@@ -316,6 +427,66 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void processNodeReport(DatanodeDetails dnUuid,
                                 NodeReportProto nodeReport) {
     // do nothing.
+  }
+
+  /**
+   * Empty implementation for processLayoutVersionReport.
+   * @param dnUuid
+   * @param layoutVersionReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                LayoutVersionProto layoutVersionReport) {
+    // do nothing.
+  }
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  @Override
+  public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) {
+    return -1;
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
+  }
+
+  /**
+   * Get the total number of pending commands of the given type on the given
+   * datanode. This includes both the number of commands queued in SCM which
+   * will be sent to the datanode on the next heartbeat, and the number of
+   * commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The command Type To query.
+   * @return The number of commands of the given type pending on the datanode.
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public int getTotalDatanodeCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException {
+    return 0;
+  }
+
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
   }
 
   @Override
@@ -342,5 +513,30 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
+  }
+
+  @Override
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
+  public int totalHealthyVolumeCount() {
+    return 0;
+  }
+
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    return 0;
+  }
+
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
+    return 0;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 }

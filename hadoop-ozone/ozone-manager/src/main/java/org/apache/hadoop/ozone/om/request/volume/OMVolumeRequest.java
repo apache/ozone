@@ -18,15 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.slf4j.Logger;
@@ -60,8 +59,9 @@ public abstract class OMVolumeRequest extends OMClientRequest {
    * @return UserVolumeInfo - updated UserVolumeInfo.
    * @throws IOException
    */
-  protected UserVolumeInfo delVolumeFromOwnerList(UserVolumeInfo volumeList,
-      String volume, String owner, long txID) throws IOException {
+  protected PersistedUserVolumeInfo delVolumeFromOwnerList(
+      PersistedUserVolumeInfo volumeList, String volume,
+      String owner, long txID) throws IOException {
 
     List<String> prevVolList = new ArrayList<>();
 
@@ -75,7 +75,7 @@ public abstract class OMVolumeRequest extends OMClientRequest {
 
     // Remove the volume from the list
     prevVolList.remove(volume);
-    UserVolumeInfo newVolList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo newVolList = PersistedUserVolumeInfo.newBuilder()
         .addAllVolumeNames(prevVolList)
             .setObjectID(volumeList.getObjectID())
             .setUpdateID(txID)
@@ -95,9 +95,9 @@ public abstract class OMVolumeRequest extends OMClientRequest {
    * @throws OMException - if user has volumes greater than
    * maxUserVolumeCount, an exception is thrown.
    */
-  protected UserVolumeInfo addVolumeToOwnerList(UserVolumeInfo volumeList,
-      String volume, String owner, long maxUserVolumeCount, long txID)
-      throws IOException {
+  protected static PersistedUserVolumeInfo addVolumeToOwnerList(
+      PersistedUserVolumeInfo volumeList, String volume, String owner,
+      long maxUserVolumeCount, long txID) throws IOException {
 
     // Check the volume count
     if (volumeList != null &&
@@ -114,7 +114,7 @@ public abstract class OMVolumeRequest extends OMClientRequest {
     }
 
     volumeSet.add(volume);
-    return UserVolumeInfo.newBuilder()
+    return PersistedUserVolumeInfo.newBuilder()
         .setObjectID(objectID)
         .setUpdateID(txID)
         .addAllVolumeNames(volumeSet).build();
@@ -131,16 +131,17 @@ public abstract class OMVolumeRequest extends OMClientRequest {
    * @param transactionLogIndex
    * @throws IOException
    */
-  protected void createVolume(final OMMetadataManager omMetadataManager,
-      OmVolumeArgs omVolumeArgs, UserVolumeInfo volumeList, String dbVolumeKey,
+  protected static void createVolume(
+      final OMMetadataManager omMetadataManager, OmVolumeArgs omVolumeArgs,
+      PersistedUserVolumeInfo volumeList, String dbVolumeKey,
       String dbUserKey, long transactionLogIndex) {
     // Update cache: Update user and volume cache.
     omMetadataManager.getUserTable().addCacheEntry(new CacheKey<>(dbUserKey),
-        new CacheValue<>(Optional.of(volumeList), transactionLogIndex));
+        CacheValue.get(transactionLogIndex, volumeList));
 
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(dbVolumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+        CacheValue.get(transactionLogIndex, omVolumeArgs));
   }
 
   /**

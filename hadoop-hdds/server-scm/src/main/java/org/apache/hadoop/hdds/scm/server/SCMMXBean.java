@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.util.Map;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
-
-import java.util.Map;
 
 /**
  *
@@ -43,12 +43,6 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getClientRpcPort();
 
   /**
-   * Get container report info that includes container IO stats of nodes.
-   * @return The datanodeUUid to report json string mapping
-   */
-  Map<String, String> getContainerReport();
-
-  /**
    * Returns safe mode status.
    * @return boolean
    */
@@ -64,4 +58,22 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
    * Returns the container count in all states.
    */
   Map<String, Integer> getContainerStateCount();
+
+  Map<String, String[]> getSafeModeRuleStatus();
+
+  String getScmId();
+
+  String getClusterId();
+
+  String getScmRatisRoles();
+
+  /**
+   * Primordial node is the node on which scm init operation is performed.
+   * @return hostname of primordialNode
+   */
+  String getPrimordialNode();
+
+  String getRatisLogDirectory();
+
+  String getRocksDbDirectory();
 }

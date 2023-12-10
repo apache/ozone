@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.cli;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.ServiceLoader;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.Path;
@@ -26,15 +27,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
 import picocli.CommandLine;
-import picocli.CommandLine.ExecutionException;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.ExitCode;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.RunLast;
 
 /**
  * This is a generic parent class for all the ozone related cli tools.
  */
 public class GenericCli implements Callable<Void>, GenericParentCommand {
+
+  public static final int EXECUTION_ERROR_EXIT_CODE = -1;
 
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
@@ -50,6 +53,29 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public GenericCli() {
     cmd = new CommandLine(this);
+    cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
+      printError(ex);
+      return EXECUTION_ERROR_EXIT_CODE;
+    });
+  }
+
+  public GenericCli(Class<?> type) {
+    this();
+    addSubcommands(getCmd(), type);
+  }
+
+  private void addSubcommands(CommandLine cli, Class<?> type) {
+    ServiceLoader<SubcommandWithParent> registeredSubcommands =
+        ServiceLoader.load(SubcommandWithParent.class);
+    for (SubcommandWithParent subcommand : registeredSubcommands) {
+      if (subcommand.getParentType().equals(type)) {
+        final Command commandAnnotation =
+            subcommand.getClass().getAnnotation(Command.class);
+        CommandLine subcommandCommandLine = new CommandLine(subcommand);
+        addSubcommands(subcommandCommandLine, subcommand.getClass());
+        cli.addSubcommand(commandAnnotation.name(), subcommandCommandLine);
+      }
+    }
   }
 
   /**
@@ -58,21 +84,20 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   public static void missingSubcommand(CommandSpec spec) {
     System.err.println("Incomplete command");
     spec.commandLine().usage(System.err);
-    System.exit(-1);
+    System.exit(EXECUTION_ERROR_EXIT_CODE);
   }
 
   public void run(String[] argv) {
-    try {
-      execute(argv);
-    } catch (ExecutionException ex) {
-      printError(ex.getCause() == null ? ex : ex.getCause());
-      System.exit(-1);
+    int exitCode = execute(argv);
+
+    if (exitCode != ExitCode.OK) {
+      System.exit(exitCode);
     }
   }
 
   @VisibleForTesting
-  public void execute(String[] argv) {
-    cmd.parseWithHandler(new RunLast(), argv);
+  public int execute(String[] argv) {
+    return cmd.execute(argv);
   }
 
   protected void printError(Throwable error) {

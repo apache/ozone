@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,8 +38,9 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR;
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
   protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
-    protected Factory() {}
+    protected Factory() { }
 
+    @Override
     public InnerNodeImpl newInnerNode(String name, String location,
         InnerNode parent, int level, int cost) {
       return new InnerNodeImpl(name, location, parent, level, cost);
@@ -80,6 +82,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * relative level. If level is 1, means node itself. If level is 2, means its
    * direct children, and so on.
    **/
+  @Override
   public int getNumOfNodes(int level) {
     Preconditions.checkArgument(level > 0);
     int count = 0;
@@ -90,7 +93,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     } else {
       for (Node node: childrenMap.values()) {
         if (node instanceof InnerNode) {
-          count += ((InnerNode)node).getNumOfNodes(level -1);
+          count += ((InnerNode)node).getNumOfNodes(level - 1);
         } else {
           throw new RuntimeException("Cannot support Level:" + level +
               " on this node " + this.toString());
@@ -98,6 +101,32 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       }
     }
     return count;
+  }
+
+  /**
+   * @return all nodes at level <i>level</i>. Here level is a relative level.
+   * If level is 1, means node itself. If level is 2, means its direct
+   * children, and so on.
+   **/
+  @Override
+  public List<Node> getNodes(int level) {
+    Preconditions.checkArgument(level > 0);
+    List<Node> result = new ArrayList<>();
+    if (level == 1) {
+      result.add(this);
+    } else if (level == 2) {
+      result.addAll(childrenMap.values());
+    } else {
+      for (Node node: childrenMap.values()) {
+        if (node instanceof InnerNode) {
+          result.addAll(((InnerNode)node).getNodes(level - 1));
+        } else {
+          throw new RuntimeException("Cannot support Level:" + level +
+              " on this node " + this.toString());
+        }
+      }
+    }
+    return result;
   }
 
   /**
@@ -109,7 +138,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       return true;
     }
     Node child = childrenMap.values().iterator().next();
-    return child instanceof InnerNode ? false : true;
+    return !(child instanceof InnerNode);
   }
 
   /**
@@ -126,6 +155,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * @param node node to be added
    * @return true if the node is added, false if is only updated
    */
+  @Override
   public boolean add(Node node) {
     if (!isAncestor(node)) {
       throw new IllegalArgumentException(node.getNetworkName()
@@ -162,6 +192,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * Remove node <i>node</i> from the subtree of this node.
    * @param node node to be deleted
    */
+  @Override
   public void remove(Node node) {
     if (!isAncestor(node)) {
       throw new IllegalArgumentException(node.getNetworkName()
@@ -206,6 +237,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    *
    * @return null if the node is not found
    */
+  @Override
   public Node getNode(String loc) {
     if (loc == null) {
       return null;
@@ -233,7 +265,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     if (child == null) {
       return null;
     }
-    if (path.length == 1){
+    if (path.length == 1) {
       return child;
     }
     if (child instanceof InnerNode) {
@@ -249,6 +281,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * @param leafIndex an indexed leaf of the node
    * @return the leaf node corresponding to the given index.
    */
+  @Override
   public Node getLeaf(int leafIndex) {
     Preconditions.checkArgument(leafIndex >= 0);
     // children are leaves
@@ -259,7 +292,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       }
       return getChildNode(leafIndex);
     } else {
-      for(Node node : childrenMap.values()) {
+      for (Node node : childrenMap.values()) {
         InnerNodeImpl child = (InnerNodeImpl)node;
         int leafCount = child.getNumOfLeaves();
         if (leafIndex < leafCount) {
@@ -314,6 +347,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    *   means picking the 3th available node, which is n5.
    *
    */
+  @Override
   public Node getLeaf(int leafIndex, List<String> excludedScopes,
       Collection<Node> excludedNodes, int ancestorGen) {
     Preconditions.checkArgument(leafIndex >= 0 && ancestorGen >= 0);
@@ -434,13 +468,12 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     if (leafIndex >= getNumOfChildren()) {
       return null;
     }
-    for(Node node : childrenMap.values()) {
+    for (Node node : childrenMap.values()) {
       if (excludedNodes != null && excludedNodes.contains(node)) {
         continue;
       }
       if (excludedScopes != null && excludedScopes.size() > 0) {
-        if (excludedScopes.stream().anyMatch(scope ->
-            node.getNetworkFullPath().startsWith(scope))) {
+        if (excludedScopes.stream().anyMatch(node::isDescendant)) {
           continue;
         }
       }
@@ -485,7 +518,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   private Node getChildNode(int index) {
     Iterator iterator = childrenMap.values().iterator();
     Node node = null;
-    while(index >= 0 && iterator.hasNext()) {
+    while (index >= 0 && iterator.hasNext()) {
       node = (Node)iterator.next();
       index--;
     }

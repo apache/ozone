@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 
 /**
  * A naive implementation of the replication source which creates a tar file
@@ -34,8 +36,6 @@ public class OnDemandContainerReplicationSource
     implements ContainerReplicationSource {
 
   private final ContainerController controller;
-
-  private final TarContainerPacker packer = new TarContainerPacker();
 
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
@@ -48,16 +48,19 @@ public class OnDemandContainerReplicationSource
   }
 
   @Override
-  public void copyData(long containerId, OutputStream destination)
+  public void copyData(long containerId, OutputStream destination,
+                       CopyContainerCompression compression)
       throws IOException {
 
     Container container = controller.getContainer(containerId);
 
-    Preconditions.checkNotNull(
-        container, "Container is not found " + containerId);
+    if (container == null) {
+      throw new StorageContainerException("Container " + containerId +
+          " is not found.", CONTAINER_NOT_FOUND);
+    }
 
     controller.exportContainer(
-        container.getContainerType(), containerId, destination, packer);
-
+        container.getContainerType(), containerId, destination,
+        new TarContainerPacker(compression));
   }
 }

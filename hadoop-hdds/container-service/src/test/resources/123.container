@@ -1,0 +1,10 @@
+!<KeyValueContainerData>
+containerDBType: RocksDB
+containerID: 123
+containerType: KeyValueContainer
+layOutVersion: 2
+maxSize: 1073741824
+metadata: {}
+originNodeId: fc916013-b295-4015-b775-b132a520dc7e
+originPipelineId: bf52d0e3-6418-4713-b0ff-3846243c3541
+state: CLOSED

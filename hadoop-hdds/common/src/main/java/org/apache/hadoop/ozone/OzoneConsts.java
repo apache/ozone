@@ -19,10 +19,15 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
@@ -35,12 +40,17 @@ public final class OzoneConsts {
 
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
+  public static final String SCM_HA = "scmHA";
+  public static final String CLUSTER_ID_PREFIX = "CID-";
+  public static final String SCM_CERT_SERIAL_ID = "scmCertSerialId";
+  public static final String PRIMARY_SCM_NODE_ID = "primaryScmNodeId";
 
   public static final String OZONE_SIMPLE_ROOT_USER = "root";
   public static final String OZONE_SIMPLE_HDFS_USER = "hdfs";
 
   public static final String STORAGE_ID = "storageID";
   public static final String DATANODE_UUID = "datanodeUuid";
+  public static final String DATANODE_LAYOUT_VERSION_DIR = "dnlayoutversion";
   public static final String CLUSTER_ID = "clusterID";
   public static final String LAYOUTVERSION = "layOutVersion";
   public static final String CTIME = "ctime";
@@ -80,15 +90,20 @@ public final class OzoneConsts {
   // OM Http server endpoints
   public static final String OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT =
       "/serviceList";
-  public static final String OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT =
+  public static final String OZONE_DB_CHECKPOINT_HTTP_ENDPOINT =
       "/dbCheckpoint";
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
+  public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
+  public static final String OZONE_O3TRASH_URI_SCHEME = "o3trash";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
+  public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+  public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
+
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META = ".meta";
@@ -102,7 +117,7 @@ public final class OzoneConsts {
 
   public static final String FILE_HASH = "SHA-256";
   public static final String MD5_HASH = "MD5";
-  public final static String CHUNK_OVERWRITE = "OverWriteRequested";
+  public static final String CHUNK_OVERWRITE = "OverWriteRequested";
 
   public static final int CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
   public static final long KB = 1024L;
@@ -115,14 +130,28 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
-  public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
+  public static final String CRL_DB_SUFFIX = "crl.db";
+  public static final String DN_CONTAINER_DB = "-dn-" + CONTAINER_DB_SUFFIX;
+  public static final String DN_CRL_DB = "dn-" + CRL_DB_SUFFIX;
+  public static final String CRL_DB_DIRECTORY_NAME = "crl";
   public static final String OM_DB_NAME = "om.db";
+  public static final String SCM_DB_NAME = "scm.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
+  public static final String SCM_DB_BACKUP_PREFIX = "scm.db.backup.";
+  public static final String CONTAINER_DB_NAME = "container.db";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
-  public static final String S3_VOLUME_NAME = "s3v";
+  public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
+      "includeSnapshotData";
+  public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
+      "toExcludeSST";
+
+  public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
+      "#RANGEROZONESERVICEVERSION";
+
+  public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
 
   /**
    * Supports Bucket Versioning.
@@ -135,29 +164,16 @@ public final class OzoneConsts {
     }
   }
 
+  // Block ID prefixes used in datanode containers.
   public static final String DELETING_KEY_PREFIX = "#deleting#";
-  public static final String DELETED_KEY_PREFIX = "#deleted#";
-  public static final String DELETE_TRANSACTION_KEY_PREFIX = "#delTX#";
-  public static final String BLOCK_COMMIT_SEQUENCE_ID_PREFIX = "#BCSID";
 
+  // Metadata keys for datanode containers.
+  public static final String DELETE_TRANSACTION_KEY = "#delTX";
+  public static final String BLOCK_COMMIT_SEQUENCE_ID = "#BCSID";
   public static final String BLOCK_COUNT = "#BLOCKCOUNT";
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
-
-
-  public static final byte[] DB_BLOCK_COUNT_KEY =
-      DFSUtil.string2Bytes(OzoneConsts.BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
-      DFSUtil.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
-  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
-      DFSUtil.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
-      DFSUtil.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
-  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
-      DFSUtil.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
-
-
 
   /**
    * OM LevelDB prefixes.
@@ -184,10 +200,12 @@ public final class OzoneConsts {
 
   public static final String OM_KEY_PREFIX = "/";
   public static final String OM_USER_PREFIX = "$";
-  public static final String OM_S3_PREFIX ="S3:";
+  public static final String OM_S3_PREFIX = "S3:";
+  public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
   public static final String OM_S3_VOLUME_PREFIX = "s3";
   public static final String OM_S3_SECRET = "S3Secret:";
   public static final String OM_PREFIX = "Prefix:";
+  public static final String OM_TENANT = "Tenant:";
 
   /**
    *   Max chunk size limit.
@@ -196,9 +214,20 @@ public final class OzoneConsts {
 
 
   /**
-   * Max OM Quota size of 1024 PB.
+   * Max OM Quota size of Long.MAX_VALUE.
    */
-  public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
+  public static final long MAX_QUOTA_IN_BYTES = Long.MAX_VALUE;
+
+  /**
+   * Quota RESET default is -1, which means quota is not set.
+   */
+  public static final long QUOTA_RESET = -1;
+  public static final long OLD_QUOTA_DEFAULT = -2;
+
+  /**
+   * Quota Units.
+   */
+  public enum Units { TB, GB, MB, KB, B }
 
   /**
    * Max number of keys returned per list buckets operation.
@@ -217,6 +246,11 @@ public final class OzoneConsts {
 
   public static final int INVALID_PORT = -1;
 
+  /**
+   * Object ID to identify reclaimable uncommitted blocks.
+   */
+  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
+
 
   /**
    * Default SCM Datanode ID file name.
@@ -226,6 +260,8 @@ public final class OzoneConsts {
   // The ServiceListJSONServlet context attribute where OzoneManager
   // instance gets stored.
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
+
+  public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
 
   private OzoneConsts() {
     // Never Constructed
@@ -244,6 +280,21 @@ public final class OzoneConsts {
   public static final String DATA_SCAN_TIMESTAMP = "dataScanTimestamp";
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
+  public static final String SCHEMA_VERSION = "schemaVersion";
+  public static final String REPLICA_INDEX = "replicaIndex";
+
+  // Supported .container datanode schema versions.
+  // Since containers in older schema versions are currently not reformatted to
+  // newer schema versions, a datanode may have containers with a mix of schema
+  // versions, requiring this property to be tracked on a per container basis.
+  // V1: All data in default column family.
+  public static final String SCHEMA_V1 = "1";
+  // V2: Metadata, block data, and delete transactions in their own
+  // column families.
+  public static final String SCHEMA_V2 = "2";
+  // V3: Column families definitions are close to V2,
+  // but have containerID as key prefixes.
+  public static final String SCHEMA_V3 = "3";
 
   // Supported store types.
   public static final String OZONE = "ozone";
@@ -255,7 +306,10 @@ public final class OzoneConsts {
   public static final String KEY = "key";
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
+  public static final String USED_BYTES = "usedBytes";
+  public static final String USED_NAMESPACE = "usedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
+  public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";
@@ -273,14 +327,17 @@ public final class OzoneConsts {
   public static final String ADD_ACLS = "addAcls";
   public static final String REMOVE_ACLS = "removeAcls";
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
+  public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String TO_KEY_NAME = "toKeyName";
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
   public static final String CREATION_TIME = "creationTime";
+  public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";
   public static final String REPLICATION_TYPE = "replicationType";
   public static final String REPLICATION_FACTOR = "replicationFactor";
+  public static final String REPLICATION_CONFIG = "replicationConfig";
   public static final String KEY_LOCATION_INFO = "keyLocationInfo";
   public static final String MULTIPART_LIST = "multipartList";
   public static final String UPLOAD_ID = "uploadID";
@@ -288,11 +345,32 @@ public final class OzoneConsts {
   public static final String MAX_PARTS = "maxParts";
   public static final String S3_BUCKET = "s3Bucket";
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
+  public static final String S3_SETSECRET_USER = "S3SetSecretUser";
+  public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
+  public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
+  public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
   public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
+  public static final String DELETED_KEYS_LIST = "deletedKeysList";
+  public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
+  public static final String SOURCE_VOLUME = "sourceVolume";
+  public static final String SOURCE_BUCKET = "sourceBucket";
+  public static final String BUCKET_LAYOUT = "bucketLayout";
+  public static final String TENANT = "tenant";
+  public static final String USER_PREFIX = "userPrefix";
 
-
+  // For multi-tenancy
+  public static final String TENANT_ID_USERNAME_DELIMITER = "$";
+  public static final String DEFAULT_TENANT_BUCKET_NAMESPACE_POLICY_SUFFIX =
+      "-VolumeAccess";
+  public static final String DEFAULT_TENANT_BUCKET_POLICY_SUFFIX =
+      "-BucketAccess";
+  // Predefined tenant roles
+  // Tenant user role. All tenant users are assigned this role by default
+  public static final String DEFAULT_TENANT_ROLE_USER_SUFFIX = "-UserRole";
+  // Tenant admin role. All tenant admins are assigned this role
+  public static final String DEFAULT_TENANT_ROLE_ADMIN_SUFFIX = "-AdminRole";
 
   // For OM metrics saving to a file
   public static final String OM_METRICS_FILE = "omMetrics";
@@ -300,6 +378,10 @@ public final class OzoneConsts {
 
   // For Multipart upload
   public static final int OM_MULTIPART_MIN_SIZE = 5 * 1024 * 1024;
+
+  // refer to :
+  // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
+  public static final int MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD = 10000;
 
   // GRPC block token metadata header and context key
   public static final String OZONE_BLOCK_TOKEN = "blocktoken";
@@ -315,19 +397,7 @@ public final class OzoneConsts {
 
   // Default OMServiceID for OM Ratis servers to use as RaftGroupId
   public static final String OM_SERVICE_ID_DEFAULT = "omServiceIdDefault";
-
-  // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
-  public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
-
-  // OM Ratis snapshot file to store the last applied index
-  public static final String OM_RATIS_SNAPSHOT_INDEX = "ratisSnapshotIndex";
-
-  public static final String OM_RATIS_SNAPSHOT_TERM = "ratisSnapshotTerm";
-
-  // OM Http request parameter to be used while downloading DB checkpoint
-  // from OM leader to follower
-  public static final String OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT =
-      "snapshotBeforeCheckpoint";
+  public static final String OM_DEFAULT_NODE_ID = "om1";
 
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";
@@ -336,14 +406,211 @@ public final class OzoneConsts {
   public static final int S3_BUCKET_MIN_LENGTH = 3;
   public static final int S3_BUCKET_MAX_LENGTH = 64;
 
+  public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
+
+  public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
+
+  /** Metadata stored in OmKeyInfo. */
+  public static final String HSYNC_CLIENT_ID = "hsyncClientId";
+
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";
   public static final int GDPR_DEFAULT_RANDOM_SECRET_LENGTH = 16;
-  public static final String GDPR_CHARSET = "UTF-8";
+  public static final Charset GDPR_CHARSET = StandardCharsets.UTF_8;
   public static final String GDPR_LENGTH = "length";
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
 
+  /**
+   * Block key name as illegal characters
+   *
+   * This regular expression is used to check if key name
+   * contains illegal characters when creating/renaming key.
+   *
+   * Avoid the following characters in a key name:
+   * "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", Quotation
+   * marks and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
+   */
+  public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
+          Pattern.compile("^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff]+$");
 
+  public static final String FS_FILE_COPYING_TEMP_SUFFIX = "._COPYING_";
+
+  // Transaction Info
+  public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
+  public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
+
+  public static final String PREPARE_MARKER_KEY = "#PREPAREDINFO";
+
+  public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
+
+  // SCM HA
+  public static final String SCM_SERVICE_ID_DEFAULT = "scmServiceIdDefault";
+
+  // SCM Ratis snapshot file to store the last applied index
+  public static final String SCM_RATIS_SNAPSHOT_INDEX = "scmRatisSnapshotIndex";
+
+  public static final String SCM_RATIS_SNAPSHOT_TERM = "scmRatisSnapshotTerm";
+  // An on-disk transient marker file used when replacing DB with checkpoint
+  public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
+
+  // An on-disk marker file used to indicate that the OM is in prepare and
+  // should remain prepared even after a restart.
+  public static final String PREPARE_MARKER = "prepareMarker";
+
+  // TODO : rename this to OZONE_RATIS_SNAPSHOT_DIR and use it in both
+  // SCM and OM
+  public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
+  public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
+
+  public static final long DEFAULT_OM_UPDATE_ID = -1L;
+
+  // RocksDB snapshot
+  public static final String SNAPSHOT_CANDIDATE_DIR = ".candidate";
+  public static final String ROCKSDB_SST_SUFFIX = ".sst";
+
+  // SCM default service Id and node Id in non-HA where config is not defined
+  // in non-HA style.
+  public static final String SCM_DUMMY_NODEID = "scmNodeId";
+  public static final String SCM_DUMMY_SERVICE_ID = "scmServiceId";
+
+  // CRL Sequence Id
+  public static final String CRL_SEQUENCE_ID_KEY = "CRL_SEQUENCE_ID";
+
+  public static final String SCM_CA_PATH = "ca";
+  public static final String SCM_CA_CERT_STORAGE_DIR = "scm";
+  public static final String SCM_SUB_CA_PATH = "sub-ca";
+
+  public static final String SCM_ROOT_CA_COMPONENT_NAME =
+      Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
+
+  // %s to distinguish different certificates
+  public static final String SCM_SUB_CA = "scm-sub";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "@";
+  public static final String SCM_ROOT_CA = "scm";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "@";
+
+  // Layout Version written into Meta Table ONLY during finalization.
+  public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
+  // Key written to Meta Table to indicate a component undergoing finalization.
+  // Currently this is only used on SCM, but may be useful on OM if/when
+  // finalizing one layout feature per Ratis request is implemented in
+  // HDDS-4286.
+  public static final String FINALIZING_KEY = "#FINALIZING";
+
+  // Kerberos constants
+  public static final String KERBEROS_CONFIG_VALUE = "kerberos";
+  public static final String HTTP_AUTH_TYPE_SUFFIX = "http.auth.type";
+  public static final String OZONE_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_SECURITY_ENABLED_SECURE = "true";
+  public static final String OZONE_HTTP_FILTER_INITIALIZERS_SECURE =
+      "org.apache.hadoop.security.AuthenticationFilterInitializer";
+
+  public static final String DELEGATION_TOKEN_KIND = "kind";
+  public static final String DELEGATION_TOKEN_SERVICE = "service";
+  public static final String DELEGATION_TOKEN_RENEWER = "renewer";
+
+  // EC Constants
+  public static final String BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK = "blockGroupLen";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_USER_HTTP_ENDPOINT =
+      "/service/xusers/secure/users";
+
+  // Ideally we should use /addUsersAndGroups endpoint for add user to role,
+  // but it always return 405 somehow.
+  // https://ranger.apache.org/apidocs/resource_RoleREST.html
+  // #resource_RoleREST_addUsersAndGroups_PUT
+  public static final String OZONE_OM_RANGER_ADMIN_ROLE_ADD_USER_HTTP_ENDPOINT =
+      "/service/roles/roles/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_USER_HTTP_ENDPOINT =
+      "/service/xusers/users/?name=";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_USER_HTTP_ENDPOINT =
+      "/service/xusers/secure/users/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_ROLE_HTTP_ENDPOINT =
+      "/service/roles/roles";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_ROLE_HTTP_ENDPOINT =
+      "/service/roles/roles/name/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_GROUP_HTTP_ENDPOINT =
+      "/service/xusers/secure/groups/id/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_ROLE_HTTP_ENDPOINT =
+      "/service/roles/roles/";
+
+  public static final String OZONE_OM_RANGER_ADMIN_CREATE_POLICY_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_POLICY_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy/?policyName=";
+
+  public static final String OZONE_OM_RANGER_ADMIN_GET_POLICY_ID_HTTP_ENDPOINT =
+      "/service/public/v2/api/policy/?policyId=";
+
+  public static final String OZONE_OM_RANGER_ADMIN_DELETE_POLICY_HTTP_ENDPOINT =
+      "/service/plugins/policies/";
+
+  public static final String OZONE_OM_RANGER_OZONE_SERVICE_ENDPOINT =
+      "/service/plugins/services/";
+
+  public static final String OZONE_OM_RANGER_DOWNLOAD_ENDPOINT =
+      "/service/plugins/secure/policies/download/cm_ozone" +
+          "?supportsPolicyDeltas=true&lastKnownVersion=";
+
+  public static final String OZONE_OM_RANGER_ALL_POLICIES_ENDPOINT =
+      "/service/plugins/policies/service/";
+
+  public static final String OZONE_TENANT_RANGER_POLICY_LABEL = "OzoneTenant";
+
+  /**
+   * The time (in ms) that AuthorizerLock try-lock operations would wait (by
+   * default, some can be overridden) before declaring timeout.
+   */
+  public static final long OZONE_TENANT_AUTHORIZER_LOCK_WAIT_MILLIS = 1000L;
+
+  /**
+   * The maximum length of accessId allowed when assigning new users to a
+   * tenant.
+   */
+  public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
+
+  public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_CHECKPOINT_DIR = "db.checkpoints";
+  public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "diffState";
+
+  public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
+  public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
+
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_SST_BACKUP_DIR =
+      "compaction-sst-backup";
+
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_LOG_DIR = "compaction-log";
+
+  /**
+   * DB snapshot info table name. Referenced in RDBStore.
+   */
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
+
+  /**
+   * DB compaction log table name. Referenced in RDBStore.
+   */
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
 }

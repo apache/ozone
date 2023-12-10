@@ -20,40 +20,39 @@
 #
 # Environment Variables
 #
-#   HADOOP_WORKERS    File naming remote hosts.
-#     Default is ${HADOOP_CONF_DIR}/workers.
-#   HADOOP_CONF_DIR  Alternate conf dir. Default is ${HADOOP_HOME}/conf.
-#   HADOOP_WORKER_SLEEP Seconds to sleep between spawning remote commands.
-#   HADOOP_SSH_OPTS Options passed to ssh when running remote commands.
+#   OZONE_WORKERS    File naming remote hosts.
+#     Default is ${OZONE_CONF_DIR}/workers.
+#   OZONE_CONF_DIR  Alternate conf dir. Default is ${OZONE_HOME}/conf.
+#   OZONE_WORKER_SLEEP Seconds to sleep between spawning remote commands.
+#   OZONE_SSH_OPTS Options passed to ssh when running remote commands.
 ##
 
-function hadoop_usage
+function ozone_usage
 {
   echo "Usage: workers.sh [--config confdir] command..."
 }
 
-# let's locate libexec...
-if [[ -n "${HADOOP_HOME}" ]]; then
-  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
-else
-  this="${BASH_SOURCE-$0}"
-  bin=$(cd -P -- "$(dirname -- "${this}")" >/dev/null && pwd -P)
-  HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
-fi
+# load functions
+for dir in "${OZONE_LIBEXEC_DIR}" "${OZONE_HOME}/libexec" "${HADOOP_LIBEXEC_DIR}" "${HADOOP_HOME}/libexec" "${bin}/../libexec"; do
+  if [[ -e "${dir}/ozone-functions.sh" ]]; then
+    . "${dir}/ozone-functions.sh"
+    if declare -F ozone_bootstrap >& /dev/null; then
+      break
+    fi
+  fi
+done
 
-HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
-# shellcheck disable=SC2034
-HADOOP_NEW_CONFIG=true
-if [[ -f "${HADOOP_LIBEXEC_DIR}/hadoop-config.sh" ]]; then
-  . "${HADOOP_LIBEXEC_DIR}/hadoop-config.sh"
-else
-  echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/hadoop-config.sh." 2>&1
+if ! declare -F ozone_bootstrap >& /dev/null; then
+  echo "ERROR: Cannot find ozone-functions.sh." 2>&1
   exit 1
 fi
 
+ozone_bootstrap
+. "${OZONE_LIBEXEC_DIR}/ozone-config.sh"
+
 # if no args specified, show usage
 if [[ $# -le 0 ]]; then
-  hadoop_exit_with_usage 1
+  ozone_exit_with_usage 1
 fi
 
-hadoop_connect_to_hosts "$@"
+ozone_connect_to_hosts "$@"

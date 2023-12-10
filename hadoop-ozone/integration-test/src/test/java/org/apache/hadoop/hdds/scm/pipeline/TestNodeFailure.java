@@ -19,21 +19,22 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Test Node failure detection and handling in Ratis.
@@ -50,17 +51,15 @@ public class TestNodeFailure {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-        DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
-        10, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-        DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
-        10, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(10));
+    ratisServerConfig.setNoLeaderTimeout(Duration.ofMinutes(5));
+    conf.setFromObject(ratisServerConfig);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.set(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, "2s");
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -73,17 +72,17 @@ public class TestNodeFailure {
     final StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
     ratisPipelines = pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+        RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE));
 
-    timeForFailure = (int) conf.getObject(DatanodeRatisServerConfig.class)
+    timeForFailure = (int) ratisServerConfig
         .getFollowerSlownessTimeout();
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -105,7 +104,7 @@ public class TestNodeFailure {
           }
         }, timeForFailure / 2, timeForFailure * 3);
       } catch (Exception e) {
-        Assert.fail("Test Failed: " + e.getMessage());
+        Assertions.fail("Test Failed: " + e.getMessage());
       }
     });
   }

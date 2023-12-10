@@ -23,27 +23,24 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Manager Init.
  */
+@Timeout(300)
 public class TestOmInit {
+
   private static MiniOzoneCluster cluster = null;
   private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
   private static String clusterId;
   private static String scmId;
   private static String omId;
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -52,13 +49,12 @@ public class TestOmInit {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     cluster =  MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -71,7 +67,7 @@ public class TestOmInit {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -89,7 +85,7 @@ public class TestOmInit {
     // Stop the Ozone Manager
     cluster.getOzoneManager().stop();
     // Now try to init the OM again. It should succeed
-    Assert.assertTrue(OzoneManager.omInit(conf));
+    Assertions.assertTrue(OzoneManager.omInit(conf));
   }
 
 }

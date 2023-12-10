@@ -19,27 +19,46 @@ package org.apache.hadoop.hdds.server.http;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.common.TextFormat;
-import org.apache.ratis.server.metrics.RaftLogMetrics;
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.ratis.metrics.dropwizard3.RatisMetricsUtils;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.metrics.SegmentedRaftLogMetrics;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import static org.apache.ratis.server.metrics.SegmentedRaftLogMetrics.RAFT_LOG_SYNC_TIME;
 
 /**
  * Test RatisDropwizardRexporter.
  */
 public class TestRatisDropwizardExports {
+  static Timer findTimer(String name, MetricRegistry registry) {
+    for (Map.Entry<String, Timer> e : registry.getTimers().entrySet()) {
+      if (e.getKey().contains(name)) {
+        return e.getValue();
+      }
+    }
+    throw new IllegalStateException(name + " not found");
+  }
 
   @Test
   public void export() throws IOException {
     //create Ratis metrics
-    RaftLogMetrics instance = new RaftLogMetrics("instance");
-    instance.getRaftLogSyncTimer().update(10, TimeUnit.MILLISECONDS);
+    SegmentedRaftLogMetrics instance = new SegmentedRaftLogMetrics(
+        RaftGroupMemberId.valueOf(
+            RaftPeerId.valueOf("peerId"), RaftGroupId.randomId()));
     MetricRegistry dropWizardMetricRegistry =
-        instance.getRegistry().getDropWizardMetricRegistry();
+        RatisMetricsUtils.getDropWizardMetricRegistry(instance.getRegistry());
+    findTimer(RAFT_LOG_SYNC_TIME, dropWizardMetricRegistry)
+        .update(10, TimeUnit.MILLISECONDS);
 
     //create and register prometheus collector
     RatisDropwizardExports exports =
@@ -52,12 +71,11 @@ public class TestRatisDropwizardExports {
     StringWriter writer = new StringWriter();
     TextFormat.write004(writer, collector.metricFamilySamples());
 
-    System.out.println(writer.toString());
+    System.out.println(writer);
 
-    Assert.assertFalse("Instance name is not moved to be a tag",
-        writer.toString()
-            .contains("ratis_core_ratis_log_worker_instance_syncTime"));
-
+    Assertions.assertFalse(writer.toString()
+            .contains("ratis_core_ratis_log_worker_instance_syncTime"),
+        "Instance name is not moved to be a tag");
   }
 
 }

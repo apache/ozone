@@ -59,6 +59,32 @@ public interface EventExecutor<PAYLOAD> extends AutoCloseable {
   long queuedEvents();
 
   /**
+   * Return the number of events scheduled to be processed.
+   */
+  long scheduledEvents();
+
+  /**
+   * Return the number of dropped events to be processed.
+   */
+  default long droppedEvents() {
+    return 0;
+  }
+
+  /**
+   * Return the number of events having long wait in queue crossing threshold.
+   */
+  default long longWaitInQueueEvents() {
+    return 0;
+  }
+
+  /**
+   * Return the number of events having long execution crossing threshold.
+   */
+  default long longTimeExecutionEvents() {
+    return 0;
+  }
+  
+  /**
    * The human readable name for the event executor.
    * <p>
    * Used in monitoring and logging.

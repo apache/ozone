@@ -19,14 +19,19 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.ArrayList;
@@ -39,9 +44,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatch() throws Exception {
-
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager
+            .getKeyTable(getBucketLayout()).get(ozoneKey);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -50,34 +55,34 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
             .build();
 
-    OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+    OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
+            omResponse);
 
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
-
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assertions.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
     omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assertions.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
+
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
 
     // As default key entry does not have any blocks, it should not be in
     // deletedKeyTable.
-    Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(
-        ozoneKey));
+    Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(
+        deletedKey));
   }
 
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
-
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+    final String ozoneKey = addKeyToTable();
+    final OmKeyInfo omKeyInfo = omMetadataManager
+            .getKeyTable(getBucketLayout())
+            .get(ozoneKey);
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -85,8 +90,8 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
-        .setType(replicationType)
-        .setFactor(replicationFactor)
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(replicationFactor))
         .setNodes(new ArrayList<>())
         .build();
 
@@ -100,11 +105,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
 
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
-
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
             OzoneManagerProtocolProtos.DeleteKeyResponse.getDefaultInstance())
@@ -112,27 +112,33 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
             .build();
 
-    OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+    OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
+            omResponse);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assertions.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
     omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assertions.assertFalse(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
+    
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, deletedKey);
 
     // Key has blocks, it should not be in deletedKeyTable.
-    Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
-        ozoneKey));
+    Assertions.assertTrue(rangeKVs.size() > 0);
   }
 
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -141,25 +147,45 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
             .build();
 
-    OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+    OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
+            omResponse);
 
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
+    String ozoneKey = addKeyToTable();
 
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+    Assertions.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
 
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
-
-    omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omKeyDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse is error it is a no-op. So, entry should be still in the
     // keyTable.
-    Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
+    Assertions.assertTrue(
+        omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
 
+  }
+
+  protected String addKeyToTable() throws Exception {
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+            keyName);
+
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+            clientID, replicationType, replicationFactor, omMetadataManager);
+    return ozoneKey;
+  }
+
+  protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
+      OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
+    return new OMKeyDeleteResponse(omResponse, omKeyInfo, true, omBucketInfo);
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.OBJECT_STORE;
   }
 }

@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Uses DedicatedDiskSpaceUsage for all volumes.  Does not save results since
@@ -40,7 +39,7 @@ public class DedicatedDiskSpaceUsageFactory implements SpaceUsageCheckFactory {
   @Override
   public SpaceUsageCheckFactory setConfiguration(
       ConfigurationSource configuration) {
-    conf = OzoneConfiguration.of(configuration).getObject(Conf.class);
+    conf = configuration.getObject(Conf.class);
     return this;
   }
 
@@ -70,14 +69,10 @@ public class DedicatedDiskSpaceUsageFactory implements SpaceUsageCheckFactory {
         description = "Disk space usage information will be refreshed with the"
             + "specified period following the completion of the last check."
     )
-    private long refreshPeriod;
-
-    public void setRefreshPeriod(long millis) {
-      refreshPeriod = millis;
-    }
+    private Duration refreshPeriod;
 
     public Duration getRefreshPeriod() {
-      return Duration.ofMillis(refreshPeriod);
+      return refreshPeriod;
     }
 
     static String configKeyForRefreshPeriod() {

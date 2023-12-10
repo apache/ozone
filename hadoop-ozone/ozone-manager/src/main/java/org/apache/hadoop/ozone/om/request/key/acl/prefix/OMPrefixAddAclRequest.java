@@ -20,8 +20,12 @@ package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
@@ -86,14 +90,15 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMPrefixAclResponse(createErrorOMResponse(omResponse,
         exception));
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex) {
+  void onComplete(boolean operationResult, Exception exception,
+      OMMetrics omMetrics, Result result, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
@@ -106,14 +111,7 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
         }
       }
       break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
-      }
-      break;
     case FAILURE:
-      omMetrics.incNumBucketUpdateFails();
       LOG.error("Add acl {} to path {} failed!", ozoneAcls,
           ozoneObj.getPath(), exception);
       break;
@@ -121,6 +119,12 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
       LOG.error("Unrecognized Result for OMPrefixAddAclRequest: {}",
           getOmRequest());
     }
+
+    if (ozoneAcls != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
+        exception, getOmRequest().getUserInfo()));
   }
 
   @Override
@@ -129,5 +133,6 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
     return prefixManager.addAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo,
         trxnLogIndex);
   }
+
 }
 

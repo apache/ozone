@@ -18,26 +18,31 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class to test StorageContainerServiceProviderImpl APIs.
@@ -47,14 +52,17 @@ public class TestStorageContainerServiceProviderImpl {
   private Injector injector;
   private HddsProtos.PipelineID pipelineID;
 
-  @Before
-  public void setup() {
+  @BeforeEach
+  void setup(@TempDir File testDir) {
     injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
         try {
           StorageContainerLocationProtocol mockScmClient = mock(
               StorageContainerLocationProtocol.class);
+          ReconUtils reconUtils =  new ReconUtils();
+          OzoneConfiguration conf = new OzoneConfiguration();
+          conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
           pipelineID = PipelineID.randomId().getProtobuf();
           when(mockScmClient.getPipeline(pipelineID))
               .thenReturn(mock(Pipeline.class));
@@ -62,8 +70,11 @@ public class TestStorageContainerServiceProviderImpl {
               .toInstance(mockScmClient);
           bind(StorageContainerServiceProvider.class)
               .to(StorageContainerServiceProviderImpl.class);
+          bind(OzoneConfiguration.class).
+              toInstance(conf);
+          bind(ReconUtils.class).toInstance(reconUtils);
         } catch (Exception e) {
-          Assert.fail();
+          Assertions.fail();
         }
       }
     });

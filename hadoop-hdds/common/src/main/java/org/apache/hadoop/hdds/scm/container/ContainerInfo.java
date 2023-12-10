@@ -17,62 +17,81 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
+import java.time.Clock;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Comparator;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.util.Time;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import static java.lang.Math.max;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Class wraps ozone container info.
  */
-public class ContainerInfo implements Comparator<ContainerInfo>,
-    Comparable<ContainerInfo>, Externalizable {
+public final class ContainerInfo implements Comparable<ContainerInfo> {
+  private static final Comparator<ContainerInfo> COMPARATOR
+      = Comparator.comparingLong(info -> info.getLastUsed().toEpochMilli());
 
-  private static final String SERIALIZATION_ERROR_MSG = "Java serialization not"
-      + " supported. Use protobuf instead.";
+  private static final Codec<ContainerInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(HddsProtos.ContainerInfoProto.getDefaultInstance()),
+      ContainerInfo::fromProtobuf,
+      ContainerInfo::getProtobuf);
 
+  public static Codec<ContainerInfo> getCodec() {
+    return CODEC;
+  }
 
   private HddsProtos.LifeCycleState state;
-  @JsonIgnore
-  private PipelineID pipelineID;
-  private ReplicationFactor replicationFactor;
-  private ReplicationType replicationType;
-  private long usedBytes;
-  private long numberOfKeys;
-  private Instant lastUsed;
   // The wall-clock ms since the epoch at which the current state enters.
   private Instant stateEnterTime;
+  @JsonIgnore
+  private HddsProtos.LifeCycleState previousState;
+  @JsonIgnore
+  private Instant previousStateEnterTime;
+  @JsonIgnore
+  private final PipelineID pipelineID;
+  private final ReplicationConfig replicationConfig;
+  @JsonIgnore
+  private final Clock clock;
+  /*
+  usedBytes is a volatile field. Writes and Reads of volatile long are atomic
+  and each read of a volatile will see the last write to that volatile by any
+  thread. Note that operations such as `usedBytes++` are not atomic, even if
+  usedBytes is volatile.
+  */
+  private volatile long usedBytes;
+  private long numberOfKeys;
+  private Instant lastUsed;
   private String owner;
-  private long containerID;
+  // This is JsonIgnored as originally this class held a long in instead of
+  // a containerID object. By emitting this in Json, it changes the JSON output.
+  // Therefore the method getContainerID is annotated to return the original
+  // field and hence maintain the original output.
+  @JsonIgnore
+  private final ContainerID containerID;
+  // Delete Transaction Id is updated when new transaction for a container
+  // is stored in SCM delete Table.
+  // TODO: Replication Manager should consider deleteTransactionId so that
+  // replica with higher deleteTransactionId is preferred over replica with
+  // lower deleteTransactionId.
   private long deleteTransactionId;
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
 
-  /**
-   * Allows you to maintain private data on ContainerInfo. This is not
-   * serialized via protobuf, just allows us to maintain some private data.
-   */
-  @JsonIgnore
-  private byte[] data;
-
   @SuppressWarnings("parameternumber")
-  ContainerInfo(
+  private ContainerInfo(
       long containerID,
       HddsProtos.LifeCycleState state,
       PipelineID pipelineID,
@@ -82,46 +101,52 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       String owner,
       long deleteTransactionId,
       long sequenceId,
-      ReplicationFactor replicationFactor,
-      ReplicationType repType) {
-    this.containerID = containerID;
+      ReplicationConfig repConfig,
+      Clock clock) {
+    this.containerID = ContainerID.valueOf(containerID);
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
     this.numberOfKeys = numberOfKeys;
-    this.lastUsed = Instant.ofEpochMilli(Time.now());
+    this.lastUsed = clock.instant();
     this.state = state;
     this.stateEnterTime = Instant.ofEpochMilli(stateEnterTime);
     this.owner = owner;
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
-    this.replicationFactor = replicationFactor;
-    this.replicationType = repType;
-  }
-
-  /**
-   * Needed for serialization findbugs.
-   */
-  public ContainerInfo() {
+    this.replicationConfig = repConfig;
+    this.clock = clock;
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    return builder.setPipelineID(
-        PipelineID.getFromProtobuf(info.getPipelineID()))
-        .setUsedBytes(info.getUsedBytes())
+    final ReplicationConfig config = ReplicationConfig
+        .fromProto(info.getReplicationType(), info.getReplicationFactor(),
+            info.getEcReplicationConfig());
+    builder.setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
         .setState(info.getState())
         .setStateEnterTime(info.getStateEnterTime())
         .setOwner(info.getOwner())
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
-        .setReplicationFactor(info.getReplicationFactor())
-        .setReplicationType(info.getReplicationType())
+        .setReplicationConfig(config)
+        .setSequenceId(info.getSequenceId())
         .build();
+
+    if (info.hasPipelineID()) {
+      builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
+    }
+    return builder.build();
+
   }
 
+  /**
+   * Unless the long value of the ContainerID is needed, use the containerID()
+   * method to obtain the {@link ContainerID} object.
+   */
+  @JsonProperty
   public long getContainerID() {
-    return containerID;
+    return containerID.getId();
   }
 
   public HddsProtos.LifeCycleState getState() {
@@ -129,21 +154,57 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public void setState(HddsProtos.LifeCycleState state) {
+    previousState = this.state;
+    previousStateEnterTime = this.stateEnterTime;
+
     this.state = state;
+    this.stateEnterTime = clock.instant();
   }
 
   public Instant getStateEnterTime() {
     return stateEnterTime;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
+  }
+
+  @JsonIgnore
+  public HddsProtos.ReplicationType getReplicationType() {
+    return replicationConfig.getReplicationType();
+  }
+
+  @JsonIgnore
+  public HddsProtos.ReplicationFactor getReplicationFactor() {
+    return ReplicationConfig.getLegacyFactor(replicationConfig);
   }
 
   public PipelineID getPipelineID() {
     return pipelineID;
   }
 
+  /**
+   * Returns the usedBytes for the container. The value returned is derived
+   * from the replicas reported from the datanodes for the container.
+   *
+   * The size of a container can change over time. For an open container we
+   * assume the size of the container will grow, and hence the value will be
+   * the maximum of the values reported from its replicas.
+   *
+   * A closed container can only reduce in size as its blocks are removed. For
+   * a closed container, the value will be the minimum of the values reported
+   * from its replicas.
+   *
+   * An EC container, is made from a group data and parity containers where the
+   * first data and all parity containers should be the same size. The other
+   * data containers can be smaller or the same size. When calculating the EC
+   * container size, we use the min / max of the first data and parity
+   * containers,ignoring the others. For EC containers, this value actually
+   * represents the size of the largest container in the container group, rather
+   * than the total space used by all containers in the group.
+   *
+   * @return bytes used in the container.
+   */
   public long getUsedBytes() {
     return usedBytes;
   }
@@ -178,7 +239,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public ContainerID containerID() {
-    return new ContainerID(getContainerID());
+    return containerID;
   }
 
   /**
@@ -190,29 +251,38 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return lastUsed;
   }
 
-  public ReplicationType getReplicationType() {
-    return replicationType;
-  }
-
   public void updateLastUsedTime() {
-    lastUsed = Instant.ofEpochMilli(Time.now());
+    lastUsed = clock.instant();
   }
 
+  @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
         HddsProtos.ContainerInfoProto.newBuilder();
-    Preconditions.checkState(containerID > 0);
-    return builder.setContainerID(getContainerID())
+    builder.setContainerID(getContainerID())
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())
         .setStateEnterTime(getStateEnterTime().toEpochMilli())
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
-        .setPipelineID(getPipelineID().getProtobuf())
-        .setReplicationFactor(getReplicationFactor())
-        .setReplicationType(getReplicationType())
         .setOwner(getOwner())
-        .build();
+        .setSequenceId(getSequenceId())
+        .setReplicationType(getReplicationType());
+
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
+          .toProto());
+    } else {
+      builder.setReplicationFactor(
+          ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+
+    builder.setReplicationType(replicationConfig.getReplicationType());
+
+    if (getPipelineID() != null) {
+      builder.setPipelineID(getPipelineID().getProtobuf());
+    }
+    return builder.build();
   }
 
   public String getOwner() {
@@ -228,8 +298,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return "ContainerInfo{"
         + "id=" + containerID
         + ", state=" + state
-        + ", pipelineID=" + pipelineID
         + ", stateEnterTime=" + stateEnterTime
+        + ", pipelineID=" + pipelineID
         + ", owner=" + owner
         + '}';
   }
@@ -268,26 +338,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   /**
-   * Compares its two arguments for order.  Returns a negative integer, zero, or
-   * a positive integer as the first argument is less than, equal to, or greater
-   * than the second.<p>
-   *
-   * @param o1 the first object to be compared.
-   * @param o2 the second object to be compared.
-   * @return a negative integer, zero, or a positive integer as the first
-   * argument is less than, equal to, or greater than the second.
-   * @throws NullPointerException if an argument is null and this comparator
-   *                              does not permit null arguments
-   * @throws ClassCastException   if the arguments' types prevent them from
-   *                              being compared by this comparator.
-   */
-  @Override
-  public int compare(ContainerInfo o1, ContainerInfo o2) {
-    return Long.compare(
-        o1.getLastUsed().toEpochMilli(), o2.getLastUsed().toEpochMilli());
-  }
-
-  /**
    * Compares this object with the specified object for order.  Returns a
    * negative integer, zero, or a positive integer as this object is less than,
    * equal to, or greater than the specified object.
@@ -301,65 +351,21 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    */
   @Override
   public int compareTo(ContainerInfo o) {
-    return this.compare(this, o);
+    return COMPARATOR.compare(this, o);
   }
 
-
-
   /**
-   * Returns private data that is set on this containerInfo.
-   *
-   * @return blob, the user can interpret it any way they like.
+   * Restore previous state.
    */
-  public byte[] getData() {
-    if (this.data != null) {
-      return Arrays.copyOf(this.data, this.data.length);
-    } else {
-      return null;
+  public void revertState() {
+    if (previousState == null || previousStateEnterTime == null) {
+      throw new IllegalStateException("previous state unknown");
     }
-  }
 
-  /**
-   * Set private data on ContainerInfo object.
-   *
-   * @param data -- private data.
-   */
-  public void setData(byte[] data) {
-    if (data != null) {
-      this.data = Arrays.copyOf(data, data.length);
-    }
-  }
-
-  /**
-   * Throws IOException as default java serialization is not supported. Use
-   * serialization via protobuf instead.
-   *
-   * @param out the stream to write the object to
-   * @throws IOException Includes any I/O exceptions that may occur
-   * @serialData Overriding methods should use this tag to describe
-   * the data layout of this Externalizable object.
-   * List the sequence of element types and, if possible,
-   * relate the element to a public/protected field and/or
-   * method of this Externalizable class.
-   */
-  @Override
-  public void writeExternal(ObjectOutput out) throws IOException {
-    throw new IOException(SERIALIZATION_ERROR_MSG);
-  }
-
-  /**
-   * Throws IOException as default java serialization is not supported. Use
-   * serialization via protobuf instead.
-   *
-   * @param in the stream to read data from in order to restore the object
-   * @throws IOException            if I/O errors occur
-   * @throws ClassNotFoundException If the class for an object being
-   *                                restored cannot be found.
-   */
-  @Override
-  public void readExternal(ObjectInput in)
-      throws IOException, ClassNotFoundException {
-    throw new IOException(SERIALIZATION_ERROR_MSG);
+    state = previousState;
+    stateEnterTime = previousStateEnterTime;
+    previousState = null;
+    previousStateEnterTime = null;
   }
 
   /**
@@ -369,33 +375,27 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private HddsProtos.LifeCycleState state;
     private long used;
     private long keys;
-    private long stateEnterTime;
+    private Clock clock = Clock.systemUTC();
+    private long stateEnterTime = clock.millis();
     private String owner;
     private long containerID;
     private long deleteTransactionId;
     private long sequenceId;
     private PipelineID pipelineID;
-    private ReplicationFactor replicationFactor;
-    private ReplicationType replicationType;
-
-    public Builder setReplicationType(
-        ReplicationType repType) {
-      this.replicationType = repType;
-      return this;
-    }
+    private ReplicationConfig replicationConfig;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
       return this;
     }
 
-    public Builder setReplicationFactor(ReplicationFactor repFactor) {
-      this.replicationFactor = repFactor;
+    public Builder setReplicationConfig(ReplicationConfig repConfig) {
+      this.replicationConfig = repConfig;
       return this;
     }
 
     public Builder setContainerID(long id) {
-      Preconditions.checkState(id >= 0);
+      Preconditions.assertTrue(id >= 0, () -> id + " < 0");
       this.containerID = id;
       return this;
     }
@@ -435,10 +435,19 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
+    /**
+     * Also resets {@code stateEnterTime}, so make sure to set clock first.
+     */
+    public Builder setClock(Clock clock) {
+      this.clock = clock;
+      this.stateEnterTime = clock.millis();
+      return this;
+    }
+
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationFactor, replicationType);
+          sequenceId, replicationConfig, clock);
     }
   }
 
@@ -452,4 +461,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         || state == HddsProtos.LifeCycleState.CLOSING;
   }
 
+  public boolean isDeleted() {
+    return state == HddsProtos.LifeCycleState.DELETED;
+  }
 }

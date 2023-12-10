@@ -21,6 +21,9 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import static org.apache.commons.io.FilenameUtils.removeExtension;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_CHECKSUM_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
@@ -30,10 +33,19 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,6 +54,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -73,8 +87,16 @@ public final class ContainerUtils {
       ContainerCommandRequestProto request) {
     String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
         "Result: {} , StorageContainerException Occurred.";
-    log.info(logInfo, request.getCmdType().name(), request.getTraceID(),
-        ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+    if (ex.getResult() == CLOSED_CONTAINER_IO ||
+        ex.getResult() == CONTAINER_NOT_OPEN) {
+      if (log.isDebugEnabled()) {
+        log.debug(logInfo, request.getCmdType(), request.getTraceID(),
+            ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+      }
+    } else {
+      log.warn(logInfo, request.getCmdType(), request.getTraceID(),
+          ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
+    }
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())
         .build();
   }
@@ -101,7 +123,6 @@ public final class ContainerUtils {
    * Verifies that this is indeed a new container.
    *
    * @param containerFile - Container File to verify
-   * @throws FileAlreadyExistsException
    */
   public static void verifyIsNewContainer(File containerFile) throws
       FileAlreadyExistsException {
@@ -125,8 +146,9 @@ public final class ContainerUtils {
    *
    * @throws IOException when read/write error occurs
    */
-  public synchronized static void writeDatanodeDetailsTo(
-      DatanodeDetails datanodeDetails, File path) throws IOException {
+  public static synchronized void writeDatanodeDetailsTo(
+      DatanodeDetails datanodeDetails, File path, ConfigurationSource conf)
+      throws IOException {
     if (path.exists()) {
       if (!path.delete() || !path.createNewFile()) {
         throw new IOException("Unable to overwrite the datanode ID file.");
@@ -137,7 +159,7 @@ public final class ContainerUtils {
         throw new IOException("Unable to create datanode ID directories.");
       }
     }
-    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path);
+    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
   }
 
   /**
@@ -147,7 +169,7 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public synchronized static DatanodeDetails readDatanodeDetailsFrom(File path)
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
       throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
@@ -155,7 +177,7 @@ public final class ContainerUtils {
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Error loading DatanodeDetails yaml from " +
+      LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (FileInputStream in = new FileInputStream(path)) {
@@ -171,24 +193,30 @@ public final class ContainerUtils {
   /**
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
-   * @param containerData
-   * @throws IOException
    */
-  public static void verifyChecksum(ContainerData containerData)
-      throws IOException {
-    String storedChecksum = containerData.getChecksum();
+  public static void verifyChecksum(ContainerData containerData,
+      ConfigurationSource conf) throws IOException {
+    boolean enabled = conf.getBoolean(
+            HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED,
+            HddsConfigKeys.
+                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED_DEFAULT);
+    if (enabled) {
+      String storedChecksum = containerData.getChecksum();
 
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-        containerData.getContainerType());
-    containerData.computeAndSetChecksum(yaml);
-    String computedChecksum = containerData.getChecksum();
+      Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+          containerData.getContainerType(),
+          containerData instanceof KeyValueContainerData &&
+              ((KeyValueContainerData)containerData).getReplicaIndex() > 0);
+      containerData.computeAndSetChecksum(yaml);
+      String computedChecksum = containerData.getChecksum();
 
-    if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
-      throw new StorageContainerException("Container checksum error for " +
-          "ContainerID: " + containerData.getContainerID() + ". " +
-          "\nStored Checksum: " + storedChecksum +
-          "\nExpected Checksum: " + computedChecksum,
-          CONTAINER_CHECKSUM_ERROR);
+      if (storedChecksum == null || !storedChecksum.equals(computedChecksum)) {
+        throw new StorageContainerException("Container checksum error for " +
+                "ContainerID: " + containerData.getContainerID() + ". " +
+                "\nStored Checksum: " + storedChecksum +
+                "\nExpected Checksum: " + computedChecksum,
+                CONTAINER_CHECKSUM_ERROR);
+      }
     }
   }
 
@@ -196,7 +224,6 @@ public final class ContainerUtils {
    * Return the SHA-256 checksum of the containerData.
    * @param containerDataYamlStr ContainerData as a Yaml String
    * @return Checksum of the container data
-   * @throws StorageContainerException
    */
   public static String getChecksum(String containerDataYamlStr)
       throws StorageContainerException {
@@ -209,6 +236,29 @@ public final class ContainerUtils {
       throw new StorageContainerException("Unable to create Message Digest, " +
           "usually this is a java configuration issue.", NO_SUCH_ALGORITHM);
     }
+  }
+
+  public static boolean recentlyScanned(Container<?> container,
+      long minScanGap, Logger log) {
+    Optional<Instant> lastScanTime =
+        container.getContainerData().lastDataScanTime();
+    Instant now = Instant.now();
+    // Container is considered recently scanned if it was scanned within the
+    // configured time frame. If the optional is empty, the container was
+    // never scanned.
+    boolean recentlyScanned = lastScanTime.map(scanInstant ->
+        Duration.between(now, scanInstant).abs()
+            .compareTo(Duration.ofMillis(minScanGap)) < 0)
+        .orElse(false);
+
+    if (recentlyScanned && log.isDebugEnabled()) {
+      log.debug("Skipping scan for container {} which was last " +
+              "scanned at {}. Current time is {}.",
+          container.getContainerData().getContainerID(), lastScanTime.get(),
+          now);
+    }
+
+    return recentlyScanned;
   }
 
   /**
@@ -226,9 +276,70 @@ public final class ContainerUtils {
   }
 
   /**
+   * Get the chunk directory from the containerData.
+   *
+   * @param containerData {@link ContainerData}
+   * @return the file of chunk directory
+   * @throws StorageContainerException
+   */
+  public static File getChunkDir(ContainerData containerData)
+      throws StorageContainerException {
+    Preconditions.checkNotNull(containerData, "Container data can't be null");
+
+    String chunksPath = containerData.getChunksPath();
+    if (chunksPath == null) {
+      LOG.error("Chunks path is null in the container data");
+      throw new StorageContainerException("Unable to get Chunks directory.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+
+    File chunksDir = new File(chunksPath);
+    if (!chunksDir.exists()) {
+      LOG.error("Chunks dir {} does not exist", chunksDir.getAbsolutePath());
+      throw new StorageContainerException("Chunks directory " +
+          chunksDir.getAbsolutePath() + " does not exist.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    return chunksDir;
+  }
+
+  /**
    * ContainerID can be decoded from the container base directory name.
    */
   public static long getContainerID(File containerBaseDir) {
     return Long.parseLong(containerBaseDir.getName());
+  }
+
+  public static String getContainerTarName(long containerId) {
+    return "container-" + containerId + "-" + UUID.randomUUID() + ".tar";
+  }
+
+  public static long retrieveContainerIdFromTarName(String tarName)
+      throws IOException {
+    assert tarName != null;
+    Pattern pattern = Pattern.compile("container-(\\d+)-.*\\.tar");
+    // Now create matcher object.
+    Matcher m = pattern.matcher(tarName);
+
+    if (m.find()) {
+      return Long.parseLong(m.group(1));
+    } else {
+      throw new IOException("Illegal container tar gz file " +
+          tarName);
+    }
+  }
+
+  public static long getPendingDeletionBlocks(ContainerData containerData) {
+    if (containerData.getContainerType()
+        .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
+      return ((KeyValueContainerData) containerData)
+          .getNumPendingDeletionBlocks();
+    } else {
+      // If another ContainerType is available later, implement it
+      throw new IllegalArgumentException(
+          "getPendingDeletionBlocks for ContainerType: " +
+              containerData.getContainerType() +
+              " not support.");
+    }
   }
 }

@@ -35,8 +35,10 @@ Daemon commands:
    * **om** -   Ozone Manager, via daemon command can be started or stopped.
    * **datanode** - Via daemon command, the HDDS data nodes can be started or
    stopped.
-   * **s3g** -
-
+   * **s3g** - Start the S3 compatible REST gateway
+   * **recon** - The Web UI service of Ozone can be started with this command.
+   * **httpfs** - Start the HttpFS gateway
+   
 Client commands:
 
    * **sh** -  Primary command line interface for ozone to manage volumes/buckets/keys.
@@ -48,18 +50,17 @@ Admin commands:
 
    * **admin** -  Collects admin and developer related commands related to the 
    ozone components.
+   * **insight** - Generic tool to display filtered log, metrics or configs to help debuging. See [the observability]({{< ref "feature/Observability.md" >}}) page for more information.
    * **classpath** - Prints the class path needed to get the hadoop jar and the
     required libraries.
    * **dtutil**    - Operations related to delegation tokens
    * **envvars** - Display computed Hadoop environment variables.
    * **getconf** -  Reads ozone config values from configuration.
-   * **jmxget**  - Get JMX exported values from NameNode or DataNode.
    * **genconf** -  Generate minimally required ozone configs and output to
    ozone-site.xml.
 
 Test tools:
 
    * **freon** -  Runs the ozone load generator.
-   * **genesis**  - Developer Only, Ozone micro-benchmark application.
 
  For more information see the following subpages:

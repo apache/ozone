@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,15 +30,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests to test block deleting service.
  */
+@Timeout(10)
 public class TestBlockData {
   static final Logger LOG = LoggerFactory.getLogger(TestBlockData.class);
-  @Rule
-  public TestRule timeout = new Timeout(10000);
 
   static ContainerProtos.ChunkInfo buildChunkInfo(String name, long offset,
       long len) {
@@ -60,11 +57,11 @@ public class TestBlockData {
     assertChunks(expected, computed);
     long offset = 0;
     int n = 5;
-    for(int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
       offset += assertAddChunk(expected, computed, offset);
     }
 
-    for(; !expected.isEmpty();) {
+    for (; !expected.isEmpty();) {
       removeChunk(expected, computed);
     }
   }
@@ -101,9 +98,9 @@ public class TestBlockData {
   static void assertChunks(List<ContainerProtos.ChunkInfo> expected,
       BlockData computed) {
     final List<ContainerProtos.ChunkInfo> computedChunks = computed.getChunks();
-    Assert.assertEquals("expected=" + expected + "\ncomputed=" +
-        computedChunks, expected, computedChunks);
-    Assert.assertEquals(expected.stream().mapToLong(i -> i.getLen()).sum(),
+    Assertions.assertEquals(expected, computedChunks,
+        "expected=" + expected + "\ncomputed=" + computedChunks);
+    Assertions.assertEquals(expected.stream().mapToLong(i -> i.getLen()).sum(),
         computed.getSize());
   }
 
@@ -125,7 +122,7 @@ public class TestBlockData {
     assertChunks(expected, computed);
     long offset = 0;
     int n = 5;
-    for(int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
       offset += addChunk(expected, offset).getLen();
       LOG.info("setChunk: {}", toString(expected));
       computed.setChunks(expected);
@@ -138,7 +135,7 @@ public class TestBlockData {
     final BlockID blockID = new BlockID(5, 123);
     blockID.setBlockCommitSequenceId(42);
     final BlockData subject = new BlockData(blockID);
-    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42,size=0]",
+    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42, size=0]",
         subject.toString());
   }
 }

@@ -1,4 +1,5 @@
 ---
+name: Ozone
 title: Overview
 menu: main
 weight: -10
@@ -20,16 +21,16 @@ weight: -10
   limitations under the License.
 -->
 
-# Apache Hadoop Ozone
+# Apache Ozone
 
-{{<figure src="/ozone-usage.png" width="60%">}}
+{{<figure class="ozone-usage" src="/ozone-usage.png" width="60%">}}
 
 *_Ozone is a scalable, redundant, and distributed object store for Hadoop. <p>
 Apart from scaling to billions of objects of varying sizes,
 Ozone can function effectively in containerized environments
 like Kubernetes._* <p>
 
-Applications like Apache Spark, Hive and YARN, work without any modifications when using Ozone. Ozone comes with a [Java client library]({{<ref "JavaApi.md">}}), [S3 protocol support]({{< ref "S3.md" >}}), and a [command line interface]({{< ref "shell/_index.md" >}})  which makes it easy to use Ozone.
+Applications like Apache Spark, Hive and YARN, work without any modifications when using Ozone. Ozone comes with a [Java client library]({{<ref "JavaApi.md">}}), [S3 protocol support]({{< ref "S3.md" >}}), and a [command line interface]({{< ref "Cli.md" >}})  which makes it easy to use Ozone.
 
 Ozone consists of volumes, buckets, and keys:
 

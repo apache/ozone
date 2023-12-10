@@ -19,11 +19,12 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeDeleteResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
+
 /**
  * Handles volume delete request.
  */
@@ -83,7 +84,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredUserLock = false;
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
     String owner = null;
     OMClientResponse omClientResponse = null;
     try {
@@ -94,24 +95,26 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
             null, null);
       }
 
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, deleteVolumeRequest);
-        return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));
+      // Check reference count
+      final long volRefCount = omVolumeArgs.getRefCount();
+      if (volRefCount != 0L) {
+        LOG.debug("volume: {} has a non-zero ref count. won't delete", volume);
+        throw new OMException("Volume reference count is not zero (" +
+            volRefCount + "). Ozone features are enabled on this volume. " +
+            "Try `ozone tenant delete <tenantId>` first.",
+            OMException.ResultCodes.VOLUME_IS_REFERENCED);
       }
 
       owner = omVolumeArgs.getOwnerName();
-      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
-          owner);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(USER_LOCK, owner));
+      acquiredUserLock = getOmLockDetails().isLockAcquired();
 
       String dbUserKey = omMetadataManager.getUserKey(owner);
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
@@ -121,7 +124,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
         throw new OMException(OMException.ResultCodes.VOLUME_NOT_EMPTY);
       }
 
-      OzoneManagerProtocolProtos.UserVolumeInfo newVolumeList =
+      OzoneManagerStorageProtos.PersistedUserVolumeInfo newVolumeList =
           omMetadataManager.getUserTable().get(owner);
 
       // delete the volume from the owner list
@@ -130,18 +133,17 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
           transactionLogIndex);
 
       omMetadataManager.getUserTable().addCacheEntry(new CacheKey<>(dbUserKey),
-          new CacheValue<>(Optional.of(newVolumeList), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, newVolumeList));
 
       omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(dbVolumeKey), new CacheValue<>(Optional.absent(),
-              transactionLogIndex));
+          new CacheKey<>(dbVolumeKey), CacheValue.get(transactionLogIndex));
 
       omResponse.setDeleteVolumeResponse(
           DeleteVolumeResponse.newBuilder().build());
       omClientResponse = new OMVolumeDeleteResponse(omResponse.build(),
           volume, owner, newVolumeList);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));
@@ -149,10 +151,15 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
-        omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(USER_LOCK, owner));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -172,5 +179,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     }
     return omClientResponse;
   }
+
 }
 

@@ -20,34 +20,31 @@ package org.apache.hadoop.hdds.scm.block;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.ozone.common.BlockGroup;
 
 /**
  *
  *  Block APIs.
  *  Container is transparent to these APIs.
  */
-public interface BlockManager extends Closeable,
-    EventHandler<SafeModeStatus> {
+public interface BlockManager extends Closeable {
   /**
    * Allocates a new block for a given size.
    * @param size - Block Size
-   * @param type Replication Type
-   * @param factor - Replication Factor
+   * @param replicationConfig configuration of the replication method
    * @param excludeList List of datanodes/containers to exclude during block
    *                    allocation.
    * @return AllocatedBlock
    * @throws IOException
    */
-  AllocatedBlock allocateBlock(long size, HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, String owner,
-      ExcludeList excludeList) throws IOException;
+  AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig,
+      String owner,
+      ExcludeList excludeList) throws IOException, TimeoutException;
 
   /**
    * Deletes a list of blocks in an atomic operation. Internally, SCM
@@ -59,7 +56,7 @@ public interface BlockManager extends Closeable,
    *                 a particular object key.
    * @throws IOException if exception happens, non of the blocks is deleted.
    */
-  void deleteBlocks(List<BlockID> blockIDs) throws IOException;
+  void deleteBlocks(List<BlockGroup> blockIDs) throws IOException;
 
   /**
    * @return the block deletion transaction log maintained by SCM.

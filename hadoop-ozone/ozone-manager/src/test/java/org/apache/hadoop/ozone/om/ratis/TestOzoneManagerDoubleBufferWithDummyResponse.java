@@ -19,14 +19,18 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -43,42 +47,48 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.test.GenericTestUtils.waitFor;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
  * dummy response class.
  */
+@Timeout(300)
 public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
   private long lastAppliedIndex;
+  private long term = 1L;
+  @TempDir
+  private Path folder;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager =
-        new OmMetadataManagerImpl(configuration);
+        new OmMetadataManagerImpl(configuration, null);
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
+        .setIndexToTerm((val) -> term)
         .build();
   }
 
-  @After
+  @AfterEach
   public void stop() {
     doubleBuffer.stop();
   }
@@ -88,7 +98,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
    * check OM DB bucket table has 100 entries or not. In addition checks
    * flushed transaction count is matching with expected count or not.
    */
-  @Test(timeout = 300_000)
+  @Test
   public void testDoubleBufferWithDummyResponse() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     int bucketCount = 100;
@@ -101,7 +111,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(0, metrics.getTotalNumOfFlushedTransactions());
     assertEquals(0, metrics.getMaxNumberOfTransactionsFlushedInOneIteration());
 
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           trxId.incrementAndGet());
     }
@@ -114,8 +124,10 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
     assertTrue(doubleBuffer.getFlushIterations() > 0);
-    assertTrue(metrics.getFlushTime().lastStat().mean() > 0);
+    assertTrue(metrics.getFlushTime().lastStat().numSamples() > 0);
     assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
+    assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
+    assertTrue(metrics.getQueueSize().lastStat().numSamples() > 0);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =
@@ -124,6 +136,15 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
     // Check lastAppliedIndex is updated correctly or not.
     assertEquals(bucketCount, lastAppliedIndex);
+
+
+    TransactionInfo transactionInfo =
+        omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    assertNotNull(transactionInfo);
+
+    Assertions.assertEquals(lastAppliedIndex,
+        transactionInfo.getTransactionIndex());
+    Assertions.assertEquals(term, transactionInfo.getTerm());
   }
 
   /**
@@ -149,6 +170,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   /**
    * DummyCreatedBucket Response class used in testing.
    */
+  @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
   private static class OMDummyCreateBucketResponse extends OMClientResponse {
     private final OmBucketInfo omBucketInfo;
 
@@ -167,6 +189,5 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
           dbBucketKey, omBucketInfo);
     }
-
   }
 }

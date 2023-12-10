@@ -19,16 +19,21 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,48 +51,80 @@ public class IncrementalContainerReportHandler extends
 
   public IncrementalContainerReportHandler(
       final NodeManager nodeManager,
-      final ContainerManager containerManager)  {
-    super(containerManager, LOG);
+      final ContainerManager containerManager,
+      final SCMContext scmContext) {
+    super(containerManager, scmContext, LOG);
     this.nodeManager = nodeManager;
   }
 
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
+    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing incremental container report from data node {}",
-          report.getDatanodeDetails().getUuid());
+          dnFromReport.getUuid());
+    }
+    DatanodeDetails dd =
+        nodeManager.getNodeByUuid(dnFromReport.getUuid());
+    if (dd == null) {
+      LOG.warn("Received container report from unknown datanode {}",
+          dnFromReport);
+      return;
     }
 
-    boolean success = true;
-    for (ContainerReplicaProto replicaProto :
-        report.getReport().getReportList()) {
-      try {
-        final DatanodeDetails dd = report.getDatanodeDetails();
-        final ContainerID id = ContainerID.valueof(
-            replicaProto.getContainerID());
-        nodeManager.addContainer(dd, id);
-        processContainerReplica(dd, replicaProto);
-      } catch (ContainerNotFoundException e) {
-        success = false;
-        LOG.warn("Container {} not found!", replicaProto.getContainerID());
-      } catch (NodeNotFoundException ex) {
-        success = false;
-        LOG.error("Received ICR from unknown datanode {} {}",
-            report.getDatanodeDetails(), ex);
-      } catch (IOException e) {
-        success = false;
-        LOG.error("Exception while processing ICR for container {}",
-            replicaProto.getContainerID());
+    boolean success = false;
+    // HDDS-5249 - we must ensure that an ICR and FCR for the same datanode
+    // do not run at the same time or it can result in a data consistency
+    // issue between the container list in NodeManager and the replicas in
+    // ContainerManager.
+    synchronized (dd) {
+      for (ContainerReplicaProto replicaProto :
+          report.getReport().getReportList()) {
+        ContainerID id = ContainerID.valueOf(replicaProto.getContainerID());
+        ContainerInfo container = null;
+        try {
+          try {
+            container = getContainerManager().getContainer(id);
+            // Ensure we reuse the same ContainerID instance in containerInfo
+            id = container.containerID();
+          } finally {
+            if (replicaProto.getState().equals(
+                ContainerReplicaProto.State.DELETED)) {
+              nodeManager.removeContainer(dd, id);
+            } else {
+              nodeManager.addContainer(dd, id);
+            }
+          }
+          if (ContainerReportValidator.validate(container, dd, replicaProto)) {
+            processContainerReplica(dd, container, replicaProto, publisher);
+          }
+          success = true;
+        } catch (ContainerNotFoundException e) {
+          LOG.warn("Container {} not found!", replicaProto.getContainerID());
+        } catch (NodeNotFoundException ex) {
+          LOG.error("Received ICR from unknown datanode {}",
+              report.getDatanodeDetails(), ex);
+        } catch (ContainerReplicaNotFoundException e) {
+          LOG.warn("Container {} replica not found!",
+              replicaProto.getContainerID());
+        } catch (SCMException ex) {
+          if (ex.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
+            LOG.warn("Failed to process {} container {}: {}",
+                replicaProto.getState(), id, ex.getMessage());
+          } else {
+            LOG.error("Exception while processing ICR for container {}",
+                replicaProto.getContainerID(), ex);
+          }
+        } catch (IOException | InvalidStateTransitionException |
+                 TimeoutException e) {
+          LOG.error("Exception while processing ICR for container {}",
+              replicaProto.getContainerID(), e);
+        }
       }
     }
 
-    if (success) {
-      getContainerManager().notifyContainerReportProcessing(false, true);
-    } else {
-      getContainerManager().notifyContainerReportProcessing(false, false);
-    }
-
+    getContainerManager().notifyContainerReportProcessing(false, success);
   }
 
   protected NodeManager getNodeManager() {

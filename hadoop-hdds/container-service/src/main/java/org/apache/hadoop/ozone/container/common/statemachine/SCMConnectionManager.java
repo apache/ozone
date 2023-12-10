@@ -46,6 +46,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import static java.util.Collections.unmodifiableList;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,10 +129,11 @@ public class SCMConnectionManager
   /**
    * adds a new SCM machine to the target set.
    *
-   * @param address - Address of the SCM machine to send heatbeat to.
+   * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
-  public void addSCMServer(InetSocketAddress address) throws IOException {
+  public void addSCMServer(InetSocketAddress address,
+      String threadNamePrefix) throws IOException {
     writeLock();
     try {
       if (scmMachines.containsKey(address)) {
@@ -149,8 +152,9 @@ public class SCMConnectionManager
           RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
 
       RetryPolicy retryPolicy =
-          RetryPolicies.retryForeverWithFixedSleep(
-              1000, TimeUnit.MILLISECONDS);
+          RetryPolicies.retryUpToMaximumCountWithFixedSleep(
+              getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf),
+              TimeUnit.MILLISECONDS);
 
       StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           StorageContainerDatanodeProtocolPB.class, version,
@@ -160,10 +164,10 @@ public class SCMConnectionManager
 
       StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
           new StorageContainerDatanodeProtocolClientSideTranslatorPB(
-          rpcProxy);
+              rpcProxy);
 
-      EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, this.conf);
+      EndpointStateMachine endPoint = new EndpointStateMachine(address,
+          rpcClient, this.conf, threadNamePrefix);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
@@ -173,10 +177,12 @@ public class SCMConnectionManager
 
   /**
    * Adds a new Recon server to the set of endpoints.
+   *
    * @param address Recon address.
    * @throws IOException
    */
-  public void addReconServer(InetSocketAddress address) throws IOException {
+  public void addReconServer(InetSocketAddress address,
+      String threadNamePrefix) throws IOException {
     LOG.info("Adding Recon Server : {}", address.toString());
     writeLock();
     try {
@@ -193,8 +199,9 @@ public class SCMConnectionManager
           RPC.getProtocolVersion(ReconDatanodeProtocolPB.class);
 
       RetryPolicy retryPolicy =
-          RetryPolicies.retryUpToMaximumCountWithFixedSleep(10,
-              60000, TimeUnit.MILLISECONDS);
+          RetryPolicies.retryUpToMaximumCountWithFixedSleep(
+              getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf),
+              TimeUnit.MILLISECONDS);
       ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           ReconDatanodeProtocolPB.class, version,
           address, UserGroupInformation.getCurrentUser(), hadoopConfig,
@@ -205,7 +212,7 @@ public class SCMConnectionManager
           new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
 
       EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, conf);
+          new EndpointStateMachine(address, rpcClient, conf, threadNamePrefix);
       endPoint.setPassive(true);
       scmMachines.put(address, endPoint);
     } finally {
@@ -216,7 +223,7 @@ public class SCMConnectionManager
   /**
    * Removes a  SCM machine for the target set.
    *
-   * @param address - Address of the SCM machine to send heatbeat to.
+   * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
   public void removeSCMServer(InetSocketAddress address) throws IOException {

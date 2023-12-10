@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import java.util.Comparator;
 import java.util.PriorityQueue;
 
 /**
@@ -27,8 +28,8 @@ public class BackgroundTaskQueue {
   private final PriorityQueue<BackgroundTask> tasks;
 
   public BackgroundTaskQueue() {
-    tasks = new PriorityQueue<>((task1, task2)
-        -> task1.getPriority() - task2.getPriority());
+    tasks = new PriorityQueue<>(
+        Comparator.comparingInt(BackgroundTask::getPriority));
   }
 
   /**

@@ -21,25 +21,24 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.ws.rs.core.Response;
+import java.time.LocalDate;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-
-import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
-import java.time.LocalDate;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class test Create Bucket functionality.
@@ -50,7 +49,7 @@ public class TestBucketPut {
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
@@ -59,51 +58,38 @@ public class TestBucketPut {
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
-    bucketEndpoint.setSignatureProcessor(new SignatureProcessor() {
-      @Override
-      public String getStringToSign() throws Exception {
-        return null;
-      }
-
-      @Override
-      public String getSignature() {
-        return null;
-      }
-
-      @Override
-      public String getAwsAccessId() {
-        return OzoneConsts.OZONE;
-      }
-    });
   }
 
   @Test
   public void testBucketFailWithAuthHeaderMissing() throws Exception {
-
     try {
-      bucketEndpoint.put(bucketName, null);
+      bucketEndpoint.put(bucketName, null, null, null);
     } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      Assert.assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
     }
   }
 
   @Test
   public void testBucketPut() throws Exception {
-    String auth = generateAuthHeader();
-
-    Response response = bucketEndpoint.put(bucketName, null);
+    Response response = bucketEndpoint.put(bucketName, null, null, null);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getLocation());
+
+    // Create-bucket on an existing bucket fails
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
+        bucketName, null, null, null));
+    assertEquals(HTTP_CONFLICT, e.getHttpCode());
+    assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
   }
 
   @Test
   public void testBucketFailWithInvalidHeader() throws Exception {
     try {
-      bucketEndpoint.put(bucketName, null);
+      bucketEndpoint.put(bucketName, null, null, null);
     } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      Assert.assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
+      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
     }
   }
 

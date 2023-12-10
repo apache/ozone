@@ -1,0 +1,1471 @@
+{
+  "definitions": [
+    {
+      "protopath": "csi.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Service.Type",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN"
+              },
+              {
+                "name": "CONTROLLER_SERVICE",
+                "integer": 1
+              },
+              {
+                "name": "VOLUME_ACCESSIBILITY_CONSTRAINTS",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "VolumeExpansion.Type",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN"
+              },
+              {
+                "name": "ONLINE",
+                "integer": 1
+              },
+              {
+                "name": "OFFLINE",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "AccessMode.Mode",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN"
+              },
+              {
+                "name": "SINGLE_NODE_WRITER",
+                "integer": 1
+              },
+              {
+                "name": "SINGLE_NODE_READER_ONLY",
+                "integer": 2
+              },
+              {
+                "name": "MULTI_NODE_READER_ONLY",
+                "integer": 3
+              },
+              {
+                "name": "MULTI_NODE_SINGLE_WRITER",
+                "integer": 4
+              },
+              {
+                "name": "MULTI_NODE_MULTI_WRITER",
+                "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "RPC.Type",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN"
+              },
+              {
+                "name": "CREATE_DELETE_VOLUME",
+                "integer": 1
+              },
+              {
+                "name": "PUBLISH_UNPUBLISH_VOLUME",
+                "integer": 2
+              },
+              {
+                "name": "LIST_VOLUMES",
+                "integer": 3
+              },
+              {
+                "name": "GET_CAPACITY",
+                "integer": 4
+              },
+              {
+                "name": "CREATE_DELETE_SNAPSHOT",
+                "integer": 5
+              },
+              {
+                "name": "LIST_SNAPSHOTS",
+                "integer": 6
+              },
+              {
+                "name": "CLONE_VOLUME",
+                "integer": 7
+              },
+              {
+                "name": "PUBLISH_READONLY",
+                "integer": 8
+              },
+              {
+                "name": "EXPAND_VOLUME",
+                "integer": 9
+              }
+            ]
+          },
+          {
+            "name": "VolumeUsage.Unit",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN"
+              },
+              {
+                "name": "BYTES",
+                "integer": 1
+              },
+              {
+                "name": "INODES",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "RPC.Type",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN"
+              },
+              {
+                "name": "STAGE_UNSTAGE_VOLUME",
+                "integer": 1
+              },
+              {
+                "name": "GET_VOLUME_STATS",
+                "integer": 2
+              },
+              {
+                "name": "EXPAND_VOLUME",
+                "integer": 3
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "google.protobuf.FieldOptions",
+            "fields": [
+              {
+                "id": 1059,
+                "name": "csi_secret",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "GetPluginInfoRequest"
+          },
+          {
+            "name": "GetPluginInfoResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "vendor_version",
+                "type": "string"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 3,
+                  "name": "manifest",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "GetPluginCapabilitiesRequest"
+          },
+          {
+            "name": "GetPluginCapabilitiesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capabilities",
+                "type": "PluginCapability",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PluginCapability",
+            "fields": [
+              {
+                "id": 1,
+                "name": "service",
+                "type": "Service"
+              },
+              {
+                "id": 2,
+                "name": "volume_expansion",
+                "type": "VolumeExpansion"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Service",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "type",
+                    "type": "Type"
+                  }
+                ]
+              },
+              {
+                "name": "VolumeExpansion"
+              }
+            ]
+          },
+          {
+            "name": "ProbeRequest"
+          },
+          {
+            "name": "ProbeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ready",
+                "type": ".google.protobuf.BoolValue"
+              }
+            ]
+          },
+          {
+            "name": "CreateVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "capacity_range",
+                "type": "CapacityRange"
+              },
+              {
+                "id": 3,
+                "name": "volume_capabilities",
+                "type": "VolumeCapability",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "volume_content_source",
+                "type": "VolumeContentSource"
+              },
+              {
+                "id": 7,
+                "name": "accessibility_requirements",
+                "type": "TopologyRequirement"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 4,
+                  "name": "parameters",
+                  "type": "string"
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 5,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "VolumeContentSource",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshot",
+                "type": "SnapshotSource"
+              },
+              {
+                "id": 2,
+                "name": "volume",
+                "type": "VolumeSource"
+              }
+            ],
+            "messages": [
+              {
+                "name": "SnapshotSource",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "snapshot_id",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "VolumeSource",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "volume_id",
+                    "type": "string"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "CreateVolumeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume",
+                "type": "Volume"
+              }
+            ]
+          },
+          {
+            "name": "VolumeCapability",
+            "fields": [
+              {
+                "id": 1,
+                "name": "block",
+                "type": "BlockVolume"
+              },
+              {
+                "id": 2,
+                "name": "mount",
+                "type": "MountVolume"
+              },
+              {
+                "id": 3,
+                "name": "access_mode",
+                "type": "AccessMode"
+              }
+            ],
+            "messages": [
+              {
+                "name": "BlockVolume"
+              },
+              {
+                "name": "MountVolume",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "fs_type",
+                    "type": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "mount_flags",
+                    "type": "string",
+                    "is_repeated": true
+                  }
+                ]
+              },
+              {
+                "name": "AccessMode",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "mode",
+                    "type": "Mode"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "CapacityRange",
+            "fields": [
+              {
+                "id": 1,
+                "name": "required_bytes",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "limit_bytes",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "Volume",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capacity_bytes",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "content_source",
+                "type": "VolumeContentSource"
+              },
+              {
+                "id": 5,
+                "name": "accessible_topology",
+                "type": "Topology",
+                "is_repeated": true
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 3,
+                  "name": "volume_context",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "TopologyRequirement",
+            "fields": [
+              {
+                "id": 1,
+                "name": "requisite",
+                "type": "Topology",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "preferred",
+                "type": "Topology",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "Topology",
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 1,
+                  "name": "segments",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "DeleteVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 2,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "DeleteVolumeResponse"
+          },
+          {
+            "name": "ControllerPublishVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "node_id",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "volume_capability",
+                "type": "VolumeCapability"
+              },
+              {
+                "id": 4,
+                "name": "readonly",
+                "type": "bool"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 5,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 6,
+                  "name": "volume_context",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "ControllerPublishVolumeResponse",
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 1,
+                  "name": "publish_context",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "ControllerUnpublishVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "node_id",
+                "type": "string"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 3,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "ControllerUnpublishVolumeResponse"
+          },
+          {
+            "name": "ValidateVolumeCapabilitiesRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "volume_capabilities",
+                "type": "VolumeCapability",
+                "is_repeated": true
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 2,
+                  "name": "volume_context",
+                  "type": "string"
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 4,
+                  "name": "parameters",
+                  "type": "string"
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 5,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "ValidateVolumeCapabilitiesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "confirmed",
+                "type": "Confirmed"
+              },
+              {
+                "id": 2,
+                "name": "message",
+                "type": "string"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Confirmed",
+                "fields": [
+                  {
+                    "id": 2,
+                    "name": "volume_capabilities",
+                    "type": "VolumeCapability",
+                    "is_repeated": true
+                  }
+                ],
+                "maps": [
+                  {
+                    "key_type": "string",
+                    "field": {
+                      "id": 1,
+                      "name": "volume_context",
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "key_type": "string",
+                    "field": {
+                      "id": 3,
+                      "name": "parameters",
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ListVolumesRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "max_entries",
+                "type": "int32"
+              },
+              {
+                "id": 2,
+                "name": "starting_token",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ListVolumesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "entries",
+                "type": "Entry",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "next_token",
+                "type": "string"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Entry",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "volume",
+                    "type": "Volume"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "GetCapacityRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_capabilities",
+                "type": "VolumeCapability",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "accessible_topology",
+                "type": "Topology"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 2,
+                  "name": "parameters",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "GetCapacityResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "available_capacity",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "ControllerGetCapabilitiesRequest"
+          },
+          {
+            "name": "ControllerGetCapabilitiesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capabilities",
+                "type": "ControllerServiceCapability",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ControllerServiceCapability",
+            "fields": [
+              {
+                "id": 1,
+                "name": "rpc",
+                "type": "RPC"
+              }
+            ],
+            "messages": [
+              {
+                "name": "RPC",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "type",
+                    "type": "Type"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "CreateSnapshotRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "source_volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "name",
+                "type": "string"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 3,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 4,
+                  "name": "parameters",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "CreateSnapshotResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshot",
+                "type": "Snapshot"
+              }
+            ]
+          },
+          {
+            "name": "Snapshot",
+            "fields": [
+              {
+                "id": 1,
+                "name": "size_bytes",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "snapshot_id",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "source_volume_id",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "creation_time",
+                "type": ".google.protobuf.Timestamp"
+              },
+              {
+                "id": 5,
+                "name": "ready_to_use",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "DeleteSnapshotRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshot_id",
+                "type": "string"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 2,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "DeleteSnapshotResponse"
+          },
+          {
+            "name": "ListSnapshotsRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "max_entries",
+                "type": "int32"
+              },
+              {
+                "id": 2,
+                "name": "starting_token",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "source_volume_id",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "snapshot_id",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ListSnapshotsResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "entries",
+                "type": "Entry",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "next_token",
+                "type": "string"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Entry",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "snapshot",
+                    "type": "Snapshot"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ControllerExpandVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "capacity_range",
+                "type": "CapacityRange"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 3,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "ControllerExpandVolumeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capacity_bytes",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "node_expansion_required",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "NodeStageVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "staging_target_path",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "volume_capability",
+                "type": "VolumeCapability"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 2,
+                  "name": "publish_context",
+                  "type": "string"
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 5,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 6,
+                  "name": "volume_context",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "NodeStageVolumeResponse"
+          },
+          {
+            "name": "NodeUnstageVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "staging_target_path",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "NodeUnstageVolumeResponse"
+          },
+          {
+            "name": "NodePublishVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "staging_target_path",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "target_path",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "volume_capability",
+                "type": "VolumeCapability"
+              },
+              {
+                "id": 6,
+                "name": "readonly",
+                "type": "bool"
+              }
+            ],
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 2,
+                  "name": "publish_context",
+                  "type": "string"
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 7,
+                  "name": "secrets",
+                  "type": "string",
+                  "options": [
+                    {
+                      "name": "(csi_secret)",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 8,
+                  "name": "volume_context",
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          {
+            "name": "NodePublishVolumeResponse"
+          },
+          {
+            "name": "NodeUnpublishVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "target_path",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "NodeUnpublishVolumeResponse"
+          },
+          {
+            "name": "NodeGetVolumeStatsRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "volume_path",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "NodeGetVolumeStatsResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "usage",
+                "type": "VolumeUsage",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "VolumeUsage",
+            "fields": [
+              {
+                "id": 1,
+                "name": "available",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "total",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "used",
+                "type": "int64"
+              },
+              {
+                "id": 4,
+                "name": "unit",
+                "type": "Unit"
+              }
+            ]
+          },
+          {
+            "name": "NodeGetCapabilitiesRequest"
+          },
+          {
+            "name": "NodeGetCapabilitiesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capabilities",
+                "type": "NodeServiceCapability",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "NodeServiceCapability",
+            "fields": [
+              {
+                "id": 1,
+                "name": "rpc",
+                "type": "RPC"
+              }
+            ],
+            "messages": [
+              {
+                "name": "RPC",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "type",
+                    "type": "Type"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "NodeGetInfoRequest"
+          },
+          {
+            "name": "NodeGetInfoResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "node_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "max_volumes_per_node",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "accessible_topology",
+                "type": "Topology"
+              }
+            ]
+          },
+          {
+            "name": "NodeExpandVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume_id",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "volume_path",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "capacity_range",
+                "type": "CapacityRange"
+              }
+            ]
+          },
+          {
+            "name": "NodeExpandVolumeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "capacity_bytes",
+                "type": "int64"
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "Identity",
+            "rpcs": [
+              {
+                "name": "GetPluginInfo",
+                "in_type": "GetPluginInfoRequest",
+                "out_type": "GetPluginInfoResponse"
+              },
+              {
+                "name": "GetPluginCapabilities",
+                "in_type": "GetPluginCapabilitiesRequest",
+                "out_type": "GetPluginCapabilitiesResponse"
+              },
+              {
+                "name": "Probe",
+                "in_type": "ProbeRequest",
+                "out_type": "ProbeResponse"
+              }
+            ]
+          },
+          {
+            "name": "Controller",
+            "rpcs": [
+              {
+                "name": "CreateVolume",
+                "in_type": "CreateVolumeRequest",
+                "out_type": "CreateVolumeResponse"
+              },
+              {
+                "name": "DeleteVolume",
+                "in_type": "DeleteVolumeRequest",
+                "out_type": "DeleteVolumeResponse"
+              },
+              {
+                "name": "ControllerPublishVolume",
+                "in_type": "ControllerPublishVolumeRequest",
+                "out_type": "ControllerPublishVolumeResponse"
+              },
+              {
+                "name": "ControllerUnpublishVolume",
+                "in_type": "ControllerUnpublishVolumeRequest",
+                "out_type": "ControllerUnpublishVolumeResponse"
+              },
+              {
+                "name": "ValidateVolumeCapabilities",
+                "in_type": "ValidateVolumeCapabilitiesRequest",
+                "out_type": "ValidateVolumeCapabilitiesResponse"
+              },
+              {
+                "name": "ListVolumes",
+                "in_type": "ListVolumesRequest",
+                "out_type": "ListVolumesResponse"
+              },
+              {
+                "name": "GetCapacity",
+                "in_type": "GetCapacityRequest",
+                "out_type": "GetCapacityResponse"
+              },
+              {
+                "name": "ControllerGetCapabilities",
+                "in_type": "ControllerGetCapabilitiesRequest",
+                "out_type": "ControllerGetCapabilitiesResponse"
+              },
+              {
+                "name": "CreateSnapshot",
+                "in_type": "CreateSnapshotRequest",
+                "out_type": "CreateSnapshotResponse"
+              },
+              {
+                "name": "DeleteSnapshot",
+                "in_type": "DeleteSnapshotRequest",
+                "out_type": "DeleteSnapshotResponse"
+              },
+              {
+                "name": "ListSnapshots",
+                "in_type": "ListSnapshotsRequest",
+                "out_type": "ListSnapshotsResponse"
+              },
+              {
+                "name": "ControllerExpandVolume",
+                "in_type": "ControllerExpandVolumeRequest",
+                "out_type": "ControllerExpandVolumeResponse"
+              }
+            ]
+          },
+          {
+            "name": "Node",
+            "rpcs": [
+              {
+                "name": "NodeStageVolume",
+                "in_type": "NodeStageVolumeRequest",
+                "out_type": "NodeStageVolumeResponse"
+              },
+              {
+                "name": "NodeUnstageVolume",
+                "in_type": "NodeUnstageVolumeRequest",
+                "out_type": "NodeUnstageVolumeResponse"
+              },
+              {
+                "name": "NodePublishVolume",
+                "in_type": "NodePublishVolumeRequest",
+                "out_type": "NodePublishVolumeResponse"
+              },
+              {
+                "name": "NodeUnpublishVolume",
+                "in_type": "NodeUnpublishVolumeRequest",
+                "out_type": "NodeUnpublishVolumeResponse"
+              },
+              {
+                "name": "NodeGetVolumeStats",
+                "in_type": "NodeGetVolumeStatsRequest",
+                "out_type": "NodeGetVolumeStatsResponse"
+              },
+              {
+                "name": "NodeExpandVolume",
+                "in_type": "NodeExpandVolumeRequest",
+                "out_type": "NodeExpandVolumeResponse"
+              },
+              {
+                "name": "NodeGetCapabilities",
+                "in_type": "NodeGetCapabilitiesRequest",
+                "out_type": "NodeGetCapabilitiesResponse"
+              },
+              {
+                "name": "NodeGetInfo",
+                "in_type": "NodeGetInfoRequest",
+                "out_type": "NodeGetInfoResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "google/protobuf/descriptor.proto"
+          },
+          {
+            "path": "google/protobuf/timestamp.proto"
+          },
+          {
+            "path": "google/protobuf/wrappers.proto"
+          }
+        ],
+        "package": {
+          "name": "csi.v1"
+        },
+        "options": [
+          {
+            "name": "go_package",
+            "value": "csi"
+          }
+        ]
+      }
+    }
+  ]
+}

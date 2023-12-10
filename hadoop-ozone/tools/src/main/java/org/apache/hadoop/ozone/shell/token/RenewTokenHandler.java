@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /**
  * Executes renewDelegationToken api.
@@ -36,6 +37,7 @@ public class RenewTokenHandler extends TokenHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
     long expiryTime = client.getObjectStore().renewDelegationToken(getToken());
-    out().printf("Token renewed successfully, expiry time: %s.%n", expiryTime);
+    out().printf("Token renewed successfully, expiry time: %s.%n",
+        Instant.ofEpochMilli(expiryTime));
   }
 }

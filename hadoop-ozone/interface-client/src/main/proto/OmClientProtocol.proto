@@ -1,0 +1,2109 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+
+syntax = "proto2";
+option java_package = "org.apache.hadoop.ozone.protocol.proto";
+option java_outer_classname = "OzoneManagerProtocolProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+package hadoop.ozone;
+
+/**
+This file contains the protocol to communicate with
+Ozone Manager. Ozone Manager manages the namespace for ozone.
+This is similar to Namenode for Ozone.
+*/
+
+import "hdds.proto";
+import "Security.proto";
+
+enum Type {
+  UnknownCommand = 0;
+  CreateVolume = 11;
+  SetVolumeProperty = 12;
+  CheckVolumeAccess = 13;
+  InfoVolume = 14;
+  DeleteVolume = 15;
+  ListVolume = 16;
+
+  CreateBucket = 21;
+  InfoBucket = 22;
+  SetBucketProperty = 23;
+  DeleteBucket = 24;
+  ListBuckets = 25;
+
+  CreateKey = 31;
+  LookupKey = 32;
+  RenameKey = 33;
+  DeleteKey = 34;
+  ListKeys = 35;
+  CommitKey = 36;
+  AllocateBlock = 37;
+  DeleteKeys = 38;
+  RenameKeys = 39;
+  DeleteOpenKeys = 40;
+
+  InitiateMultiPartUpload = 45;
+  CommitMultiPartUpload = 46;
+  CompleteMultiPartUpload = 47;
+  AbortMultiPartUpload = 48;
+  GetS3Secret = 49;
+  ListMultiPartUploadParts = 50;
+
+  ServiceList = 51;
+  DBUpdates = 53;
+  FinalizeUpgrade = 54;
+  FinalizeUpgradeProgress = 55;
+  Prepare = 56;
+  PrepareStatus = 57;
+  CancelPrepare = 58;
+
+  GetDelegationToken = 61;
+  RenewDelegationToken = 62;
+  CancelDelegationToken = 63;
+
+  GetFileStatus = 70;
+  CreateDirectory = 71;
+  CreateFile = 72;
+  LookupFile = 73;
+  ListStatus = 74;
+  AddAcl = 75;
+  RemoveAcl = 76;
+  SetAcl = 77;
+  GetAcl = 78;
+
+  PurgeKeys = 81;
+
+  ListMultipartUploads = 82;
+
+  ListTrash = 91;
+  RecoverTrash = 92;
+
+  RevokeS3Secret = 93;
+
+  PurgePaths = 94; // [deprecated = true]
+  PurgeDirectories = 95;
+
+  CreateTenant = 96;
+  DeleteTenant = 97;
+  ListTenant = 98;
+
+  TenantGetUserInfo = 99;
+  TenantAssignUserAccessId = 100;
+  TenantRevokeUserAccessId = 101;
+
+  TenantAssignAdmin = 102;
+  TenantRevokeAdmin = 103;
+
+  GetS3VolumeContext = 104;
+  TenantListUser = 105;
+
+  SetS3Secret = 106;
+
+  SetRangerServiceVersion = 107;
+  RangerBGSync = 109;
+
+  EchoRPC = 110;
+  GetKeyInfo = 111;
+
+  CreateSnapshot = 112;
+  ListSnapshot = 113;
+  SnapshotDiff = 114;
+  DeleteSnapshot = 115;
+  SnapshotMoveDeletedKeys = 116;
+  TransferLeadership = 117;
+  SnapshotPurge = 118;
+  RecoverLease = 119;
+  SetTimes = 120;
+  RefetchSecretKey = 121;
+  ListSnapshotDiffJobs = 122;
+  CancelSnapshotDiff = 123;
+  SetSafeMode = 124;
+  PrintCompactionLogDag = 125;
+  ListKeysLight = 126;
+  AbortExpiredMultiPartUploads = 127;
+  SetSnapshotProperty = 128;
+  ListStatusLight = 129;
+  GetSnapshotInfo = 130;
+}
+
+enum SafeMode {
+    ENTER = 1;
+    LEAVE = 2;
+    FORCE_EXIT = 3;
+    GET = 4;
+}
+
+message OMRequest {
+  required Type cmdType = 1; // Type of the command
+
+  // A string that identifies this command, we generate  Trace ID in Ozone
+  // frontend and this allows us to trace that command all over ozone.
+  optional string traceID = 2;
+
+  required string clientId = 3;
+
+  optional UserInfo userInfo = 4;
+  optional uint32 version = 5;
+
+  optional LayoutVersion layoutVersion = 6;
+
+  optional CreateVolumeRequest              createVolumeRequest            = 11;
+  optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
+  optional CheckVolumeAccessRequest         checkVolumeAccessRequest       = 13;
+  optional InfoVolumeRequest                infoVolumeRequest              = 14;
+  optional DeleteVolumeRequest              deleteVolumeRequest            = 15;
+  optional ListVolumeRequest                listVolumeRequest              = 16;
+
+  optional CreateBucketRequest              createBucketRequest            = 21;
+  optional InfoBucketRequest                infoBucketRequest              = 22;
+  optional SetBucketPropertyRequest         setBucketPropertyRequest       = 23;
+  optional DeleteBucketRequest              deleteBucketRequest            = 24;
+  optional ListBucketsRequest               listBucketsRequest             = 25;
+
+  optional CreateKeyRequest                 createKeyRequest               = 31;
+  optional LookupKeyRequest                 lookupKeyRequest               = 32;
+  optional RenameKeyRequest                 renameKeyRequest               = 33;
+  optional DeleteKeyRequest                 deleteKeyRequest               = 34;
+  optional ListKeysRequest                  listKeysRequest                = 35;
+  optional CommitKeyRequest                 commitKeyRequest               = 36;
+  optional AllocateBlockRequest             allocateBlockRequest           = 37;
+  optional DeleteKeysRequest                deleteKeysRequest              = 38;
+  optional RenameKeysRequest                renameKeysRequest              = 39;
+  optional DeleteOpenKeysRequest            deleteOpenKeysRequest          = 40;
+
+  optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
+  optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
+  optional MultipartUploadCompleteRequest   completeMultiPartUploadRequest = 47;
+  optional MultipartUploadAbortRequest      abortMultiPartUploadRequest    = 48;
+  optional GetS3SecretRequest               getS3SecretRequest             = 49;
+  optional MultipartUploadListPartsRequest  listMultipartUploadPartsRequest = 50;
+
+  optional ServiceListRequest               serviceListRequest             = 51;
+  optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
+  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
+  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
+  optional PrepareRequest                   prepareRequest                 = 56;
+  optional PrepareStatusRequest             prepareStatusRequest           = 57;
+  optional CancelPrepareRequest             cancelPrepareRequest           = 58;
+
+  optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
+  optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
+  optional hadoop.common.CancelDelegationTokenRequestProto cancelDelegationTokenRequest = 63;
+  optional UpdateGetDelegationTokenRequest updateGetDelegationTokenRequest = 64;
+  optional UpdateRenewDelegationTokenRequest updatedRenewDelegationTokenRequest = 65;
+
+  optional GetFileStatusRequest             getFileStatusRequest           = 70;
+  optional CreateDirectoryRequest           createDirectoryRequest         = 71;
+  optional CreateFileRequest                createFileRequest              = 72;
+  optional LookupFileRequest                lookupFileRequest              = 73;
+  optional ListStatusRequest                listStatusRequest              = 74;
+  optional AddAclRequest                    addAclRequest                  = 75;
+  optional RemoveAclRequest                 removeAclRequest               = 76;
+  optional SetAclRequest                    setAclRequest                  = 77;
+  optional GetAclRequest                    getAclRequest                  = 78;
+
+  optional PurgeKeysRequest                 purgeKeysRequest               = 81;
+
+  optional UpdateGetS3SecretRequest         updateGetS3SecretRequest       = 82;
+  optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
+
+  optional ListTrashRequest                 listTrashRequest               = 91;
+  optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+
+  optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
+
+  optional PurgePathsRequest                purgePathsRequest              = 94 [deprecated = true];
+  optional PurgeDirectoriesRequest          purgeDirectoriesRequest        = 108;
+
+  optional S3Authentication                 s3Authentication               = 95;
+
+  optional CreateTenantRequest              CreateTenantRequest            = 96;
+  optional DeleteTenantRequest              DeleteTenantRequest            = 97;
+  optional ListTenantRequest                ListTenantRequest              = 98;
+
+  optional TenantGetUserInfoRequest         TenantGetUserInfoRequest       = 99;
+  optional TenantAssignUserAccessIdRequest  TenantAssignUserAccessIdRequest= 100;
+  optional TenantRevokeUserAccessIdRequest  TenantRevokeUserAccessIdRequest= 101;
+
+  optional TenantAssignAdminRequest         TenantAssignAdminRequest       = 102;
+  optional TenantRevokeAdminRequest         TenantRevokeAdminRequest       = 103;
+
+  optional GetS3VolumeContextRequest        getS3VolumeContextRequest      = 104;
+  optional TenantListUserRequest            tenantListUserRequest          = 105;
+
+  optional SetS3SecretRequest               SetS3SecretRequest             = 106;
+
+  optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
+  optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
+
+  optional EchoRPCRequest                   EchoRPCRequest                 = 110;
+  optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
+
+  optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 113;
+  optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
+  optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
+
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+  optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
+
+  optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
+  optional SetTimesRequest                  SetTimesRequest                = 120;
+  optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
+  optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
+  optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
+  optional SetSafeModeRequest               SetSafeModeRequest             = 124;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+
+  optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
+  optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
+  optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+}
+
+message OMResponse {
+  required Type cmdType = 1; // Type of the command
+
+  // A string that identifies this command, we generate  Trace ID in Ozone
+  // frontend and this allows us to trace that command all over ozone.
+  optional string traceID = 2;
+
+  optional bool success = 3 [default=true];
+
+  optional string message = 4;
+
+  required Status status = 5;
+
+  optional string leaderOMNodeId = 6;
+
+  optional CreateVolumeResponse              createVolumeResponse          = 11;
+  optional SetVolumePropertyResponse         setVolumePropertyResponse     = 12;
+  optional CheckVolumeAccessResponse         checkVolumeAccessResponse     = 13;
+  optional InfoVolumeResponse                infoVolumeResponse            = 14;
+  optional DeleteVolumeResponse              deleteVolumeResponse          = 15;
+  optional ListVolumeResponse                listVolumeResponse            = 16;
+
+  optional CreateBucketResponse              createBucketResponse          = 21;
+  optional InfoBucketResponse                infoBucketResponse            = 22;
+  optional SetBucketPropertyResponse         setBucketPropertyResponse     = 23;
+  optional DeleteBucketResponse              deleteBucketResponse          = 24;
+  optional ListBucketsResponse               listBucketsResponse           = 25;
+
+  optional CreateKeyResponse                 createKeyResponse             = 31;
+  optional LookupKeyResponse                 lookupKeyResponse             = 32;
+  optional RenameKeyResponse                 renameKeyResponse             = 33;
+  optional DeleteKeyResponse                 deleteKeyResponse             = 34;
+  optional ListKeysResponse                  listKeysResponse              = 35;
+  optional CommitKeyResponse                 commitKeyResponse             = 36;
+  optional AllocateBlockResponse             allocateBlockResponse         = 37;
+  optional DeleteKeysResponse                deleteKeysResponse            = 38;
+  optional RenameKeysResponse                renameKeysResponse            = 39;
+
+  optional MultipartInfoInitiateResponse   initiateMultiPartUploadResponse = 45;
+  optional MultipartCommitUploadPartResponse commitMultiPartUploadResponse = 46;
+  optional MultipartUploadCompleteResponse completeMultiPartUploadResponse = 47;
+  optional MultipartUploadAbortResponse    abortMultiPartUploadResponse    = 48;
+  optional GetS3SecretResponse               getS3SecretResponse           = 49;
+  optional MultipartUploadListPartsResponse listMultipartUploadPartsResponse = 50;
+
+  optional ServiceListResponse               ServiceListResponse           = 51;
+  optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
+  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
+  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
+  optional PrepareResponse                 prepareResponse                 = 56;
+  optional PrepareStatusResponse           prepareStatusResponse           = 57;
+  optional CancelPrepareResponse           cancelPrepareResponse           = 58;
+
+  optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
+  optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
+  optional CancelDelegationTokenResponseProto cancelDelegationTokenResponse = 63;
+
+  optional GetFileStatusResponse              getFileStatusResponse        = 70;
+  optional CreateDirectoryResponse            createDirectoryResponse      = 71;
+  optional CreateFileResponse                 createFileResponse           = 72;
+  optional LookupFileResponse                 lookupFileResponse           = 73;
+  optional ListStatusResponse                 listStatusResponse           = 74;
+  optional AddAclResponse                    addAclResponse                = 75;
+  optional RemoveAclResponse                 removeAclResponse             = 76;
+  optional SetAclResponse                   setAclResponse                 = 77;
+  optional GetAclResponse                    getAclResponse                = 78;
+
+  optional PurgeKeysResponse                  purgeKeysResponse            = 81;
+
+  optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
+
+  optional ListTrashResponse                  listTrashResponse            = 91;
+  optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
+  optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
+
+  // Skipped 94/95 to align with OMRequest
+  optional CreateTenantResponse              CreateTenantResponse          = 96;
+  optional DeleteTenantResponse              DeleteTenantResponse          = 97;
+  optional ListTenantResponse                ListTenantResponse            = 98;
+
+  optional TenantGetUserInfoResponse         TenantGetUserInfoResponse     = 99;
+  optional TenantAssignUserAccessIdResponse  TenantAssignUserAccessIdResponse = 100;
+  optional TenantRevokeUserAccessIdResponse  TenantRevokeUserAccessIdResponse = 101;
+
+  optional TenantAssignAdminResponse         TenantAssignAdminResponse     = 102;
+  optional TenantRevokeAdminResponse         TenantRevokeAdminResponse     = 103;
+
+  optional GetS3VolumeContextResponse        getS3VolumeContextResponse    = 104;
+  optional TenantListUserResponse            tenantListUserResponse        = 105;
+
+  optional SetS3SecretResponse               SetS3SecretResponse           = 106;
+
+  optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
+  optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
+
+  optional EchoRPCResponse                   EchoRPCResponse               = 110;
+  optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
+
+  optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
+  optional ListSnapshotResponse              ListSnapshotResponse          = 113;
+  optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
+  optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
+  optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
+
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse        = 118;
+  optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
+  optional SetTimesResponse                  SetTimesResponse              = 120;
+  optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
+  optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
+  optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 124;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional ListKeysLightResponse             listKeysLightResponse         = 126;
+  optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
+  optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
+  optional ListStatusLightResponse           listStatusLightResponse       = 129;
+  optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
+  optional OMLockDetailsProto                omLockDetails                 = 131;
+}
+
+enum Status {
+    OK = 1;
+    VOLUME_NOT_UNIQUE = 2;
+    VOLUME_NOT_FOUND = 3;
+    VOLUME_NOT_EMPTY = 4;
+    VOLUME_ALREADY_EXISTS = 5;
+    USER_NOT_FOUND = 6;
+    USER_TOO_MANY_VOLUMES = 7;
+    BUCKET_NOT_FOUND = 8;
+    BUCKET_NOT_EMPTY = 9;
+    BUCKET_ALREADY_EXISTS = 10;
+    KEY_ALREADY_EXISTS = 11;
+    KEY_NOT_FOUND = 12;
+    INVALID_KEY_NAME = 13;
+    ACCESS_DENIED = 14;
+    INTERNAL_ERROR = 15;
+    KEY_ALLOCATION_ERROR = 16;
+    KEY_DELETION_ERROR = 17;
+    KEY_RENAME_ERROR = 18;
+    METADATA_ERROR = 19;
+    OM_NOT_INITIALIZED = 20;
+    SCM_VERSION_MISMATCH_ERROR = 21;
+
+    INITIATE_MULTIPART_UPLOAD_ERROR = 24;
+    MULTIPART_UPLOAD_PARTFILE_ERROR = 25;
+    NO_SUCH_MULTIPART_UPLOAD_ERROR = 26;
+    MISMATCH_MULTIPART_LIST = 27;
+    MISSING_UPLOAD_PARTS = 28;
+    COMPLETE_MULTIPART_UPLOAD_ERROR = 29;
+    ENTITY_TOO_SMALL = 30;
+    ABORT_MULTIPART_UPLOAD_FAILED = 31;
+
+    S3_SECRET_NOT_FOUND = 32;
+
+    INVALID_AUTH_METHOD = 33;
+    INVALID_TOKEN = 34;
+    TOKEN_EXPIRED = 35;
+    TOKEN_ERROR_OTHER = 36;
+    LIST_MULTIPART_UPLOAD_PARTS_FAILED = 37;
+    SCM_IN_SAFE_MODE = 38;
+    INVALID_REQUEST = 39;
+
+    BUCKET_ENCRYPTION_KEY_NOT_FOUND = 40;
+    UNKNOWN_CIPHER_SUITE = 41;
+    INVALID_KMS_PROVIDER = 42;
+    TOKEN_CREATION_ERROR = 43;
+
+    FILE_NOT_FOUND = 44;
+    DIRECTORY_NOT_FOUND = 45;
+    FILE_ALREADY_EXISTS = 46;
+    NOT_A_FILE = 47;
+    PERMISSION_DENIED = 48;
+    TIMEOUT = 49;
+    PREFIX_NOT_FOUND=50;
+
+    RATIS_ERROR = 52;
+
+    INVALID_PATH_IN_ACL_REQUEST = 53; // Invalid path name in acl request.
+
+    USER_MISMATCH = 54; // Error code when requested user name passed is
+    // different from remote user.
+
+    INVALID_PART = 55;
+    INVALID_PART_ORDER = 56;
+    SCM_GET_PIPELINE_EXCEPTION = 57;
+    INVALID_BUCKET_NAME = 58;
+
+    CANNOT_CREATE_DIRECTORY_AT_ROOT = 59;
+    DIRECTORY_ALREADY_EXISTS = 60;
+
+    INVALID_VOLUME_NAME = 61;
+
+    PARTIAL_DELETE = 62;
+
+    DETECTED_LOOP_IN_BUCKET_LINKS = 63;
+
+    NOT_SUPPORTED_OPERATION = 64;
+
+    PARTIAL_RENAME = 65;
+
+    QUOTA_EXCEEDED = 66;
+
+    QUOTA_ERROR = 67;
+
+    DIRECTORY_NOT_EMPTY = 68;
+
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
+    UPDATE_LAYOUT_VERSION_FAILED = 71;
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
+    PREPARE_FAILED = 73;
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
+    NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
+
+    TENANT_NOT_FOUND = 76;
+    TENANT_ALREADY_EXISTS = 77;
+    INVALID_TENANT_ID = 78;
+
+    ACCESS_ID_NOT_FOUND = 79;
+    TENANT_USER_ACCESS_ID_ALREADY_EXISTS = 80;
+    INVALID_TENANT_USERNAME = 81;
+    INVALID_ACCESS_ID = 82;
+    TENANT_AUTHORIZER_ERROR = 83;
+
+    VOLUME_IS_REFERENCED = 84;
+    TENANT_NOT_EMPTY = 85;
+
+    FEATURE_NOT_ENABLED = 86;
+
+    INVALID_SNAPSHOT_ERROR = 87;
+
+    CONTAINS_SNAPSHOT = 88;
+    SSL_CONNECTION_FAILURE = 89;
+    RENAME_OPEN_FILE = 90;
+    UNAUTHORIZED = 91;
+
+    S3_SECRET_ALREADY_EXISTS = 92;
+    
+    INVALID_PATH = 93;
+
+    TOO_MANY_BUCKETS = 94;
+}
+
+/**
+    This command acts as a list command for deleted keys that are still present
+    in the deleted table on Ozone Manager.
+*/
+message ListTrashRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string startKeyName = 3;
+  optional string keyPrefix = 4;
+  optional int32 maxKeys = 5;
+}
+
+message ListTrashResponse {
+  repeated RepeatedKeyInfo deletedKeys = 1;
+}
+
+/**
+    This command acts as a recover command for deleted keys that are still
+    in deleted table on Ozone Manager.
+*/
+
+message RecoverTrashRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required string destinationBucket = 4;
+}
+
+message RecoverTrashResponse {
+    required bool response = 1;
+}
+
+message VolumeInfo {
+    required string adminName = 1;
+    required string ownerName = 2;
+    required string volume = 3;
+    optional uint64 quotaInBytes = 4;
+    repeated hadoop.hdds.KeyValue metadata = 5;
+    repeated OzoneAclInfo volumeAcls = 6;
+    optional uint64 creationTime = 7;
+    optional uint64 objectID = 8;
+    optional uint64 updateID = 9;
+    optional uint64 modificationTime = 10;
+    optional int64 quotaInNamespace = 11 [default = -2];
+    optional uint64 usedNamespace = 12;
+    optional int64 refCount = 13;
+}
+
+/**
+    User information which will be extracted during RPC context and used
+    during validating Acl.
+*/
+message UserInfo {
+    optional string userName = 1;
+    optional string remoteAddress = 3;
+    optional string hostName = 4;
+}
+
+/**
+  This will be used during OM HA, once leader generates token sends this
+  request via ratis to persist to OM DB. This request will be internally used
+   by OM for replicating token across a quorum of OMs.
+*/
+message UpdateGetDelegationTokenRequest {
+    required GetDelegationTokenResponseProto getDelegationTokenResponse = 1;
+    optional uint64 tokenRenewInterval = 2;
+}
+
+/**
+  This will be used during OM HA, once leader renews token, sends this
+   request via ratis to persist to OM DB. This request will be internally used
+   by OM for replicating renewed token information across a quorum of OMs.
+*/
+message UpdateRenewDelegationTokenRequest {
+    required hadoop.common.RenewDelegationTokenRequestProto
+    renewDelegationTokenRequest = 1;
+    required RenewDelegationTokenResponseProto renewDelegationTokenResponse = 2;
+}
+
+/**
+    Creates a volume
+*/
+message CreateVolumeRequest {
+    required VolumeInfo volumeInfo = 1;
+}
+
+message CreateVolumeResponse {
+
+}
+
+message UserVolumeInfo {
+    repeated string volumeNames = 1;
+    optional uint64 objectID = 2;
+    optional uint64 updateID = 3;
+}
+
+/**
+    Changes the Volume Properties -- like ownership and quota for a volume.
+*/
+message SetVolumePropertyRequest {
+    required string volumeName = 1;
+    optional string ownerName = 2;
+    optional uint64 quotaInBytes = 3;
+    optional uint64 modificationTime = 4;
+    optional uint64 quotaInNamespace = 5;
+}
+
+message SetVolumePropertyResponse {
+    optional bool response = 1;
+}
+
+message RefetchSecretKeyRequest {
+
+}
+
+message RefetchSecretKeyResponse {
+    optional hdds.UUID id = 1;
+}
+
+/**
+ * Checks if the user has specified permissions for the volume
+ */
+message CheckVolumeAccessRequest {
+    required string volumeName = 1;
+    required OzoneAclInfo userAcl = 2;
+}
+
+message CheckVolumeAccessResponse {
+
+}
+
+
+/**
+    Returns information about a volume.
+*/
+
+message InfoVolumeRequest {
+    required string volumeName = 1;
+}
+
+message InfoVolumeResponse {
+    optional VolumeInfo volumeInfo = 2;
+}
+
+/**
+    Deletes an existing volume.
+*/
+message DeleteVolumeRequest {
+    required string volumeName = 1;
+}
+
+message DeleteVolumeResponse {
+
+}
+
+
+/**
+    List Volumes -- List all volumes in the cluster or by user.
+*/
+
+message ListVolumeRequest {
+    enum Scope {
+        USER_VOLUMES = 1;   // User volumes -- called by user
+        VOLUMES_BY_USER = 2; // User volumes - called by Admin
+        VOLUMES_BY_CLUSTER = 3; // All volumes in the cluster
+    }
+    required Scope scope = 1;
+    optional string userName = 2;
+    optional string prefix = 3;
+    optional string prevKey = 4;
+    optional uint32 maxKeys = 5;
+}
+
+message ListVolumeResponse {
+    repeated VolumeInfo volumeInfo = 2;
+}
+
+message BucketInfo {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated OzoneAclInfo acls = 3;
+    required bool isVersionEnabled = 4 [default = false];
+    required StorageTypeProto storageType = 5 [default = DISK];
+    optional uint64 creationTime = 6;
+    repeated hadoop.hdds.KeyValue metadata = 7;
+    optional BucketEncryptionInfoProto beinfo = 8;
+    optional uint64 objectID = 9;
+    optional uint64 updateID = 10;
+    optional uint64 modificationTime = 11;
+    optional string sourceVolume = 12;
+    optional string sourceBucket = 13;
+    optional uint64 usedBytes = 14;
+    optional int64 quotaInBytes = 15 [default = -2];
+    optional int64 quotaInNamespace = 16 [default = -2];
+    optional uint64 usedNamespace = 17;
+    optional BucketLayoutProto bucketLayout = 18;
+    optional string owner = 19;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
+}
+
+enum StorageTypeProto {
+    DISK = 1;
+    SSD = 2;
+    ARCHIVE = 3;
+    RAM_DISK = 4;
+}
+
+enum BucketLayoutProto {
+    LEGACY = 1;
+    FILE_SYSTEM_OPTIMIZED = 2;
+    OBJECT_STORE = 3;
+}
+
+/**
+ * Cipher suite.
+ */
+enum CipherSuiteProto {
+    UNKNOWN = 1;
+    AES_CTR_NOPADDING = 2;
+}
+
+/**
+ * Crypto protocol version used to access encrypted files.
+ */
+enum CryptoProtocolVersionProto {
+    UNKNOWN_PROTOCOL_VERSION = 1;
+    ENCRYPTION_ZONES = 2;
+}
+/**
+ * Encryption information for bucket (bucket key)
+ */
+message BucketEncryptionInfoProto {
+    required string keyName = 1;
+    optional CipherSuiteProto suite = 2;
+    optional CryptoProtocolVersionProto cryptoProtocolVersion = 3;
+}
+
+/**
+ * Encryption information for a file.
+ */
+message FileEncryptionInfoProto {
+    required CipherSuiteProto suite = 1;
+    required CryptoProtocolVersionProto cryptoProtocolVersion = 2;
+    required bytes key = 3;
+    required bytes iv = 4;
+    required string keyName = 5;
+    required string ezKeyVersionName = 6;
+}
+
+/**
+ * Encryption information for an individual
+ * file within an encryption zone
+ */
+message PerFileEncryptionInfoProto {
+    required bytes key = 1;
+    required bytes iv = 2;
+    required string ezKeyVersionName = 3;
+}
+
+message DataEncryptionKeyProto {
+    required uint32 keyId = 1;
+    required bytes nonce = 3;
+    required bytes encryptionKey = 4;
+    required uint64 expiryDate = 5;
+    optional string encryptionAlgorithm = 6;
+}
+
+message BucketArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    optional bool isVersionEnabled = 5;
+    optional StorageTypeProto storageType = 6;
+    repeated hadoop.hdds.KeyValue metadata = 7;
+    optional uint64 quotaInBytes = 8;
+    optional uint64 quotaInNamespace = 9;
+    optional string ownerName = 10;
+    optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
+}
+
+message PrefixInfo {
+    required string name = 1;
+    repeated OzoneAclInfo acls = 2;
+    repeated hadoop.hdds.KeyValue metadata = 3;
+    optional uint64 objectID = 4;
+    optional uint64 updateID = 5;
+}
+
+/**
+ * SnapshotStatus - snapshot states.
+ * Snapshot in one of : active or deleted state
+ */
+enum SnapshotStatusProto {
+  SNAPSHOT_ACTIVE = 1;
+  SNAPSHOT_DELETED = 2;
+}
+
+/**
+ * SnapshotInfo table entry for Bucket/Volume snapshot metadata
+ */
+message SnapshotInfo {
+  optional hadoop.hdds.UUID snapshotID = 1;
+  optional string name = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
+  optional SnapshotStatusProto snapshotStatus = 5;
+  optional uint64 creationTime = 6;
+  optional uint64 deletionTime = 7;
+  optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
+  optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
+  optional string snapshotPath = 10;
+  optional string checkpointDir = 11;
+  optional int64 dbTxSequenceNumber = 12;
+  optional bool deepClean = 13;
+  optional bool sstFiltered = 14;
+  // snapshot reference size before any key replication or EC
+  optional uint64 referencedSize = 15;
+  // snapshot reference size after replication
+  optional uint64 referencedReplicatedSize = 16;
+  // snapshot exclusive size before any key replication or EC
+  optional uint64 exclusiveSize = 17;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSize = 18;
+  // note: shared sizes can be calculated from: referenced - exclusive
+}
+
+message SnapshotDiffJobProto {
+  optional uint64 creationTime = 1;
+  optional string jobId = 2;
+  optional SnapshotDiffResponse.JobStatusProto status = 3;
+  optional string volume = 4;
+  optional string bucket = 5;
+  optional string fromSnapshot = 6;
+  optional string toSnapshot = 7;
+  optional bool forceFullDiff = 8;
+  optional uint64 totalDiffEntries = 9;
+  optional string message = 10;
+  optional bool disableNativeDiff = 11;
+}
+
+message OzoneObj {
+  enum ObjectType {
+    VOLUME = 1;
+    BUCKET = 2;
+    KEY = 3;
+    PREFIX = 4;
+  }
+
+  enum StoreType {
+    OZONE = 1;
+    S3 = 2;
+  }
+  required ObjectType resType = 1;
+  required StoreType storeType = 2  [default = S3];
+  required string path = 3;
+}
+
+message OzoneAclInfo {
+    enum OzoneAclType {
+        USER = 1;
+        GROUP = 2;
+        WORLD = 3;
+        ANONYMOUS = 4;
+        CLIENT_IP = 5;
+    }
+
+    enum OzoneAclScope {
+      ACCESS = 0;
+      DEFAULT = 1;
+    }
+
+    required OzoneAclType type = 1;
+    required string name = 2;
+    required bytes rights = 3;
+    required OzoneAclScope aclScope = 4 [default = ACCESS];
+}
+
+message GetAclRequest {
+  required OzoneObj obj = 1;
+}
+
+message GetAclResponse {
+  repeated OzoneAclInfo acls = 1;
+}
+
+message AddAclRequest {
+  required OzoneObj obj = 1;
+  required OzoneAclInfo acl = 2;
+  optional uint64 modificationTime = 3;
+}
+
+message AddAclResponse {
+  required bool response = 1;
+}
+
+message RemoveAclRequest {
+  required OzoneObj obj = 1;
+  required OzoneAclInfo acl = 2;
+  optional uint64 modificationTime = 3;
+}
+
+message RemoveAclResponse {
+  required bool response = 1;
+}
+
+message SetAclRequest {
+  required OzoneObj obj = 1;
+  repeated OzoneAclInfo acl = 2;
+  optional uint64 modificationTime = 3;
+}
+
+message SetAclResponse {
+  required bool response = 1;
+}
+
+message CreateBucketRequest {
+    required BucketInfo bucketInfo = 1;
+}
+
+message CreateBucketResponse {
+}
+
+message InfoBucketRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+}
+
+message InfoBucketResponse {
+    optional BucketInfo bucketInfo = 2;
+}
+
+message SetBucketPropertyRequest {
+    optional BucketArgs bucketArgs = 1;
+    optional uint64 modificationTime = 2;
+}
+
+message SetBucketPropertyResponse {
+    optional bool response = 1;
+}
+
+message DeleteBucketRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+}
+
+message DeleteBucketResponse {
+
+}
+
+message ListBucketsRequest {
+    required string volumeName = 1;
+    optional string startKey = 2;
+    optional string prefix = 3;
+    optional int32 count = 4;
+    optional bool hasSnapshot = 5;
+}
+
+message ListBucketsResponse {
+
+    repeated BucketInfo bucketInfo = 2;
+}
+
+message KeyArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    optional uint64 dataSize = 4;
+    optional hadoop.hdds.ReplicationType type = 5 [default = NONE];
+    optional hadoop.hdds.ReplicationFactor factor = 6 [default = ZERO];
+    repeated KeyLocation keyLocations = 7;
+    optional bool isMultipartKey = 8;
+    optional string multipartUploadID = 9;
+    optional uint32 multipartNumber = 10;
+    repeated hadoop.hdds.KeyValue metadata = 11;
+    repeated OzoneAclInfo acls = 12;
+    // This will be set when the request is received in pre-Execute. This
+    // value is used in setting creation/modification time depending on the
+    // request type.
+    optional uint64 modificationTime = 13;
+    optional bool sortDatanodes = 14;
+
+    // This will be set by leader OM in HA and update the original request.
+    optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+    optional bool latestVersionLocation = 16;
+
+    // This will be set when user performs delete directory recursively.
+    optional bool recursive = 17;
+
+    // When it is a head operation which is to check whether key exist
+    optional bool headOp = 18;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
+    // Force OM to update container cache location from SCL
+    optional bool forceUpdateContainerCacheFromSCM = 20;
+}
+
+message KeyLocation {
+    required hadoop.hdds.BlockID blockID = 1;
+    required uint64 offset = 3;
+    required uint64 length = 4;
+    // indicated at which version this block gets created.
+    optional uint64 createVersion = 5;
+    optional hadoop.common.TokenProto token = 6;
+    // Walk around to include pipeline info for client read/write
+    // without talking to scm.
+    // NOTE: the pipeline info may change after pipeline close.
+    // So eventually, we will have to change back to call scm to
+    // get the up to date pipeline information. This will need o3fs
+    // provide not only a OM delegation token but also a SCM delegation token
+    optional hadoop.hdds.Pipeline pipeline = 7;
+
+    optional int32 partNumber = 9 [default = -1];
+}
+
+message KeyLocationList {
+    optional uint64 version = 1;
+    repeated KeyLocation keyLocations = 2;
+    optional FileEncryptionInfoProto fileEncryptionInfo = 3;
+    optional bool isMultipartKey = 4 [default = false];
+}
+
+/**
+ * Checksum algorithms/types used in Ozone
+ * Make sure this enum's integer values match enum values' id properties defined
+ * in org.apache.hadoop.util.DataChecksum.Type
+ */
+enum ChecksumTypeProto {
+  CHECKSUM_NULL = 0;
+  CHECKSUM_CRC32 = 1;
+  CHECKSUM_CRC32C = 2;
+}
+
+enum FileChecksumTypeProto {
+  MD5CRC = 1;  // BlockChecksum obtained by taking the MD5 digest of chunk CRCs
+  COMPOSITE_CRC = 2;  // Chunk-independent CRC, optionally striped
+}
+
+message CompositeCrcFileChecksumProto {
+  required ChecksumTypeProto checksumType = 1;
+  required uint32 bytesPerCrc = 2;
+  required uint32 crc = 3;
+}
+
+message MD5MD5Crc32FileChecksumProto {
+  required ChecksumTypeProto checksumType = 1;
+  required uint32 bytesPerCRC = 2;
+  required uint64 crcPerBlock = 3;
+  required bytes md5 = 4;
+}
+
+message FileChecksumProto {
+  required FileChecksumTypeProto checksumType = 1  [default = COMPOSITE_CRC];
+  optional CompositeCrcFileChecksumProto compositeCrc = 2;
+  optional MD5MD5Crc32FileChecksumProto md5Crc = 3;
+}
+
+message KeyInfo {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required uint64 dataSize = 4;
+    required hadoop.hdds.ReplicationType type = 5;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
+    repeated KeyLocationList keyLocationList = 7;
+    required uint64 creationTime = 8;
+    required uint64 modificationTime = 9;
+    optional uint64 latestVersion = 10;
+    repeated hadoop.hdds.KeyValue metadata = 11;
+    optional FileEncryptionInfoProto fileEncryptionInfo = 12;
+    repeated OzoneAclInfo acls = 13;
+    optional uint64 objectID = 14;
+    optional uint64 updateID = 15;
+    optional uint64 parentID = 16;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+    optional FileChecksumProto fileChecksum = 18;
+    optional bool isFile = 19;
+}
+
+message BasicKeyInfo {
+    optional string keyName = 1;
+    optional uint64 dataSize = 2;
+    optional uint64 creationTime = 3;
+    optional uint64 modificationTime = 4;
+    optional hadoop.hdds.ReplicationType type = 5;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
+}
+
+message DirectoryInfo {
+    required string name = 1;
+    required uint64 creationTime = 2;
+    required uint64 modificationTime = 3;
+    repeated hadoop.hdds.KeyValue metadata = 4;
+    repeated OzoneAclInfo acls = 5;
+    required uint64 objectID = 6;
+    required uint64 updateID = 7;
+    required uint64 parentID = 8;
+}
+
+message RepeatedKeyInfo {
+    repeated KeyInfo keyInfo = 1;
+}
+
+message OzoneFileStatusProto {
+    optional KeyInfo keyInfo = 2;
+    optional uint64 blockSize = 3;
+    optional bool isDirectory = 4;
+
+}
+
+message OzoneFileStatusProtoLight {
+    optional string volumeName = 1;
+    optional string bucketName = 2;
+    optional BasicKeyInfo basicKeyInfo = 3;
+    optional uint64 blockSize = 4;
+    optional bool isDirectory = 5;
+}
+
+message GetFileStatusRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message GetFileStatusResponse {
+    required OzoneFileStatusProto status = 1;
+}
+
+message GetFileStatusLightResponse {
+    required OzoneFileStatusProtoLight status = 1;
+}
+
+message CreateDirectoryRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message CreateDirectoryResponse {
+}
+
+message CreateFileRequest {
+    required KeyArgs keyArgs = 1;
+    required bool isRecursive = 2;
+    required bool isOverwrite = 3;
+    // Set in OM HA during preExecute step. This way all OM's use same ID in
+    // OM HA.
+    optional uint64 clientID = 4;
+}
+
+message CreateFileResponse {
+
+    optional KeyInfo keyInfo = 1;
+    // clients' followup request may carry this ID for stateful operations
+    // (similar to a cookie).
+    optional uint64 ID = 2;
+    optional uint64 openVersion = 3;
+}
+
+message LookupFileRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message LookupFileResponse {
+    optional KeyInfo keyInfo = 1;
+}
+
+message ListStatusRequest {
+    required KeyArgs keyArgs = 1;
+    required bool recursive = 2;
+    required string startKey = 3;
+    required uint64 numEntries = 4;
+    optional bool allowPartialPrefix = 5;
+}
+
+message ListStatusResponse {
+    repeated OzoneFileStatusProto statuses = 1;
+}
+
+message ListStatusLightResponse {
+    repeated OzoneFileStatusProtoLight statuses = 1;
+}
+
+message CreateKeyRequest {
+    required KeyArgs keyArgs = 1;
+    // Set in OM HA during preExecute step. This way all OM's use same ID in
+    // OM HA.
+    optional uint64 clientID = 2;
+}
+
+message CreateKeyResponse {
+    optional KeyInfo keyInfo = 2;
+    // clients' followup request may carry this ID for stateful operations
+    // (similar to a cookie).
+    optional uint64 ID = 3;
+    optional uint64 openVersion = 4;
+}
+
+message LookupKeyRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message LookupKeyResponse {
+    optional KeyInfo keyInfo = 2;
+    // clients' followup request may carry this ID for stateful operations (similar
+    // to a cookie).
+    optional uint64 ID = 3;
+    // TODO : allow specifying a particular version to read.
+    optional uint64 openVersion = 4;
+}
+
+message GetKeyInfoRequest {
+  required KeyArgs keyArgs = 1;
+  optional bool assumeS3Context = 2;
+}
+
+message GetKeyInfoResponse {
+  optional KeyInfo keyInfo = 1;
+  optional VolumeInfo volumeInfo = 2;
+  optional string UserPrincipal = 3;
+}
+
+message RenameKeysRequest {
+    required RenameKeysArgs renameKeysArgs = 1;
+}
+
+message RenameKeysArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated RenameKeysMap renameKeysMap = 3;
+}
+
+message RenameKeysMap {
+    required string fromKeyName = 1;
+    required string toKeyName = 2;
+}
+
+message RenameKeysResponse{
+    repeated RenameKeysMap unRenamedKeys = 1;
+    optional bool status = 2;
+}
+
+message RenameKeyRequest{
+    required KeyArgs keyArgs = 1;
+    required string toKeyName = 2;
+}
+
+message RenameKeyResponse{
+
+}
+
+message DeleteKeyRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message DeleteKeysRequest {
+    optional DeleteKeyArgs deleteKeys = 1;
+}
+
+message DeleteKeyArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated string keys = 3;
+}
+
+message DeleteKeysResponse {
+    optional DeleteKeyArgs unDeletedKeys = 1;
+    optional bool status = 2;
+}
+
+message DeleteKeyResponse {
+
+    optional KeyInfo keyInfo = 2;
+    // clients' followup request may carry this ID for stateful operations
+    // (similar to a cookie).
+    optional uint64 ID = 3;
+    optional uint64 openVersion = 4;
+}
+
+message DeletedKeys {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated string keys = 3;
+}
+
+message PurgeKeysRequest {
+    repeated DeletedKeys deletedKeys = 1;
+    // if set, will purge keys in a snapshot DB instead of active DB
+    optional string snapshotTableKey = 2;
+    repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+}
+
+message PurgeKeysResponse {
+
+}
+
+message PurgePathsRequest {
+    // option deprecated = true;
+    // Use PurgeDirectoriesRequest
+    repeated string deletedDirs = 1;
+    repeated KeyInfo deletedSubFiles = 2;
+    repeated KeyInfo markDeletedSubDirs = 3;
+}
+
+message PurgePathsResponse {
+  // option deprecated = true;
+  // Use PurgeDirectoriesResponse
+}
+
+message PurgeDirectoriesRequest {
+  repeated PurgePathRequest deletedPath = 1;
+  optional string snapshotTableKey = 2;
+}
+
+message PurgeDirectoriesResponse {
+
+}
+
+message PurgePathRequest {
+  required uint64 volumeId = 1;
+  required uint64 bucketId = 2;
+  optional string deletedDir = 3;
+  repeated KeyInfo deletedSubFiles = 4;
+  repeated KeyInfo markDeletedSubDirs = 5;
+}
+
+message DeleteOpenKeysRequest {
+  repeated OpenKeyBucket openKeysPerBucket = 1;
+  optional BucketLayoutProto bucketLayout = 2;
+}
+
+message OpenKeyBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated OpenKey keys = 3;
+}
+
+message OpenKey {
+  required string name = 1;
+  optional uint64 clientID = 2 [deprecated=true];
+}
+
+message OMTokenProto {
+    enum Type {
+      DELEGATION_TOKEN = 1;
+      S3AUTHINFO = 2;
+    };
+    required Type   type           = 1;
+    optional uint32 version        = 2;
+    optional string owner          = 3;
+    optional string renewer        = 4;
+    optional string realUser       = 5;
+    optional uint64 issueDate      = 6;
+    optional uint64 maxDate        = 7;
+    optional uint32 sequenceNumber = 8;
+    optional uint32 masterKeyId    = 9;
+    optional uint64 expiryDate     = 10;
+    optional string omCertSerialId = 11;
+    optional string accessKeyId    = 12;
+    optional string signature      = 13;
+    optional string strToSign      = 14;
+    optional string omServiceId    = 15;
+}
+
+message SecretKeyProto {
+    required uint32 keyId = 1;
+    required uint64 expiryDate = 2;
+    required bytes privateKeyBytes = 3;
+    required bytes publicKeyBytes = 4;
+}
+
+message ListKeysRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    optional string startKey = 3;
+    optional string prefix = 4;
+    optional int32 count = 5;
+}
+
+message ListKeysResponse {
+    repeated KeyInfo keyInfo = 2;
+    optional bool isTruncated = 3;
+}
+
+message ListKeysLightResponse {
+    repeated BasicKeyInfo basicKeyInfo = 1;
+    optional bool isTruncated = 2;
+}
+
+message CommitKeyRequest {
+    required KeyArgs keyArgs = 1;
+    required uint64 clientID = 2;
+    optional bool hsync = 3;
+}
+
+message CommitKeyResponse {
+
+}
+
+message AllocateBlockRequest {
+    required KeyArgs keyArgs = 1;
+    required uint64 clientID = 2;
+    optional hadoop.hdds.ExcludeListProto excludeList = 3;
+    // During HA on one of the OM nodes, we allocate block and send the
+    // AllocateBlockRequest with keyLocation set. If this is set, no need to
+    // call scm again in OM Ratis applyTransaction just append it to DB.
+    optional KeyLocation keyLocation = 4;
+}
+
+message AllocateBlockResponse {
+
+    optional KeyLocation keyLocation = 2;
+}
+
+message ServiceListRequest {
+}
+
+message DBUpdatesRequest {
+    required uint64 sequenceNumber = 1;
+    optional uint64 limitCount = 2;
+}
+
+message ServiceListResponse {
+
+    repeated ServiceInfo serviceInfo = 2;
+    // When security is enabled, return SCM CA certificate to Ozone client
+    // to set up gRPC TLS for client to authenticate server(DN).
+    optional string caCertificate = 3;
+
+    repeated string caCerts = 4;
+}
+
+message DBUpdatesResponse {
+    required uint64 sequenceNumber = 1;
+    repeated bytes data = 2;
+    optional uint64 latestSequenceNumber = 3;
+    optional bool dbUpdateSuccess = 4;
+}
+
+message RangerBGSyncRequest {
+    optional bool noWait = 1;
+}
+
+message RangerBGSyncResponse {
+    optional bool runSuccess = 1;
+}
+
+message FinalizeUpgradeRequest {
+  required string upgradeClientId = 1;
+}
+
+message FinalizeUpgradeResponse {
+    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message FinalizeUpgradeProgressRequest {
+    required string upgradeClientId = 1;
+    optional bool takeover = 2;
+    optional bool readonly = 3;
+}
+
+message FinalizeUpgradeProgressResponse {
+    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+message PrepareRequest {
+    required PrepareRequestArgs args = 1;
+}
+
+message PrepareRequestArgs {
+    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300];
+    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5];
+}
+
+message PrepareResponse {
+    required uint64 txnID = 1;
+}
+
+message PrepareStatusRequest {
+    required uint64 txnID = 1;
+}
+
+message PrepareStatusResponse {
+    enum PrepareStatus {
+        NOT_PREPARED = 1;
+        PREPARE_GATE_ENABLED = 2;
+        PREPARE_COMPLETED = 3;
+    }
+    required PrepareStatus status = 1;
+    optional uint64 currentTxnIndex = 2;
+}
+
+message CancelPrepareRequest {
+
+}
+
+message CancelPrepareResponse {
+
+}
+
+message ServicePort {
+    enum Type {
+        RPC = 1;
+        HTTP = 2;
+        HTTPS = 3;
+        RATIS = 4;
+    };
+    required Type type = 1;
+    required uint32 value = 2;
+}
+
+message OMRoleInfo {
+    required string nodeId = 1;
+    required string serverRole = 2;
+}
+
+message ServiceInfo {
+    required hadoop.hdds.NodeType nodeType = 1;
+    required string hostname = 2;
+    repeated ServicePort servicePorts = 3;
+    optional OMRoleInfo omRole = 4;
+    optional int32 OMVersion = 5 [default = 0];
+}
+
+message MultipartInfoInitiateRequest {
+    required KeyArgs keyArgs = 1;
+
+}
+
+message MultipartInfoInitiateResponse {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required string multipartUploadID = 4;
+}
+
+message MultipartKeyInfo {
+    required string uploadID = 1;
+    required uint64 creationTime = 2;
+    required hadoop.hdds.ReplicationType type = 3;
+    optional hadoop.hdds.ReplicationFactor factor = 4;
+    repeated PartKeyInfo partKeyInfoList = 5;
+    optional uint64 objectID = 6;
+    optional uint64 updateID = 7;
+    optional uint64 parentID = 8;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+}
+
+message PartKeyInfo {
+    required string partName = 1;
+    required uint32 partNumber = 2;
+    required KeyInfo partKeyInfo = 3;
+}
+
+message MultipartCommitUploadPartRequest {
+    required KeyArgs keyArgs = 1;
+    required uint64 clientID = 2;
+}
+
+message MultipartCommitUploadPartResponse {
+    // This one is returned as Etag for S3.
+    optional string partName = 1;
+}
+
+message MultipartUploadCompleteRequest {
+    required KeyArgs keyArgs = 1;
+    repeated Part partsList = 2;
+}
+
+message MultipartUploadCompleteResponse {
+    optional string volume = 1;
+    optional string bucket = 2;
+    optional string key = 3;
+    optional string hash = 4; // This will be used as etag for s3
+}
+
+message Part {
+    required uint32 partNumber = 1;
+    required string partName = 2;
+}
+
+message MultipartUploadAbortRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message MultipartUploadAbortResponse {
+
+}
+
+message MultipartUploadsExpiredAbortRequest {
+  repeated ExpiredMultipartUploadsBucket expiredMultipartUploadsPerBucket = 1;
+}
+
+message ExpiredMultipartUploadsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated ExpiredMultipartUploadInfo multipartUploads = 3;
+}
+
+message ExpiredMultipartUploadInfo {
+  required string name = 1;
+}
+
+message MultipartUploadsExpiredAbortResponse {
+}
+
+message MultipartUploadListPartsRequest {
+    required string volume = 1;
+    required string bucket = 2;
+    required string key = 3;
+    required string uploadID = 4;
+    optional uint32 partNumbermarker = 5;
+    optional uint32 maxParts = 6;
+}
+
+message MultipartUploadListPartsResponse {
+    optional hadoop.hdds.ReplicationType type = 2;
+    optional hadoop.hdds.ReplicationFactor factor = 3;
+    optional uint32 nextPartNumberMarker = 4;
+    optional bool isTruncated = 5;
+    repeated PartInfo partsList = 6;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
+}
+
+message ListMultipartUploadsRequest {
+    required string volume = 1;
+    required string bucket = 2;
+    required string prefix = 3;
+}
+
+message ListMultipartUploadsResponse {
+    optional bool isTruncated = 1;
+    repeated MultipartUploadInfo uploadsList = 2;
+}
+
+message MultipartUploadInfo {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required string uploadId = 4;
+    required uint64 creationTime = 5;
+    required hadoop.hdds.ReplicationType type = 6;
+    optional hadoop.hdds.ReplicationFactor factor = 7;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
+}
+
+message PartInfo {
+    required uint32 partNumber = 1;
+    required string partName = 2;
+    required uint64 modificationTime = 3;
+    required uint64 size = 4;
+}
+
+/**
+ Rpc request with optional payload, used in OmRPCLoadGenerator
+ */
+message EchoRPCRequest {
+    optional bytes payloadReq = 1;
+    optional int32 payloadSizeResp = 2;
+    optional bool readOnly = 3 [default = true];
+}
+
+/**
+ Rpc response with optional payload, used in OmRPCLoadGenerator
+ */
+message EchoRPCResponse {
+    optional bytes payload = 1;
+}
+
+
+message GetDelegationTokenResponseProto {
+
+    optional hadoop.common.GetDelegationTokenResponseProto response = 2;
+}
+
+message RenewDelegationTokenResponseProto {
+
+    optional hadoop.common.RenewDelegationTokenResponseProto response = 2;
+}
+
+message CancelDelegationTokenResponseProto {
+
+    optional hadoop.common.CancelDelegationTokenResponseProto response = 2;
+}
+
+message S3Secret {
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
+    required string awsSecret = 2;
+}
+
+message GetS3SecretRequest {
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
+    optional bool createIfNotExist = 2;
+}
+
+message GetS3SecretResponse {
+    required S3Secret s3Secret = 2;
+}
+
+message SetS3SecretRequest {
+    optional string accessId = 1;
+    optional string secretKey = 2;
+}
+
+message SetS3SecretResponse {
+    optional string accessId = 1;
+    optional string secretKey = 2;
+}
+
+message TenantState {
+    optional string tenantId = 1;
+    optional string bucketNamespaceName = 2;        // Volume name
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+    optional string bucketNamespacePolicyName = 5;  // VolumeAccessPolicy name
+    optional string bucketPolicyName = 6;           // BucketAccessPolicy name
+}
+
+message TenantUserPrincipalInfo {
+    repeated string accessIds = 1;
+}
+
+// Stores a basic user-accessId pair, used in TenantListUserResponse
+message UserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;
+}
+
+// Multi-purpose message for storing or transferring extra access ID information
+//
+// This is an extension to the S3Secret protobuf message, carrying supplementary
+//   information to the existing accessId (kerberosID) field.
+// For now, all fields are related to multi-tenancy. New fields can be added
+//   when necessary in the future. e.g. when implementing new features.
+//
+// Usage 1: Stored as value (OmDBAccessIdInfo) in TenantAccessIdTable.
+//   In this case, accessId field is not set to avoid duplication,
+//   because the key of TenantAccessIdTable is already accessId.
+//
+// Usage 2: Used when transferring the result of `ozone tenant user info`
+//   See TenantUserInfoValue.
+//
+message ExtendedUserAccessIdInfo {
+    optional string userPrincipal = 1;
+    optional string accessId = 2;  // OmDBAccessIdInfo doesn't use this field
+    optional string tenantId = 3;
+    optional bool isAdmin = 4;
+    optional bool isDelegatedAdmin = 5;
+}
+
+message ListTenantRequest {
+
+}
+
+message ListTenantResponse {
+    repeated TenantState tenantState = 1;
+}
+
+message TenantListUserRequest {
+    optional string tenantId = 1;
+    optional string prefix = 2;
+}
+
+message TenantListUserResponse {
+    repeated UserAccessIdInfo userAccessIdInfo = 1;
+}
+
+message TenantGetUserInfoRequest {
+    optional string userPrincipal = 1;
+}
+
+message TenantGetUserInfoResponse {
+    repeated ExtendedUserAccessIdInfo accessIdInfo = 1;
+}
+
+message LayoutVersion {
+  required uint64 version = 1;
+}
+
+message RevokeS3SecretRequest {
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
+}
+
+message CreateTenantRequest {
+    optional string tenantId = 1;  // Tenant name
+    optional string volumeName = 2;
+    optional string userRoleName = 3;
+    optional string adminRoleName = 4;
+    optional bool forceCreationWhenVolumeExists = 5;
+}
+
+message SetRangerServiceVersionRequest {
+    required uint64 rangerServiceVersion = 1;
+}
+
+message CreateSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional hadoop.hdds.UUID snapshotId = 4;
+  optional uint64 creationTime = 5;
+}
+
+message ListSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string prefix = 3;
+  optional string prevSnapshot = 4;
+  optional uint32 maxListResult = 5;
+}
+
+message SnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+  optional string token = 5;
+  optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7;
+  optional bool disableNativeDiff = 8;
+}
+
+message CancelSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+}
+
+message ListSnapshotDiffJobRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string jobStatus = 3;
+  optional bool listAll = 4;
+}
+
+message DeleteSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional uint64 deletionTime = 4;
+}
+
+message SnapshotInfoRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+}
+
+message PrintCompactionLogDagRequest {
+  optional string fileNamePrefix = 1;
+  optional string graphType = 2;
+}
+
+message SnapshotMoveDeletedKeysRequest {
+  optional SnapshotInfo fromSnapshot = 1;
+  repeated SnapshotMoveKeyInfos nextDBKeys = 2;
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+  repeated string deletedDirsToMove = 5;
+}
+
+message SnapshotMoveKeyInfos {
+  optional string key = 1;
+  repeated KeyInfo keyInfos = 2;
+}
+
+message SnapshotPurgeRequest {
+  repeated string snapshotDBKeys = 1;
+  repeated string updatedSnapshotDBKey = 2;
+}
+
+message SetSnapshotPropertyRequest {
+  optional SnapshotProperty snapshotProperty = 1;
+}
+
+message SnapshotProperty {
+  optional string snapshotKey = 1;
+  optional uint64 exclusiveSize = 2;
+  optional uint64 exclusiveReplicatedSize = 3;
+}
+
+message DeleteTenantRequest {
+    optional string tenantId = 1;
+}
+
+message TenantAssignUserAccessIdRequest {
+    optional string userPrincipal = 1;
+    optional string tenantId = 2;
+    optional string accessId = 3;
+}
+
+message TenantRevokeUserAccessIdRequest {
+    optional string accessId = 1;
+    optional string tenantId = 2;
+}
+
+message TenantAssignAdminRequest {
+    optional string accessId = 1;
+    optional string tenantId = 2;
+    optional bool delegated = 3;
+}
+
+message TenantRevokeAdminRequest {
+    optional string accessId = 1;
+    optional string tenantId = 2;
+}
+
+message GetS3VolumeContextRequest {
+
+}
+
+message CreateTenantResponse {
+
+}
+
+message SetRangerServiceVersionResponse {
+}
+
+message CreateSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
+}
+
+message ListSnapshotResponse {
+  repeated SnapshotInfo snapshotInfo = 1;
+}
+
+message SnapshotDiffResponse {
+  enum JobStatusProto {
+    QUEUED = 1;
+    IN_PROGRESS = 2;
+    DONE = 3;
+    REJECTED = 4;
+    FAILED = 5;
+    CANCELLED = 6;
+  }
+
+  optional SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional JobStatusProto jobStatus = 2;
+  optional int64 waitTimeInMs = 3;
+  optional string reason = 4;
+}
+
+message CancelSnapshotDiffResponse {
+  optional string reason = 1;
+}
+
+message ListSnapshotDiffJobResponse {
+  repeated SnapshotDiffJobProto snapshotDiffJob = 1;
+}
+
+message DeleteSnapshotResponse {
+
+}
+
+message SnapshotInfoResponse {
+  optional SnapshotInfo snapshotInfo = 1;
+}
+
+message PrintCompactionLogDagResponse {
+  optional string message = 1;
+}
+
+message SnapshotMoveDeletedKeysResponse {
+
+}
+
+message SnapshotPurgeResponse {
+
+}
+
+message SetSnapshotPropertyResponse {
+
+}
+
+message SnapshotDiffReportProto {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+  repeated DiffReportEntryProto diffList = 5;
+  optional string token = 6;
+}
+
+message DiffReportEntryProto {
+  enum DiffTypeProto {
+    CREATE = 1;
+    MODIFY = 2;
+    DELETE= 3;
+    RENAME = 4;
+  }
+  optional DiffTypeProto diffType = 1;
+  optional string sourcePath = 2;
+  optional string targetPath = 3;
+}
+
+message DeleteTenantResponse {
+    optional string volumeName = 1;
+    optional int64 volRefCount = 2;
+}
+
+message TenantAssignUserAccessIdResponse {
+    optional S3Secret s3Secret = 1;
+}
+
+message TenantRevokeUserAccessIdResponse {
+
+}
+
+message TenantAssignAdminResponse {
+
+}
+
+message TenantRevokeAdminResponse {
+
+}
+
+message GetS3VolumeContextResponse {
+  optional VolumeInfo volumeInfo = 1;
+  // Piggybacked username (principal) response to be used for KMS client operations
+  optional string userPrincipal = 2;
+}
+
+/**
+  This will be used internally by OM to replicate S3 Secret across quorum of
+  OM's.
+*/
+message UpdateGetS3SecretRequest {
+    required string kerberosID = 1;  // HDDS-6339: This really means accessId
+    required string awsSecret = 2;
+}
+
+// MARK
+
+/**
+  This will be used by OM to authenticate S3 gateway requests on a per request basis.
+*/
+message S3Authentication {
+    optional string stringToSign = 1;
+    optional string signature = 2;
+    optional string accessId = 3;
+}
+
+message RecoverLeaseRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string keyName = 3;
+}
+
+message RecoverLeaseResponse {
+  optional bool response = 1;
+}
+
+message SetTimesRequest {
+  required KeyArgs keyArgs = 1;
+  required uint64 mtime    = 2;
+  required uint64 atime    = 3;
+}
+
+message SetTimesResponse {
+}
+
+message SetSafeModeRequest {
+  required SafeMode safeMode    = 1;
+}
+
+message SetSafeModeResponse {
+  optional bool response = 1;
+}
+
+message OMLockDetailsProto {
+  optional bool isLockAcquired = 1;
+  optional uint64 waitLockNanos    = 2;
+  optional uint64 readLockNanos    = 3;
+  optional uint64 writeLockNanos   = 4;
+}
+
+/**
+ The OM service that takes care of Ozone namespace.
+*/
+service OzoneManagerService {
+    // A client-to-OM RPC to send client requests to OM Ratis server
+    rpc submitRequest(OMRequest)
+          returns(OMResponse);
+}

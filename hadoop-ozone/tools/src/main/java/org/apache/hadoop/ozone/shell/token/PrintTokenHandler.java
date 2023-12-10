@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.shell.token;
 
-import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -42,7 +41,7 @@ public class PrintTokenHandler implements Callable<Void> {
   public Void call() throws Exception {
     if (tokenFile.exists()) {
       Token<OzoneTokenIdentifier> token = tokenFile.decode();
-      System.out.print(JsonUtils.toJsonStringWithDefaultPrettyPrinter(token));
+      System.out.println(token.toString());
     }
     return null;
   }

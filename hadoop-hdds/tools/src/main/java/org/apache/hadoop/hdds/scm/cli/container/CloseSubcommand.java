@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
 import static org.apache.hadoop.hdds.scm.cli.container.ContainerCommands.checkContainerExists;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * The handler of close container command.
@@ -35,21 +35,15 @@ import picocli.CommandLine.ParentCommand;
     description = "close container",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class CloseSubcommand implements Callable<Void> {
-
-  @ParentCommand
-  private ContainerCommands parent;
+public class CloseSubcommand extends ScmSubcommand {
 
   @Parameters(description = "Id of the container to close")
   private long containerId;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      checkContainerExists(scmClient, containerId);
-      scmClient.closeContainer(containerId);
-      return null;
-    }
+  public void execute(ScmClient scmClient) throws IOException {
+    checkContainerExists(scmClient, containerId);
+    scmClient.closeContainer(containerId);
   }
 
 }

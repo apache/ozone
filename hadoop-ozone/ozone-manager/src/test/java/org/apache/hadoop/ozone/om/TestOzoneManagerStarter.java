@@ -19,15 +19,24 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import static org.junit.Assert.*;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.cli.GenericCli.EXECUTION_ERROR_EXIT_CODE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static picocli.CommandLine.ExitCode.OK;
+import static picocli.CommandLine.ExitCode.USAGE;
 
 /**
  * This class is used to test the CLI provided by OzoneManagerStarter, which is
@@ -41,17 +50,18 @@ public class TestOzoneManagerStarter {
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
+  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   private MockOMStarter mock;
 
-  @Before
-  public void setUpStreams() {
-    System.setOut(new PrintStream(outContent));
-    System.setErr(new PrintStream(errContent));
+  @BeforeEach
+  public void setUpStreams() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
     mock = new MockOMStarter();
   }
 
-  @After
+  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);
@@ -59,71 +69,69 @@ public class TestOzoneManagerStarter {
 
   @Test
   public void testCallsStartWhenServerStarted() throws Exception {
-    executeCommand();
+    assertEquals(OK, executeCommand());
     assertTrue(mock.startCalled);
   }
 
   @Test
   public void testExceptionThrownWhenStartFails() throws Exception {
     mock.throwOnStart = true;
-    try {
-      executeCommand();
-      fail("Exception should have been thrown");
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand());
   }
 
   @Test
   public void testStartNotCalledWithInvalidParam() throws Exception {
-    executeCommand("--invalid");
+    assertEquals(USAGE, executeCommand("--invalid"));
     assertFalse(mock.startCalled);
   }
 
   @Test
   public void testPassingInitSwitchCallsInit() {
-    executeCommand("--init");
+    assertEquals(OK, executeCommand("--init"));
     assertTrue(mock.initCalled);
   }
 
   @Test
   public void testInitSwitchWithInvalidParamDoesNotRun() {
-    executeCommand("--init", "--invalid");
+    assertEquals(USAGE, executeCommand("--init", "--invalid"));
     assertFalse(mock.initCalled);
   }
 
   @Test
   public void testUnSuccessfulInitThrowsException() {
     mock.throwOnInit = true;
-    try {
-      executeCommand("--init");
-      fail("Exception show have been thrown");
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--init"));
   }
 
   @Test
   public void testInitThatReturnsFalseThrowsException() {
     mock.initStatus = false;
-    try {
-      executeCommand("--init");
-      fail("Exception show have been thrown");
-    } catch (Exception e) {
-      assertTrue(true);
-    }
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--init"));
   }
 
   @Test
-  public void testUsagePrintedOnInvalidInput() {
-    executeCommand("--invalid");
+  public void testCallsStartAndCancelPrepareWithUpgradeFlag() {
+    assertEquals(OK, executeCommand("--upgrade"));
+    assertTrue(mock.startAndCancelPrepareCalled);
+  }
+
+  @Test
+  public void testUnsuccessfulUpgradeThrowsException() {
+    mock.throwOnStartAndCancelPrepare = true;
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--upgrade"));
+  }
+
+  @Test
+  public void testUsagePrintedOnInvalidInput()
+      throws UnsupportedEncodingException {
+    assertEquals(USAGE, executeCommand("--invalid"));
     Pattern p = Pattern.compile("^Unknown option:.*--invalid.*\nUsage");
-    Matcher m = p.matcher(errContent.toString());
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
 
-  private void executeCommand(String... args) {
-    new OzoneManagerStarter(mock).execute(args);
+  private int executeCommand(String... args) {
+    return new OzoneManagerStarter(mock).execute(args);
   }
 
   static class MockOMStarter implements OMStarterInterface {
@@ -133,7 +141,10 @@ public class TestOzoneManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit = false;
+    private boolean startAndCancelPrepareCalled = false;
+    private boolean throwOnStartAndCancelPrepare = false;
 
+    @Override
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       startCalled = true;
@@ -142,6 +153,7 @@ public class TestOzoneManagerStarter {
       }
     }
 
+    @Override
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       initCalled = true;
@@ -149,6 +161,21 @@ public class TestOzoneManagerStarter {
         throw new IOException("Simulated Exception");
       }
       return initStatus;
+    }
+
+    @Override
+    public void bootstrap(OzoneConfiguration conf, boolean force)
+        throws IOException, AuthenticationException {
+      //TODO: Add test for bootstrap
+    }
+
+    @Override
+    public void startAndCancelPrepare(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      startAndCancelPrepareCalled = true;
+      if (throwOnStartAndCancelPrepare) {
+        throw new IOException("Simulated Exception");
+      }
     }
   }
 }

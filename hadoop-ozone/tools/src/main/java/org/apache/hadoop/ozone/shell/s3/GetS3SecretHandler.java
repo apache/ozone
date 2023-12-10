@@ -17,19 +17,31 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
+import java.io.IOException;
+
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.security.UserGroupInformation;
-import picocli.CommandLine.Command;
 
-import java.io.IOException;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 
 /**
  * Executes getsecret calls.
  */
-@Command(name = "getsecret",
-    description = "Returns s3 secret for current user")
+@Command(name = "getsecret", aliases = "get-secret",
+    description = "Creates S3 secret for a user")
 public class GetS3SecretHandler extends S3Handler {
+
+  @Option(names = "-u",
+      description = "Specify the user (accessId). Requires admin privilege'")
+  private String username;
+
+  @Option(names = "-e",
+      description = "Print out variables together with 'export' prefix, to "
+          + "use it from 'eval $(ozone s3 getsecret)'")
+  private boolean export;
 
   @Override
   protected boolean isApplicable() {
@@ -39,8 +51,19 @@ public class GetS3SecretHandler extends S3Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    String userName = UserGroupInformation.getCurrentUser().getUserName();
-    out().println(client.getObjectStore().getS3Secret(userName));
+    if (username == null || username.isEmpty()) {
+      username = UserGroupInformation.getCurrentUser().getUserName();
+    }
+
+    final S3SecretValue secret = client.getObjectStore().getS3Secret(username);
+    if (export) {
+      out().println("export AWS_ACCESS_KEY_ID='" +
+          secret.getAwsAccessKey() + "'");
+      out().println("export AWS_SECRET_ACCESS_KEY='" +
+          secret.getAwsSecret() + "'");
+    } else {
+      out().println(secret);
+    }
   }
 
 }

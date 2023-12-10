@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.RatisVersionInfo;
+import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.ClassUtil;
-import org.apache.hadoop.hdds.utils.HddsVersionInfo;
-import org.apache.hadoop.hdds.utils.VersionInfo;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +41,10 @@ public final class OzoneVersionInfo {
   public static final VersionInfo OZONE_VERSION_INFO =
       new VersionInfo(OzoneConsts.OZONE);
 
-  private OzoneVersionInfo() {}
+  public static final RatisVersionInfo RATIS_VERSION_INFO =
+      new RatisVersionInfo();
+
+  private OzoneVersionInfo() { }
 
   public static void main(String[] args) {
     System.out.println(
@@ -67,10 +72,16 @@ public final class OzoneVersionInfo {
     System.out.println("Compiled by " + OZONE_VERSION_INFO.getUser() + " on "
         + OZONE_VERSION_INFO.getDate());
     System.out.println(
-        "Compiled with protoc " + OZONE_VERSION_INFO.getProtocVersion());
+        "Compiled with protoc " + OZONE_VERSION_INFO.getHadoopProtoc2Version() +
+            ", " + OZONE_VERSION_INFO.getGrpcProtocVersion() +
+            " and " + OZONE_VERSION_INFO.getHadoopProtoc3Version());
     System.out.println(
-        "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum()
-            + "\n");
+        "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum());
+    System.out.println(
+        "With Apache Ratis: " + RATIS_VERSION_INFO.getBuildVersion());
+    System.out.println(
+        "Compiled on platform " + OZONE_VERSION_INFO.getCompilePlatform());
+    System.out.println();
     LOG.debug("This command was run using " +
         ClassUtil.findContainingJar(OzoneVersionInfo.class));
     HddsVersionInfo.main(args);

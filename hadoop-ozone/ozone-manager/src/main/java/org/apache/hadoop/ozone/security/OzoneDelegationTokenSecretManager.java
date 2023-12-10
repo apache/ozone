@@ -17,17 +17,30 @@
 
 package org.apache.hadoop.ozone.security;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.OzoneSecretManager;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
-import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.security.OzoneSecretStore.OzoneManagerSecretState;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier.TokenInfo;
 import org.apache.hadoop.security.AccessControlException;
@@ -35,19 +48,12 @@ import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SecretManager for Ozone Master. Responsible for signing identifiers with
@@ -62,19 +68,19 @@ public class OzoneDelegationTokenSecretManager
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;
-  private final S3SecretManagerImpl s3SecretManager;
+  private final S3SecretManager s3SecretManager;
   private Thread tokenRemoverThread;
   private final long tokenRemoverScanInterval;
-  private String omCertificateSerialId;
-  private String omServiceId;
+  private final String omServiceId;
+  private final OzoneManager ozoneManager;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
    * interrupted.
    */
-  private Object noInterruptsLock = new Object();
+  private final Object noInterruptsLock = new Object();
 
-  private boolean isRatisEnabled;
+  private final boolean isRatisEnabled;
 
   /**
    * Create a secret manager with a builder object.
@@ -85,11 +91,12 @@ public class OzoneDelegationTokenSecretManager
         b.tokenRenewInterval, b.service, LOG);
     setCertClient(b.certClient);
     this.omServiceId = b.omServiceId;
-    currentTokens = new ConcurrentHashMap();
+    currentTokens = new ConcurrentHashMap<>();
     this.tokenRemoverScanInterval = b.tokenRemoverScanInterval;
-    this.s3SecretManager = (S3SecretManagerImpl) b.s3SecretManager;
+    this.s3SecretManager = b.s3SecretManager;
+    this.ozoneManager = b.ozoneManager;
     this.store = new OzoneSecretStore(b.ozoneConf,
-        this.s3SecretManager.getOmMetadataManager());
+        this.ozoneManager.getMetadataManager());
     isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
@@ -109,6 +116,7 @@ public class OzoneDelegationTokenSecretManager
     private S3SecretManager s3SecretManager;
     private CertificateClient certClient;
     private String omServiceId;
+    private OzoneManager ozoneManager;
 
     public OzoneDelegationTokenSecretManager build() throws IOException {
       return new OzoneDelegationTokenSecretManager(this);
@@ -153,6 +161,11 @@ public class OzoneDelegationTokenSecretManager
       this.omServiceId = serviceId;
       return this;
     }
+
+    public Builder setOzoneManager(OzoneManager ozoneMgr) {
+      this.ozoneManager = ozoneMgr;
+      return this;
+    }
   }
 
   @Override
@@ -173,10 +186,6 @@ public class OzoneDelegationTokenSecretManager
   /**
    * Returns {@link Token} for given identifier.
    *
-   * @param owner
-   * @param renewer
-   * @param realUser
-   * @return Token
    * @throws IOException to allow future exceptions to be added without breaking
    * compatibility
    */
@@ -207,8 +216,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Add delegation token in to in-memory map of tokens.
-   * @param token
-   * @param ozoneTokenIdentifier
    * @return renewTime - If updated successfully, return renewTime.
    */
   public long updateToken(Token<OzoneTokenIdentifier> token,
@@ -222,10 +229,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Stores given identifier in token store.
-   *
-   * @param identifier
-   * @param password
-   * @throws IOException
    */
   private void addToTokenStore(OzoneTokenIdentifier identifier,
       byte[] password, long renewTime)
@@ -249,19 +252,8 @@ public class OzoneDelegationTokenSecretManager
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
-    identifier.setOmCertSerialId(getOmCertificateSerialId());
+    identifier.setOmCertSerialId(getCertSerialId());
     identifier.setOmServiceId(getOmServiceId());
-  }
-
-  /**
-   * Get OM certificate serial id.
-   * */
-  private String getOmCertificateSerialId() {
-    if (omCertificateSerialId == null) {
-      omCertificateSerialId =
-          getCertClient().getCertificate().getSerialNumber().toString();
-    }
-    return omCertificateSerialId;
   }
 
   private String getOmServiceId() {
@@ -325,7 +317,7 @@ public class OzoneDelegationTokenSecretManager
       OzoneTokenIdentifier ozoneTokenIdentifier, long expiryTime) {
     //TODO: Instead of having in-memory map inside this class, we can use
     // cache from table and make this table cache clean up policy NEVER. In
-    // this way, we don't need to maintain seperate in-memory map. To do this
+    // this way, we don't need to maintain separate in-memory map. To do this
     // work we need to merge HA/Non-HA code.
     TokenInfo tokenInfo = new TokenInfo(expiryTime, token.getPassword(),
         ozoneTokenIdentifier.getTrackingId());
@@ -339,6 +331,7 @@ public class OzoneDelegationTokenSecretManager
    * @throws InvalidToken for invalid token
    * @throws AccessControlException if the user isn't allowed to cancel
    */
+  @Override
   public OzoneTokenIdentifier cancelToken(Token<OzoneTokenIdentifier> token,
       String canceller) throws IOException {
     OzoneTokenIdentifier id = OzoneTokenIdentifier.readProtoBuf(
@@ -389,8 +382,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Remove the expired token from in-memory map.
-   * @param ozoneTokenIdentifier
-   * @throws IOException
    */
   public void removeToken(OzoneTokenIdentifier ozoneTokenIdentifier) {
     currentTokens.remove(ozoneTokenIdentifier);
@@ -399,7 +390,19 @@ public class OzoneDelegationTokenSecretManager
   @Override
   public byte[] retrievePassword(OzoneTokenIdentifier identifier)
       throws InvalidToken {
-    if(identifier.getTokenType().equals(S3AUTHINFO)) {
+    // Tokens are a bit different in that a follower OM may be behind and
+    // thus not yet know of all tokens issued by the leader OM.  the
+    // following check does not allow ANY token auth. In optimistic, it should
+    // allow known tokens in.
+    try {
+      ozoneManager.checkLeaderStatus();
+    } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+      InvalidToken wrappedStandby = new InvalidToken("IOException");
+      wrappedStandby.initCause(e);
+      throw wrappedStandby;
+    }
+
+    if (identifier.getTokenType().equals(S3AUTHINFO)) {
       return validateS3AuthInfo(identifier);
     }
     return validateToken(identifier).getPassword();
@@ -430,16 +433,34 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Validates if given hash is valid.
-   *
-   * @param identifier
-   * @param password
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
+    X509Certificate signerCert;
+    try {
+      signerCert = getCertClient().getCertificate(
+          identifier.getOmCertSerialId());
+    } catch (CertificateException e) {
+      return false;
+    }
+
+    if (signerCert == null) {
+      return false;
+    }
+
+    // Check for expired certificate or not yet valid certificate
+    try {
+      signerCert.checkValidity();
+    } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+      LOG.error("signerCert {} is invalid", signerCert, e);
+      return false;
+    }
+
     try {
       return getCertClient().verifySignature(identifier.getBytes(), password,
-          getCertClient().getCertificate(identifier.getOmCertSerialId()));
+          signerCert);
     } catch (CertificateException e) {
+      LOG.error("verifySignature with signerCert {} failed", signerCert, e);
       return false;
     }
   }
@@ -450,9 +471,22 @@ public class OzoneDelegationTokenSecretManager
   private byte[] validateS3AuthInfo(OzoneTokenIdentifier identifier)
       throws InvalidToken {
     LOG.trace("Validating S3AuthInfo for identifier:{}", identifier);
+    if (identifier.getOwner() == null) {
+      throw new InvalidToken(
+          "Owner is missing from the S3 auth token");
+    }
+    if (!identifier.getOwner().toString().equals(identifier.getAwsAccessId())) {
+      LOG.error(
+          "Owner and AWSAccessId is different in the S3 token. Possible "
+              + " security attack: {}",
+          identifier);
+      throw new InvalidToken(
+          "Invalid S3 identifier: owner=" + identifier.getOwner()
+              + ", awsAccessId=" + identifier.getAwsAccessId());
+    }
     String awsSecret;
     try {
-      awsSecret = s3SecretManager.getS3UserSecretString(identifier
+      awsSecret = s3SecretManager.getSecretString(identifier
           .getAwsAccessId());
     } catch (IOException e) {
       LOG.error("Error while validating S3 identifier:{}",
@@ -514,10 +548,13 @@ public class OzoneDelegationTokenSecretManager
       throws IOException {
     super.start(certClient);
     tokenRemoverThread = new Daemon(new ExpiredTokenRemover());
+    tokenRemoverThread.setName(
+        ozoneManager.getThreadNamePrefix() +
+            "ExpiredTokenRemover");
     tokenRemoverThread.start();
   }
 
-  public void stopThreads() {
+  private synchronized void stopThreads() {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stopping expired delegation token remover thread");
     }
@@ -530,6 +567,7 @@ public class OzoneDelegationTokenSecretManager
       try {
         tokenRemoverThread.join();
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new RuntimeException(
             "Unable to join on token removal thread", e);
       }
@@ -538,8 +576,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Stops the OzoneDelegationTokenSecretManager.
-   *
-   * @throws IOException
    */
   @Override
   public void stop() throws IOException {
@@ -555,7 +591,7 @@ public class OzoneDelegationTokenSecretManager
    */
   private void removeExpiredToken() {
     long now = Time.now();
-    synchronized (this) {
+    synchronized (noInterruptsLock) {
       Iterator<Map.Entry<OzoneTokenIdentifier,
           TokenInfo>> i = currentTokens.entrySet().iterator();
       while (i.hasNext()) {
@@ -593,14 +629,15 @@ public class OzoneDelegationTokenSecretManager
             removeExpiredToken();
             lastTokenCacheCleanup = now;
           }
-          try {
-            Thread.sleep(Math.min(5000,
-                getTokenRemoverScanInterval())); // 5 seconds
-          } catch (InterruptedException ie) {
-            LOG.error("ExpiredTokenRemover received {}", ie);
-          }
+
+          // Sleep for 5 seconds
+          Thread.sleep(Math.min(5000, getTokenRemoverScanInterval()));
+
         }
-      } catch (Throwable t) {
+      } catch (InterruptedException ie) {
+        LOG.info("ExpiredTokenRemover was interrupted.", ie);
+        Thread.currentThread().interrupt();
+      } catch (Exception t) {
         LOG.error("ExpiredTokenRemover thread received unexpected exception",
             t);
         Runtime.getRuntime().exit(-1);

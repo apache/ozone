@@ -21,12 +21,16 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+
+import java.time.Duration;
+
 
 /**
  * The configuration class for the SCM service.
  */
 @ConfigGroup(prefix = "hdds.scm")
-public class ScmConfig {
+public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
@@ -40,7 +44,7 @@ public class ScmConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = "The keytab file used by SCM daemon to login as "+
+      description = "The keytab file used by SCM daemon to login as " +
           "its service principal."
   )
   private String keytab;
@@ -59,6 +63,81 @@ public class ScmConfig {
   )
   private String action;
 
+  @Config(key = "pipeline.choose.policy.impl",
+      type = ConfigType.STRING,
+      defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms" +
+          ".RandomPipelineChoosePolicy",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "The full name of class which implements "
+          + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+          + "The class decides which pipeline will be used to find or "
+          + "allocate Ratis containers. If not set, "
+          + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
+          + "RandomPipelineChoosePolicy will be used as default value."
+  )
+  private String pipelineChoosePolicyName;
+
+  @Config(key = "ec.pipeline.choose.policy.impl",
+      type = ConfigType.STRING,
+      defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms" +
+          ".RandomPipelineChoosePolicy",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "The full name of class which implements "
+              + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+              + "The class decides which pipeline will be used when "
+              + "selecting an EC Pipeline. If not set, "
+              + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
+              + "RandomPipelineChoosePolicy will be used as default value."
+  )
+  private String ecPipelineChoosePolicyName;
+
+  @Config(key = "block.deletion.per-interval.max",
+      type = ConfigType.INT,
+      defaultValue = "100000",
+      reconfigurable = true,
+      tags = { ConfigTag.SCM, ConfigTag.DELETION},
+      description =
+          "Maximum number of blocks which SCM processes during an interval. "
+              + "The block num is counted at the replica level."
+              + "If SCM has 100000 blocks which need to be deleted and the "
+              + "configuration is 5000 then it would only send 5000 blocks "
+              + "for deletion to the datanodes."
+  )
+  private int blockDeletionLimit;
+
+  @Config(key = "block.deleting.service.interval",
+      defaultValue = "60s",
+      type = ConfigType.TIME,
+      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      description =
+          "Time interval of the scm block deleting service. The block deleting"
+              + "service runs on SCM periodically and deletes blocks "
+              + "queued for deletion. Unit could be defined with "
+              + "postfix (ns,ms,s,m,h,d). "
+  )
+  private Duration blockDeletionInterval = Duration.ofSeconds(60);
+
+  @Config(key = "init.default.layout.version",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = { ConfigTag.SCM, ConfigTag.UPGRADE },
+      description =
+          " Default Layout Version to init the SCM with. Intended to be used " +
+              "in tests to finalize from an older version of SCM to the " +
+              "latest. By default, SCM init uses the highest layout version."
+  )
+  private int defaultLayoutVersionOnInit = -1;
+
+  public Duration getBlockDeletionInterval() {
+    return blockDeletionInterval;
+  }
+
+  public void setBlockDeletionInterval(Duration duration) {
+    blockDeletionInterval = duration;
+  }
+
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
   }
@@ -72,6 +151,18 @@ public class ScmConfig {
     this.action = unknownContainerAction;
   }
 
+  public void setPipelineChoosePolicyName(String pipelineChoosePolicyName) {
+    this.pipelineChoosePolicyName = pipelineChoosePolicyName;
+  }
+
+  public void setECPipelineChoosePolicyName(String policyName) {
+    this.ecPipelineChoosePolicyName = policyName;
+  }
+
+  public void setBlockDeletionLimit(int blockDeletionLimit) {
+    this.blockDeletionLimit = blockDeletionLimit;
+  }
+
   public String getKerberosPrincipal() {
     return this.principal;
   }
@@ -82,6 +173,22 @@ public class ScmConfig {
 
   public String getUnknownContainerAction() {
     return this.action;
+  }
+
+  public String getPipelineChoosePolicyName() {
+    return pipelineChoosePolicyName;
+  }
+
+  public String getECPipelineChoosePolicyName() {
+    return ecPipelineChoosePolicyName;
+  }
+
+  public int getBlockDeletionLimit() {
+    return blockDeletionLimit;
+  }
+
+  public int getScmDefaultLayoutVersionOnInit() {
+    return defaultLayoutVersionOnInit;
   }
 
   /**
@@ -97,6 +204,8 @@ public class ScmConfig {
           "hdds.scm.kerberos.principal";
     public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY =
           "hdds.scm.kerberos.keytab.file";
+    public static final String HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION =
+        "hdds.scm.init.default.layout.version";
   }
 
   public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION =

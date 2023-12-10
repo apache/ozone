@@ -17,24 +17,24 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -56,44 +56,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   void stop() throws IOException;
 
   /**
-   * After calling commit, the key will be made visible. There can be multiple
-   * open key writes in parallel (identified by client id). The most recently
-   * committed one will be the one visible.
-   *
-   * @param args the key to commit.
-   * @param clientID the client that is committing.
-   * @throws IOException
-   */
-  void commitKey(OmKeyArgs args, long clientID) throws IOException;
-
-  /**
-   * A client calls this on an open key, to request to allocate a new block,
-   * and appended to the tail of current block list of the open client.
-   *
-   * @param args the key to append
-   * @param clientID the client requesting block.
-   * @param excludeList List of datanodes/containers to exclude during block
-   *                    allocation.
-   * @return the reference to the new block.
-   * @throws IOException
-   */
-  OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
-      ExcludeList excludeList) throws IOException;
-
-  /**
-   * Given the args of a key to put, write an open key entry to meta data.
-   *
-   * In case that the container creation or key write failed on
-   * DistributedStorageHandler, this key's metadata will still stay in OM.
-   * TODO garbage collect the open keys that never get closed
-   *
-   * @param args the args of the key provided by client.
-   * @return a OpenKeySession instance client uses to talk to container.
-   * @throws IOException
-   */
-  OpenKeySession openKey(OmKeyArgs args) throws IOException;
-
-  /**
    * Look up an existing key. Return the info of the key to client side, which
    * DistributedStorageHandler will use to access the data on datanode.
    *
@@ -103,28 +65,21 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return a OmKeyInfo instance client uses to talk to container.
    * @throws IOException
    */
-  OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress) throws IOException;
+  OmKeyInfo lookupKey(OmKeyArgs args, ResolvedBucket bucketLayout,
+      String clientAddress) throws IOException;
 
   /**
-   * Renames an existing key within a bucket.
-   *
+   * Return info of an existing key to client side to access to data on
+   * datanodes.
    * @param args the args of the key provided by client.
-   * @param toKeyName New name to be used for the key
-   * @throws IOException if specified key doesn't exist or
-   * some other I/O errors while renaming the key.
+   * @param clientAddress a hint to key manager, order the datanode in returned
+   *                      pipeline by distance between client and datanode.
+   * @return a OmKeyInfo instance client uses to talk to container.
+   * @throws IOException
    */
-  void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
+  OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket buctket,
+      String clientAddress) throws IOException;
 
-  /**
-   * Deletes an object by an object key. The key will be immediately removed
-   * from OM namespace and become invisible to clients. The object data
-   * will be removed in async manner that might retain for some time.
-   *
-   * @param args the args of the key provided by client.
-   * @throws IOException if specified key doesn't exist or
-   * some other I/O errors while deleting an object.
-   */
-  void deleteKey(OmKeyArgs args) throws IOException;
 
   /**
    * Returns a list of keys represented by {@link OmKeyInfo}
@@ -147,8 +102,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return a list of keys.
    * @throws IOException
    */
-  List<OmKeyInfo> listKeys(String volumeName,
-      String bucketName, String startKey, String keyPrefix, int maxKeys)
+  ListKeysResult listKeys(String volumeName, String bucketName, String startKey,
+                          String keyPrefix, int maxKeys)
       throws IOException;
 
   /**
@@ -170,36 +125,49 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the
-   * key name and all its associated block IDs. A pending deletion key is
-   * stored with #deleting# prefix in OM DB.
+   * Returns a PendingKeysDeletion. It has a list of pending deletion key info
+   * that ups to the given count.Each entry is a {@link BlockGroup}, which
+   * contains the info about the key name and all its associated block IDs.
+   * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
    *
    * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
+   * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns a list of all still open key info. Which contains the info about
-   * the key name and all its associated block IDs. A pending open key has
-   * prefix #open# in OM DB.
+   * Returns the names of up to {@code count} open keys whose age is
+   * greater than or equal to {@code expireThreshold}.
    *
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @param count The maximum number of expired open keys to return.
+   * @param expireThreshold The threshold of open key expiration age.
+   * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
+   * @return the expired open keys.
    * @throws IOException
    */
-  List<BlockGroup> getExpiredOpenKeys() throws IOException;
+  ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
+      BucketLayout bucketLayout) throws IOException;
 
   /**
-   * Deletes a expired open key by its name. Called when a hanging key has been
-   * lingering for too long. Once called, the open key entries gets removed
-   * from OM mdata data.
+   * Returns the MPU infos of up to {@code count} whose age is greater
+   * than or equal to {@code expireThreshold}.
    *
-   * @param objectKeyName object key name with #open# prefix.
-   * @throws IOException if specified key doesn't exist or other I/O errors.
+   * @param expireThreshold The threshold of expired multipart uploads
+   *                        to return.
+   * @param maxParts The threshold of number of MPU parts to return.
+   *                 This is a soft limit, which means if the last MPU has
+   *                 parts that exceed this limit, it will be included
+   *                 in the returned expired MPUs. This is to handle
+   *                 situation where MPU that has more parts than
+   *                 maxParts never get deleted.
+   * @return a {@link List} of the expired
+   *        {@link ExpiredMultipartUploadsBucket}, the expired multipart
+   *        uploads, grouped by volume and bucket.
    */
-  void deleteExpiredOpenKey(String objectKeyName) throws IOException;
+  List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
+      Duration expireThreshold, int maxParts) throws IOException;
 
   /**
    * Returns the metadataManager.
@@ -211,44 +179,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the instance of Deleting Service.
    * @return Background service.
    */
-  BackgroundService getDeletingService();
+  KeyDeletingService getDeletingService();
 
-
-  /**
-   * Initiate multipart upload for the specified key.
-   * @param keyArgs
-   * @return MultipartInfo
-   * @throws IOException
-   */
-  OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws IOException;
-
-  /**
-   * Commit Multipart upload part file.
-   * @param omKeyArgs
-   * @param clientID
-   * @return OmMultipartCommitUploadPartInfo
-   * @throws IOException
-   */
-
-  OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
-      OmKeyArgs omKeyArgs, long clientID) throws IOException;
-
-  /**
-   * Complete Multipart upload Request.
-   * @param omKeyArgs
-   * @param multipartUploadList
-   * @return OmMultipartUploadCompleteInfo
-   * @throws IOException
-   */
-  OmMultipartUploadCompleteInfo completeMultipartUpload(OmKeyArgs omKeyArgs,
-      OmMultipartUploadCompleteList multipartUploadList) throws IOException;
-
-  /**
-   * Abort multipart upload request.
-   * @param omKeyArgs
-   * @throws IOException
-   */
-  void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException;
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws OMException;
@@ -266,4 +198,91 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   OmMultipartUploadListParts listParts(String volumeName, String bucketName,
       String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException;
+
+  /**
+   * Refresh the key block location information by get latest info from SCM.
+   * @param key
+   */
+  void refresh(OmKeyInfo key) throws IOException;
+
+  /**
+   * Assume OM has FS namespace like below, deleteDirTable stores absolute
+   * path name as existing KeyDeletionService expects full key name.
+   * For example, if user deletes directory 'd1' then the entry in OM DB looks
+   * like, DBKey = 1030/d3 and DBValue = KeyInfo with keyName "a/b2/d3"
+   *
+   *                   vol1
+   *                    |
+   *                  buck-1
+   *                    |
+   *                    a
+   *                    |
+   *      -----------------------------------
+   *     |             |                     |
+   *     b1            b2                    b3
+   *   -----       ---------               ----------
+   *   |    |      |    |   |             |    |     |
+   *  c1   c2     d1   d2  d3             e1   e2   e3
+   *                   |                  |
+   *               --------               |
+   *              |        |              |
+   *           d21.txt   d22.txt        e11.txt
+   *
+   * @return OmKeyInfo
+   * @throws IOException
+   */
+  Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
+
+  /**
+   * Returns all sub directories under the given parent directory.
+   *
+   * @param parentInfo
+   * @param numEntries
+   * @return list of dirs
+   * @throws IOException
+   */
+  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, long numEntries) throws IOException;
+
+  /**
+   * Returns all sub files under the given parent directory.
+   *
+   * @param parentInfo
+   * @param numEntries
+   * @return list of files
+   * @throws IOException
+   */
+  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo, long numEntries)
+          throws IOException;
+
+  /**
+   * Returns the instance of Directory Deleting Service.
+   * @return Background service.
+   */
+  BackgroundService getDirDeletingService();
+
+  /**
+   * Returns the instance of Open Key Cleanup Service.
+   * @return Background service.
+   */
+  BackgroundService getOpenKeyCleanupService();
+
+  /**
+   * Returns the instance of Multipart Upload Cleanup Service.
+   * @return Background service.
+   */
+  BackgroundService getMultipartUploadCleanupService();
+
+  /**
+   * Returns the instance of Snapshot SST Filtering service.
+   * @return Background service.
+   */
+  SstFilteringService getSnapshotSstFilteringService();
+
+  /**
+   * Returns the instance of Snapshot Deleting service.
+   * @return Background service.
+   */
+  SnapshotDeletingService getSnapshotDeletingService();
 }

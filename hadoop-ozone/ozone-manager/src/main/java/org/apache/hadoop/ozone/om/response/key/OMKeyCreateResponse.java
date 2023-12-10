@@ -23,45 +23,55 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for CreateKey request.
  */
-public class OMKeyCreateResponse extends OMClientResponse {
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, BUCKET_TABLE})
+public class OMKeyCreateResponse extends OmKeyResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
+  private OmBucketInfo omBucketInfo;
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
-    super(omResponse);
+      @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
+      long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
+    super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
     this.parentKeyInfos = parentKeyInfos;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyCreateResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeyCreateResponse(@Nonnull OMResponse omResponse, @Nonnull
+                             BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 
   @Override
-  protected void addToDBBatch(OMMetadataManager omMetadataManager,
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     /**
@@ -78,15 +88,34 @@ public class OMKeyCreateResponse extends OMClientResponse {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
               parentKeyInfo);
         }
-        omMetadataManager.getKeyTable()
+        omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
+      
+      // namespace quota changes for parent directory
+      String bucketKey = omMetadataManager.getBucketKey(
+          getOmBucketInfo().getVolumeName(),
+          getOmBucketInfo().getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, getOmBucketInfo());
     }
 
     String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
-    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-        openKey, omKeyInfo);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, openKey, omKeyInfo);
+  }
+
+  protected long getOpenKeySessionID() {
+    return openKeySessionID;
+  }
+
+  protected OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
   }
 }
 

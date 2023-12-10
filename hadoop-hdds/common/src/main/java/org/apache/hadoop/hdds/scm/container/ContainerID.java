@@ -15,32 +15,46 @@
  * the License.
  *
  */
-
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 
 /**
  * Container ID is an integer that is a value between 1..MAX_CONTAINER ID.
  * <p>
  * We are creating a specific type for this to avoid mixing this with
  * normal integers in code.
+ * <p>
+ * This class is immutable.
  */
 public final class ContainerID implements Comparable<ContainerID> {
+  private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(
+      LongCodec.get(), ContainerID::valueOf, c -> c.id,
+      DelegatedCodec.CopyType.SHALLOW);
+
+  public static final ContainerID MIN = ContainerID.valueOf(0);
+
+  public static Codec<ContainerID> getCodec() {
+    return CODEC;
+  }
 
   private final long id;
 
-  // TODO: make this private.
   /**
    * Constructs ContainerID.
    *
    * @param id int
    */
   public ContainerID(long id) {
+    Preconditions.checkState(id >= 0,
+        "Container ID should be positive. %s.", id);
     this.id = id;
   }
 
@@ -49,9 +63,7 @@ public final class ContainerID implements Comparable<ContainerID> {
    * @param containerID  long
    * @return ContainerID.
    */
-  public static ContainerID valueof(final long containerID) {
-    Preconditions.checkState(containerID > 0,
-        "Container ID should be a positive long. "+ containerID);
+  public static ContainerID valueOf(final long containerID) {
     return new ContainerID(containerID);
   }
 
@@ -60,12 +72,28 @@ public final class ContainerID implements Comparable<ContainerID> {
    *
    * @return int
    */
+  @Deprecated
+  /*
+   * Don't expose the int value.
+   */
   public long getId() {
     return id;
   }
 
+  /**
+   * Use proto message.
+   */
+  @Deprecated
   public byte[] getBytes() {
-    return Longs.toByteArray(id);
+    return LongCodec.get().toPersistedFormat(id);
+  }
+
+  public HddsProtos.ContainerID getProtobuf() {
+    return HddsProtos.ContainerID.newBuilder().setId(id).build();
+  }
+
+  public static ContainerID getFromProtobuf(HddsProtos.ContainerID proto) {
+    return ContainerID.valueOf(proto.getId());
   }
 
   @Override
@@ -81,14 +109,14 @@ public final class ContainerID implements Comparable<ContainerID> {
     final ContainerID that = (ContainerID) o;
 
     return new EqualsBuilder()
-        .append(getId(), that.getId())
+        .append(id, that.id)
         .isEquals();
   }
 
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
-        .append(getId())
+        .append(id)
         .toHashCode();
   }
 
@@ -96,7 +124,7 @@ public final class ContainerID implements Comparable<ContainerID> {
   public int compareTo(final ContainerID that) {
     Preconditions.checkNotNull(that);
     return new CompareToBuilder()
-        .append(this.getId(), that.getId())
+        .append(this.id, that.id)
         .build();
   }
 

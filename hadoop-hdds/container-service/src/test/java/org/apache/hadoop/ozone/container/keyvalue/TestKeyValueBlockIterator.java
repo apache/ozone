@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -32,25 +33,27 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
-import com.google.common.primitives.Longs;
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+
 import org.junit.After;
+
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -65,176 +68,197 @@ import org.junit.runners.Parameterized;
 @RunWith(Parameterized.class)
 public class TestKeyValueBlockIterator {
 
+  private static final long CONTAINER_ID = 105L;
+
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
+  private DBHandle db;
+  private final ContainerLayoutVersion layout;
+  private String schemaVersion;
+  private String datanodeID = UUID.randomUUID().toString();
+  private String clusterID = UUID.randomUUID().toString();
 
-  private final String storeImpl;
-  private final ChunkLayOutVersion layout;
-
-  public TestKeyValueBlockIterator(String metadataImpl,
-      ChunkLayOutVersion layout) {
-    this.storeImpl = metadataImpl;
-    this.layout = layout;
+  public TestKeyValueBlockIterator(ContainerTestVersionInfo versionInfo,
+      String keySeparator) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setContainerSchemaV3KeySeparator(keySeparator);
+    conf.setFromObject(dc);
   }
 
   @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, FILE_PER_BLOCK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, FILE_PER_BLOCK}});
+  public static Iterable<Object[]> data() {
+    List listA =
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each, ""})
+            .collect(toList());
+    List listB =
+        ContainerTestVersionInfo.getLayoutList().stream().map(
+            each -> new Object[] {each,
+                new DatanodeConfiguration().getContainerSchemaV3KeySeparator()})
+            .collect(toList());
+
+    listB.addAll(listA);
+    return listB;
   }
 
   @Before
   public void setUp() throws Exception {
     testRoot = GenericTestUtils.getRandomizedTestDir();
-    conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
-    conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
+    volumeSet = new MutableVolumeSet(datanodeID, clusterID, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
+
+    containerData = new KeyValueContainerData(105L,
+            layout,
+            (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+            UUID.randomUUID().toString());
+    // Init the container.
+    container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterID);
+    db = BlockUtils.getDB(containerData, conf);
   }
 
 
   @After
-  public void tearDown() {
+  public void tearDown() throws Exception {
+    db.close();
+    db.cleanup();
+    BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
 
   @Test
   public void testKeyValueBlockIteratorWithMixedBlocks() throws Exception {
-
-    long containerID = 100L;
-    int deletedBlocks = 5;
+    int deletingBlocks = 5;
     int normalBlocks = 5;
-    createContainerWithBlocks(containerID, normalBlocks, deletedBlocks);
-    String containerPath = new File(containerData.getMetadataPath())
-        .getParent();
-    try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
-        containerID, new File(containerPath))) {
+    Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
+            normalBlocks, deletingBlocks);
 
-      int counter = 0;
+    // Default filter used is all unprefixed blocks.
+    List<Long> unprefixedBlockIDs = blockIDs.get("");
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
+
+      Iterator<Long> blockIDIter = unprefixedBlockIDs.iterator();
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
-        assertEquals(blockData.getLocalID(), counter++);
+        assertEquals(blockData.getLocalID(), (long)blockIDIter.next());
       }
-
       assertFalse(keyValueBlockIterator.hasNext());
+      assertFalse(blockIDIter.hasNext());
 
       keyValueBlockIterator.seekToFirst();
-      counter = 0;
+      blockIDIter = unprefixedBlockIDs.iterator();
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
-        assertEquals(blockData.getLocalID(), counter++);
+        assertEquals(blockData.getLocalID(), (long)blockIDIter.next());
       }
       assertFalse(keyValueBlockIterator.hasNext());
+      assertFalse(blockIDIter.hasNext());
 
       try {
         keyValueBlockIterator.nextBlock();
       } catch (NoSuchElementException ex) {
         GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
-            "for ContainerID " + containerID, ex);
+            "for ContainerID " + CONTAINER_ID, ex);
       }
     }
   }
 
   @Test
   public void testKeyValueBlockIteratorWithNextBlock() throws Exception {
-    long containerID = 101L;
-    createContainerWithBlocks(containerID, 2, 0);
-    String containerPath = new File(containerData.getMetadataPath())
-        .getParent();
-    try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
-        containerID, new File(containerPath))) {
-      long blockID = 0L;
-      assertEquals(blockID++, keyValueBlockIterator.nextBlock().getLocalID());
-      assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
+    List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
+      assertEquals((long)blockIDs.get(0),
+              keyValueBlockIterator.nextBlock().getLocalID());
+      assertEquals((long)blockIDs.get(1),
+              keyValueBlockIterator.nextBlock().getLocalID());
 
       try {
         keyValueBlockIterator.nextBlock();
       } catch (NoSuchElementException ex) {
         GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
-            "for ContainerID " + containerID, ex);
+            "for ContainerID " + CONTAINER_ID, ex);
       }
     }
   }
 
   @Test
   public void testKeyValueBlockIteratorWithHasNext() throws Exception {
-    long containerID = 102L;
-    createContainerWithBlocks(containerID, 2, 0);
-    String containerPath = new File(containerData.getMetadataPath())
-        .getParent();
-    try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
-        containerID, new File(containerPath))) {
-      long blockID = 0L;
+    List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
+    try (BlockIterator<BlockData> blockIter =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
 
       // Even calling multiple times hasNext() should not move entry forward.
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertEquals(blockID++, keyValueBlockIterator.nextBlock().getLocalID());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertEquals((long)blockIDs.get(0),
+              blockIter.nextBlock().getLocalID());
 
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertEquals((long)blockIDs.get(1), blockIter.nextBlock().getLocalID());
 
-      keyValueBlockIterator.seekToLast();
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
-
-      keyValueBlockIterator.seekToFirst();
-      blockID = 0L;
-      assertEquals(blockID++, keyValueBlockIterator.nextBlock().getLocalID());
-      assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
+      blockIter.seekToFirst();
+      assertEquals((long)blockIDs.get(0), blockIter.nextBlock().getLocalID());
+      assertEquals((long)blockIDs.get(1), blockIter.nextBlock().getLocalID());
 
       try {
-        keyValueBlockIterator.nextBlock();
+        blockIter.nextBlock();
       } catch (NoSuchElementException ex) {
         GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
-            "for ContainerID " + containerID, ex);
+            "for ContainerID " + CONTAINER_ID, ex);
       }
     }
   }
 
   @Test
   public void testKeyValueBlockIteratorWithFilter() throws Exception {
-    long containerId = 103L;
-    int deletedBlocks = 5;
     int normalBlocks = 5;
-    createContainerWithBlocks(containerId, normalBlocks, deletedBlocks);
-    String containerPath = new File(containerData.getMetadataPath())
-        .getParent();
-    try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
-        containerId, new File(containerPath), MetadataKeyFilters
-        .getDeletingKeyFilter())) {
-
-      int counter = 5;
+    int deletingBlocks = 5;
+    Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
+            normalBlocks, deletingBlocks);
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID,
+                        containerData.getDeletingBlockKeyFilter())) {
+      List<Long> deletingBlockIDs =
+              blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX);
+      int counter = 0;
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
-        assertEquals(blockData.getLocalID(), counter++);
+        assertEquals((long)deletingBlockIDs.get(counter),
+                blockData.getLocalID());
+        counter++;
       }
+
+      assertEquals(deletingBlocks, counter);
     }
   }
 
   @Test
   public void testKeyValueBlockIteratorWithOnlyDeletedBlocks() throws
       Exception {
-    long containerId = 104L;
-    createContainerWithBlocks(containerId, 0, 5);
-    String containerPath = new File(containerData.getMetadataPath())
-        .getParent();
-    try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
-        containerId, new File(containerPath))) {
+    createContainerWithBlocks(CONTAINER_ID, 0, 5);
+    try (BlockIterator<BlockData> keyValueBlockIterator =
+                db.getStore().getBlockIterator(CONTAINER_ID)) {
       //As all blocks are deleted blocks, blocks does not match with normal key
       // filter.
       assertFalse(keyValueBlockIterator.hasNext());
@@ -242,49 +266,162 @@ public class TestKeyValueBlockIterator {
   }
 
   /**
-   * Creates a container with specified number of normal blocks and deleted
-   * blocks. First it will insert normal blocks, and then it will insert
-   * deleted blocks.
-   * @param containerId
-   * @param normalBlocks
-   * @param deletedBlocks
+   * Due to RocksDB internals, prefixed keys may be grouped all at the
+   * beginning or end of the key iteration, depending on the serialization
+   * used. Keys of the same prefix are grouped
+   * together. This method runs the same set of tests on the iterator first
+   * positively filtering one prefix, and then positively filtering
+   * a second prefix. If the sets of keys with prefix one, prefix
+   * two, and no prefixes are not empty, it follows that the filter will
+   * encounter both of the following cases:
+   *
+   * 1. A failing key followed by a passing key.
+   * 2. A passing key followed by a failing key.
+   *
+   * Note that with the current block data table implementation, there is
+   * only ever one type of prefix. This test adds a dummy second prefix type
+   * to ensure that the iterator will continue to work if more prefixes are
+   * added in the future.
+   *
    * @throws Exception
    */
-  private void createContainerWithBlocks(long containerId, int
-      normalBlocks, int deletedBlocks) throws
-      Exception {
-    containerData = new KeyValueContainerData(containerId,
-        layout,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
-        .randomUUID().toString());
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
-        conf)) {
+  @Test
+  public void testKeyValueBlockIteratorWithAdvancedFilter() throws
+          Exception {
+    // Block data table currently only uses one prefix type.
+    // Introduce a second prefix type to make sure the iterator functions
+    // correctly if more prefixes were to be added in the future.
+    final String secondPrefix = "#FOOBAR#";
+    Map<String, Integer> prefixCounts = new HashMap<>();
+    prefixCounts.put(OzoneConsts.DELETING_KEY_PREFIX, 3);
+    prefixCounts.put("", 3);
+    prefixCounts.put(secondPrefix, 3);
+
+    Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
+            prefixCounts);
+    // Test deleting filter.
+    testWithFilter(containerData.getDeletingBlockKeyFilter(),
+            blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX));
+
+    // Test arbitrary filter.
+    String schemaPrefix = containerData.containerPrefix();
+    MetadataKeyFilters.KeyPrefixFilter secondFilter =
+            new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(schemaPrefix + secondPrefix);
+    testWithFilter(secondFilter, blockIDs.get(secondPrefix));
+  }
+
+  /**
+   * Helper method to run some iterator tests with a provided filter.
+   */
+  private void testWithFilter(MetadataKeyFilters.KeyPrefixFilter filter,
+                              List<Long> expectedIDs) throws Exception {
+    try (BlockIterator<BlockData> iterator =
+                db.getStore().getBlockIterator(CONTAINER_ID, filter)) {
+      // Test seek.
+      iterator.seekToFirst();
+      long firstID = iterator.nextBlock().getLocalID();
+      assertEquals(expectedIDs.get(0).longValue(), firstID);
+      assertTrue(iterator.hasNext());
+
+      // Test atypical iteration use.
+      iterator.seekToFirst();
+      int numIDsSeen = 0;
+      for (long id: expectedIDs) {
+        assertEquals(iterator.nextBlock().getLocalID(), id);
+        numIDsSeen++;
+
+        // Test that iterator can handle sporadic hasNext() calls.
+        if (id % 2 == 0 && numIDsSeen < expectedIDs.size()) {
+          assertTrue(iterator.hasNext());
+        }
+      }
+
+      assertFalse(iterator.hasNext());
+    }
+  }
+
+  /**
+   * Creates a container with specified number of unprefixed blocks.
+   * @param containerId
+   * @param unprefixedBlocks
+   * @return The list of block IDs of normal blocks that were created.
+   * @throws Exception
+   */
+  private List<Long> createContainerWithBlocks(long containerId,
+            int unprefixedBlocks) throws Exception {
+    return createContainerWithBlocks(containerId, unprefixedBlocks, 0).get("");
+  }
+
+  /**
+   * Creates a container with specified number of unprefixed blocks and deleted
+   * blocks.
+   * @param containerId
+   * @param unprefixedBlocks
+   * @param deletingBlocks
+   * @return Each key prefix mapped to the sorted list of block IDs of blocks
+   * created whose keys had that prefix.
+   * @throws Exception
+   */
+  private Map<String, List<Long>> createContainerWithBlocks(long containerId,
+            int unprefixedBlocks, int deletingBlocks) throws Exception {
+
+    Map<String, Integer> prefixes = new HashMap<>();
+    prefixes.put("", unprefixedBlocks);
+    prefixes.put(OzoneConsts.DELETING_KEY_PREFIX, deletingBlocks);
+    return createContainerWithBlocks(containerId, prefixes);
+  }
+
+  /**
+   * Creates a container with the provided container ID based on
+   * {@link TestKeyValueBlockIterator#conf}. For each prefix specified in
+   * {@code prefixCounts}, the specified number of keys with that prefix will
+   * be created.
+   * <p>
+   * Returns each prefix mapped to a list of the block IDs that were created
+   * for that prefix. Each block ID list will be sorted for each prefix.
+   *
+   * @param containerId The ID of the container to create.
+   * @param prefixCounts A map mapping each key prefix to the number of
+    * blocks that should be created whose keys have that prefix.
+   * @return Each key prefix mapped to the sorted list of block IDs of blocks
+   * created whose keys had that prefix.
+   * @throws Exception
+   */
+  private Map<String, List<Long>> createContainerWithBlocks(long containerId,
+            Map<String, Integer> prefixCounts) throws Exception {
+    // Create required block data.
+    Map<String, List<Long>> blockIDs = new HashMap<>();
+    try (DBHandle metadataStore = BlockUtils.getDB(containerData, conf)) {
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);
       chunkList.add(info.getProtoBufMessage());
 
-      for (int i = 0; i < normalBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
-        BlockData blockData = new BlockData(blockID);
-        blockData.setChunks(chunkList);
-        metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-            blockData
-            .getProtoBufMessage().toByteArray());
-      }
+      int blockIndex = 0;
+      // Maps each prefix to the block IDs of the blocks created with that
+      // prefix.
+      Table<String, BlockData> blockDataTable =
+              metadataStore.getStore().getBlockDataTable();
+      String schemaPrefix = containerData.containerPrefix();
 
-      for (int i = normalBlocks; i < deletedBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
-        BlockData blockData = new BlockData(blockID);
-        blockData.setChunks(chunkList);
-        metadataStore.getStore().put(DFSUtil.string2Bytes(OzoneConsts
-            .DELETING_KEY_PREFIX + blockID.getLocalID()), blockData
-            .getProtoBufMessage().toByteArray());
+      for (Map.Entry<String, Integer> entry: prefixCounts.entrySet()) {
+        String prefix = entry.getKey();
+        blockIDs.put(prefix, new ArrayList<>());
+        int numBlocks = entry.getValue();
+
+        for (int i = 0; i < numBlocks; i++) {
+          BlockID blockID = new BlockID(containerId, blockIndex);
+          blockIndex++;
+          BlockData blockData = new BlockData(blockID);
+          blockData.setChunks(chunkList);
+          String blockKey = schemaPrefix + prefix + blockID.getLocalID();
+          blockDataTable.put(blockKey, blockData);
+          blockIDs.get(prefix).add(blockID.getLocalID());
+        }
       }
     }
-  }
 
+    return blockIDs;
+  }
 }

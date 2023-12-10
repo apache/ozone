@@ -16,11 +16,13 @@
  */
 package org.apache.hadoop.ozone.container.common;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -30,19 +32,21 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageContainerDatanodeProtocolService;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.protobuf.BlockingService;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import org.mockito.Mockito;
+
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 
 /**
  * Test Endpoint class.
@@ -79,7 +83,7 @@ public final class SCMTestUtils {
         .setSecretManager(null)
         .build();
 
-    DFSUtil.addPBProtocol(conf, protocol, instance, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
   }
 
@@ -122,11 +126,22 @@ public final class SCMTestUtils {
   }
 
   public static OzoneConfiguration getConf() {
+    String name = getCallerClass(2).getSimpleName()
+        + "-" + randomAlphanumeric(10);
+    File testDir = GenericTestUtils.getTestDir(name);
+    Runtime.getRuntime().addShutdownHook(new Thread(
+        () -> FileUtils.deleteQuietly(testDir)));
+    return getConf(testDir);
+  }
+
+  public static OzoneConfiguration getConf(File testDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, GenericTestUtils
-        .getRandomizedTempPath());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, GenericTestUtils
-        .getRandomizedTempPath());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        new File(testDir, "datanode").getAbsolutePath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        new File(testDir, "metadata").getAbsolutePath());
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR,
+        new File(testDir, "datanodeID").getAbsolutePath());
     conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
         MockSpaceUsageCheckFactory.None.class,
         SpaceUsageCheckFactory.class);

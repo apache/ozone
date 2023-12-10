@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.scm.pipeline;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -30,23 +32,22 @@ import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
  */
+@Timeout(3000)
 public class TestPipelineManagerMXBean {
 
   private MiniOzoneCluster cluster;
-  private static MBeanServer mbs;
+  private MBeanServer mbs;
 
-  @Before
+  @BeforeEach
   public void init()
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -64,33 +65,38 @@ public class TestPipelineManagerMXBean {
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
         "Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo");
+    Map<String, Integer> pipelineStateCount = cluster
+        .getStorageContainerManager().getPipelineManager().getPipelineInfo();
 
-    TabularData data = (TabularData) mbs.getAttribute(bean, "PipelineInfo");
-    Map<String, Integer> datanodeInfo = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelineInfo();
-    verifyEquals(data, datanodeInfo);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        final TabularData data = (TabularData) mbs.getAttribute(
+            bean, "PipelineInfo");
+        for (Map.Entry<String, Integer> entry : pipelineStateCount.entrySet()) {
+          final Integer count = entry.getValue();
+          final Integer currentCount = getMetricsCount(data, entry.getKey());
+          if (currentCount == null || !currentCount.equals(count)) {
+            return false;
+          }
+        }
+        return true;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 500, 3000);
   }
 
-  private void verifyEquals(TabularData actualData, Map<String, Integer>
-      expectedData) {
-    if (actualData == null || expectedData == null) {
-      fail("Data should not be null.");
+  private Integer getMetricsCount(TabularData data, String state) {
+    for (Object obj : data.values()) {
+      CompositeData cds = assertInstanceOf(CompositeData.class, obj);
+      if (cds.get("key").equals(state)) {
+        return Integer.parseInt(cds.get("value").toString());
+      }
     }
-    for (Object obj : actualData.values()) {
-      assertTrue(obj instanceof CompositeData);
-      CompositeData cds = (CompositeData) obj;
-      assertEquals(2, cds.values().size());
-      Iterator<?> it = cds.values().iterator();
-      String key = it.next().toString();
-      String value = it.next().toString();
-      long num = Long.parseLong(value);
-      assertTrue(expectedData.containsKey(key));
-      assertEquals(expectedData.remove(key).longValue(), num);
-    }
-    assertTrue(expectedData.isEmpty());
+    return null;
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     cluster.shutdown();
   }

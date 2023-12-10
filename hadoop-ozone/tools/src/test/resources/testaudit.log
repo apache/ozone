@@ -4,12 +4,15 @@
 2018-09-06 01:58:08,035 | ERROR | OMAudit | user=hadoop | ip=172.18.0.4 | op=CREATE_VOLUME {admin=hadoop, owner=tom, volume=dcv, creationTime=0, quotaInBytes=1152921504606846976} | ret=FAILURE | org.apache.hadoop.ozone.om.exceptions.OMException
 at org.apache.hadoop.ozone.om.VolumeManagerImpl.createVolume(VolumeManagerImpl.java:137)
 at org.apache.hadoop.ozone.om.OzoneManager.createVolume(OzoneManager.java:469)
+2018-09-06 01:58:09,035 | INFO | OMAudit | user=hadoop | ip=172.18.0.4 | op=CREATE_VOLUME {admin=hadoop, owner=tom, volume=ddv, creationTime=0, quotaInBytes=1152921504606846976} | ret=SUCCESS |
 2018-09-06 01:58:18,447 | ERROR | OMAudit | user=hadoop | ip=172.18.0.4 | op=CREATE_BUCKET {volume=dcv, bucket=dcb, acls=[USER:hadoop:rw, GROUP:users:rw], isVersionEnabled=false, storageType=DISK, creationTime=0} | ret=FAILURE | org.apache.hadoop.ozone.om.exceptions.OMException: Bucket already exist
 at org.apache.hadoop.ozone.om.BucketManagerImpl.createBucket(BucketManagerImpl.java:98)
 at org.apache.hadoop.ozone.om.OzoneManager.createBucket(OzoneManager.java:694)
+2018-09-06 01:59:18,447 | INFO | OMAudit | user=hadoop | ip=172.18.0.4 | op=CREATE_BUCKET {volume=dcv, bucket=dbb, acls=[USER:hadoop:rw, GROUP:users:rw], isVersionEnabled=false, storageType=DISK, creationTime=0} | ret=SUCCESS |
 2018-09-06 01:59:36,686 | INFO  | OMAudit | user=hadoop | ip=172.18.0.4 | op=DELETE_KEY {volume=dcv, bucket=dcb, key=dck1, dataSize=0, replicationType=null, replicationFactor=null, keyLocationInfo=null} | ret=SUCCESS |
 2018-09-06 01:59:41,027 | INFO  | OMAudit | user=hadoop | ip=172.18.0.4 | op=DELETE_KEY {volume=dcv, bucket=dcb, key=dck2, dataSize=0, replicationType=null, replicationFactor=null, keyLocationInfo=null} | ret=SUCCESS |
 2018-09-06 01:59:47,169 | ERROR | OMAudit | user=hadoop | ip=172.18.0.4 | op=DELETE_KEY {volume=dcv, bucket=dcb, key=dck2, dataSize=0, replicationType=null, replicationFactor=null, keyLocationInfo=null} | ret=FAILURE | org.apache.hadoop.ozone.om.exceptions.OMException: Key not found
 at org.apache.hadoop.ozone.om.KeyManagerImpl.deleteKey(KeyManagerImpl.java:448)
 at org.apache.hadoop.ozone.om.OzoneManager.deleteKey(OzoneManager.java:892)
 2018-09-06 01:60:22,900 | INFO  | OMAudit | user=hadoop | ip=172.18.0.4 | op=ALLOCATE_KEY {volume=vol-8-67105, bucket=bucket-0-68911, key=key-246-29031, dataSize=10240, replicationType=STAND_ALONE, replicationFactor=ONE, keyLocationInfo=null} | ret=SUCCESS |
+2021-05-18 11:03:21,306 | INFO  | OMAudit | user=hadoop | ip=172.18.0.4 |op=COMPLETE_MULTIPART_UPLOAD {volume=vol-8-67105, bucket=bucket-0-68911,key=key-246-29032/chunks/000005, dataSize=0, replicationType=RATIS, replicationFactor=ONE,multipartList=[partNumber: 1 partName:"/vol-8-67105/bucket-0-68911/key-246-29032/chunks/000005106253975577886743" , partNumber: 2 partName: "/vol-8-67105/bucket-0-68911/key-246-29032/chunks/000005106253975577886745" , partNumber: 3 partName: "/vol-8-67105/bucket-0-68911/key-246-29032/chunks/000005106253975577886744" , partNumber: 4 partName: "/vol-8-67105/bucket-0-68911/key-246-29032/chunks/000005106253975577886742" ]} | ret=SUCCESS |

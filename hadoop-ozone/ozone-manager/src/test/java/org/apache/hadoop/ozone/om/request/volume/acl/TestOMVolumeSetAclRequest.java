@@ -20,22 +20,18 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmOzoneAclMap;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.volume.TestOMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.UUID;
-
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope.ACCESS;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope.DEFAULT;
 
 /**
  * Tests volume setAcl request.
@@ -47,15 +43,22 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
-        TestOMRequestUtils.createVolumeSetAclRequest(volumeName,
+        OMRequestTestUtils.createVolumeSetAclRequest(volumeName,
             Lists.newArrayList(acl));
+    long originModTime = originalRequest.getSetAclRequest()
+        .getModificationTime();
 
     OMVolumeSetAclRequest omVolumeSetAclRequest =
         new OMVolumeSetAclRequest(originalRequest);
 
     OMRequest modifiedRequest = omVolumeSetAclRequest.preExecute(
         ozoneManager);
-    Assert.assertNotEquals(modifiedRequest, originalRequest);
+    Assertions.assertNotEquals(modifiedRequest, originalRequest);
+
+    long newModTime = modifiedRequest.getSetAclRequest().getModificationTime();
+    // When preExecute() of setting acl,
+    // the new modification time is greater than origin one.
+    Assertions.assertTrue(newModTime > originModTime);
   }
 
   @Test
@@ -63,8 +66,8 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
 
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     OzoneAcl userAccessAcl = OzoneAcl.parseAcl("user:bilbo:rw[ACCESS]");
     OzoneAcl groupDefaultAcl =
@@ -73,7 +76,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     List<OzoneAcl> acls = Lists.newArrayList(userAccessAcl, groupDefaultAcl);
 
     OMRequest originalRequest =
-        TestOMRequestUtils.createVolumeSetAclRequest(volumeName, acls);
+        OMRequestTestUtils.createVolumeSetAclRequest(volumeName, acls);
 
     OMVolumeSetAclRequest omVolumeSetAclRequest =
         new OMVolumeSetAclRequest(originalRequest);
@@ -86,27 +89,26 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     OmVolumeArgs omVolumeArgs =
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should have entry.
-    Assert.assertNotNull(omVolumeArgs);
-    OmOzoneAclMap aclMapBeforeSet = omVolumeArgs.getAclMap();
+    Assertions.assertNotNull(omVolumeArgs);
 
     OMClientResponse omClientResponse =
         omVolumeSetAclRequest.validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getSetAclResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getSetAclResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
-    OmOzoneAclMap aclMapAfterSet = omMetadataManager
-        .getVolumeTable().get(volumeKey).getAclMap();
+    List<OzoneAcl> aclsAfterSet = omMetadataManager
+        .getVolumeTable().get(volumeKey).getAcls();
 
     // Acl is added to aclMapAfterSet
-    Assert.assertEquals(2, aclMapAfterSet.getAcl().size());
-    Assert.assertTrue("Default Acl should be set.",
-        aclMapAfterSet.getAclsByScope(ACCESS).contains(userAccessAcl));
-    Assert.assertTrue("Default Acl should be set.",
-        aclMapAfterSet.getAclsByScope(DEFAULT).contains(groupDefaultAcl));
+    Assertions.assertEquals(2, aclsAfterSet.size());
+    Assertions.assertTrue(aclsAfterSet.contains(userAccessAcl),
+        "Access Acl should be set.");
+    Assertions.assertTrue(aclsAfterSet.contains(groupDefaultAcl),
+        "Default Acl should be set.");
   }
 
   @Test
@@ -115,7 +117,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
-        TestOMRequestUtils.createVolumeSetAclRequest(volumeName,
+        OMRequestTestUtils.createVolumeSetAclRequest(volumeName,
             Lists.newArrayList(acl));
 
     OMVolumeSetAclRequest omVolumeSetAclRequest =
@@ -128,43 +130,8 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
             ozoneManagerDoubleBufferHelper);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getSetAclResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    Assertions.assertNotNull(omResponse.getSetAclResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String ownerName = "user1";
-
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-
-    OzoneAcl userAccessAcl = OzoneAcl.parseAcl("user:bilbo:rw[ACCESS]");
-    OzoneAcl groupDefaultAcl = OzoneAcl.parseAcl(
-        "group:admin:rwdlncxy[DEFAULT]");
-
-    List<OzoneAcl> acls = Lists.newArrayList(userAccessAcl, groupDefaultAcl);
-
-    OMRequest originalRequest = TestOMRequestUtils.createVolumeSetAclRequest(
-        volumeName, acls);
-
-    OMVolumeSetAclRequest omVolumeSetAclRequest = new OMVolumeSetAclRequest(
-        originalRequest);
-    omVolumeSetAclRequest.preExecute(ozoneManager);
-
-    OMClientResponse omClientResponse = omVolumeSetAclRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omClientResponse.getOMResponse().getStatus());
-
-    OMClientResponse replayResponse = omVolumeSetAclRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        replayResponse.getOMResponse().getStatus());
   }
 }

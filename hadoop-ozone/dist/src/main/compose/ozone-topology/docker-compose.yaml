@@ -14,94 +14,106 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.8"
 services:
    datanode_1:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
         - 9882
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+        OZONE_OPTS:
       networks:
          net:
             ipv4_address: 10.5.0.4
    datanode_2:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
         - 9882
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+        OZONE_OPTS:
       networks:
          net:
             ipv4_address: 10.5.0.5
    datanode_3:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
         - 9882
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+         OZONE_OPTS:
       networks:
          net:
             ipv4_address: 10.5.0.6
    datanode_4:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
         - 9882
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+        OZONE_OPTS:
       networks:
          net:
             ipv4_address: 10.5.0.7
    datanode_5:
-     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
      privileged: true #required by the profiler
      volumes:
        - ../..:/opt/hadoop
      ports:
-       - 9864
+       - 19864
        - 9882
      command: ["/opt/hadoop/bin/ozone","datanode"]
      env_file:
        - ./docker-config
+     environment:
+       OZONE_OPTS:
      networks:
        net:
          ipv4_address: 10.5.0.8
    datanode_6:
-     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
      privileged: true #required by the profiler
      volumes:
        - ../..:/opt/hadoop
      ports:
-       - 9864
+       - 19864
        - 9882
      command: ["/opt/hadoop/bin/ozone","datanode"]
      env_file:
        - ./docker-config
+     environment:
+       OZONE_OPTS:
      networks:
        net:
          ipv4_address: 10.5.0.9
    om:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -110,6 +122,7 @@ services:
          - 9862:9862
       environment:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+         OZONE_OPTS:
       env_file:
           - ./docker-config
       command: ["/opt/hadoop/bin/ozone","om"]
@@ -117,21 +130,38 @@ services:
          net:
             ipv4_address: 10.5.0.70
    scm:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
       ports:
          - 9876:9876
+         - 9860:9860
       env_file:
           - ./docker-config
       environment:
           ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
           OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-6}"
+          OZONE_OPTS:
       command: ["/opt/hadoop/bin/ozone","scm"]
       networks:
          net:
             ipv4_address: 10.5.0.71
+   recon:
+     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+     privileged: true #required by the profiler
+     volumes:
+       - ../..:/opt/hadoop
+     ports:
+       - 9888:9888
+     env_file:
+       - ./docker-config
+     environment:
+       OZONE_OPTS:
+     command: [ "/opt/hadoop/bin/ozone","recon" ]
+     networks:
+       net:
+         ipv4_address: 10.5.0.72
 networks:
    net:
      driver: bridge

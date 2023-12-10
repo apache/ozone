@@ -24,35 +24,47 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.zip.GZIPOutputStream;
+import java.sql.Timestamp;
 
+import com.google.common.base.Preconditions;
+import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.jooq.impl.DSL.currentTimestamp;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
+
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Recon Utility class.
  */
+@Singleton
 public class ReconUtils {
 
-  private final static int WRITE_BUFFER = 1048576; //1MB
+  private static final int WRITE_BUFFER = 1048576; //1MB
 
   public ReconUtils() {
   }
@@ -87,23 +99,21 @@ public class ReconUtils {
   }
 
   /**
-   * Given a source directory, create a tar.gz file from it.
+   * Given a source directory, create a tar file from it.
    *
    * @param sourcePath the path to the directory to be archived.
-   * @return tar.gz file
+   * @return tar file
    * @throws IOException
    */
   public static File createTarFile(Path sourcePath) throws IOException {
     TarArchiveOutputStream tarOs = null;
     FileOutputStream fileOutputStream = null;
-    GZIPOutputStream gzipOutputStream = null;
     try {
       String sourceDir = sourcePath.toString();
-      String fileName = sourceDir.concat(".tar.gz");
+      String fileName = sourceDir.concat(".tar");
       fileOutputStream = new FileOutputStream(fileName);
-      gzipOutputStream =
-          new GZIPOutputStream(new BufferedOutputStream(fileOutputStream));
-      tarOs = new TarArchiveOutputStream(gzipOutputStream);
+      tarOs = new TarArchiveOutputStream(fileOutputStream);
+      tarOs.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       File folder = new File(sourceDir);
       File[] filesInDir = folder.listFiles();
       if (filesInDir != null) {
@@ -116,7 +126,6 @@ public class ReconUtils {
       try {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
         org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
-        org.apache.hadoop.io.IOUtils.closeStream(gzipOutputStream);
       } catch (Exception e) {
         LOG.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
@@ -160,12 +169,8 @@ public class ReconUtils {
       throws IOException {
 
     FileInputStream fileInputStream = null;
-    BufferedInputStream buffIn = null;
-    GzipCompressorInputStream gzIn = null;
     try {
       fileInputStream = new FileInputStream(tarFile);
-      buffIn = new BufferedInputStream(fileInputStream);
-      gzIn = new GzipCompressorInputStream(buffIn);
 
       //Create Destination directory if it does not exist.
       if (!destPath.toFile().exists()) {
@@ -176,7 +181,7 @@ public class ReconUtils {
       }
 
       try (TarArchiveInputStream tarInStream =
-               new TarArchiveInputStream(gzIn)) {
+               new TarArchiveInputStream(fileInputStream)) {
         TarArchiveEntry entry;
 
         while ((entry = (TarArchiveEntry) tarInStream.getNextEntry()) != null) {
@@ -206,27 +211,25 @@ public class ReconUtils {
         }
       }
     } finally {
-      IOUtils.closeStream(gzIn);
-      IOUtils.closeStream(buffIn);
       IOUtils.closeStream(fileInputStream);
     }
   }
 
   /**
-   * Make HTTP GET call on the URL and return inputstream to the response.
-   * @param httpClient HttpClient to use.
+   * Make HTTP GET call on the URL and return HttpURLConnection instance.
+   * @param connectionFactory URLConnectionFactory to use.
    * @param url url to call
-   * @return Inputstream to the response of the HTTP call.
-   * @throws IOException While reading the response.
+   * @param isSpnego is SPNEGO enabled
+   * @return HttpURLConnection instance of the HTTP call.
+   * @throws IOException, AuthenticationException While reading the response.
    */
-  public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
-                                  String url)
-      throws IOException {
-
-    URLConnection urlConnection =
-          connectionFactory.openConnection(new URL(url));
+  public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
+                                  String url, boolean isSpnego)
+      throws IOException, AuthenticationException {
+    HttpURLConnection urlConnection = (HttpURLConnection)
+          connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
-    return urlConnection.getInputStream();
+    return urlConnection;
   }
 
   /**
@@ -264,4 +267,93 @@ public class ReconUtils {
         new File(reconDbDir.getPath(), lastKnownSnapshotFileName);
   }
 
+  /**
+   * Upsert row in GlobalStats table.
+   *
+   * @param sqlConfiguration
+   * @param globalStatsDao
+   * @param key
+   * @param count
+   */
+  public static void upsertGlobalStatsTable(Configuration sqlConfiguration,
+                                            GlobalStatsDao globalStatsDao,
+                                            String key,
+                                            Long count) {
+    // Get the current timestamp
+    Timestamp now =
+        using(sqlConfiguration).fetchValue(select(currentTimestamp()));
+    GlobalStats record = globalStatsDao.fetchOneByKey(key);
+    GlobalStats newRecord = new GlobalStats(key, count, now);
+
+    // Insert a new record for key if it does not exist
+    if (record == null) {
+      globalStatsDao.insert(newRecord);
+    } else {
+      globalStatsDao.update(newRecord);
+    }
+  }
+
+  public static long getFileSizeUpperBound(long fileSize) {
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
+      return Long.MAX_VALUE;
+    }
+    // The smallest file size being tracked for count
+    // is 1 KB i.e. 1024 = 2 ^ 10.
+    int binIndex = getFileSizeBinIndex(fileSize);
+    return (long) Math.pow(2, (10 + binIndex));
+  }
+
+  public static long getContainerSizeUpperBound(long containerSize) {
+    if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
+      return Long.MAX_VALUE;
+    }
+    // The smallest container size being tracked for count
+    // is 512MB i.e. 536870912L = 2 ^ 29.
+    int binIndex = getContainerSizeBinIndex(containerSize);
+    return (long) Math.pow(2, (29 + binIndex));
+  }
+
+
+  public static int getFileSizeBinIndex(long fileSize) {
+    Preconditions.checkArgument(fileSize >= 0,
+        "fileSize = %s < 0", fileSize);
+    // if the file size is larger than our track scope,
+    // we map it to the last bin
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
+      return ReconConstants.NUM_OF_FILE_SIZE_BINS - 1;
+    }
+    int index = nextClosestPowerIndexOfTwo(fileSize);
+    // if the file size is smaller than our track scope,
+    // we map it to the first bin
+    return index < 10 ? 0 : index - 10;
+  }
+
+  public static int getContainerSizeBinIndex(long containerSize) {
+    Preconditions.checkArgument(containerSize >= 0,
+        "containerSize = %s < 0", containerSize);
+    // if the container size is larger than our track scope,
+    // we map it to the last bin
+    if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
+      return ReconConstants.NUM_OF_CONTAINER_SIZE_BINS - 1;
+    }
+    int index = nextClosestPowerIndexOfTwo(containerSize);
+    // if the container size is smaller than our track scope,
+    // we map it to the first bin
+    return index < 29 ? 0 : index - 29;
+  }
+
+  static int nextClosestPowerIndexOfTwo(long n) {
+    return n > 0 ? 64 - Long.numberOfLeadingZeros(n - 1)
+        : n == 0 ? 0
+        : n == Long.MIN_VALUE ? -63
+        : -nextClosestPowerIndexOfTwo(-n);
+  }
+
+  public SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        HddsServerUtil.getReconDataNodeBindAddress(conf));
+    return builder.build();
+  }
 }

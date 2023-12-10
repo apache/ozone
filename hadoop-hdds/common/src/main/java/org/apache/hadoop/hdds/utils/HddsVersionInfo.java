@@ -37,7 +37,7 @@ public final class HddsVersionInfo {
   public static final VersionInfo HDDS_VERSION_INFO =
       new VersionInfo("hdds");
 
-  private HddsVersionInfo() {}
+  private HddsVersionInfo() { }
 
   public static void main(String[] args) {
     System.out.println("Using HDDS " + HDDS_VERSION_INFO.getVersion());
@@ -47,9 +47,13 @@ public final class HddsVersionInfo {
     System.out.println("Compiled by " + HDDS_VERSION_INFO.getUser() + " on "
         + HDDS_VERSION_INFO.getDate());
     System.out.println(
-        "Compiled with protoc " + HDDS_VERSION_INFO.getProtocVersion());
+        "Compiled with protoc " + HDDS_VERSION_INFO.getHadoopProtoc2Version() +
+            ", " + HDDS_VERSION_INFO.getGrpcProtocVersion() +
+            " and " + HDDS_VERSION_INFO.getHadoopProtoc3Version());
     System.out.println(
         "From source with checksum " + HDDS_VERSION_INFO.getSrcChecksum());
+    System.out.println(
+        "Compiled on platform " + HDDS_VERSION_INFO.getCompilePlatform());
     if (LOG.isDebugEnabled()) {
       LOG.debug("This command was run using " +
           ClassUtil.findContainingJar(HddsVersionInfo.class));

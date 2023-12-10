@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.IOException;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,16 +28,18 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
@@ -50,20 +54,28 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.junit.After;
+
 import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Exception handling by Ozone Client.
  */
+@Timeout(300)
 public class TestFailureHandlingByClient {
 
   private MiniOzoneCluster cluster;
@@ -88,33 +100,34 @@ public class TestFailureHandlingByClient {
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
-    conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
-        1, TimeUnit.SECONDS);
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
+    conf.setFromObject(ratisClientConfig);
+
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
     conf.setBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.
-                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "watch.request.timeout",
-            3, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    conf.setFromObject(ratisServerConfig);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
+    conf.setFromObject(raftClientConfig);
+
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamBufferFlushDelay(false);
+    conf.setFromObject(clientConfig);
 
     conf.setQuietMode(false);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
@@ -142,8 +155,9 @@ public class TestFailureHandlingByClient {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -154,13 +168,16 @@ public class TestFailureHandlingByClient {
     startCluster();
     String keyName = UUID.randomUUID().toString();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    byte[] data =
-        ContainerTestHelper
-        .getFixedLengthString(keyString, chunkSize + chunkSize / 2).getBytes();
+    byte[] data = ContainerTestHelper.getFixedLengthString(
+        keyString, 2 * chunkSize + chunkSize / 2).getBytes(UTF_8);
     key.write(data);
 
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    // assert that the exclude list's expire time equals to
+    // default value 600000 ms in OzoneClientConfig.java
+    Assert.assertEquals(((KeyOutputStream) key.getOutputStream())
+        .getExcludeList().getExpiryTime(), 600000);
     KeyOutputStream groupOutputStream =
         (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
@@ -169,7 +186,7 @@ public class TestFailureHandlingByClient {
     long containerId = locationInfoList.get(0).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
-        .getContainer(ContainerID.valueof(containerId));
+        .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -181,13 +198,115 @@ public class TestFailureHandlingByClient {
     key.close();
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
+
     Assert.assertEquals(data.length, keyInfo.getDataSize());
     validateData(keyName, data);
+
+    // Verify that the block information is updated correctly in the DB on
+    // failures
+    testBlockCountOnFailures(keyInfo);
+  }
+
+  /**
+   * Test whether blockData and Container metadata (block count and used
+   * bytes) is updated correctly when there is a write failure.
+   * We can combine this test with {@link #testBlockWritesWithDnFailures()}
+   * as that test also simulates a write failure and client writes failed
+   * chunk writes to a new block.
+   */
+  private void testBlockCountOnFailures(OmKeyInfo omKeyInfo) throws Exception {
+    // testBlockWritesWithDnFailures writes chunkSize*2.5 size of data into
+    // KeyOutputStream. But before closing the outputStream, 2 of the DNs in
+    // the pipeline being written to are closed. So the key will be written
+    // to 2 blocks as atleast the last 0.5 chunk would not be committed to the
+    // first block before the stream is closed.
+    /**
+     * There are 3 possible scenarios:
+     * 1. Block1 has 2 chunks and OMKeyInfo also has 2 chunks against this block
+     *    => Block2 should have 1 chunk
+     *    (2 chunks were written to Block1, committed and acknowledged by
+     *    CommitWatcher)
+     * 2. Block1 has 1 chunk and OMKeyInfo has 1 chunk against this block
+     *    => Block2 should have 2 chunks
+     *    (Possibly 2 chunks were written but only 1 was committed to the
+     *    block)
+     * 3. Block1 has 2 chunks but OMKeyInfo has only 1 chunk against this block
+     *    => Block2 should have 2 chunks
+     *    (This happens when the 2nd chunk has been committed to Block1 but
+     *    not acknowledged by CommitWatcher before pipeline shutdown)
+     */
+
+    // Get information about the first and second block (in different pipelines)
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations()
+        .getLocationList();
+    long containerId1 = locationList.get(0).getContainerID();
+    List<DatanodeDetails> block1DNs = locationList.get(0).getPipeline()
+        .getNodes();
+    long containerId2 = locationList.get(1).getContainerID();
+    List<DatanodeDetails> block2DNs = locationList.get(1).getPipeline()
+        .getNodes();
+
+
+    int block2ExpectedChunkCount;
+    if (locationList.get(0).getLength() == 2 * chunkSize) {
+      // Scenario 1
+      block2ExpectedChunkCount = 1;
+    } else {
+      // Scenario 2
+      block2ExpectedChunkCount = 2;
+    }
+
+    // For the first block, first 2 DNs in the pipeline are shutdown (to
+    // simulate a failure). It should have 1 or 2 chunks (depending on
+    // whether the DN CommitWatcher successfully acknowledged the 2nd chunk
+    // write or not). The 3rd chunk would not exist on the first pipeline as
+    // the pipeline would be closed before the last 0.5 chunk was committed
+    // to the block.
+    KeyValueContainerData containerData1 =
+        ((KeyValueContainer) cluster.getHddsDatanode(block1DNs.get(2))
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(containerId1)).getContainerData();
+    try (DBHandle containerDb1 = BlockUtils.getDB(containerData1, conf)) {
+      BlockData blockData1 = containerDb1.getStore().getBlockDataTable().get(
+          containerData1.getBlockKey(locationList.get(0).getBlockID()
+              .getLocalID()));
+      // The first Block could have 1 or 2 chunkSize of data
+      int block1NumChunks = blockData1.getChunks().size();
+      Assert.assertTrue(block1NumChunks >= 1);
+
+      Assert.assertEquals(chunkSize * block1NumChunks, blockData1.getSize());
+      Assert.assertEquals(1, containerData1.getBlockCount());
+      Assert.assertEquals(chunkSize * block1NumChunks,
+          containerData1.getBytesUsed());
+    }
+
+    // Verify that the second block has the remaining 0.5*chunkSize of data
+    KeyValueContainerData containerData2 =
+        ((KeyValueContainer) cluster.getHddsDatanode(block2DNs.get(0))
+            .getDatanodeStateMachine().getContainer().getContainerSet()
+            .getContainer(containerId2)).getContainerData();
+    try (DBHandle containerDb2 = BlockUtils.getDB(containerData2, conf)) {
+      BlockData blockData2 = containerDb2.getStore().getBlockDataTable().get(
+          containerData2.getBlockKey(locationList.get(1).getBlockID()
+              .getLocalID()));
+      // The second Block should have 0.5 chunkSize of data
+      Assert.assertEquals(block2ExpectedChunkCount,
+          blockData2.getChunks().size());
+      Assert.assertEquals(1, containerData2.getBlockCount());
+      int expectedBlockSize;
+      if (block2ExpectedChunkCount == 1) {
+        expectedBlockSize = chunkSize / 2;
+      } else {
+        expectedBlockSize = chunkSize + chunkSize / 2;
+      }
+      Assert.assertEquals(expectedBlockSize, blockData2.getSize());
+      Assert.assertEquals(expectedBlockSize, containerData2.getBytesUsed());
+    }
   }
 
   @Test
@@ -197,8 +316,8 @@ public class TestFailureHandlingByClient {
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 0);
     String data = ContainerTestHelper
-        .getFixedLengthString(keyString,  chunkSize/2);
-    key.write(data.getBytes());
+        .getFixedLengthString(keyString,  chunkSize / 2);
+    key.write(data.getBytes(UTF_8));
     // get the name of a valid container
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
@@ -209,7 +328,7 @@ public class TestFailureHandlingByClient {
     BlockID blockId = locationInfoList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -221,9 +340,9 @@ public class TestFailureHandlingByClient {
     // this will throw AlreadyClosedException and and current stream
     // will be discarded and write a new block
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -231,8 +350,9 @@ public class TestFailureHandlingByClient {
     Assert.assertNotEquals(
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
-    Assert.assertEquals(data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.getBytes());
+    Assert.assertEquals(data.getBytes(UTF_8).length,
+        keyInfo.getDataSize());
+    validateData(keyName, data.getBytes(UTF_8));
   }
 
 
@@ -255,7 +375,7 @@ public class TestFailureHandlingByClient {
 
     // Assert that 1 block will be preallocated
     Assert.assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
     BlockID blockId = streamEntryList.get(0).getBlockID();
@@ -268,11 +388,11 @@ public class TestFailureHandlingByClient {
 
     // This write will hit ClosedContainerException and this container should
     // will be added in the excludelist
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
 
     Assert.assertTrue(keyOutputStream.getExcludeList().getContainerIds()
-        .contains(ContainerID.valueof(containerId)));
+        .contains(ContainerID.valueOf(containerId)));
     Assert.assertTrue(
         keyOutputStream.getExcludeList().getDatanodes().isEmpty());
     Assert.assertTrue(
@@ -281,9 +401,9 @@ public class TestFailureHandlingByClient {
     // The close will just write to the buffer
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -291,12 +411,12 @@ public class TestFailureHandlingByClient {
     Assert.assertNotEquals(
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
-    Assert.assertEquals(2 * data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.concat(data).getBytes());
+    Assert.assertEquals(2 * data.getBytes(UTF_8).length,
+        keyInfo.getDataSize());
+    validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
   @Test
-  @Ignore("HDDS-3298")
   public void testDatanodeExclusionWithMajorityCommit() throws Exception {
     startCluster();
     String keyName = UUID.randomUUID().toString();
@@ -314,13 +434,13 @@ public class TestFailureHandlingByClient {
 
     // Assert that 1 block will be preallocated
     Assert.assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
     BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -330,8 +450,8 @@ public class TestFailureHandlingByClient {
     // next write ops.
     cluster.shutdownHddsDatanode(datanodes.get(0));
 
-    key.write(data.getBytes());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
+    key.write(data.getBytes(UTF_8));
     key.flush();
 
     Assert.assertTrue(keyOutputStream.getExcludeList().getDatanodes()
@@ -344,9 +464,9 @@ public class TestFailureHandlingByClient {
     key.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -354,8 +474,8 @@ public class TestFailureHandlingByClient {
     Assert.assertNotEquals(
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
-    Assert.assertEquals(3 * data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.concat(data).concat(data).getBytes());
+    Assert.assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
 
 
@@ -377,13 +497,13 @@ public class TestFailureHandlingByClient {
 
     // Assert that 1 block will be preallocated
     Assert.assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
     BlockID blockId = streamEntryList.get(0).getBlockID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerId));
+            .getContainer(ContainerID.valueOf(containerId));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
@@ -394,8 +514,8 @@ public class TestFailureHandlingByClient {
     cluster.shutdownHddsDatanode(datanodes.get(0));
     cluster.shutdownHddsDatanode(datanodes.get(1));
 
-    key.write(data.getBytes());
-    key.write(data.getBytes());
+    key.write(data.getBytes(UTF_8));
+    key.write(data.getBytes(UTF_8));
     key.flush();
     Assert.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
         .contains(pipeline.getId()));
@@ -407,9 +527,9 @@ public class TestFailureHandlingByClient {
     key.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
-        .setRefreshPipeline(true)
+        .setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
@@ -417,8 +537,8 @@ public class TestFailureHandlingByClient {
     Assert.assertNotEquals(
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
-    Assert.assertEquals(3 * data.getBytes().length, keyInfo.getDataSize());
-    validateData(keyName, data.concat(data).concat(data).getBytes());
+    Assert.assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,

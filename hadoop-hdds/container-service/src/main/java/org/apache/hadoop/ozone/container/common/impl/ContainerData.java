@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -94,11 +95,15 @@ public abstract class ContainerData {
   private final AtomicLong readCount;
   private final AtomicLong writeCount;
   private final AtomicLong bytesUsed;
-  private final AtomicLong keyCount;
+  private final AtomicLong blockCount;
 
   private HddsVolume volume;
 
   private String checksum;
+
+  private boolean isEmpty;
+
+  private int replicaIndex;
 
   /** Timestamp of last data scan (milliseconds since Unix Epoch).
    * {@code null} if not yet scanned (or timestamp not recorded,
@@ -128,19 +133,20 @@ public abstract class ContainerData {
    * Creates a ContainerData Object, which holds metadata of the container.
    * @param type - ContainerType
    * @param containerId - ContainerId
-   * @param layOutVersion - Container layOutVersion
+   * @param layoutVersion - Container layoutVersion
    * @param size - Container maximum size in bytes
    * @param originPipelineId - Pipeline Id where this container is/was created
    * @param originNodeId - Node Id where this container is/was created
    */
   protected ContainerData(ContainerType type, long containerId,
-      ChunkLayOutVersion layOutVersion, long size, String originPipelineId,
-      String originNodeId) {
+                          ContainerLayoutVersion layoutVersion, long size,
+                          String originPipelineId,
+                          String originNodeId) {
     Preconditions.checkNotNull(type);
 
     this.containerType = type;
     this.containerID = containerId;
-    this.layOutVersion = layOutVersion.getVersion();
+    this.layOutVersion = layoutVersion.getVersion();
     this.metadata = new TreeMap<>();
     this.state = ContainerDataProto.State.OPEN;
     this.readCount = new AtomicLong(0L);
@@ -148,17 +154,19 @@ public abstract class ContainerData {
     this.writeCount =  new AtomicLong(0L);
     this.writeBytes =  new AtomicLong(0L);
     this.bytesUsed = new AtomicLong(0L);
-    this.keyCount = new AtomicLong(0L);
+    this.blockCount = new AtomicLong(0L);
     this.maxSize = size;
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
+    this.isEmpty = false;
     setChecksumTo0ByteArray();
   }
 
   protected ContainerData(ContainerData source) {
     this(source.getContainerType(), source.getContainerID(),
-        source.getLayOutVersion(), source.getMaxSize(),
+        source.getLayoutVersion(), source.getMaxSize(),
         source.getOriginPipelineId(), source.getOriginNodeId());
+    replicaIndex = source.getReplicaIndex();
   }
 
   /**
@@ -189,6 +197,14 @@ public abstract class ContainerData {
    */
   public synchronized ContainerDataProto.State getState() {
     return state;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
   }
 
   /**
@@ -224,11 +240,11 @@ public abstract class ContainerData {
   }
 
   /**
-   * Returns the layOutVersion of the actual container data format.
-   * @return layOutVersion
+   * Returns the layoutVersion of the actual container data format.
+   * @return layoutVersion
    */
-  public ChunkLayOutVersion getLayOutVersion() {
-    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
+  public ContainerLayoutVersion getLayoutVersion() {
+    return ContainerLayoutVersion.getContainerLayoutVersion(layOutVersion);
   }
 
   /**
@@ -259,7 +275,7 @@ public abstract class ContainerData {
   }
 
   /**
-   * Retuns metadata of the container.
+   * Returns metadata of the container.
    * @return metadata
    */
   public Map<String, String> getMetadata() {
@@ -287,11 +303,19 @@ public abstract class ContainerData {
   }
 
   /**
+   * checks if the container is closing.
+   * @return - boolean
+   */
+  public synchronized  boolean isClosing() {
+    return ContainerDataProto.State.CLOSING == state;
+  }
+
+  /**
    * checks if the container is invalid.
    * @return - boolean
    */
   public synchronized boolean isValid() {
-    return !(ContainerDataProto.State.INVALID == state);
+    return ContainerDataProto.State.INVALID != state;
   }
 
   /**
@@ -415,7 +439,12 @@ public abstract class ContainerData {
     long unused = getMaxSize() - getBytesUsed();
 
     this.writeBytes.addAndGet(bytes);
-
+    /*
+       Increase the cached Used Space in VolumeInfo as it
+       maybe not updated, DU or DedicatedDiskSpaceUsage runs
+       periodically to update the Used Space in VolumeInfo.
+     */
+    this.getVolume().incrementUsedSpace(bytes);
     // only if container size < max size
     if (committedSpace && unused > 0) {
       //with this write, container size might breach max size
@@ -486,47 +515,60 @@ public abstract class ContainerData {
    * Returns the volume of the Container.
    * @return HddsVolume
    */
+  @JsonIgnore
   public HddsVolume getVolume() {
     return volume;
   }
 
   /**
-   * Increments the number of keys in the container.
+   * Increments the number of blocks in the container.
    */
-  public void incrKeyCount() {
-    this.keyCount.incrementAndGet();
+  public void incrBlockCount() {
+    this.blockCount.incrementAndGet();
   }
 
   /**
-   * Decrements number of keys in the container.
+   * Decrements number of blocks in the container.
    */
-  public void decrKeyCount() {
-    this.keyCount.decrementAndGet();
+  public void decrBlockCount() {
+    this.blockCount.decrementAndGet();
   }
 
   /**
-   * Decrease the count of keys in the container.
+   * Decrease the count of blocks (blocks) in the container.
    *
-   * @param deletedKeyCount
+   * @param deletedBlockCount
    */
-  public void decrKeyCount(long deletedKeyCount) {
-    this.keyCount.addAndGet(-1 * deletedKeyCount);
+  public void decrBlockCount(long deletedBlockCount) {
+    this.blockCount.addAndGet(-1 * deletedBlockCount);
   }
 
   /**
-   * Returns number of keys in the container.
-   * @return key count
+   * Returns number of blocks in the container.
+   * @return block count
    */
-  public long getKeyCount() {
-    return this.keyCount.get();
+  public long getBlockCount() {
+    return this.blockCount.get();
+  }
+
+  public boolean isEmpty() {
+    return isEmpty;
   }
 
   /**
-   * Set's number of keys in the container.
+   * Indicates that this container has no more data, and is eligible for
+   * deletion. Once this flag is set on a container, it cannot leave this state.
+   */
+  public void markAsEmpty() {
+    this.isEmpty = true;
+  }
+
+  /**
+   * Set's number of blocks in the container.
    * @param count
    */
-  public void setKeyCount(long count) {
-    this.keyCount.set(count);
+  public void setBlockCount(long count) {
+    this.blockCount.set(count);
   }
 
   public void setChecksumTo0ByteArray() {

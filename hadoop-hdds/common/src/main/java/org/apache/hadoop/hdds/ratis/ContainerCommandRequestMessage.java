@@ -61,9 +61,11 @@ public final class ContainerCommandRequestMessage implements Message {
   public static ContainerCommandRequestProto toProto(
       ByteString bytes, RaftGroupId groupId)
       throws InvalidProtocolBufferException {
-    final int i = 4 + bytes.asReadOnlyByteBuffer().getInt();
+    final int i = Integer.BYTES + bytes.substring(0, Integer.BYTES)
+        .asReadOnlyByteBuffer().getInt();
     final ContainerCommandRequestProto header
-        = ContainerCommandRequestProto.parseFrom(bytes.substring(4, i));
+        = ContainerCommandRequestProto
+        .parseFrom(bytes.substring(Integer.BYTES, i));
     // TODO: setting pipeline id can be avoided if the client is sending it.
     //       In such case, just have to validate the pipeline id.
     final ContainerCommandRequestProto.Builder b = header.toBuilder();

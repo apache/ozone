@@ -26,28 +26,34 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .CopyContainerRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .CopyContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .IntraDatanodeProtocolServiceGrpc;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
+import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
+import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Client to read container data from gRPC.
  */
-public class GrpcReplicationClient {
+public class GrpcReplicationClient implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationClient.class);
@@ -56,31 +62,59 @@ public class GrpcReplicationClient {
 
   private final IntraDatanodeProtocolServiceStub client;
 
-  private final Path workingDirectory;
+  private final CopyContainerCompression compression;
 
-  public GrpcReplicationClient(String host,
-      int port, Path workingDir) {
+  private final AtomicBoolean closed = new AtomicBoolean();
+  private final String debugString;
 
-    channel = NettyChannelBuilder.forAddress(host, port)
-        .usePlaintext()
-        .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .build();
+  public GrpcReplicationClient(
+      String host, int port,
+      SecurityConfig secConfig, CertificateClient certClient,
+      CopyContainerCompression compression)
+      throws IOException {
+    NettyChannelBuilder channelBuilder =
+        NettyChannelBuilder.forAddress(host, port)
+            .usePlaintext()
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+
+    if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
+      channelBuilder.useTransportSecurity();
+
+      SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
+      if (certClient != null) {
+        KeyStoresFactory factory = certClient.getClientKeyStoresFactory();
+        sslContextBuilder
+            .trustManager(factory.getTrustManagers()[0])
+            .clientAuth(ClientAuth.REQUIRE)
+            .keyManager(factory.getKeyManagers()[0]);
+      }
+      if (secConfig.useTestCert()) {
+        channelBuilder.overrideAuthority("localhost");
+      }
+      channelBuilder.sslContext(sslContextBuilder.build());
+    }
+    channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
-    workingDirectory = workingDir;
+    this.compression = compression;
+    debugString = getClass().getSimpleName()
+        + "{" + host + ":" + port + "}"
+        + "@" + Integer.toHexString(hashCode());
+    LOG.debug("{}: created", this);
   }
 
-  public CompletableFuture<Path> download(long containerId) {
+  public CompletableFuture<Path> download(long containerId, Path dir) {
     CopyContainerRequestProto request =
         CopyContainerRequestProto.newBuilder()
             .setContainerID(containerId)
             .setLen(-1)
             .setReadOffset(0)
+            .setCompression(compression.toProto())
             .build();
 
     CompletableFuture<Path> response = new CompletableFuture<>();
 
-    Path destinationPath =
-        getWorkingDirectory().resolve("container-" + containerId + ".tar.gz");
+    Path destinationPath = dir
+        .resolve(ContainerUtils.getContainerTarName(containerId));
 
     client.download(request,
         new StreamDownloader(containerId, response, destinationPath));
@@ -88,17 +122,32 @@ public class GrpcReplicationClient {
     return response;
   }
 
-  private Path getWorkingDirectory() {
-    return workingDirectory;
+  public StreamObserver<SendContainerRequest> upload(
+      StreamObserver<SendContainerResponse> responseObserver) {
+    return client.upload(responseObserver);
   }
 
-  public void shutdown() {
-    channel.shutdown();
-    try {
-      channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      LOG.error("failed to shutdown replication channel", e);
+  private void shutdown() {
+    if (!closed.getAndSet(true)) {
+      LOG.debug("{}: shutdown", this);
+      channel.shutdown();
+      try {
+        channel.awaitTermination(5, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        LOG.error("failed to shutdown replication channel", e);
+        Thread.currentThread().interrupt();
+      }
     }
+  }
+
+  @Override
+  public void close() throws Exception {
+    shutdown();
+  }
+
+  @Override
+  public String toString() {
+    return debugString;
   }
 
   /**
@@ -133,7 +182,16 @@ public class GrpcReplicationClient {
       try {
         chunk.getData().writeTo(stream);
       } catch (IOException e) {
-        response.completeExceptionally(e);
+        LOG.error("Failed to write the stream buffer to {} for container {}",
+            outputPath, containerId, e);
+        try {
+          stream.close();
+        } catch (IOException ex) {
+          LOG.error("Failed to close OutputStream {}", outputPath, e);
+        } finally {
+          deleteOutputOnFailure();
+          response.completeExceptionally(e);
+        }
       }
     }
 
@@ -148,6 +206,7 @@ public class GrpcReplicationClient {
       } catch (IOException e) {
         LOG.error("Failed to close {} for container {}",
             outputPath, containerId, e);
+        deleteOutputOnFailure();
         response.completeExceptionally(e);
       }
     }
@@ -161,9 +220,9 @@ public class GrpcReplicationClient {
       } catch (IOException e) {
         LOG.error("Downloaded container {} OK, but failed to close {}",
             containerId, outputPath, e);
+        deleteOutputOnFailure();
         response.completeExceptionally(e);
       }
-
     }
 
     private void deleteOutputOnFailure() {
@@ -176,5 +235,4 @@ public class GrpcReplicationClient {
       }
     }
   }
-
 }

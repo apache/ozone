@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import java.beans.IntrospectionException;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,6 +27,7 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,13 +43,19 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
 import static org.apache.hadoop.ozone.container.keyvalue
     .KeyValueContainerData.KEYVALUE_YAML_TAG;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
-import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.introspector.BeanAccess;
 import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
@@ -85,8 +91,12 @@ public final class ContainerDataYaml {
     Writer writer = null;
     FileOutputStream out = null;
     try {
+      boolean withReplicaIndex =
+          containerData instanceof KeyValueContainerData &&
+          ((KeyValueContainerData) containerData).getReplicaIndex() > 0;
+
       // Create Yaml for given container type
-      Yaml yaml = getYamlForContainerType(containerType);
+      Yaml yaml = getYamlForContainerType(containerType, withReplicaIndex);
       // Compute Checksum and update ContainerData
       containerData.computeAndSetChecksum(yaml);
 
@@ -149,16 +159,29 @@ public final class ContainerDataYaml {
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    Representer representer = new ContainerDataRepresenter();
+    Representer representer = new ContainerDataRepresenter(
+        KeyValueContainerData.getYamlFields());
     representer.setPropertyUtils(propertyUtils);
 
-    Constructor containerDataConstructor = new ContainerDataConstructor();
+    SafeConstructor containerDataConstructor = new ContainerDataConstructor();
 
     Yaml yaml = new Yaml(containerDataConstructor, representer);
     yaml.setBeanAccess(BeanAccess.FIELD);
 
-    containerData = (ContainerData)
-        yaml.load(input);
+    try {
+      containerData = yaml.load(input);
+    } catch (YAMLException ex) {
+      // Unchecked exception. Convert to IOException since an error with one
+      // container file is not fatal for the whole thread or datanode.
+      throw new IOException(ex);
+    }
+
+    if (containerData == null) {
+      // If Yaml#load returned null, then the file is empty. This is valid yaml
+      // but considered an error in this case since we have lost data about
+      // the container.
+      throw new IOException("Failed to load container file. File is empty.");
+    }
 
     return containerData;
   }
@@ -167,49 +190,61 @@ public final class ContainerDataYaml {
    * Given a ContainerType this method returns a Yaml representation of
    * the container properties.
    *
-   * @param containerType type of container
+   * @param containerType    type of container
+   * @param withReplicaIndex in the container yaml
    * @return Yamal representation of container properties
-   *
    * @throws StorageContainerException if the type is unrecognized
    */
-  public static Yaml getYamlForContainerType(ContainerType containerType)
+  public static Yaml getYamlForContainerType(ContainerType containerType,
+      boolean withReplicaIndex)
       throws StorageContainerException {
     PropertyUtils propertyUtils = new PropertyUtils();
     propertyUtils.setBeanAccess(BeanAccess.FIELD);
     propertyUtils.setAllowReadOnlyProperties(true);
 
-    switch (containerType) {
-    case KeyValueContainer:
-      Representer representer = new ContainerDataRepresenter();
+    if (containerType == ContainerType.KeyValueContainer) {
+      List<String> yamlFields =
+          KeyValueContainerData.getYamlFields();
+      if (withReplicaIndex) {
+        yamlFields = new ArrayList<>(yamlFields);
+        yamlFields.add(REPLICA_INDEX);
+      }
+      Representer representer = new ContainerDataRepresenter(yamlFields);
       representer.setPropertyUtils(propertyUtils);
       representer.addClassTag(
           KeyValueContainerData.class,
-          KeyValueContainerData.KEYVALUE_YAML_TAG);
+          KEYVALUE_YAML_TAG);
 
-      Constructor keyValueDataConstructor = new ContainerDataConstructor();
+      SafeConstructor keyValueDataConstructor = new ContainerDataConstructor();
 
       return new Yaml(keyValueDataConstructor, representer);
-    default:
-      throw new StorageContainerException("Unrecognized container Type " +
-          "format " + containerType, ContainerProtos.Result
-          .UNKNOWN_CONTAINER_TYPE);
     }
+    throw new StorageContainerException("Unrecognized container Type " +
+        "format " + containerType, ContainerProtos.Result
+        .UNKNOWN_CONTAINER_TYPE);
   }
 
   /**
    * Representer class to define which fields need to be stored in yaml file.
    */
   private static class ContainerDataRepresenter extends Representer {
+
+    private List<String> yamlFields;
+
+    ContainerDataRepresenter(List<String> yamlFields) {
+      super(new DumperOptions());
+      this.yamlFields = yamlFields;
+    }
+
     @Override
-    protected Set<Property> getProperties(Class<? extends Object> type)
-        throws IntrospectionException {
+    protected Set<Property> getProperties(Class<? extends Object> type) {
       Set<Property> set = super.getProperties(type);
       Set<Property> filtered = new TreeSet<Property>();
 
       // When a new Container type is added, we need to add what fields need
       // to be filtered here
       if (type.equals(KeyValueContainerData.class)) {
-        List<String> yamlFields = KeyValueContainerData.getYamlFields();
+
         // filter properties
         for (Property prop : set) {
           String name = prop.getName();
@@ -236,8 +271,9 @@ public final class ContainerDataYaml {
   /**
    * Constructor class for KeyValueData, which will be used by Yaml.
    */
-  private static class ContainerDataConstructor extends Constructor {
+  private static class ContainerDataConstructor extends SafeConstructor {
     ContainerDataConstructor() {
+      super(new LoaderOptions());
       //Adding our own specific constructors for tags.
       // When a new Container type is added, we need to add yamlConstructor
       // for that
@@ -247,14 +283,16 @@ public final class ContainerDataYaml {
     }
 
     private class ConstructKeyValueContainerData extends AbstractConstruct {
+      @Override
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
 
         //Needed this, as TAG.INT type is by default converted to Long.
-        long layOutVersion = (long) nodes.get(OzoneConsts.LAYOUTVERSION);
-        ChunkLayOutVersion layoutVersion =
-            ChunkLayOutVersion.getChunkLayOutVersion((int) layOutVersion);
+        long layoutVersion = (long) nodes.get(OzoneConsts.LAYOUTVERSION);
+        ContainerLayoutVersion containerLayoutVersion =
+            ContainerLayoutVersion.getContainerLayoutVersion(
+                (int) layoutVersion);
 
         long size = (long) nodes.get(OzoneConsts.MAX_SIZE);
 
@@ -264,8 +302,8 @@ public final class ContainerDataYaml {
 
         //When a new field is added, it needs to be added here.
         KeyValueContainerData kvData = new KeyValueContainerData(
-            (long) nodes.get(OzoneConsts.CONTAINER_ID), layoutVersion, size,
-            originPipelineId, originNodeId);
+            (long) nodes.get(OzoneConsts.CONTAINER_ID), containerLayoutVersion,
+            size, originPipelineId, originNodeId);
 
         kvData.setContainerDBType((String)nodes.get(
             OzoneConsts.CONTAINER_DB_TYPE));
@@ -280,6 +318,13 @@ public final class ContainerDataYaml {
         String state = (String) nodes.get(OzoneConsts.STATE);
         kvData
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));
+        String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
+        kvData.setSchemaVersion(schemaVersion);
+        final Object replicaIndex = nodes.get(REPLICA_INDEX);
+        if (replicaIndex != null) {
+          kvData.setReplicaIndex(
+              ((Long) replicaIndex).intValue());
+        }
         return kvData;
       }
     }
@@ -288,6 +333,7 @@ public final class ContainerDataYaml {
     // number if it fits in integer, otherwise returns long. So, slightly
     // modified the code to return long in all cases.
     private class ConstructLong extends AbstractConstruct {
+      @Override
       public Object construct(Node node) {
         String value = constructScalar((ScalarNode) node).toString()
             .replaceAll("_", "");

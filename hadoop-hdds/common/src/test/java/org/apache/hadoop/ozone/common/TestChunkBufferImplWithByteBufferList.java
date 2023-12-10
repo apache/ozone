@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.collect.ImmutableList;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -36,7 +36,7 @@ public class TestChunkBufferImplWithByteBufferList {
   @Test
   public void rejectsNullList() {
     List<ByteBuffer> list = null;
-    assertThrows(IllegalArgumentException.class, () -> ChunkBuffer.wrap(list));
+    assertThrows(NullPointerException.class, () -> ChunkBuffer.wrap(list));
   }
 
   @Test

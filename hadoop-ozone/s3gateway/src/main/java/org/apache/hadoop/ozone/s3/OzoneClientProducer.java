@@ -21,22 +21,13 @@ import javax.annotation.PreDestroy;
 import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.net.URISyntaxException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,77 +37,48 @@ import org.slf4j.LoggerFactory;
 @RequestScoped
 public class OzoneClientProducer {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
-  private OzoneClient client;
 
-  @Inject
-  private SignatureProcessor v4RequestParser;
+  private OzoneClient client;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
-  @Inject
-  private Text omService;
-
-  @Inject
-  private String omServiceID;
-
+  @Context
+  private ContainerRequestContext context;
 
   @Produces
-  public OzoneClient createClient() throws IOException {
+  public synchronized OzoneClient createClient() throws WebApplicationException,
+      IOException {
+    ozoneConfiguration.set("ozone.om.group.rights", "NONE");
     client = getClient(ozoneConfiguration);
     return client;
   }
-  
+
   @PreDestroy
-  public void destory() throws IOException {
-    client.close();
+  public void destroy() throws IOException {
+    client.getObjectStore().getClientProxy().clearThreadLocalS3Auth();
   }
 
-  private OzoneClient getClient(OzoneConfiguration config) throws IOException {
+  private OzoneClient getClient(OzoneConfiguration config)
+      throws IOException {
+    OzoneClient ozoneClient = null;
     try {
-      String awsAccessId = v4RequestParser.getAwsAccessId();
-      UserGroupInformation remoteUser =
-          UserGroupInformation.createRemoteUser(awsAccessId);
-      if (OzoneSecurityUtil.isSecurityEnabled(config)) {
-        LOG.debug("Creating s3 auth info for client.");
-        try {
-
-          OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-          identifier.setTokenType(S3AUTHINFO);
-          identifier.setStrToSign(v4RequestParser.getStringToSign());
-          identifier.setSignature(v4RequestParser.getSignature());
-          identifier.setAwsAccessId(awsAccessId);
-          identifier.setOwner(new Text(awsAccessId));
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("Adding token for service:{}", omService);
-          }
-          Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
-              identifier.getSignature().getBytes(UTF_8),
-              identifier.getKind(),
-              omService);
-          remoteUser.addToken(token);
-        } catch (OS3Exception | URISyntaxException ex) {
-          LOG.error("S3 auth info creation failed.");
-          throw S3_AUTHINFO_CREATION_ERROR;
-        }
-
-      }
-      UserGroupInformation.setLoginUser(remoteUser);
+      ozoneClient =
+          OzoneClientCache.getOzoneClientInstance(ozoneConfiguration);
     } catch (Exception e) {
-      LOG.error("Error: ", e);
+      // For any other critical errors during object creation throw Internal
+      // error.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Client Creation: ", e);
+      }
+      throw e;
     }
-
-    if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
-    } else {
-      // As in HA case, we need to pass om service ID.
-      return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);
-    }
+    return ozoneClient;
   }
 
-  public void setOzoneConfiguration(OzoneConfiguration config) {
+  public synchronized void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
   }
 }

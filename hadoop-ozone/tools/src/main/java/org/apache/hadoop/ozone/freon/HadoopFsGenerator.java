@@ -16,7 +16,10 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -26,8 +29,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.codahale.metrics.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -43,40 +45,65 @@ import picocli.CommandLine.Option;
 public class HadoopFsGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(HadoopFsGenerator.class);
-
   @Option(names = {"--path"},
-      description = "Hadoop FS file system path",
+      description = "Hadoop FS file system path. Use full path.",
       defaultValue = "o3fs://bucket1.vol1")
   private String rootPath;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated files (in bytes)",
-      defaultValue = "10240")
-  private int fileSize;
+      description = "Size of the generated files. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "10KB",
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   @Option(names = {"--buffer"},
-      description = "Size of buffer used to generated the key content.",
-      defaultValue = "4096")
+      description = "Size of buffer used store the generated key content",
+      defaultValue = "10240")
   private int bufferSize;
+
+  @Option(names = {"--copy-buffer"},
+      description = "Size of bytes written to the output in one operation",
+      defaultValue = "4096")
+  private int copyBufferSize;
+
+  @Option(names = {"--sync"},
+      description = "Type of operation to execute after a write. Supported " +
+      "options include NONE (default), HFLUSH and HSYNC",
+      defaultValue = "NONE")
+  private static ContentGenerator.SyncOptions flushOrSync;
 
   private ContentGenerator contentGenerator;
 
   private Timer timer;
 
-  private FileSystem fileSystem;
+  private OzoneConfiguration configuration;
+  private URI uri;
+  private final ThreadLocal<FileSystem> threadLocalFileSystem =
+      ThreadLocal.withInitial(this::createFS);
 
   @Override
   public Void call() throws Exception {
-
     init();
 
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    configuration = createOzoneConfiguration();
+    uri = URI.create(rootPath);
+    String scheme = Optional.ofNullable(uri.getScheme())
+            .orElseGet(() -> FileSystem.getDefaultUri(configuration)
+                    .getScheme());
+    String disableCacheName =
+            String.format("fs.%s.impl.disable.cache", scheme);
+    print("Disabling FS cache: " + disableCacheName);
+    configuration.setBoolean(disableCacheName, true);
 
-    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+    Path file = new Path(rootPath + "/" + generateObjectName(0));
+    try (FileSystem fileSystem = threadLocalFileSystem.get()) {
+      fileSystem.mkdirs(file.getParent());
+    }
 
-    contentGenerator = new ContentGenerator(fileSize, bufferSize);
+    contentGenerator =
+        new ContentGenerator(fileSize.toBytes(), bufferSize, copyBufferSize,
+            flushOrSync);
 
     timer = getMetrics().timer("file-create");
 
@@ -87,7 +114,7 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
   private void createFile(long counter) throws Exception {
     Path file = new Path(rootPath + "/" + generateObjectName(counter));
-    fileSystem.mkdirs(file.getParent());
+    FileSystem fileSystem = threadLocalFileSystem.get();
 
     timer.time(() -> {
       try (FSDataOutputStream output = fileSystem.create(file)) {
@@ -95,5 +122,23 @@ public class HadoopFsGenerator extends BaseFreonGenerator
       }
       return null;
     });
+  }
+
+  private FileSystem createFS() {
+    try {
+      return FileSystem.get(uri, configuration);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  @Override
+  protected void taskLoopCompleted() {
+    FileSystem fileSystem = threadLocalFileSystem.get();
+    try {
+      fileSystem.close();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 }

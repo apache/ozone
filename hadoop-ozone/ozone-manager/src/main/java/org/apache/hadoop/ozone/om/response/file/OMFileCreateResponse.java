@@ -20,30 +20,40 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import javax.annotation.Nonnull;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for crate file request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, OPEN_KEY_TABLE})
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
-    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID);
+      @Nonnull OmKeyInfo omKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
+      long openKeySessionID,
+      @Nonnull OmBucketInfo omBucketInfo) {
+    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID,
+        omBucketInfo);
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMFileCreateResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMFileCreateResponse(@Nonnull OMResponse omResponse, @Nonnull
+                              BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 

@@ -46,7 +46,7 @@ echo "logging chaos logs and heapdump to ${logfiledirectory}"
 echo "Starting MiniOzoneChaosCluster with ${MVN_OPTS}"
 mvn clean install -DskipTests > "${compilefilename}" 2>&1
 mvn exec:java \
-  -Dexec.mainClass="org.apache.hadoop.ozone.TestMiniChaosOzoneCluster" \
+  -Dexec.mainClass="org.apache.hadoop.ozone.OzoneChaosCluster" \
   -Dexec.classpathScope=test \
   -Dchaoslogfilename=${chaosfilename} \
   -Dproblemlogfilename=${problemfilename} \

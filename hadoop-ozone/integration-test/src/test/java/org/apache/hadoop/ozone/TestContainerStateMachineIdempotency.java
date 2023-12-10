@@ -44,10 +44,23 @@ import org.junit.Test;
 
 import java.io.IOException;
 
+import org.junit.Rule;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * Tests the idempotent operations in ContainerStateMachine.
  */
 public class TestContainerStateMachineIdempotency {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
@@ -89,11 +102,12 @@ public class TestContainerStateMachineIdempotency {
       // call create Container again
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       byte[] data =
-          RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes();
+          RandomStringUtils.random(RandomUtils.nextInt(0, 1024))
+              .getBytes(UTF_8);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
               .getWriteChunkRequest(container.getPipeline(), blockID,
-                  data.length, null);
+                  data.length);
       client.sendCommand(writeChunkRequest);
 
       //Make the write chunk request again without requesting for overWrite

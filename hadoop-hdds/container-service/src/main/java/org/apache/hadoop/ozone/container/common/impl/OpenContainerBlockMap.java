@@ -130,7 +130,7 @@ public class OpenContainerBlockMap {
   public void removeFromBlockMap(BlockID blockID) {
     Preconditions.checkNotNull(blockID);
     containers.computeIfPresent(blockID.getContainerID(), (containerId, blocks)
-        -> blocks.removeAndGetSize(blockID.getLocalID()) == 0? null: blocks);
+        -> blocks.removeAndGetSize(blockID.getLocalID()) == 0 ? null : blocks);
   }
 
   /**

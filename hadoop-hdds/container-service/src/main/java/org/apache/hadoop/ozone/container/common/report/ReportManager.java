@@ -28,7 +28,7 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,17 +49,18 @@ public final class ReportManager {
    * Construction of {@link ReportManager} should be done via
    * {@link ReportManager.Builder}.
    *
-   * @param context StateContext which holds the report
+   * @param context    StateContext which holds the report
    * @param publishers List of publishers which generates report
    */
-  private ReportManager(StateContext context,
-                        List<ReportPublisher> publishers) {
+  private ReportManager(StateContext context, List<ReportPublisher> publishers,
+      String threadNamePrefix) {
     this.context = context;
     this.publishers = publishers;
     this.executorService = HadoopExecutors.newScheduledThreadPool(
         publishers.size(),
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("Datanode ReportManager Thread - %d").build());
+            .setNameFormat(threadNamePrefix +
+                "DatanodeReportManager-%d").build());
   }
 
   /**
@@ -79,8 +80,9 @@ public final class ReportManager {
     executorService.shutdown();
     try {
       executorService.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       LOG.error("Failed to shutdown Report Manager", e);
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -102,6 +104,7 @@ public final class ReportManager {
     private StateContext stateContext;
     private List<ReportPublisher> reportPublishers;
     private ReportPublisherFactory publisherFactory;
+    private String threadNamePrefix = "";
 
 
     private Builder(ConfigurationSource conf) {
@@ -128,7 +131,7 @@ public final class ReportManager {
      *
      * @return ReportManager.Builder
      */
-    public Builder addPublisherFor(Class<? extends GeneratedMessage> report) {
+    public Builder addPublisherFor(Class<? extends Message> report) {
       reportPublishers.add(publisherFactory.getPublisherFor(report));
       return this;
     }
@@ -145,6 +148,11 @@ public final class ReportManager {
       return this;
     }
 
+    public Builder addThreadNamePrefix(String threadPrefix) {
+      this.threadNamePrefix = threadPrefix;
+      return this;
+    }
+
     /**
      * Build and returns ReportManager.
      *
@@ -152,7 +160,8 @@ public final class ReportManager {
      */
     public ReportManager build() {
       Preconditions.checkNotNull(stateContext);
-      return new ReportManager(stateContext, reportPublishers);
+      return new ReportManager(
+          stateContext, reportPublishers, threadNamePrefix);
     }
 
   }

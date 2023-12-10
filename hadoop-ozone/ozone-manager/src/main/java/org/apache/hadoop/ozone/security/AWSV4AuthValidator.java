@@ -24,9 +24,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -39,32 +36,39 @@ import java.security.NoSuchAlgorithmException;
  **/
 final class AWSV4AuthValidator {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
-  private static final Charset UTF_8 = Charset.forName("utf-8");
 
   private AWSV4AuthValidator() {
   }
 
-  private static String urlDecode(String str) {
-    try {
-      return URLDecoder.decode(str, UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
-  }
+  /**
+   * ThreadLocal cache of Mac instances.
+   */
+  private static final ThreadLocal<Mac> THREAD_LOCAL_MAC =
+      ThreadLocal.withInitial(() -> {
+        try {
+          return Mac.getInstance(HMAC_SHA256_ALGORITHM);
+        } catch (NoSuchAlgorithmException nsa) {
+          throw new IllegalArgumentException(
+              "Failed to initialize Mac instance that implements the " +
+                  HMAC_SHA256_ALGORITHM + " algorithm.", nsa);
+        }
+      });
 
   public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(payload.getBytes(UTF_8));
+    md.update(payload.getBytes(StandardCharsets.UTF_8));
     return String.format("%064x", new java.math.BigInteger(1, md.digest()));
   }
 
   private static byte[] sign(byte[] key, String msg) {
     try {
       SecretKeySpec signingKey = new SecretKeySpec(key, HMAC_SHA256_ALGORITHM);
-      Mac mac = Mac.getInstance(HMAC_SHA256_ALGORITHM);
+      // Returns the cached Mac instance for the current thread or creates a
+      // new one if none exists.
+      Mac mac = THREAD_LOCAL_MAC.get();
       mac.init(signingKey);
       return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
     } catch (GeneralSecurityException gse) {
@@ -91,11 +95,14 @@ final class AWSV4AuthValidator {
     String dateStamp = signData[0];
     String regionName = signData[1];
     String serviceName = signData[2];
-    byte[] kDate = sign(("AWS4" + key).getBytes(UTF_8), dateStamp);
+    byte[] kDate = sign(("AWS4" + key)
+        .getBytes(StandardCharsets.UTF_8), dateStamp);
     byte[] kRegion = sign(kDate, regionName);
     byte[] kService = sign(kRegion, serviceName);
     byte[] kSigning = sign(kService, "aws4_request");
-    LOG.info(Hex.encode(kSigning));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(Hex.encode(kSigning));
+    }
     return kSigning;
   }
 

@@ -29,6 +29,10 @@ public class DBUpdates {
 
   private long currentSequenceNumber = -1;
 
+  private long latestSequenceNumber = -1L;
+
+  private boolean isDBUpdateSuccess = true;
+
   public DBUpdates() {
     this.dataList = new ArrayList<>();
   }
@@ -54,5 +58,21 @@ public class DBUpdates {
 
   public long getCurrentSequenceNumber() {
     return currentSequenceNumber;
+  }
+
+  public void setLatestSequenceNumber(long sequenceNumber) {
+    this.latestSequenceNumber = sequenceNumber;
+  }
+
+  public long getLatestSequenceNumber() {
+    return latestSequenceNumber;
+  }
+
+  public boolean isDBUpdateSuccess() {
+    return isDBUpdateSuccess;
+  }
+
+  public void setDBUpdateSuccess(boolean dbUpdateSuccess) {
+    this.isDBUpdateSuccess = dbUpdateSuccess;
   }
 }

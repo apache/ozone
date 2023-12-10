@@ -44,7 +44,7 @@ Container Manager) one data node  and the S3 compatible REST server
 If you would like to use a more realistic pseudo-cluster where each components
 run in own containers, you can start it with a docker-compose file.
 
-We have shipped a docker-compose and an enviorment file as part of the
+We have shipped a docker-compose and an environment file as part of the
 container image  that is uploaded to docker hub.
 
 The following commands can be used to extract these files from the image in the docker hub.
@@ -72,11 +72,7 @@ connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
 
 The S3 gateway endpoint will be exposed at port 9878. You can use Ozone's S3
 support as if you are working against the real S3.  S3 buckets are stored under
-the `/s3v` volume, which needs to be created by an administrator first:
-
-```
-docker-compose exec scm ozone sh volume create /s3v
-```
+the `/s3v` volume.
 
 Here is how you create buckets from command line:
 
@@ -108,9 +104,3 @@ our bucket.
 ```bash
 aws s3 --endpoint http://localhost:9878 ls s3://bucket1/testfile
 ```
-
-<div class="alert alert-info" role="alert"> You can also check the internal
-bucket browser supported by Ozone S3 interface by clicking on the below link.
-<br>
-</div>
-http://localhost:9878/bucket1?browser

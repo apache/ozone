@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG OZONE_RUNNER_IMAGE
 ARG OZONE_RUNNER_VERSION
 
-FROM apache/ozone-runner:${OZONE_RUNNER_VERSION}
+FROM ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
 
 # Install ssh
 RUN sudo yum install -y openssh-clients openssh-server
@@ -38,7 +39,7 @@ RUN sudo chmod 700 /opt/.ssh
 RUN sudo sh -c 'echo "export JAVA_HOME=/usr/lib/jvm/jre/" >> /etc/profile'
 
 # Install required robot framework libraries
-RUN sudo pip install robotframework-sshlibrary
+RUN sudo pip3 install robotframework-sshlibrary
 
 # Add start script to start OMs
 ADD startOM.sh /opt/startOM.sh

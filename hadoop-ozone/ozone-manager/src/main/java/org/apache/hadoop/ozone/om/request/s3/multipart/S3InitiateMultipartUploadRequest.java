@@ -18,37 +18,51 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.UUID;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -57,24 +71,33 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
-
   private static final Logger LOG =
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
 
-  public S3InitiateMultipartUploadRequest(OMRequest omRequest) {
-    super(omRequest);
+  public S3InitiateMultipartUploadRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) {
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
     Preconditions.checkNotNull(multipartInfoInitiateRequest);
 
-    OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        multipartInfoInitiateRequest.getKeyArgs().toBuilder()
-            .setMultipartUploadID(UUID.randomUUID().toString() + "-" +
-                UniqueId.next()).setModificationTime(Time.now());
+    KeyArgs keyArgs = multipartInfoInitiateRequest.getKeyArgs();
+
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
+
+    KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
+            .setMultipartUploadID(
+                OMMultipartUploadUtils.getMultipartUploadId())
+            .setModificationTime(Time.now())
+            .setKeyName(keyPath);
+
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
@@ -91,40 +114,47 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+    KeyArgs keyArgs =
         multipartInfoInitiateRequest.getKeyArgs();
 
     Preconditions.checkNotNull(keyArgs.getMultipartUploadID());
 
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
+    final String requestedVolume = volumeName;
+    final String requestedBucket = bucketName;
     String keyName = keyArgs.getKeyName();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     ozoneManager.getMetrics().incNumInitiateMultipartUploads();
     boolean acquiredBucketLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
     Result result = null;
-    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
+    long objectID = ozoneManager.getObjectIdFromTxId(transactionLogIndex);
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
     try {
-      // TODO to support S3 ACL later.
-      acquiredBucketLock =
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
+      // check Acl
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-              bucketName);
+              bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      // We do not check if this transaction is a replay here to avoid extra
-      // DB reads. Even if this transaction is replayed, in
-      // S3MultipartUploadComplete request, we would delete this entry from
-      // the openKeyTable. Hence, it is safe to replay this transaction here.
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -141,74 +171,105 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // multipart upload request is received, it returns multipart upload id
       // for the key.
 
-      String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-          bucketName, keyName, keyArgs.getMultipartUploadID());
+      String multipartKey = omMetadataManager.getMultipartKey(
+          volumeName, bucketName, keyName,
+          keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
+      final OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+          .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+
+      OMFileRequest.OMPathInfo pathInfo = null;
+      if (bucketInfo != null && bucketInfo.getBucketLayout()
+          .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+        pathInfo = OMFileRequest.verifyFilesInPath(omMetadataManager,
+            volumeName, bucketName, keyName, Paths.get(keyName));
+      }
+      final ReplicationConfig replicationConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo != null ?
+                  bucketInfo.getDefaultReplicationConfig() :
+                  null, ozoneManager);
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplicationConfig(
+              replicationConfig)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
-          .setVolumeName(keyArgs.getVolumeName())
-          .setBucketName(keyArgs.getBucketName())
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
-              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+              new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+          .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfo,
+              ozoneManager.getPrefixManager()))
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
+          .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
+              OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .build();
 
       // Add to cache
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omKeyInfo));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, multipartKeyInfo));
 
       omClientResponse =
           new S3InitiateMultipartUploadResponse(
               omResponse.setInitiateMultiPartUploadResponse(
                   MultipartInfoInitiateResponse.newBuilder()
-                      .setVolumeName(volumeName)
-                      .setBucketName(bucketName)
+                      .setVolumeName(requestedVolume)
+                      .setBucketName(requestedBucket)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
-                  .build(), multipartKeyInfo, omKeyInfo);
+                  .build(), multipartKeyInfo, omKeyInfo, getBucketLayout());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponse(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
+    logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
+            bucketName, keyName, exception, result);
 
+    return omClientResponse;
+  }
+
+  @SuppressWarnings("parameternumber")
+  protected void logResult(OzoneManager ozoneManager,
+      MultipartInfoInitiateRequest multipartInfoInitiateRequest,
+      Map<String, String> auditMap, String volumeName, String bucketName,
+      String keyName, Exception exception, Result result) {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.INITIATE_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
+        OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     switch (result) {
@@ -222,11 +283,62 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("S3 InitiateMultipart Upload request for Key {} in " +
               "Volume/Bucket {}/{} is failed", keyName, volumeName, bucketName,
           exception);
+      break;
     default:
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
     }
+  }
 
-    return omClientResponse;
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.InitiateMultiPartUpload
+  )
+  public static OMRequest
+      disallowInitiateMultiPartUploadWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getInitiateMultiPartUploadRequest().getKeyArgs()
+          .hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+
+  /**
+   * Validates S3 initiate MPU requests.
+   * We do not want to allow older clients to initiate MPU to buckets which
+   * use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.InitiateMultiPartUpload
+  )
+  public static OMRequest blockInitiateMPUWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getInitiateMultiPartUploadRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getInitiateMultiPartUploadRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
   }
 }

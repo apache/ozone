@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.insight;
 
+import java.lang.reflect.Field;
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -24,9 +27,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.insight.Component.Type;
 
 import picocli.CommandLine;
-
-import java.lang.reflect.Method;
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to show configuration values/documentation.
@@ -60,20 +60,31 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
     return null;
   }
 
-  private void showConfig(Class clazz, Type type) {
+  protected void showConfig(Class clazz, Type type) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.addResource(getHost(conf, new Component(type)) + "/conf");
+    printConfig(clazz, conf);
+  }
+
+  /**
+   * Print all the configuration annotated on the class or any superclass.
+   */
+  protected void printConfig(Class clazz, OzoneConfiguration conf) {
     ConfigGroup configGroup =
         (ConfigGroup) clazz.getAnnotation(ConfigGroup.class);
     if (configGroup == null) {
       return;
     }
+    printConfig(configGroup, clazz, conf);
+  }
 
+  private void printConfig(ConfigGroup configGroup, Class clazz,
+      OzoneConfiguration conf) {
     String prefix = configGroup.prefix();
 
-    for (Method method : clazz.getMethods()) {
-      if (method.isAnnotationPresent(Config.class)) {
-        Config config = method.getAnnotation(Config.class);
+    for (Field field : clazz.getDeclaredFields()) {
+      if (field.isAnnotationPresent(Config.class)) {
+        Config config = field.getAnnotation(Config.class);
         String key = prefix + "." + config.key();
         System.out.println(">>> " + key);
         System.out.println("       default: " + config.defaultValue());
@@ -82,10 +93,12 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
         System.out.println(config.description());
         System.out.println();
         System.out.println();
-
+      }
+      final Class superclass = clazz.getSuperclass();
+      if (superclass != Object.class) {
+        printConfig(configGroup, superclass, conf);
       }
     }
-
   }
 
 }

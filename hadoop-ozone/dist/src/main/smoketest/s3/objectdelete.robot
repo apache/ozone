@@ -29,14 +29,12 @@ ${BUCKET}             generated
 *** Test Cases ***
 Delete file with s3api
                         Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key deletetestapi/f1 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix deletetestapi/
-                        Should contain             ${result}         f1
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapi/f1
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix deletetestapi/
-                        Should not contain         ${result}         f1
-#In case of HTTP 500, the error code is printed out to the console.
-                        Should not contain         ${result}         500
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapi/key=value/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/deletetestapi/key=value/
+                        Should contain             ${result}         "${PREFIX}/deletetestapi/key=value/f1"
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapi/key=value/f1
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/deletetestapi/key=value/
+                        Should not contain         ${result}         "${PREFIX}/deletetestapi/key=value/f1"
 
 Delete file with s3api, file doesn't exist
     ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/
@@ -47,24 +45,24 @@ Delete file with s3api, file doesn't exist
 
 Delete dir with s3api
                         Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/deletetestapidir/f1
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapidir/
+    ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/${PREFIX}/deletetestapidir/key=value/f1
+    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/${PREFIX}/deletetestapidir/key=value/
                         Should contain             ${result}         f1
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapidir/
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapidir/
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapidir/key=value/
+    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/${PREFIX}/deletetestapidir/key=value/
                         Should contain             ${result}         f1
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapidir/f1
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapidir/key=value/f1
 
 
 Delete file with s3api, file doesn't exist, prefix of a real file
                         Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/deletetestapiprefix/filefile
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapiprefix/
+    ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/${PREFIX}/deletetestapiprefix/key=value/filefile
+    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/${PREFIX}/deletetestapiprefix/key=value/
                         Should contain             ${result}         filefile
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapiprefix/file
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapiprefix/
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapiprefix/key=value/file
+    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/${PREFIX}/deletetestapiprefix/key=value/
                         Should contain             ${result}         filefile
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapiprefix/filefile
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key ${PREFIX}/deletetestapiprefix/key=value/filefile
 
 
 

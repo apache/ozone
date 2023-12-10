@@ -28,39 +28,46 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.nio.file.Path;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests OMVolumeCreateResponse.
  */
 public class TestOMVolumeDeleteResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+        folder.toAbsolutePath().toString());
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
+  }
+
+  @AfterEach
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
   }
 
   @Test
@@ -68,7 +75,7 @@ public class TestOMVolumeDeleteResponse {
 
     String volumeName = UUID.randomUUID().toString();
     String userName = "user1";
-    UserVolumeInfo volumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo volumeList = PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1)
         .setUpdateID(1)
         .addVolumeNames(volumeName).build();
@@ -87,7 +94,8 @@ public class TestOMVolumeDeleteResponse {
         new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 
     // As we are deleting updated volume list should be empty.
-    UserVolumeInfo updatedVolumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo updatedVolumeList =
+        PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1).setUpdateID(1).build();
     OMVolumeDeleteResponse omVolumeDeleteResponse =
         new OMVolumeDeleteResponse(omResponse, volumeName, userName,
@@ -99,13 +107,11 @@ public class TestOMVolumeDeleteResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(null,
-        omMetadataManager.getVolumeTable().get(
+    Assertions.assertNull(omMetadataManager.getVolumeTable().get(
             omMetadataManager.getVolumeKey(volumeName)));
 
-    Assert.assertEquals(null,
-        omMetadataManager.getUserTable().get(
-            omMetadataManager.getUserKey(userName)));
+    Assertions.assertNull(omMetadataManager.getUserTable().get(
+        omMetadataManager.getUserKey(userName)));
   }
 
   @Test

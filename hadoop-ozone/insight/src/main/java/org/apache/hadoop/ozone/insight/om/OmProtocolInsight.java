@@ -46,7 +46,7 @@ public class OmProtocolInsight extends BaseInsightPoint {
   }
 
   @Override
-  public List<MetricGroupDisplay> getMetrics() {
+  public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
     List<MetricGroupDisplay> metrics = new ArrayList<>();
 
     Map<String, String> filter = new HashMap<>();

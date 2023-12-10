@@ -17,7 +17,8 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -26,62 +27,78 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
- * This class sets up a MiniOzoneHACluster to test with Recon.
+ * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
 public class TestReconWithOzoneManagerHA {
   @Rule
-  public Timeout timeout = new Timeout(300_000);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
-  private final String omServiceId = "omService1";
-  private final String volName = "testrecon";
+  private static final String OM_SERVICE_ID = "omService1";
+  private static final String VOL_NAME = "testrecon";
+  private OzoneClient client;
 
   @Before
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, Boolean.TRUE.toString());
+
     // Sync to disk enabled
-    conf.set("hadoop.hdds.db.rocksdb.writeoption.sync",
-        Boolean.TRUE.toString());
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    RocksDBConfiguration dbConf = conf.getObject(RocksDBConfiguration.class);
+    dbConf.setSyncOption(true);
+    conf.setFromObject(dbConf);
+
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
-        .setOMServiceId(omServiceId)
+        .setOMServiceId(OM_SERVICE_ID)
         .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
         .includeRecon(true)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
-    objectStore.createVolume(volName);
-    objectStore.getVolume(volName).createBucket(volName);
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
+    objectStore = client.getObjectStore();
+    objectStore.createVolume(VOL_NAME);
+    // TODO: HDDS-5463
+    //  Recon's container ID to key mapping does not yet support FSO buckets.
+    objectStore.getVolume(VOL_NAME).createBucket(VOL_NAME,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
   }
 
   @After
   public void tearDown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -99,7 +116,7 @@ public class TestReconWithOzoneManagerHA {
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
         + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",
-        ozoneManager.get().isLeader());
+        ozoneManager.get().isLeaderReady());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();
@@ -109,34 +126,35 @@ public class TestReconWithOzoneManagerHA {
     String expectedUrl = "http://" +
         (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
         ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
-        OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
     Assert.assertEquals("OM Snapshot should be requested from the leader.",
         expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
-    OzoneOutputStream key = objectStore.getVolume(volName)
-        .getBucket(volName)
+    OzoneOutputStream key = objectStore.getVolume(VOL_NAME)
+        .getBucket(VOL_NAME)
         .createKey(keyPrefix, 1024, ReplicationType.RATIS,
             ReplicationFactor.ONE, new HashMap<>());
-    key.write(keyPrefix.getBytes());
+    key.write(keyPrefix.getBytes(UTF_8));
     key.flush();
     key.close();
     // Sync data to Recon
     impl.syncDataFromOM();
 
-    ContainerDBServiceProvider containerDBServiceProvider =
-        cluster.getReconServer().getContainerDBServiceProvider();
-    TableIterator iterator =
-        containerDBServiceProvider.getContainerTableIterator();
-    String reconKeyPrefix = null;
-    while (iterator.hasNext()) {
-      Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
-          (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
-      reconKeyPrefix = keyValue.getKey().getKeyPrefix();
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        cluster.getReconServer().getReconContainerMetadataManager();
+    try (TableIterator iterator =
+        reconContainerMetadataManager.getContainerTableIterator()) {
+      String reconKeyPrefix = null;
+      while (iterator.hasNext()) {
+        Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
+            (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
+        reconKeyPrefix = keyValue.getKey().getKeyPrefix();
+      }
+      Assert.assertEquals("Container data should be synced to recon.",
+          String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
+          reconKeyPrefix);
     }
-    Assert.assertEquals("Container data should be synced to recon.",
-        String.format("/%s/%s/%s", volName, volName, keyPrefix),
-        reconKeyPrefix);
   }
 }

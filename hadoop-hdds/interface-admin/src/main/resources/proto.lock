@@ -1,0 +1,1810 @@
+{
+  "definitions": [
+    {
+      "protopath": "ScmAdminProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "ScmContainerLocationResponse.Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              },
+              {
+                "name": "CONTAINER_ALREADY_EXISTS",
+                "integer": 2
+              },
+              {
+                "name": "CONTAINER_IS_MISSING",
+                "integer": 3
+              },
+              {
+                "name": "SCM_NOT_LEADER",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "AllocateContainer",
+                "integer": 1
+              },
+              {
+                "name": "GetContainer",
+                "integer": 2
+              },
+              {
+                "name": "GetContainerWithPipeline",
+                "integer": 3
+              },
+              {
+                "name": "ListContainer",
+                "integer": 4
+              },
+              {
+                "name": "DeleteContainer",
+                "integer": 5
+              },
+              {
+                "name": "QueryNode",
+                "integer": 6
+              },
+              {
+                "name": "CloseContainer",
+                "integer": 7
+              },
+              {
+                "name": "AllocatePipeline",
+                "integer": 8
+              },
+              {
+                "name": "ListPipelines",
+                "integer": 9
+              },
+              {
+                "name": "ActivatePipeline",
+                "integer": 10
+              },
+              {
+                "name": "DeactivatePipeline",
+                "integer": 11
+              },
+              {
+                "name": "ClosePipeline",
+                "integer": 12
+              },
+              {
+                "name": "GetScmInfo",
+                "integer": 13
+              },
+              {
+                "name": "InSafeMode",
+                "integer": 14
+              },
+              {
+                "name": "ForceExitSafeMode",
+                "integer": 15
+              },
+              {
+                "name": "StartReplicationManager",
+                "integer": 16
+              },
+              {
+                "name": "StopReplicationManager",
+                "integer": 17
+              },
+              {
+                "name": "GetReplicationManagerStatus",
+                "integer": 18
+              },
+              {
+                "name": "GetPipeline",
+                "integer": 19
+              },
+              {
+                "name": "GetContainerWithPipelineBatch",
+                "integer": 20
+              },
+              {
+                "name": "GetSafeModeRuleStatuses",
+                "integer": 21
+              },
+              {
+                "name": "DecommissionNodes",
+                "integer": 22
+              },
+              {
+                "name": "RecommissionNodes",
+                "integer": 23
+              },
+              {
+                "name": "StartMaintenanceNodes",
+                "integer": 24
+              },
+              {
+                "name": "DatanodeUsageInfo",
+                "integer": 25
+              },
+              {
+                "name": "GetExistContainerWithPipelinesInBatch",
+                "integer": 26
+              },
+              {
+                "name": "GetContainerToken",
+                "integer": 27
+              },
+              {
+                "name": "StartContainerBalancer",
+                "integer": 28
+              },
+              {
+                "name": "StopContainerBalancer",
+                "integer": 29
+              },
+              {
+                "name": "GetContainerBalancerStatus",
+                "integer": 30
+              },
+              {
+                "name": "FinalizeScmUpgrade",
+                "integer": 31
+              },
+              {
+                "name": "QueryUpgradeFinalizationProgress",
+                "integer": 32
+              },
+              {
+                "name": "GetContainerCount",
+                "integer": 33
+              },
+              {
+                "name": "GetContainerReplicas",
+                "integer": 34
+              },
+              {
+                "name": "GetReplicationManagerReport",
+                "integer": 35
+              },
+              {
+                "name": "ResetDeletedBlockRetryCount",
+                "integer": 36
+              }
+            ]
+          },
+          {
+            "name": "ContainerResponseProto.Error",
+            "enum_fields": [
+              {
+                "name": "success",
+                "integer": 1
+              },
+              {
+                "name": "errorContainerAlreadyExists",
+                "integer": 2
+              },
+              {
+                "name": "errorContainerMissing",
+                "integer": 3
+              },
+              {
+                "name": "scmNotLeader",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "PipelineResponseProto.Error",
+            "enum_fields": [
+              {
+                "name": "success",
+                "integer": 1
+              },
+              {
+                "name": "errorPipelineAlreadyExists",
+                "integer": 2
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "ScmContainerLocationRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "version",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "containerRequest",
+                "type": "ContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "getContainerRequest",
+                "type": "GetContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "getContainerWithPipelineRequest",
+                "type": "GetContainerWithPipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "scmListContainerRequest",
+                "type": "SCMListContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "scmDeleteContainerRequest",
+                "type": "SCMDeleteContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "nodeQueryRequest",
+                "type": "NodeQueryRequestProto",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "scmCloseContainerRequest",
+                "type": "SCMCloseContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "pipelineRequest",
+                "type": "PipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "listPipelineRequest",
+                "type": "ListPipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "activatePipelineRequest",
+                "type": "ActivatePipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "deactivatePipelineRequest",
+                "type": "DeactivatePipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "closePipelineRequest",
+                "type": "ClosePipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 18,
+                "name": "getScmInfoRequest",
+                "type": "GetScmInfoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 19,
+                "name": "inSafeModeRequest",
+                "type": "InSafeModeRequestProto",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "forceExitSafeModeRequest",
+                "type": "ForceExitSafeModeRequestProto",
+                "optional": true
+              },
+              {
+                "id": 21,
+                "name": "startReplicationManagerRequest",
+                "type": "StartReplicationManagerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "stopReplicationManagerRequest",
+                "type": "StopReplicationManagerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 23,
+                "name": "seplicationManagerStatusRequest",
+                "type": "ReplicationManagerStatusRequestProto",
+                "optional": true
+              },
+              {
+                "id": 24,
+                "name": "getPipelineRequest",
+                "type": "GetPipelineRequestProto",
+                "optional": true
+              },
+              {
+                "id": 25,
+                "name": "getContainerWithPipelineBatchRequest",
+                "type": "GetContainerWithPipelineBatchRequestProto",
+                "optional": true
+              },
+              {
+                "id": 26,
+                "name": "getSafeModeRuleStatusesRequest",
+                "type": "GetSafeModeRuleStatusesRequestProto",
+                "optional": true
+              },
+              {
+                "id": 27,
+                "name": "decommissionNodesRequest",
+                "type": "DecommissionNodesRequestProto",
+                "optional": true
+              },
+              {
+                "id": 28,
+                "name": "recommissionNodesRequest",
+                "type": "RecommissionNodesRequestProto",
+                "optional": true
+              },
+              {
+                "id": 29,
+                "name": "startMaintenanceNodesRequest",
+                "type": "StartMaintenanceNodesRequestProto",
+                "optional": true
+              },
+              {
+                "id": 30,
+                "name": "DatanodeUsageInfoRequest",
+                "type": "DatanodeUsageInfoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 31,
+                "name": "getExistContainerWithPipelinesInBatchRequest",
+                "type": "GetExistContainerWithPipelinesInBatchRequestProto",
+                "optional": true
+              },
+              {
+                "id": 32,
+                "name": "containerTokenRequest",
+                "type": "GetContainerTokenRequestProto",
+                "optional": true
+              },
+              {
+                "id": 33,
+                "name": "startContainerBalancerRequest",
+                "type": "StartContainerBalancerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 34,
+                "name": "stopContainerBalancerRequest",
+                "type": "StopContainerBalancerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 35,
+                "name": "containerBalancerStatusRequest",
+                "type": "ContainerBalancerStatusRequestProto",
+                "optional": true
+              },
+              {
+                "id": 36,
+                "name": "finalizeScmUpgradeRequest",
+                "type": "FinalizeScmUpgradeRequestProto",
+                "optional": true
+              },
+              {
+                "id": 37,
+                "name": "queryUpgradeFinalizationProgressRequest",
+                "type": "QueryUpgradeFinalizationProgressRequestProto",
+                "optional": true
+              },
+              {
+                "id": 38,
+                "name": "getContainerCountRequest",
+                "type": "GetContainerCountRequestProto",
+                "optional": true
+              },
+              {
+                "id": 39,
+                "name": "getContainerReplicasRequest",
+                "type": "GetContainerReplicasRequestProto",
+                "optional": true
+              },
+              {
+                "id": 40,
+                "name": "replicationManagerReportRequest",
+                "type": "ReplicationManagerReportRequestProto",
+                "optional": true
+              },
+              {
+                "id": 41,
+                "name": "resetDeletedBlockRetryCountRequest",
+                "type": "ResetDeletedBlockRetryCountRequestProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ScmContainerLocationResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "status",
+                "type": "Status",
+                "required": true
+              },
+              {
+                "id": 6,
+                "name": "containerResponse",
+                "type": "ContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "getContainerResponse",
+                "type": "GetContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "getContainerWithPipelineResponse",
+                "type": "GetContainerWithPipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "scmListContainerResponse",
+                "type": "SCMListContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "scmDeleteContainerResponse",
+                "type": "SCMDeleteContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "nodeQueryResponse",
+                "type": "NodeQueryResponseProto",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "scmCloseContainerResponse",
+                "type": "SCMCloseContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "pipelineResponse",
+                "type": "PipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "listPipelineResponse",
+                "type": "ListPipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "activatePipelineResponse",
+                "type": "ActivatePipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "deactivatePipelineResponse",
+                "type": "DeactivatePipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "closePipelineResponse",
+                "type": "ClosePipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 18,
+                "name": "getScmInfoResponse",
+                "type": "GetScmInfoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 19,
+                "name": "inSafeModeResponse",
+                "type": "InSafeModeResponseProto",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "forceExitSafeModeResponse",
+                "type": "ForceExitSafeModeResponseProto",
+                "optional": true
+              },
+              {
+                "id": 21,
+                "name": "startReplicationManagerResponse",
+                "type": "StartReplicationManagerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "stopReplicationManagerResponse",
+                "type": "StopReplicationManagerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 23,
+                "name": "replicationManagerStatusResponse",
+                "type": "ReplicationManagerStatusResponseProto",
+                "optional": true
+              },
+              {
+                "id": 24,
+                "name": "getPipelineResponse",
+                "type": "GetPipelineResponseProto",
+                "optional": true
+              },
+              {
+                "id": 25,
+                "name": "getContainerWithPipelineBatchResponse",
+                "type": "GetContainerWithPipelineBatchResponseProto",
+                "optional": true
+              },
+              {
+                "id": 26,
+                "name": "getSafeModeRuleStatusesResponse",
+                "type": "GetSafeModeRuleStatusesResponseProto",
+                "optional": true
+              },
+              {
+                "id": 27,
+                "name": "decommissionNodesResponse",
+                "type": "DecommissionNodesResponseProto",
+                "optional": true
+              },
+              {
+                "id": 28,
+                "name": "recommissionNodesResponse",
+                "type": "RecommissionNodesResponseProto",
+                "optional": true
+              },
+              {
+                "id": 29,
+                "name": "startMaintenanceNodesResponse",
+                "type": "StartMaintenanceNodesResponseProto",
+                "optional": true
+              },
+              {
+                "id": 30,
+                "name": "DatanodeUsageInfoResponse",
+                "type": "DatanodeUsageInfoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 31,
+                "name": "getExistContainerWithPipelinesInBatchResponse",
+                "type": "GetExistContainerWithPipelinesInBatchResponseProto",
+                "optional": true
+              },
+              {
+                "id": 32,
+                "name": "containerTokenResponse",
+                "type": "GetContainerTokenResponseProto",
+                "optional": true
+              },
+              {
+                "id": 33,
+                "name": "startContainerBalancerResponse",
+                "type": "StartContainerBalancerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 34,
+                "name": "stopContainerBalancerResponse",
+                "type": "StopContainerBalancerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 35,
+                "name": "containerBalancerStatusResponse",
+                "type": "ContainerBalancerStatusResponseProto",
+                "optional": true
+              },
+              {
+                "id": 36,
+                "name": "finalizeScmUpgradeResponse",
+                "type": "FinalizeScmUpgradeResponseProto",
+                "optional": true
+              },
+              {
+                "id": 37,
+                "name": "queryUpgradeFinalizationProgressResponse",
+                "type": "QueryUpgradeFinalizationProgressResponseProto",
+                "optional": true
+              },
+              {
+                "id": 38,
+                "name": "getContainerCountResponse",
+                "type": "GetContainerCountResponseProto",
+                "optional": true
+              },
+              {
+                "id": 39,
+                "name": "getContainerReplicasResponse",
+                "type": "GetContainerReplicasResponseProto",
+                "optional": true
+              },
+              {
+                "id": 40,
+                "name": "getReplicationManagerReportResponse",
+                "type": "ReplicationManagerReportResponseProto",
+                "optional": true
+              },
+              {
+                "id": 41,
+                "name": "resetDeletedBlockRetryCountResponse",
+                "type": "ResetDeletedBlockRetryCountResponseProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerRequestProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "replicationFactor",
+                "type": "ReplicationFactor",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "replicationType",
+                "type": "ReplicationType",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "owner",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "errorCode",
+                "type": "Error",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "containerWithPipeline",
+                "type": "ContainerWithPipeline",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "errorMessage",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerInfo",
+                "type": "ContainerInfoProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerWithPipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerWithPipelineResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerWithPipeline",
+                "type": "ContainerWithPipeline",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerReplicasRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerReplicasResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerReplica",
+                "type": "SCMContainerReplicaProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerWithPipelineBatchRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerIDs",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetExistContainerWithPipelinesInBatchRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerIDs",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetSafeModeRuleStatusesRequestProto"
+          },
+          {
+            "name": "SafeModeRuleStatusProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ruleName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "validate",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "statusText",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetSafeModeRuleStatusesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "safeModeRuleStatusesProto",
+                "type": "SafeModeRuleStatusProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerWithPipelineBatchResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerWithPipelines",
+                "type": "ContainerWithPipeline",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetExistContainerWithPipelinesInBatchResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerWithPipelines",
+                "type": "ContainerWithPipeline",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SCMListContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "count",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "startContainerID",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "state",
+                "type": "LifeCycleState",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "factor",
+                "type": "ReplicationFactor",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "type",
+                "type": "ReplicationType",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "ecReplicationConfig",
+                "type": "ECReplicationConfig",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SCMListContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containers",
+                "type": "ContainerInfoProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SCMDeleteContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SCMDeleteContainerResponseProto"
+          },
+          {
+            "name": "SCMCloseContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SCMCloseContainerResponseProto"
+          },
+          {
+            "name": "NodeQueryRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "NodeState",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "scope",
+                "type": "QueryScope",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "poolName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "opState",
+                "type": "NodeOperationalState",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "NodeQueryResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodes",
+                "type": "Node",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeUsageInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ipaddress",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "uuid",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "mostUsed",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "count",
+                "type": "uint32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeUsageInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "info",
+                "type": "DatanodeUsageInfoProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DecommissionNodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hosts",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeAdminErrorResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "host",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "error",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DecommissionNodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedHosts",
+                "type": "DatanodeAdminErrorResponseProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RecommissionNodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hosts",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RecommissionNodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedHosts",
+                "type": "DatanodeAdminErrorResponseProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "StartMaintenanceNodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hosts",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "endInHours",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StartMaintenanceNodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "failedHosts",
+                "type": "DatanodeAdminErrorResponseProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "replicationType",
+                "type": "ReplicationType",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "replicationFactor",
+                "type": "ReplicationFactor",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "nodePool",
+                "type": "NodePool",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "pipelineID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "PipelineResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "errorCode",
+                "type": "Error",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "pipeline",
+                "type": "Pipeline",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "errorMessage",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListPipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListPipelineResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelines",
+                "type": "Pipeline",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetPipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetPipelineResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipeline",
+                "type": "Pipeline",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerCountRequestProto"
+          },
+          {
+            "name": "GetContainerCountResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerCount",
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ActivatePipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ActivatePipelineResponseProto"
+          },
+          {
+            "name": "DeactivatePipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "DeactivatePipelineResponseProto"
+          },
+          {
+            "name": "ClosePipelineRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ClosePipelineResponseProto"
+          },
+          {
+            "name": "InSafeModeRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "InSafeModeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "inSafeMode",
+                "type": "bool",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ForceExitSafeModeRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ForceExitSafeModeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "exitedSafeMode",
+                "type": "bool",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "StartReplicationManagerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StartReplicationManagerResponseProto"
+          },
+          {
+            "name": "StopReplicationManagerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StopReplicationManagerResponseProto"
+          },
+          {
+            "name": "ReplicationManagerStatusRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReplicationManagerStatusResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "isRunning",
+                "type": "bool",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ReplicationManagerReportRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReplicationManagerReportResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "report",
+                "type": "ReplicationManagerReportProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ResetDeletedBlockRetryCountRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "transactionId",
+                "type": "int64",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ResetDeletedBlockRetryCountResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "resetCount",
+                "type": "int32",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "FinalizeScmUpgradeRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "upgradeClientId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "FinalizeScmUpgradeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "hadoop.hdds.UpgradeFinalizationStatus",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "QueryUpgradeFinalizationProgressRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "upgradeClientId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "takeover",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "readonly",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "QueryUpgradeFinalizationProgressResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "hadoop.hdds.UpgradeFinalizationStatus",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerTokenSecretProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ownerId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "containerId",
+                "type": "ContainerID",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "expiryDate",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "certSerialId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "ContainerID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerTokenResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "TokenProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "StartContainerBalancerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "threshold",
+                "type": "double",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "idleiterations",
+                "type": "int32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "maxDatanodesRatioToInvolvePerIteration",
+                "type": "double",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "name": "maxSizeToMovePerIterationInGB",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "maxSizeEnteringTargetInGB",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "maxSizeLeavingSourceInGB",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "maxDatanodesPercentageToInvolvePerIteration",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "iterations",
+                "type": "int32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StartContainerBalancerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "start",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "message",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StopContainerBalancerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StopContainerBalancerResponseProto"
+          },
+          {
+            "name": "ContainerBalancerStatusRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerStatusResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "isRunning",
+                "type": "bool",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "StorageContainerLocationProtocolService",
+            "rpcs": [
+              {
+                "name": "submitRequest",
+                "in_type": "ScmContainerLocationRequest",
+                "out_type": "ScmContainerLocationResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds.container"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "StorageContainerLocationProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    }
+  ]
+}

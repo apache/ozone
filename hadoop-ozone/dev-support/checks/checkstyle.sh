@@ -13,6 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+#checks:basic
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -21,7 +24,7 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -fae -Dskip.yarn -Dskip.installyarn -Dcheckstyle.failOnViolation=false'
+MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx -Dcheckstyle.failOnViolation=false --no-transfer-progress'
 
 declare -i rc
 mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
@@ -44,6 +47,9 @@ find "." -name checkstyle-errors.xml -print0 \
       -e 's/<file name="\([^"]*\)".*/\1/' \
       -e 's/<error.*line="\([[:digit:]]*\)".*message="\([^"]*\)".*/ \1: \2/' \
       -e "s!^${BASE_DIR}/!!" \
+      -e "s/&apos;/'/g" \
+      -e "s/&lt;/</g" \
+      -e "s/&gt;/>/g" \
   | tee "$REPORT_FILE"
 
 ## generate counter

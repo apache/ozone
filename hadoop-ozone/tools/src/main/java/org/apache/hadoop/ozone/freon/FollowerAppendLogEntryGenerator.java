@@ -88,6 +88,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
     implements Callable<Void>, StreamObserver<AppendEntriesReplyProto> {
 
@@ -220,10 +221,11 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         long callId = callIdRandom.nextLong();
         inFlightMessages.put(callId);
         sender.onNext(createAppendLogEntry(sequence, callId));
-      } catch (Exception e) {
+      } catch (InterruptedException e) {
         LOG.error(
             "Error while sending new append entry request (HB) to the "
                 + "follower", e);
+        Thread.currentThread().interrupt();
       }
     });
   }
@@ -241,6 +243,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         rateLimiter.acquire();
       } catch (InterruptedException e) {
         LOG.error("Rate limiter acquire has been interrupted", e);
+        Thread.currentThread().interrupt();
       }
     }
     long previousLog = nextIndex - 1;
@@ -327,16 +330,19 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         RaftPeerId.getRaftPeerId(serverId);
 
     RaftGroup group = RaftGroup.valueOf(groupId,
-        new RaftPeer(RaftPeerId.valueOf(serverId), serverAddress),
-        new RaftPeer(RaftPeerId.valueOf(FAKE_LEADER_ID),
-            FAKE_LEADER_ADDDRESS));
+        RaftPeer.newBuilder().setId(serverId).setAddress(serverAddress).build(),
+        RaftPeer.newBuilder()
+            .setId(RaftPeerId.valueOf(FAKE_LEADER_ID))
+            .setAddress(FAKE_LEADER_ADDDRESS)
+            .build());
     RaftClient client = RaftClient.newBuilder()
         .setClientId(clientId)
-        .setProperties(new RaftProperties(true))
+        .setProperties(new RaftProperties())
         .setRaftGroup(group)
         .build();
 
-    RaftClientReply raftClientReply = client.groupAdd(group, peerId);
+    RaftClientReply raftClientReply = client.getGroupManagementApi(peerId)
+        .add(group);
 
     LOG.info(
         "Group is configured in the RAFT server (one follower, one fake "
@@ -357,7 +363,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
     }
     long lastCommit = reply.getFollowerCommit();
     if (lastCommit % 1000 == 0) {
-      long currentIndex = getAttemptCounter().get();
+      long currentIndex = getAttemptCount();
       if (currentIndex - lastCommit > batching * 3) {
         LOG.warn(
             "Last committed index ({}) is behind the current index ({}) on "

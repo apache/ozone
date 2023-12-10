@@ -28,48 +28,56 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests OMVolumeCreateResponse.
  */
 public class TestOMVolumeSetOwnerResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+        folder.toAbsolutePath().toString());
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
+
+  @AfterEach
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
+  }
+
 
   @Test
   public void testAddToDBBatch() throws Exception {
 
     String volumeName = UUID.randomUUID().toString();
     String oldOwner = "user1";
-    UserVolumeInfo volumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo volumeList = PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1)
         .setUpdateID(1)
         .addVolumeNames(volumeName).build();
@@ -90,11 +98,13 @@ public class TestOMVolumeSetOwnerResponse {
 
 
     String newOwner = "user2";
-    UserVolumeInfo newOwnerVolumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo newOwnerVolumeList =
+        PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1)
         .setUpdateID(1)
         .addVolumeNames(volumeName).build();
-    UserVolumeInfo oldOwnerVolumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo oldOwnerVolumeList =
+        PersistedUserVolumeInfo.newBuilder()
         .setObjectID(2)
         .setUpdateID(2)
         .build();
@@ -114,17 +124,17 @@ public class TestOMVolumeSetOwnerResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
 
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getVolumeTable()));
 
     Table.KeyValue<String, OmVolumeArgs> keyValue =
         omMetadataManager.getVolumeTable().iterator().next();
 
-    Assert.assertEquals(omMetadataManager.getVolumeKey(volumeName),
+    Assertions.assertEquals(omMetadataManager.getVolumeKey(volumeName),
         keyValue.getKey());
-    Assert.assertEquals(newOwnerVolumeArgs, keyValue.getValue());
+    Assertions.assertEquals(newOwnerVolumeArgs, keyValue.getValue());
 
-    Assert.assertEquals(volumeList,
+    Assertions.assertEquals(volumeList,
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(newOwner)));
   }
@@ -145,8 +155,8 @@ public class TestOMVolumeSetOwnerResponse {
     try {
       omVolumeSetOwnerResponse.checkAndUpdateDB(omMetadataManager,
           batchOperation);
-      Assert.assertTrue(omMetadataManager.countRowsInTable(
-          omMetadataManager.getVolumeTable()) == 0);
+      Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+          omMetadataManager.getVolumeTable()));
     } catch (IOException ex) {
       fail("testAddToDBBatchFailure failed");
     }

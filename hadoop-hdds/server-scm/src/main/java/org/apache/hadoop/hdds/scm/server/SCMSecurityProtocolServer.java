@@ -16,41 +16,85 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.protocol.SecretKeyProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
+import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
+import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.KerberosInfo;
 
-import org.bouncycastle.cert.X509CertificateHolder;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.bouncycastle.asn1.x509.CRLReason;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
+import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_INITIALIZED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 
 /**
  * The protocol used to perform security related operations with SCM.
@@ -58,21 +102,41 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 @KerberosInfo(
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
-public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
+public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
+    SecretKeyProtocolScm {
 
   private static final Logger LOGGER = LoggerFactory
-      .getLogger(SCMClientProtocolServer.class);
-  private final SecurityConfig config;
-  private final CertificateServer certificateServer;
-  private final RPC.Server rpcServer;
+      .getLogger(SCMSecurityProtocolServer.class);
+  private CertificateServer rootCertificateServer;
+  private final CertificateServer scmCertificateServer;
+  private final RPC.Server rpcServer; // HADOOP RPC SERVER
+  private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
+  private final ProtocolMessageMetrics secretKeyMetrics;
+  private final StorageContainerManager storageContainerManager;
+  private final CertificateClient scmCertificateClient;
+  private final OzoneConfiguration config;
+  private final SequenceIdGenerator sequenceIdGen;
+
+  // SecretKey may not be enabled when neither block token nor container
+  // token is enabled.
+  private final SecretKeyManager secretKeyManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-      CertificateServer certificateServer) throws IOException {
-    this.config = new SecurityConfig(conf);
-    this.certificateServer = certificateServer;
-
+      @Nullable CertificateServer rootCertificateServer,
+      CertificateServer scmCertificateServer,
+      CertificateClient scmCertClient,
+      StorageContainerManager scm,
+      @Nullable SecretKeyManager secretKeyManager)
+      throws IOException {
+    this.storageContainerManager = scm;
+    this.rootCertificateServer = rootCertificateServer;
+    this.scmCertificateServer = scmCertificateServer;
+    this.scmCertificateClient = scmCertClient;
+    this.config = conf;
+    this.sequenceIdGen = scm.getSequenceIdGen();
+    this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -84,10 +148,20 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     metrics = new ProtocolMessageMetrics("ScmSecurityProtocol",
         "SCM Security protocol metrics",
         SCMSecurityProtocolProtos.Type.values());
+    secretKeyMetrics = new ProtocolMessageMetrics("ScmSecretKeyProtocol",
+        "SCM SecretKey protocol metrics",
+        SCMSecretKeyProtocolProtos.Type.values());
     BlockingService secureProtoPbService =
         SCMSecurityProtocolProtos.SCMSecurityProtocolService
             .newReflectiveBlockingService(
-                new SCMSecurityProtocolServerSideTranslatorPB(this, metrics));
+                new SCMSecurityProtocolServerSideTranslatorPB(this,
+                    scm, metrics));
+    BlockingService secretKeyService =
+        SCMSecretKeyProtocolProtos.SCMSecretKeyProtocolService
+            .newReflectiveBlockingService(
+                new SecretKeyProtocolServerSideTranslatorPB(
+                    this, scm, secretKeyMetrics)
+        );
     this.rpcServer =
         StorageContainerManager.startRpcServer(
             conf,
@@ -95,10 +169,20 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
             SCMSecurityProtocolPB.class,
             secureProtoPbService,
             handlerCount);
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
-        false)) {
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolDatanodePB.class,
+        secretKeyService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolOmPB.class,
+        secretKeyService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolScmPB.class,
+        secretKeyService, rpcServer);
+    if (conf.getBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       rpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
+
+    this.grpcUpdateServer = new SCMUpdateServiceGrpcServer(
+        conf.getObject(UpdateServiceConfig.class),
+        new SCMCRLStore(scmCertificateServer));
   }
 
   /**
@@ -110,21 +194,90 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    */
   @Override
   public String getDataNodeCertificate(
-      DatanodeDetailsProto dnDetails,
-      String certSignReq) throws IOException {
+      DatanodeDetailsProto dnDetails, String certSignReq) throws IOException {
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
-    Future<X509CertificateHolder> future =
-        certificateServer.requestCertificate(certSignReq,
-            KERBEROS_TRUSTED);
 
-    try {
-      return CertificateCodec.getPEMEncodedString(future.get());
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error("getDataNodeCertificate operation failed. ", e);
-      throw new IOException("getDataNodeCertificate operation failed. ", e);
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), false, config,
+        "getDataNodeCertificate");
+
+    return getEncodedCertToString(certSignReq, NodeType.DATANODE);
+  }
+
+  @Override
+  public String getCertificate(
+      NodeDetailsProto nodeDetails,
+      String certSignReq) throws IOException {
+    LOGGER.info("Processing CSR for {} {}, UUID: {}",
+        nodeDetails.getNodeType(), nodeDetails.getHostName(),
+        nodeDetails.getUuid());
+    Objects.requireNonNull(nodeDetails);
+
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), false, config,
+        "getCertificate");
+
+    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
+  }
+
+  @Override
+  public ManagedSecretKey getCurrentSecretKey() throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getCurrentSecretKey();
+  }
+
+  @Override
+  public ManagedSecretKey getSecretKey(UUID id) throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getSecretKey(id);
+  }
+
+  @Override
+  public List<ManagedSecretKey> getAllSecretKeys()
+      throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getSortedKeys();
+  }
+
+  private void validateSecretKeyStatus() throws SCMSecretKeyException {
+    if (secretKeyManager == null) {
+      throw new SCMSecretKeyException("Secret keys are not enabled.",
+          SECRET_KEY_NOT_ENABLED);
     }
+
+    if (!secretKeyManager.isInitialized()) {
+      throw new SCMSecretKeyException(
+          "Secret key initialization is not finished yet.",
+          SECRET_KEY_NOT_INITIALIZED);
+    }
+  }
+
+  @Override
+  public boolean checkAndRotate(boolean force) throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    try {
+      return secretKeyManager.checkAndRotate(force);
+    } catch (SCMException ex) {
+      LOGGER.error("Error rotating secret keys", ex);
+      throw new SCMSecretKeyException(ex.getMessage(),
+          SCMSecretKeyException.ErrorCode.INTERNAL_ERROR);
+    }
+  }
+
+  @Override
+  public synchronized List<String> getAllRootCaCertificates()
+      throws IOException {
+    List<String> pemEncodedList = new ArrayList<>();
+    Set<X509Certificate> certList =
+        scmCertificateClient.getAllRootCaCerts().size() == 0 ?
+            scmCertificateClient.getAllCaCerts() :
+            scmCertificateClient.getAllRootCaCerts();
+    for (X509Certificate cert : certList) {
+      pemEncodedList.add(getPEMEncodedString(cert));
+    }
+    return pemEncodedList;
   }
 
   /**
@@ -140,16 +293,107 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
-    Future<X509CertificateHolder> future =
-        certificateServer.requestCertificate(certSignReq,
-            KERBEROS_TRUSTED);
 
-    try {
-      return CertificateCodec.getPEMEncodedString(future.get());
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error("getOMCertificate operation failed. ", e);
-      throw new IOException("getOMCertificate operation failed. ", e);
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), false, config,
+        "getOMCertificate");
+
+    return getEncodedCertToString(certSignReq, NodeType.OM);
+  }
+
+  /**
+   * Get signed certificate for SCM Node.
+   *
+   * @param scmNodeDetails   - SCM Node Details.
+   * @param certSignReq      - Certificate signing request.
+   * @return String          - SCM signed pem encoded certificate.
+   */
+  @Override
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq) throws IOException {
+    return getSCMCertificate(scmNodeDetails, certSignReq, false);
+  }
+
+  /**
+   * Get signed certificate for SCM Node.
+   *
+   * @param scmNodeDetails   - SCM Node Details.
+   * @param certSignReq      - Certificate signing request.
+   * @param isRenew          - if SCM is renewing certificate or not.
+   * @return String          - SCM signed pem encoded certificate.
+   */
+  @Override
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq, boolean isRenew) throws IOException {
+    Objects.requireNonNull(scmNodeDetails);
+    // Check clusterID
+    if (!storageContainerManager.getClusterId().equals(
+        scmNodeDetails.getClusterId())) {
+      throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
+          scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
+          + storageContainerManager.getClusterId());
     }
+
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), isRenew, config,
+        "getSCMCertificate");
+
+    LOGGER.info("Processing CSR for scm {}, nodeId: {}",
+        scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
+
+    return getEncodedCertToString(certSignReq, NodeType.SCM);
+  }
+
+  /**
+   *  Request certificate for the specified role.
+   * @param certSignReq - Certificate signing request.
+   * @param nodeType - role OM/SCM/DATANODE
+   * @return String         - SCM signed pem encoded certificate.
+   * @throws IOException
+   */
+  private synchronized String getEncodedCertToString(String certSignReq,
+      NodeType nodeType) throws IOException {
+    Future<CertPath> future;
+    PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
+    if (nodeType == NodeType.SCM && rootCertificateServer != null) {
+      future = rootCertificateServer.requestCertificate(csr,
+          KERBEROS_TRUSTED, nodeType, getNextCertificateId());
+    } else {
+      future = scmCertificateServer.requestCertificate(csr,
+          KERBEROS_TRUSTED, nodeType, getNextCertificateId());
+    }
+    try {
+      return getPEMEncodedString(future.get());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw generateException(e, nodeType);
+    } catch (ExecutionException e) {
+      if (e.getCause() != null) {
+        if (e.getCause() instanceof SCMSecurityException) {
+          throw (SCMSecurityException) e.getCause();
+        } else {
+          throw generateException(e, nodeType);
+        }
+      } else {
+        throw generateException(e, nodeType);
+      }
+    }
+  }
+
+  private SCMSecurityException generateException(Exception ex, NodeType role) {
+    SCMSecurityException.ErrorCode errorCode;
+    if (role == NodeType.SCM) {
+      errorCode = SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
+    } else if (role == NodeType.OM) {
+      errorCode = SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
+    } else if (role == NodeType.DATANODE) {
+      errorCode = SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
+    } else {
+      errorCode = SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
+    }
+    return new SCMSecurityException("generate " + role.toString() +
+        " Certificate operation failed", ex, errorCode);
+
   }
 
   /**
@@ -164,16 +408,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         certSerialId);
     try {
       X509Certificate certificate =
-          certificateServer.getCertificate(certSerialId);
+          scmCertificateServer.getCertificate(certSerialId);
       if (certificate != null) {
-        return CertificateCodec.getPEMEncodedString(certificate);
+        return getPEMEncodedString(certificate);
       }
     } catch (CertificateException e) {
-      LOGGER.error("getCertificate operation failed. ", e);
-      throw new IOException("getCertificate operation failed. ", e);
+      throw new SCMSecurityException("getCertificate operation failed. ", e,
+          GET_CERTIFICATE_FAILED);
     }
-    LOGGER.debug("Certificate with serial id {} not found.", certSerialId);
-    throw new IOException("Certificate not found");
+    LOGGER.info("Certificate with serial id {} not found.", certSerialId);
+    throw new SCMSecurityException("Certificate not found",
+        CERTIFICATE_NOT_FOUND);
   }
 
   /**
@@ -185,12 +430,118 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public String getCACertificate() throws IOException {
     LOGGER.debug("Getting CA certificate.");
     try {
-      return CertificateCodec.getPEMEncodedString(
-          certificateServer.getCACertificate());
+      return getPEMEncodedString(
+          scmCertificateServer.getCaCertPath());
     } catch (CertificateException e) {
-      LOGGER.error("getRootCertificate operation failed. ", e);
-      throw new IOException("getRootCertificate operation failed. ", e);
+      throw new SCMSecurityException("getRootCertificate operation failed. ",
+          e, GET_CA_CERT_FAILED);
     }
+  }
+
+  /**
+   *
+   * @param role            - node role: OM/SCM/DN.
+   * @param startSerialId   - start certificate serial id.
+   * @param count           - max number of certificates returned in a batch.
+   * @param isRevoked       - whether list for revoked certs only.
+   * @return
+   * @throws IOException
+   */
+  @Override
+  public List<String> listCertificate(NodeType role,
+      long startSerialId, int count, boolean isRevoked) throws IOException {
+    List<X509Certificate> certificates =
+        scmCertificateServer.listCertificate(role, startSerialId, count,
+            isRevoked);
+    List<String> results = new ArrayList<>(certificates.size());
+    for (X509Certificate cert : certificates) {
+      try {
+        String certStr = getPEMEncodedString(cert);
+        results.add(certStr);
+      } catch (SCMSecurityException e) {
+        throw new SCMSecurityException("listCertificate operation failed.",
+            e, e.getErrorCode());
+      }
+    }
+    return results;
+  }
+
+  @Override
+  public List<String> listCACertificate() throws IOException {
+    List<String> caCerts =
+        listCertificate(NodeType.SCM, 0, 10, false);
+    return caCerts;
+  }
+
+  @Override
+  public synchronized String getRootCACertificate() throws IOException {
+    LOGGER.debug("Getting Root CA certificate.");
+    if (rootCertificateServer != null) {
+      try {
+        return CertificateCodec.getPEMEncodedString(
+            rootCertificateServer.getCACertificate());
+      } catch (CertificateException e) {
+        LOGGER.error("Failed to get root CA certificate", e);
+        throw new IOException("Failed to get root CA certificate", e);
+      }
+    }
+
+    return CertificateCodec.getPEMEncodedString(
+        scmCertificateClient.getCACertificate());
+  }
+
+  @Override
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return scmCertificateServer.getCrls(crlIds);
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return scmCertificateServer.getLatestCrlId();
+  }
+
+  @Override
+  public long revokeCertificates(List<String> certIds, int reason,
+      long revocationTime) throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
+
+    Future<Optional<Long>> revoked = scmCertificateServer.revokeCertificates(
+        certIds.stream().map(id -> new BigInteger(id))
+            .collect(Collectors.toList()), CRLReason.lookup(reason),
+        new Date(revocationTime));
+    try {
+      Long crlId = revoked.get().get();
+      getGrpcUpdateServer().notifyCrlUpdate();
+      return crlId;
+    } catch (InterruptedException | ExecutionException e) {
+      Thread.currentThread().interrupt();
+      throw new SCMException("Fail to revoke certs",
+          ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
+    }
+  }
+
+  @Override
+  public List<String> removeExpiredCertificates() throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
+    List<String> pemEncodedCerts = new ArrayList<>();
+    for (X509Certificate cert : storageContainerManager.getCertificateStore()
+        .removeAllExpiredCertificates()) {
+      pemEncodedCerts.add(CertificateCodec.getPEMEncodedString(cert));
+    }
+    return pemEncodedCerts;
+  }
+
+  private String getNextCertificateId() throws IOException {
+    return String.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
+  }
+
+  public SCMUpdateServiceGrpcServer getGrpcUpdateServer() {
+    return grpcUpdateServer;
+  }
+
+  @VisibleForTesting
+  public UserGroupInformation getRpcRemoteUser() {
+    return Server.getRemoteUser();
   }
 
   public RPC.Server getRpcServer() {
@@ -201,11 +552,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     return rpcAddress;
   }
 
-  public void start() {
-    LOGGER.info(StorageContainerManager.buildRpcServerStartMessage("Starting"
-        + " RPC server for SCMSecurityProtocolServer.", getRpcAddress()));
+  public void start() throws IOException {
+    String startupMsg = StorageContainerManager.buildRpcServerStartMessage(
+        "Starting RPC server for SCMSecurityProtocolServer.", getRpcAddress());
+    LOGGER.info(startupMsg);
     metrics.register();
     getRpcServer().start();
+    getGrpcUpdateServer().start();
   }
 
   public void stop() {
@@ -213,14 +566,29 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       LOGGER.info("Stopping the SCMSecurityProtocolServer.");
       metrics.unregister();
       getRpcServer().stop();
+      getGrpcUpdateServer().stop();
     } catch (Exception ex) {
       LOGGER.error("SCMSecurityProtocolServer stop failed.", ex);
     }
   }
 
   public void join() throws InterruptedException {
-    LOGGER.trace("Join RPC server for SCMSecurityProtocolServer.");
+    LOGGER.info("Join RPC server for SCMSecurityProtocolServer.");
     getRpcServer().join();
+    LOGGER.info("Join gRPC server for SCMSecurityProtocolServer.");
+    getGrpcUpdateServer().join();
   }
 
+  public synchronized CertificateServer getRootCertificateServer() {
+    return rootCertificateServer;
+  }
+
+  public synchronized void setRootCertificateServer(
+      CertificateServer newServer) {
+    this.rootCertificateServer = newServer;
+  }
+
+  public CertificateServer getScmCertificateServer() {
+    return scmCertificateServer;
+  }
 }

@@ -17,370 +17,179 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import static java.util.stream.Collectors.groupingBy;
 
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
  */
-public class KeyInputStream extends InputStream implements Seekable {
+public class KeyInputStream extends MultipartInputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyInputStream.class);
 
-  private static final int EOF = -1;
+  public KeyInputStream(String keyName,
+                        List<? extends BlockExtendedInputStream> inputStreams) {
+    super(keyName, inputStreams);
+  }
 
-  private String key;
-  private long length = 0;
-  private boolean closed = false;
+  private static List<BlockExtendedInputStream> createStreams(
+      OmKeyInfo keyInfo,
+      List<OmKeyLocationInfo> blockInfos,
+      XceiverClientFactory xceiverClientFactory,
+      boolean verifyChecksum,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
+    List<BlockExtendedInputStream> partStreams = new ArrayList<>();
+    for (OmKeyLocationInfo omKeyLocationInfo : blockInfos) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Adding stream for accessing {}. The stream will be " +
+            "initialized later.", omKeyLocationInfo);
+      }
+      // We also pass in functional reference which is used to refresh the
+      // pipeline info for a given OM Key location info.
 
-  // List of BlockInputStreams, one for each block in the key
-  private final List<BlockInputStream> blockStreams;
+      // Append another BlockInputStream to the end of the list. Note that the
+      // BlockInputStream is only created here and not initialized. The
+      // BlockInputStream is initialized when a read operation is performed on
+      // the block for the first time.
+      Function<BlockID, BlockLocationInfo> retry;
+      if (retryFunction != null) {
+        retry = keyBlockID -> {
+          OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
+          return getBlockLocationInfo(newKeyInfo,
+              omKeyLocationInfo.getBlockID());
+        };
+      } else {
+        retry = null;
+      }
 
-  // blockOffsets[i] stores the index of the first data byte in
-  // blockStream w.r.t the key data.
-  // For example, let’s say the block size is 200 bytes and block[0] stores
-  // data from indices 0 - 199, block[1] from indices 200 - 399 and so on.
-  // Then, blockOffset[0] = 0 (the offset of the first byte of data in
-  // block[0]), blockOffset[1] = 200 and so on.
-  private long[] blockOffsets = null;
+      BlockExtendedInputStream stream =
+          blockStreamFactory.create(
+              keyInfo.getReplicationConfig(),
+              omKeyLocationInfo,
+              omKeyLocationInfo.getPipeline(),
+              omKeyLocationInfo.getToken(),
+              verifyChecksum,
+              xceiverClientFactory,
+              retry);
+      partStreams.add(stream);
+    }
+    return partStreams;
+  }
 
-  // Index of the blockStream corresponding to the current position of the
-  // KeyInputStream i.e. offset of the data to be read next
-  private int blockIndex;
+  private static BlockLocationInfo getBlockLocationInfo(OmKeyInfo newKeyInfo,
+      BlockID blockID) {
+    List<OmKeyLocationInfo> collect =
+        newKeyInfo.getLatestVersionLocations()
+            .getLocationList()
+            .stream()
+            .filter(l -> l.getBlockID().equals(blockID))
+            .collect(Collectors.toList());
+    if (CollectionUtils.isNotEmpty(collect)) {
+      return collect.get(0);
+    } else {
+      return null;
+    }
+  }
 
-  // Tracks the blockIndex corresponding to the last seeked position so that it
-  // can be reset if a new position is seeked.
-  private int blockIndexOfPrevPosition;
-
-  public KeyInputStream() {
-    blockStreams = new ArrayList<>();
-    blockIndex = 0;
+  private static LengthInputStream getFromOmKeyInfo(
+      OmKeyInfo keyInfo,
+      XceiverClientFactory xceiverClientFactory,
+      boolean verifyChecksum,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory,
+      List<OmKeyLocationInfo> locationInfos) {
+    List<BlockExtendedInputStream> streams = createStreams(keyInfo,
+        locationInfos, xceiverClientFactory, verifyChecksum, retryFunction,
+        blockStreamFactory);
+    KeyInputStream keyInputStream =
+        new KeyInputStream(keyInfo.getKeyName(), streams);
+    return new LengthInputStream(keyInputStream, keyInputStream.getLength());
   }
 
   /**
    * For each block in keyInfo, add a BlockInputStream to blockStreams.
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientManager xceiverClientManager,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+      XceiverClientFactory xceiverClientFactory,
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
+
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-    KeyInputStream keyInputStream = new KeyInputStream();
-    keyInputStream.initialize(keyInfo, keyLocationInfos,
-        xceiverClientManager, verifyChecksum, retryFunction);
-
-    return new LengthInputStream(keyInputStream, keyInputStream.length);
+    return getFromOmKeyInfo(keyInfo, xceiverClientFactory, verifyChecksum,
+        retryFunction, blockStreamFactory, keyLocationInfos);
   }
 
-  private synchronized void initialize(OmKeyInfo keyInfo,
-      List<OmKeyLocationInfo> blockInfos,
-      XceiverClientManager xceiverClientManager,
-      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
-    this.key = keyInfo.getKeyName();
-    this.blockOffsets = new long[blockInfos.size()];
-    long keyLength = 0;
-    for (int i = 0; i < blockInfos.size(); i++) {
-      OmKeyLocationInfo omKeyLocationInfo = blockInfos.get(i);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Adding stream for accessing {}. The stream will be " +
-            "initialized later.", omKeyLocationInfo);
-      }
+  public static List<LengthInputStream> getStreamsFromKeyInfo(OmKeyInfo keyInfo,
+      XceiverClientFactory xceiverClientFactory, boolean verifyChecksum,
+      Function<OmKeyInfo, OmKeyInfo> retryFunction,
+      BlockInputStreamFactory blockStreamFactory) {
 
-      // We also pass in functional reference which is used to refresh the
-      // pipeline info for a given OM Key location info.
-      addStream(omKeyLocationInfo, xceiverClientManager,
-          verifyChecksum, keyLocationInfo -> {
-            OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
-            BlockID blockID = keyLocationInfo.getBlockID();
-            List<OmKeyLocationInfo> collect =
-                newKeyInfo.getLatestVersionLocations()
-                .getLocationList()
-                .stream()
-                .filter(l -> l.getBlockID().equals(blockID))
-                .collect(Collectors.toList());
-            if (CollectionUtils.isNotEmpty(collect)) {
-              return collect.get(0).getPipeline();
-            } else {
-              return null;
-            }
-          });
+    List<OmKeyLocationInfo> keyLocationInfos = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
-      this.blockOffsets[i] = keyLength;
-      keyLength += omKeyLocationInfo.getLength();
+    // Iterate through each block info in keyLocationInfos and assign it the
+    // corresponding part in the partsToBlockMap.
+    Map<Integer, List<OmKeyLocationInfo>> partsToBlocksMap =
+        keyLocationInfos.stream()
+            .collect(groupingBy(BlockLocationInfo::getPartNumber));
+
+    List<LengthInputStream> lengthInputStreams = new ArrayList<>();
+    // Create a KeyInputStream for each part.
+    for (List<OmKeyLocationInfo> locationInfo : partsToBlocksMap.values()) {
+      lengthInputStreams.add(getFromOmKeyInfo(keyInfo, xceiverClientFactory,
+          verifyChecksum, retryFunction, blockStreamFactory, locationInfo));
     }
-    this.length = keyLength;
+    return lengthInputStreams;
   }
 
-  /**
-   * Append another BlockInputStream to the end of the list. Note that the
-   * BlockInputStream is only created here and not initialized. The
-   * BlockInputStream is initialized when a read operation is performed on
-   * the block for the first time.
-   */
-  private synchronized void addStream(OmKeyLocationInfo blockInfo,
-      XceiverClientManager xceiverClientMngr,
-      boolean verifyChecksum,
-      Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction) {
-    blockStreams.add(new BlockInputStream(blockInfo.getBlockID(),
-        blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
-        verifyChecksum, xceiverClientMngr,
-        blockID -> refreshPipelineFunction.apply(blockInfo)));
+  @Override
+  protected int getNumBytesToRead(ByteReaderStrategy strategy,
+                                  PartInputStream current) throws IOException {
+    return (int) Math.min(strategy.getTargetLength(), current.getRemaining());
   }
 
+  @Override
+  protected void checkPartBytesRead(int numBytesToRead, int numBytesRead,
+                                    PartInputStream stream) throws IOException {
+    if (numBytesRead != numBytesToRead) {
+      // This implies that there is either data loss or corruption in the
+      // chunk entries. Even EOF in the current stream would be covered in
+      // this case.
+      throw new IOException(String.format("Inconsistent read for blockID=%s "
+              + "length=%d position=%d numBytesToRead=%d numBytesRead=%d",
+          ((BlockExtendedInputStream) stream).getBlockID(), stream.getLength(),
+          stream.getPos(), numBytesToRead, numBytesRead));
+    }
+  }
+
+  @Override
   @VisibleForTesting
-  public void addStream(BlockInputStream blockInputStream) {
-    blockStreams.add(blockInputStream);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public synchronized int read() throws IOException {
-    byte[] buf = new byte[1];
-    if (read(buf, 0, 1) == EOF) {
-      return EOF;
-    }
-    return Byte.toUnsignedInt(buf[0]);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public synchronized int read(byte[] b, int off, int len) throws IOException {
-    checkOpen();
-    if (b == null) {
-      throw new NullPointerException();
-    }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
-      return 0;
-    }
-    int totalReadLen = 0;
-    while (len > 0) {
-      // if we are at the last block and have read the entire block, return
-      if (blockStreams.size() == 0 ||
-          (blockStreams.size() - 1 <= blockIndex &&
-              blockStreams.get(blockIndex)
-                  .getRemaining() == 0)) {
-        return totalReadLen == 0 ? EOF : totalReadLen;
-      }
-
-      // Get the current blockStream and read data from it
-      BlockInputStream current = blockStreams.get(blockIndex);
-      int numBytesToRead = Math.min(len, (int)current.getRemaining());
-      int numBytesRead = current.read(b, off, numBytesToRead);
-      if (numBytesRead != numBytesToRead) {
-        // This implies that there is either data loss or corruption in the
-        // chunk entries. Even EOF in the current stream would be covered in
-        // this case.
-        throw new IOException(String.format("Inconsistent read for blockID=%s "
-                        + "length=%d numBytesToRead=%d numBytesRead=%d",
-                current.getBlockID(), current.getLength(), numBytesToRead,
-                numBytesRead));
-      }
-      totalReadLen += numBytesRead;
-      off += numBytesRead;
-      len -= numBytesRead;
-      if (current.getRemaining() <= 0 &&
-          ((blockIndex + 1) < blockStreams.size())) {
-        blockIndex += 1;
-      }
-    }
-    return totalReadLen;
-  }
-
-  /**
-   * Seeks the KeyInputStream to the specified position. This involves 2 steps:
-   *    1. Updating the blockIndex to the blockStream corresponding to the
-   *    seeked position.
-   *    2. Seeking the corresponding blockStream to the adjusted position.
-   *
-   * For example, let’s say the block size is 200 bytes and block[0] stores
-   * data from indices 0 - 199, block[1] from indices 200 - 399 and so on.
-   * Let’s say we seek to position 240. In the first step, the blockIndex
-   * would be updated to 1 as indices 200 - 399 reside in blockStream[1]. In
-   * the second step, the blockStream[1] would be seeked to position 40 (=
-   * 240 - blockOffset[1] (= 200)).
-   */
-  @Override
-  public synchronized void seek(long pos) throws IOException {
-    checkOpen();
-    if (pos == 0 && length == 0) {
-      // It is possible for length and pos to be zero in which case
-      // seek should return instead of throwing exception
-      return;
-    }
-    if (pos < 0 || pos > length) {
-      throw new EOFException(
-          "EOF encountered at pos: " + pos + " for key: " + key);
-    }
-
-    // 1. Update the blockIndex
-    if (blockIndex >= blockStreams.size()) {
-      blockIndex = Arrays.binarySearch(blockOffsets, pos);
-    } else if (pos < blockOffsets[blockIndex]) {
-      blockIndex =
-          Arrays.binarySearch(blockOffsets, 0, blockIndex, pos);
-    } else if (pos >= blockOffsets[blockIndex] + blockStreams
-        .get(blockIndex).getLength()) {
-      blockIndex = Arrays
-          .binarySearch(blockOffsets, blockIndex + 1,
-              blockStreams.size(), pos);
-    }
-    if (blockIndex < 0) {
-      // Binary search returns -insertionPoint - 1  if element is not present
-      // in the array. insertionPoint is the point at which element would be
-      // inserted in the sorted array. We need to adjust the blockIndex
-      // accordingly so that blockIndex = insertionPoint - 1
-      blockIndex = -blockIndex - 2;
-    }
-
-    // Reset the previous blockStream's position
-    blockStreams.get(blockIndexOfPrevPosition).resetPosition();
-
-    // Reset all the blockStreams above the blockIndex. We do this to reset
-    // any previous reads which might have updated the blockPosition and
-    // chunkIndex.
-    for (int index =  blockIndex + 1; index < blockStreams.size(); index++) {
-      blockStreams.get(index).seek(0);
-    }
-    // 2. Seek the blockStream to the adjusted position
-    blockStreams.get(blockIndex).seek(pos - blockOffsets[blockIndex]);
-    blockIndexOfPrevPosition = blockIndex;
-  }
-
-  @Override
-  public synchronized long getPos() throws IOException {
-    return length == 0 ? 0 : blockOffsets[blockIndex] +
-        blockStreams.get(blockIndex).getPos();
-  }
-
-  @Override
-  public boolean seekToNewSource(long targetPos) throws IOException {
-    return false;
-  }
-
-  @Override
-  public int available() throws IOException {
-    checkOpen();
-    long remaining = length - getPos();
-    return remaining <= Integer.MAX_VALUE ? (int) remaining : Integer.MAX_VALUE;
-  }
-
-  @Override
-  public void close() throws IOException {
-    closed = true;
-    for (BlockInputStream blockStream : blockStreams) {
-      blockStream.close();
-    }
-  }
-
-  /**
-   * Verify that the input stream is open. Non blocking; this gives
-   * the last state of the volatile {@link #closed} field.
-   * @throws IOException if the connection is closed.
-   */
-  private void checkOpen() throws IOException {
-    if (closed) {
-      throw new IOException(
-          ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: " + key);
-    }
-  }
-
-  @VisibleForTesting
-  public synchronized int getCurrentStreamIndex() {
-    return blockIndex;
-  }
-
-  @VisibleForTesting
-  public long getRemainingOfIndex(int index) throws IOException {
-    return blockStreams.get(index).getRemaining();
-  }
-
-  /**
-   * Copies some or all bytes from a large (over 2GB) <code>InputStream</code>
-   * to an <code>OutputStream</code>, optionally skipping input bytes.
-   * <p>
-   * Copy the method from IOUtils of commons-io to reimplement skip by seek
-   * rather than read. The reason why IOUtils of commons-io implement skip
-   * by read can be found at
-   * <a href="https://issues.apache.org/jira/browse/IO-203">IO-203</a>.
-   * </p>
-   * <p>
-   * This method uses the provided buffer, so there is no need to use a
-   * <code>BufferedInputStream</code>.
-   * </p>
-   *
-   * @param output the <code>OutputStream</code> to write to
-   * @param inputOffset : number of bytes to skip from input before copying
-   * -ve values are ignored
-   * @param length : number of bytes to copy. -ve means all
-   * @param buffer the buffer to use for the copy
-   * @return the number of bytes copied
-   * @throws NullPointerException if the input or output is null
-   * @throws IOException          if an I/O error occurs
-   */
-  public long copyLarge(final OutputStream output,
-      final long inputOffset, final long len, final byte[] buffer)
-      throws IOException {
-    if (inputOffset > 0) {
-      seek(inputOffset);
-    }
-
-    if (len == 0) {
-      return 0;
-    }
-
-    final int bufferLength = buffer.length;
-    int bytesToRead = bufferLength;
-    if (len > 0 && len < bufferLength) {
-      bytesToRead = (int) len;
-    }
-
-    int read;
-    long totalRead = 0;
-    while (bytesToRead > 0) {
-      read = read(buffer, 0, bytesToRead);
-      if (read == IOUtils.EOF) {
-        break;
-      }
-
-      output.write(buffer, 0, read);
-      totalRead += read;
-      if (len > 0) { // only adjust len if not reading to the end
-        // Note the cast must work because buffer.length is an integer
-        bytesToRead = (int) Math.min(len - totalRead, bufferLength);
-      }
-    }
-
-    return totalRead;
+  public List<BlockExtendedInputStream> getPartStreams() {
+    return (List<BlockExtendedInputStream>) super.getPartStreams();
   }
 }

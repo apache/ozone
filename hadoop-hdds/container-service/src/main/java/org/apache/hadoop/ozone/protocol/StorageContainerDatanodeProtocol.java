@@ -17,9 +17,11 @@
 package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -36,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.security.KerberosInfo;
@@ -69,19 +72,21 @@ public interface StorageContainerDatanodeProtocol {
    * @throws IOException
    */
   SCMHeartbeatResponseProto sendHeartbeat(SCMHeartbeatRequestProto heartbeat)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Register Datanode.
-   * @param datanodeDetails - Datanode Details.
+   * @param extendedDatanodeDetailsProto - extended Datanode Details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
+   * @param layoutInfo - Layout Version Information.
    * @return SCM Command.
    */
   SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetails,
-          NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReports) throws IOException;
+      ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
+      NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReports,
+      LayoutVersionProto layoutInfo) throws IOException;
 
 }

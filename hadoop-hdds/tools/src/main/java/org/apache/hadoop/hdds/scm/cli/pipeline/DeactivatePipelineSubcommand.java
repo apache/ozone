@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,10 +20,11 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 /**
  * Handler of deactivate pipeline command.
@@ -33,20 +34,14 @@ import java.util.concurrent.Callable;
     description = "Deactivates the given Pipeline",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DeactivatePipelineSubcommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private PipelineCommands parent;
+public class DeactivatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Parameters(description = "ID of the pipeline to deactivate")
   private String pipelineId;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      scmClient.deactivatePipeline(
-          HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
-      return null;
-    }
+  public void execute(ScmClient scmClient) throws IOException {
+    scmClient.deactivatePipeline(
+        HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
   }
 }

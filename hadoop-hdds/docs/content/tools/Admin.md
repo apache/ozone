@@ -24,11 +24,11 @@ Ozone Admin command (`ozone admin`) is a collection of tools intended to be used
 
 And quick overview about the available functionalities:
 
- * `ozone admin safemode`: You can check the safe mode status and force to leave/enter from/to safemode.
- * `ozone admin container`: Containers are the unit of the replicaiton. The subcommands can help to debug the current state of the containers (list/get/create/...)
+ * `ozone admin safemode`: You can check the safe mode status and force to leave/enter from/to safemode,  `--verbose` option will print validation status of all rules that evaluate safemode status.
+ * `ozone admin container`: Containers are the unit of the replication. The subcommands can help to debug the current state of the containers (list/get/create/...)
  * `ozone admin pipeline`: Can help to check the available pipelines (datanode sets)
  * `ozone admin datanode`: Provides information about the datanode
- * `ozone admin printTopology`: display the rack-awarness related information
+ * `ozone admin printTopology`: display the rack-awareness related information
  * `ozone admin replicationmanager`: Can be used to check the status of the replications (and start / stop replication in case of emergency).
  * `ozone admin om`: Ozone Manager HA related tool to get information about the current cluster.
 

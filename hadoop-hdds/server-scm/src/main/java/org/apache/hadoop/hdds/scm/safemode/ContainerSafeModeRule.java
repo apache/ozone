@@ -23,25 +23,29 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer
-    .NodeRegistrationContainerReport;
-
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class defining Safe mode exit criteria for Containers.
  */
 public class ContainerSafeModeRule extends
-    SafeModeExitRule<NodeRegistrationContainerReport>{
+    SafeModeExitRule<NodeRegistrationContainerReport> {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ContainerSafeModeRule.class);
   // Required cutoff % for containers with at least 1 reported replica.
   private double safeModeCutoff;
   // Containers read from scm db (excluding containers in ALLOCATED state).
@@ -49,11 +53,14 @@ public class ContainerSafeModeRule extends
   private double maxContainer;
 
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
+  private final ContainerManager containerManager;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
-      ConfigurationSource conf,
-      List<ContainerInfo> containers, SCMSafeModeManager manager) {
+             ConfigurationSource conf,
+             List<ContainerInfo> containers,
+             ContainerManager containerManager, SCMSafeModeManager manager) {
     super(manager, ruleName, eventQueue);
+    this.containerManager = containerManager;
     safeModeCutoff = conf.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT);
@@ -70,14 +77,17 @@ public class ContainerSafeModeRule extends
       // now. These containers can be handled by tracking pipelines.
 
       Optional.ofNullable(container.getState())
-          .filter(state -> state != HddsProtos.LifeCycleState.OPEN)
-          .filter(state -> state != HddsProtos.LifeCycleState.CLOSING)
+          .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
+              state == HddsProtos.LifeCycleState.CLOSED)
+              && container.getNumberOfKeys() > 0)
           .ifPresent(s -> containerMap.put(container.getContainerID(),
               container));
     });
     maxContainer = containerMap.size();
     long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
     getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(cutOff);
+
+    LOG.info("containers with one replica threshold count {}", cutOff);
   }
 
 
@@ -88,12 +98,12 @@ public class ContainerSafeModeRule extends
 
 
   @Override
-  protected boolean validate() {
+  protected synchronized boolean validate() {
     return getCurrentContainerThreshold() >= safeModeCutoff;
   }
 
   @VisibleForTesting
-  public double getCurrentContainerThreshold() {
+  public synchronized double getCurrentContainerThreshold() {
     if (maxContainer == 0) {
       return 1;
     }
@@ -101,11 +111,12 @@ public class ContainerSafeModeRule extends
   }
 
   @Override
-  protected void process(NodeRegistrationContainerReport reportsProto) {
+  protected synchronized void process(
+      NodeRegistrationContainerReport reportsProto) {
 
     reportsProto.getReport().getReportsList().forEach(c -> {
       if (containerMap.containsKey(c.getContainerID())) {
-        if(containerMap.remove(c.getContainerID()) != null) {
+        if (containerMap.remove(c.getContainerID()) != null) {
           containerWithMinReplicas.getAndAdd(1);
           getSafeModeMetrics()
               .incCurrentContainersWithOneReplicaReportedCount();
@@ -122,7 +133,53 @@ public class ContainerSafeModeRule extends
   }
 
   @Override
-  protected void cleanup() {
+  protected synchronized void cleanup() {
     containerMap.clear();
   }
+
+  @Override
+  public String getStatusText() {
+    return String
+        .format(
+            "%% of containers with at least one reported replica (=%1.2f) >= "
+                + "safeModeCutoff (=%1.2f)",
+            getCurrentContainerThreshold(), this.safeModeCutoff);
+  }
+
+
+  @Override
+  public synchronized void refresh(boolean forceRefresh) {
+    if (forceRefresh) {
+      reInitializeRule();
+    } else {
+      if (!validate()) {
+        reInitializeRule();
+      }
+    }
+  }
+
+  private void reInitializeRule() {
+    containerMap.clear();
+    containerManager.getContainers().forEach(container -> {
+      // There can be containers in OPEN/CLOSING state which were never
+      // created by the client. We are not considering these containers for
+      // now. These containers can be handled by tracking pipelines.
+
+      Optional.ofNullable(container.getState())
+          .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
+              state == HddsProtos.LifeCycleState.CLOSED)
+              && container.getNumberOfKeys() > 0)
+          .ifPresent(s -> containerMap.put(container.getContainerID(),
+              container));
+    });
+
+    maxContainer = containerMap.size();
+    long cutOff = (long) Math.ceil(maxContainer * safeModeCutoff);
+
+    LOG.info("Refreshed one replica container threshold {}, " +
+        "currentThreshold {}", cutOff, containerWithMinReplicas.get());
+    getSafeModeMetrics()
+        .setNumContainerWithOneReplicaReportedThreshold(cutOff);
+  }
+
 }

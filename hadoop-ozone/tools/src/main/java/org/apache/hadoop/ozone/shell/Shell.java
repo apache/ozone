@@ -23,31 +23,56 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * Ozone user interface commands.
- *
+ * <p>
  * This class uses dispatch method to make calls
  * to appropriate handlers that execute the ozone functions.
  */
 public abstract class Shell extends GenericCli {
 
-  public static final String OZONE_URI_DESCRIPTION = "Ozone URI could start "
-      + "with o3:// or without prefix. URI may contain the host/serviceId "
-      + " and port of the OM server. Both are optional. "
-      + "If they are not specified it will be identified from "
-      + "the config files.";
+  public static final String OZONE_URI_DESCRIPTION =
+      "Ozone URI could either be a full URI or short URI.\n" +
+          "Full URI should start with o3://, in case of non-HA\nclusters it " +
+          "should be followed by the host name and\noptionally the port " +
+          "number. In case of HA clusters\nthe service id should be used. " +
+          "Service id provides a\nlogical name for multiple hosts and it is " +
+          "defined\nin the property ozone.om.service.ids.\n" +
+          "Example of a full URI with host name and port number\nfor a key:" +
+          "\no3://omhostname:9862/vol1/bucket1/key1\n" +
+          "With a service id for a volume:" +
+          "\no3://omserviceid/vol1/\n" +
+          "Short URI should start from the volume." +
+          "\nExample of a short URI for a bucket:" +
+          "\nvol1/bucket1\n" +
+          "Any unspecified information will be identified from\n" +
+          "the config files.\n";
 
+  public Shell() {
+  }
+
+  public Shell(Class<?> type) {
+    super(type);
+  }
 
   @Override
   protected void printError(Throwable errorArg) {
+    OMException omException = null;
+
     if (errorArg instanceof OMException) {
-      if (isVerbose()) {
-        errorArg.printStackTrace(System.err);
-      } else {
-        OMException omException = (OMException) errorArg;
-        System.err.println(String
-            .format("%s %s", omException.getResult().name(),
-                omException.getMessage()));
-      }
+      omException = (OMException) errorArg;
+    } else if (errorArg.getCause() instanceof OMException) {
+      // If the OMException occurred in a method that could not throw a
+      // checked exception (like an Iterator implementation), it will be
+      // chained to an unchecked exception and thrown.
+      omException = (OMException) errorArg.getCause();
+    }
+
+    if (omException != null && !isVerbose()) {
+      // In non-verbose mode, reformat OMExceptions as error messages to the
+      // user.
+      System.err.println(String.format("%s %s", omException.getResult().name(),
+              omException.getMessage()));
     } else {
+      // Prints the stack trace when in verbose mode.
       super.printError(errorArg);
     }
   }

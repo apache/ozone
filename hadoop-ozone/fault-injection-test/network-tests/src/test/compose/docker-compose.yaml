@@ -19,7 +19,7 @@ services:
    datanode:
       image: ${docker.image}
       ports:
-        - 9864
+        - 19864
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
@@ -36,6 +36,7 @@ services:
       image: ${docker.image}
       ports:
          - 9876:9876
+         - 9860:9860
       env_file:
           - ./docker-config
       environment:

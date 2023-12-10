@@ -16,12 +16,24 @@
 -->
 <configuration>
   <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
+  </property>
+  <property>
     <name>hdds.profiler.endpoint.enabled</name>
     <value>true</value>
   </property>
   <property>
     <name>ozone.scm.block.client.address</name>
     <value>localhost</value>
+  </property>
+  <property>
+    <name>ozone.csi.owner</name>
+    <value>hadoop</value>
+  </property>
+  <property>
+    <name>ozone.csi.socket</name>
+    <value>/tmp/csi.sock</value>
   </property>
   <property>
     <name>ozone.scm.client.address</name>
@@ -58,5 +70,34 @@
   <property>
     <name>ozone.recon.db.dir</name>
     <value>/tmp/recon</value>
+  </property>
+  <property>
+    <name>datanode.replication.port</name>
+    <value>0</value>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.enable</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hdds.container.report.interval</name>
+    <value>60m</value>
+  </property>
+  <property>
+    <name>hdds.recon.heartbeat.interval</name>
+    <value>60s</value>
+  </property>
+  <property>
+    <name>ozone.scm.stale.node.interval</name>
+    <value>5m</value>
+  </property>
+  <property>
+    <name>ozone.scm.dead.node.interval</name>
+    <value>10m</value>
+  </property>
+
+  <property>
+    <name>ozone.metastore.rocksdb.statistics</name>
+    <value>ALL</value>
   </property>
 </configuration>

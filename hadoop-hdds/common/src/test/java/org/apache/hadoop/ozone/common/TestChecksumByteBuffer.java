@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.util.PureJavaCrc32;
 import org.apache.hadoop.util.PureJavaCrc32C;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -33,14 +33,14 @@ public class TestChecksumByteBuffer {
   @Test
   public void testPureJavaCrc32ByteBuffer() {
     final Checksum expected = new PureJavaCrc32();
-    final ChecksumByteBuffer testee = new PureJavaCrc32ByteBuffer();
+    final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32Impl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
   }
 
   @Test
   public void testPureJavaCrc32CByteBuffer() {
     final Checksum expected = new PureJavaCrc32C();
-    final ChecksumByteBuffer testee = new PureJavaCrc32CByteBuffer();
+    final ChecksumByteBuffer testee = ChecksumByteBufferFactory.crc32CImpl();
     new VerifyChecksumByteBuffer(expected, testee).testCorrectness();
   }
 
@@ -96,7 +96,7 @@ public class TestChecksumByteBuffer {
     }
 
     private void checkSame() {
-      Assert.assertEquals(expected.getValue(), testee.getValue());
+      Assertions.assertEquals(expected.getValue(), testee.getValue());
     }
   }
 }

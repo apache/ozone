@@ -17,13 +17,16 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
@@ -31,33 +34,56 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
  */
 public class DummyChunkInputStream extends ChunkInputStream {
 
-  private byte[] chunkData;
+  private final byte[] chunkData;
 
   // Stores the read chunk data in each readChunk call
-  private List<ByteString> readByteBuffers = new ArrayList<>();
+  private final List<ByteString> readByteBuffers = new ArrayList<>();
 
-  public DummyChunkInputStream(TestChunkInputStream testChunkInputStream,
-      ChunkInfo chunkInfo,
+  public DummyChunkInputStream(ChunkInfo chunkInfo,
       BlockID blockId,
-      XceiverClientSpi xceiverClient,
+      XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,
-      byte[] data) {
-    super(chunkInfo, blockId, xceiverClient, verifyChecksum);
-    this.chunkData = data;
+      byte[] data, Pipeline pipeline) {
+    super(chunkInfo, blockId, xceiverClientFactory, () -> pipeline,
+        verifyChecksum, () -> null);
+    this.chunkData = data.clone();
   }
 
   @Override
-  protected ByteString readChunk(ChunkInfo readChunkInfo) {
-    ByteString byteString = ByteString.copyFrom(chunkData,
-        (int) readChunkInfo.getOffset(),
-        (int) readChunkInfo.getLen());
-    getReadByteBuffers().add(byteString);
-    return byteString;
+  protected ByteBuffer[] readChunk(ChunkInfo readChunkInfo) {
+    int offset = (int) readChunkInfo.getOffset();
+    int remainingToRead = (int) readChunkInfo.getLen();
+
+    int bufferCapacity = readChunkInfo.getChecksumData().getBytesPerChecksum();
+    int bufferLen;
+    readByteBuffers.clear();
+    while (remainingToRead > 0) {
+      if (remainingToRead < bufferCapacity) {
+        bufferLen = remainingToRead;
+      } else {
+        bufferLen = bufferCapacity;
+      }
+      ByteString byteString = ByteString.copyFrom(chunkData,
+          offset, bufferLen);
+
+      readByteBuffers.add(byteString);
+
+      offset += bufferLen;
+      remainingToRead -= bufferLen;
+    }
+
+    return BufferUtils.getReadOnlyByteBuffers(readByteBuffers)
+        .toArray(new ByteBuffer[0]);
   }
 
   @Override
-  protected void checkOpen() {
+  protected void acquireClient() {
     // No action needed
+  }
+
+  @Override
+  protected void releaseClient() {
+    // no-op
   }
 
   public List<ByteString> getReadByteBuffers() {

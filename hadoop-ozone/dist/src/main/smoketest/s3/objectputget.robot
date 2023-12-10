@@ -31,22 +31,28 @@ ${BUCKET}             generated
 
 Put object to s3
                         Execute                    echo "Randomtext" > /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key putobject/f1 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix putobject/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/key=value/
                         Should contain             ${result}         f1
 
                         Execute                    touch -f /tmp/zerobyte
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key putobject/zerobyte --body /tmp/zerobyte
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix putobject/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --body /tmp/zerobyte
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/key=value/
                         Should contain             ${result}         zerobyte
 
 #This test depends on the previous test case. Can't be executes alone
 Get object from s3
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 /tmp/testfile.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
 
+#This test depends on the previous test case. Can't be executed alone
+Get object with wrong signature
+    Pass Execution If          '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
+    ${result} =                 Execute and Ignore Error   curl -i -H 'Authorization: AWS scm/scm@EXAMPLE.COM:asdfqwerty' ${ENDPOINT_URL}/${BUCKET}/${PREFIX}/putobject/key=value/f1
+                                Should contain             ${result}        403 Forbidden
+
 Get Partial object from s3 with both start and endoffset
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0-4 /tmp/testfile1.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-4 /tmp/testfile1.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-4/11
                                 Should contain             ${result}        AcceptRanges
@@ -54,7 +60,7 @@ Get Partial object from s3 with both start and endoffset
     ${actualData} =             Execute                    cat /tmp/testfile1.result
                                 Should Be Equal            ${expectedData}            ${actualData}
 
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=2-4 /tmp/testfile1.result1
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=2-4 /tmp/testfile1.result1
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 2-4/11
                                 Should contain             ${result}        AcceptRanges
@@ -63,7 +69,7 @@ Get Partial object from s3 with both start and endoffset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 # end offset greater than file size and start with in file length
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=2-1000 /tmp/testfile1.result2
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=2-1000 /tmp/testfile1.result2
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 2-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -72,12 +78,12 @@ Get Partial object from s3 with both start and endoffset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size)
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=10000-10000 /tmp/testfile2.result   255
+    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=10000-10000 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
 
 
 Get Partial object from s3 with both start and endoffset(end offset is greater than file size)
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0-10000 /tmp/testfile2.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-10000 /tmp/testfile2.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -86,7 +92,7 @@ Get Partial object from s3 with both start and endoffset(end offset is greater t
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with only start offset
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0- /tmp/testfile3.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0- /tmp/testfile3.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -95,7 +101,7 @@ Get Partial object from s3 with only start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with both start and endoffset which are equal
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0-0 /tmp/testfile4.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=0-0 /tmp/testfile4.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-0/11
                                 Should contain             ${result}        AcceptRanges
@@ -103,7 +109,7 @@ Get Partial object from s3 with both start and endoffset which are equal
     ${actualData} =             Execute                    cat /tmp/testfile4.result
                                 Should Be Equal            ${expectedData}            ${actualData}
 
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=4-4 /tmp/testfile5.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=4-4 /tmp/testfile5.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 4-4/11
                                 Should contain             ${result}        AcceptRanges
@@ -112,7 +118,7 @@ Get Partial object from s3 with both start and endoffset which are equal
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 to get last n bytes
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=-4 /tmp/testfile6.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=-4 /tmp/testfile6.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 7-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -121,7 +127,7 @@ Get Partial object from s3 to get last n bytes
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 # if end is greater than file length, returns whole file
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=-10000 /tmp/testfile7.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=-10000 /tmp/testfile7.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -130,14 +136,14 @@ Get Partial object from s3 to get last n bytes
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Incorrect values for end and start offset
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=-11-10000 /tmp/testfile8.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=-11-10000 /tmp/testfile8.result
                                 Should not contain         ${result}        ContentRange
                                 Should contain             ${result}        AcceptRanges
     ${expectedData} =           Execute                    cat /tmp/testfile
     ${actualData} =             Execute                    cat /tmp/testfile8.result
                                 Should Be Equal            ${expectedData}            ${actualData}
 
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=11-8 /tmp/testfile9.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/f1 --range bytes=11-8 /tmp/testfile9.result
                                 Should not contain         ${result}        ContentRange
                                 Should contain             ${result}        AcceptRanges
     ${expectedData} =           Execute                    cat /tmp/testfile
@@ -145,11 +151,110 @@ Incorrect values for end and start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Zero byte file
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
-                                Should contain             ${result}        InvalidRange
+    ${result} =			        Execute                    ozone sh bucket info /s3v/${BUCKET}
+    ${linked} = 		        Execute				       echo '${result}' | jq -j '.sourceVolume,"/",.sourceBucket'
+    ${eval} = 			        Evaluate			       "source" in """${linked}"""
+    	      			        IF	${eval} == ${True}
+    ${result} =                 Execute				       ozone sh bucket info ${linked}
+				                END
+    ${fsolayout} =    		    Evaluate    	   	       "OPTIMIZED" in """${result}"""
 
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
-                                Should contain             ${result}        InvalidRange
+    ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
+    	      			        IF 	${fsolayout} == ${True}
+                                Should contain              ${result}       NoSuchKey
+				                ELSE
+                                Should contain              ${result}       InvalidRange
+				                END
 
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
-                                Should contain             ${result}        InvalidRange
+    ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
+                                IF 	${fsolayout} == ${True}
+                                Should contain              ${result}       NoSuchKey
+                                ELSE
+                                Should contain              ${result}       InvalidRange
+				                END
+
+    ${result} =                 Execute AWSS3APICli and checkrc     get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/key=value/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
+    	      			        IF 	${fsolayout} == ${True}
+                                Should contain              ${result}       NoSuchKey
+				                ELSE
+                                Should contain              ${result}       InvalidRange
+				                END
+
+Create file with user defined metadata
+                                Execute                   echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli       put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1 --body /tmp/testfile2 --metadata="custom-key1=custom-value1,custom-key2=custom-value2"
+
+    ${result} =                 Execute AWSS3APICli       head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key1
+                                Should contain            ${result}    \"custom-key1\": \"custom-value1\"
+                                Should contain            ${result}    \"custom-key2\": \"custom-value2\"
+
+    ${result} =                 Execute                   ozone sh key info /s3v/${BUCKET}/${PREFIX}/putobject/custom-metadata/key1
+                                Should contain            ${result}   \"custom-key1\" : \"custom-value1\"
+                                Should contain            ${result}   \"custom-key2\" : \"custom-value2\"
+
+Create file with user defined metadata with gdpr enabled value in request
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+                                Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="gdprEnabled=true,custom-key2=custom-value2"
+    ${result} =                 Execute AWSS3ApiCli        head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2
+                                Should contain             ${result}   \"custom-key2\": \"custom-value2\"
+                                Should not contain         ${result}   \"gdprEnabled\": \"true\"
+
+
+Create file with user defined metadata size larger than 2 KB
+                                Execute                    echo "Randomtext" > /tmp/testfile2
+    ${custom_metadata_value} =  Execute                    printf 'v%.0s' {1..3000}
+    ${result} =                 Execute AWSS3APICli and ignore error        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/custom-metadata/key2 --body /tmp/testfile2 --metadata="custom-key1=${custom_metadata_value}"
+                                Should not contain                          ${result}   custom-key1: ${custom_metadata_value}
+
+Create small file and expect ETag (MD5) in a reponse header
+                                Execute                    head -c 1MB </dev/urandom > /tmp/small_file
+    ${file_md5_checksum} =      Execute                    md5sum /tmp/small_file | awk '{print $1}'
+    ${result} =                 Execute AWSS3CliDebug      cp /tmp/small_file s3://${BUCKET}
+                                Should Match Regexp        ${result}    (?i)Response header.*ETag':\ '"${file_md5_checksum}"'
+
+# The next two test cases depends on the previous one
+Download small file end expect ETag (MD5) in a response header
+    ${file_md5_checksum} =      Execute                    md5sum /tmp/small_file | awk '{print $1}'
+    ${result} =                 Execute AWSS3CliDebug      cp s3://${BUCKET}/small_file /tmp/small_file_downloaded
+                                Should Match Regexp        ${result}    (?is)HEAD /${BUCKET}/small_file.*?Response headers.*?ETag': '"${file_md5_checksum}"'
+                                Should Match Regexp        ${result}    (?is)GET /${BUCKET}/small_file.*?Response headers.*?ETag':\ '"${file_md5_checksum}"'
+                                # clean up
+                                Execute AWSS3Cli           rm s3://${BUCKET}/small_file
+                                Execute                    rm /tmp/small_file_downloaded
+
+Create key with custom etag metadata and expect it won't conflict with ETag response header of HEAD request
+    ${file_md5_checksum}                    Execute                             md5sum /tmp/small_file | awk '{print $1}'
+                                            Execute AWSS3CliDebug               cp --metadata "ETag=custom-etag-value" /tmp/small_file s3://${BUCKET}/test_file
+    ${result}                               Execute AWSS3CliDebug               cp s3://${BUCKET}/test_file /tmp/test_file_downloaded
+    ${match}    ${ETag}     ${etagCustom}   Should Match Regexp                 ${result}    HEAD /${BUCKET}/test_file\ .*?Response headers.*?ETag':\ '"(.*?)"'.*?x-amz-meta-etag':\ '(.*?)'     flags=DOTALL
+                                            Should Be Equal As Strings          ${ETag}     ${file_md5_checksum}
+                                            Should BE Equal As Strings          ${etagCustom}       custom-etag-value
+                                            Should Not Be Equal As Strings      ${ETag}     ${etagCustom}
+                                            # clean up
+                                            Execute AWSS3Cli                    rm s3://${BUCKET}/test_file
+                                            Execute                             rm -rf /tmp/small_file
+                                            Execute                             rm -rf /tmp/test_file_downloaded
+
+Create&Download big file by multipart upload and expect ETag in a file download response
+                                Execute                    head -c 10MB </dev/urandom > /tmp/big_file
+    ${result}                   Execute AWSS3CliDebug      cp /tmp/big_file s3://${BUCKET}/
+    ${match}    ${etag1}        Should Match Regexp        ${result}    (?is)POST /${BUCKET}/big_file\\?uploadId=.*?Response body.*?ETag>"(.*?-2)"
+    ${file_download_result}     Execute AWSS3CliDebug      cp s3://${BUCKET}/big_file /tmp/big_file_downloaded
+    ${match}    ${etag2}        Should Match Regexp        ${file_download_result}    (?is)GET /${BUCKET}/big_file.*?Response headers.*?ETag':\ '"(.*?-2)"'
+                                Should Be Equal As Strings    ${etag1}     ${etag2}
+                                # clean up
+                                Execute AWSS3Cli           rm s3://${BUCKET}/big_file
+                                Execute                    rm -rf /tmp/big_file
+
+Create key twice with different content and expect different ETags
+                                Execute                    head -c 1MiB </dev/urandom > /tmp/file1
+                                Execute                    head -c 1MiB </dev/urandom > /tmp/file2
+    ${file1UploadResult}        Execute AWSS3CliDebug      cp /tmp/file1 s3://${BUCKET}/test_key_to_check_etag_differences
+    ${match}    ${etag1}        Should Match Regexp        ${file1UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+    ${file2UploadResult}        Execute AWSS3CliDebug      cp /tmp/file2 s3://${BUCKET}/test_key_to_check_etag_differences
+    ${match}    ${etag2}        Should Match Regexp        ${file2UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+                                Should Not Be Equal As Strings  ${etag1}    ${etag2}
+                                # clean up
+                                Execute AWSS3Cli           rm s3://${BUCKET}/test_key_to_check_etag_differences
+                                Execute                    rm -rf /tmp/file1
+                                Execute                    rm -rf /tmp/file2

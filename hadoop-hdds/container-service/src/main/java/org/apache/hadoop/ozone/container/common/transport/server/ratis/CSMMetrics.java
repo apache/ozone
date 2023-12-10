@@ -33,7 +33,7 @@ import org.apache.ratis.protocol.RaftGroupId;
  * This class is for maintaining Container State Machine statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about="Container State Machine Metrics", context="dfs")
+@Metrics(about = "Container State Machine Metrics", context = "dfs")
 public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();
@@ -46,8 +46,8 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numBytesWrittenCount;
   private @Metric MutableCounterLong numBytesCommittedCount;
 
-  private @Metric MutableRate transactionLatency;
-  private MutableRate[] opsLatency;
+  private @Metric MutableRate transactionLatencyMs;
+  private MutableRate[] opsLatencyMs;
   private MetricsRegistry registry = null;
 
   // Failure Metrics
@@ -59,17 +59,20 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numReadStateMachineMissCount;
   private @Metric MutableCounterLong numStartTransactionVerifyFailures;
   private @Metric MutableCounterLong numContainerNotOpenVerifyFailures;
+  private @Metric MutableCounterLong numDataCacheMiss;
+  private @Metric MutableCounterLong numDataCacheHit;
+  private @Metric MutableCounterLong numEvictedCacheCount;
 
-  private @Metric MutableRate applyTransaction;
-  private @Metric MutableRate writeStateMachineData;
+  private @Metric MutableRate applyTransactionNs;
+  private @Metric MutableRate writeStateMachineDataNs;
 
   public CSMMetrics() {
     int numCmdTypes = ContainerProtos.Type.values().length;
-    this.opsLatency = new MutableRate[numCmdTypes];
+    this.opsLatencyMs = new MutableRate[numCmdTypes];
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (int i = 0; i < numCmdTypes; i++) {
-      opsLatency[i] = registry.newRate(
-          ContainerProtos.Type.forNumber(i + 1).toString(),
+      opsLatencyMs[i] = registry.newRate(
+          ContainerProtos.Type.forNumber(i + 1).toString() + "Ms",
           ContainerProtos.Type.forNumber(i + 1) + " op");
     }
   }
@@ -189,13 +192,14 @@ public class CSMMetrics {
     return numBytesCommittedCount.value();
   }
 
-  public MutableRate getApplyTransactionLatency() {
-    return applyTransaction;
+  public MutableRate getApplyTransactionLatencyNs() {
+    return applyTransactionNs;
   }
 
-  public void incPipelineLatency(ContainerProtos.Type type, long latencyNanos) {
-    opsLatency[type.ordinal()].add(latencyNanos);
-    transactionLatency.add(latencyNanos);
+  public void incPipelineLatencyMs(ContainerProtos.Type type,
+      long latencyMillis) {
+    opsLatencyMs[type.ordinal()].add(latencyMillis);
+    transactionLatencyMs.add(latencyMillis);
   }
 
   public void incNumStartTransactionVerifyFailures() {
@@ -206,12 +210,23 @@ public class CSMMetrics {
     numContainerNotOpenVerifyFailures.incr();
   }
 
-  public void recordApplyTransactionCompletion(long latencyNanos) {
-    applyTransaction.add(latencyNanos);
+  public void recordApplyTransactionCompletionNs(long latencyNanos) {
+    applyTransactionNs.add(latencyNanos);
   }
 
-  public void recordWriteStateMachineCompletion(long latencyNanos) {
-    writeStateMachineData.add(latencyNanos);
+  public void recordWriteStateMachineCompletionNs(long latencyNanos) {
+    writeStateMachineDataNs.add(latencyNanos);
+  }
+
+  public void incNumDataCacheMiss() {
+    numDataCacheMiss.incr();
+  }
+
+  public void incNumDataCacheHit() {
+    numDataCacheHit.incr();
+  }
+  public void incNumEvictedCacheCount() {
+    numEvictedCacheCount.incr();
   }
 
   public void unRegister() {

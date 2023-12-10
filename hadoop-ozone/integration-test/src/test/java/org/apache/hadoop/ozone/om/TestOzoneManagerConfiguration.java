@@ -17,33 +17,42 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.protocol.RaftPeer;
-import org.apache.ratis.util.LifeCycle;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.ozone.test.GenericTestUtils;
+
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.util.LifeCycle;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests OM related configurations.
  */
+@Timeout(300)
 public class TestOzoneManagerConfiguration {
 
   private OzoneConfiguration conf;
@@ -54,9 +63,9 @@ public class TestOzoneManagerConfiguration {
   private OzoneManager om;
   private OzoneManagerRatisServer omRatisServer;
 
-  private static final long LEADER_ELECTION_TIMEOUT = 500L;
+  private static final long RATIS_RPC_TIMEOUT = 500L;
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     conf = new OzoneConfiguration();
     omId = UUID.randomUUID().toString();
@@ -65,20 +74,16 @@ public class TestOzoneManagerConfiguration {
     final String path = GenericTestUtils.getTempPath(omId);
     Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    conf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
-
+    conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
+        RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
-    omStore.setScmId("testScmId");
     // writes the version file properties
     omStore.initialize();
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -90,6 +95,7 @@ public class TestOzoneManagerConfiguration {
       .setClusterId(clusterId)
       .setScmId(scmId)
       .setOmId(omId)
+      .withoutDatanodes()
       .build();
     cluster.waitForClusterToBeReady();
   }
@@ -103,7 +109,7 @@ public class TestOzoneManagerConfiguration {
     startCluster();
     om = cluster.getOzoneManager();
 
-    Assert.assertTrue(NetUtils.isLocalAddress(
+    assertTrue(NetUtils.isLocalAddress(
         om.getOmRpcServerAddr().getAddress()));
   }
 
@@ -134,16 +140,16 @@ public class TestOzoneManagerConfiguration {
 
     startCluster();
     om = cluster.getOzoneManager();
-    Assert.assertEquals("0.0.0.0",
+    assertEquals("0.0.0.0",
         om.getOmRpcServerAddr().getHostName());
-    Assert.assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
+    assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
         om.getOmRpcServerAddr().getPort());
 
     // Verify that the 2nd OMs address stored in the current OM also has the
     // default port as the port is not specified
     InetSocketAddress omNode2Addr = om.getPeerNodes().get(0).getRpcAddress();
-    Assert.assertEquals("122.0.0.122", omNode2Addr.getHostString());
-    Assert.assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
+    assertEquals("122.0.0.122", omNode2Addr.getHostString());
+    assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
         omNode2Addr.getPort());
 
   }
@@ -159,14 +165,15 @@ public class TestOzoneManagerConfiguration {
     om = cluster.getOzoneManager();
     omRatisServer = om.getOmRatisServer();
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
     // OM's Ratis server should have only 1 peer (itself) in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(1, peers.size());
+    assertEquals(1, peers.size());
 
-    // The RaftPeer id should match the configured omId
+    // The RaftPeer id should match OM_DEFAULT_NODE_ID
     RaftPeer raftPeer = peers.toArray(new RaftPeer[1])[0];
-    Assert.assertEquals(omId, raftPeer.getId().toString());
+    assertEquals(OzoneConsts.OM_DEFAULT_NODE_ID,
+        raftPeer.getId().toString());
   }
 
   /**
@@ -185,14 +192,14 @@ public class TestOzoneManagerConfiguration {
     final String omNode3Id = "omNode3";
 
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
     String omNode2RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode2Id);
     String omNode3RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode3Id);
 
-    String omNode3RatisPortKey = OmUtils.addKeySuffixes(
+    String omNode3RatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNode3Id);
 
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
@@ -209,15 +216,15 @@ public class TestOzoneManagerConfiguration {
     om = cluster.getOzoneManager();
     omRatisServer = om.getOmRatisServer();
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     // OM's Ratis server should have 3 peers in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(3, peers.size());
+    assertEquals(3, peers.size());
 
     // Ratis server RaftPeerId should match with omNode2 ID as node2 is the
     // localhost
-    Assert.assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+    assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
 
     // Verify peer details
     for (RaftPeer peer : peers) {
@@ -229,16 +236,99 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :
         // Ratis port is not set for node3. So it should take the default port
         expectedPeerAddress = "124.0.0.124:9898";
         break;
-      default : Assert.fail("Unrecognized RaftPeerId");
+      default : fail("Unrecognized RaftPeerId");
       }
-      Assert.assertEquals(expectedPeerAddress, peer.getAddress());
+      assertEquals(expectedPeerAddress, peer.getAddress());
+    }
+  }
+
+  /**
+   * Test configurating an OM service with three OM nodes.
+   * @throws Exception
+   */
+  @Test
+  public void testOMHAWithUnresolvedAddresses() throws Exception {
+    // Set the configuration for 3 node OM service. Set one node's rpc
+    // address to localhost. OM will parse all configurations and find the
+    // nodeId representing the localhost
+
+    final String omServiceId = "om-test-unresolved-addresses";
+    final String omNode1Id = "omNode1";
+    final String omNode2Id = "omNode2";
+    final String omNode3Id = "omNode3";
+    final String node1Hostname = "node1.example.com";
+    final String node3Hostname = "node3.example.com";
+
+    String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
+    String omNodesKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
+
+    String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
+    String omNode2RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode2Id);
+    String omNode3RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode3Id);
+
+    String omNode3RatisPortKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNode3Id);
+
+    conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
+    conf.set(omNodesKey, omNodesKeyValue);
+
+    // Set node2 to localhost and the other two nodes to dummy addresses
+    conf.set(omNode1RpcAddrKey, node1Hostname + ":9862");
+    conf.set(omNode2RpcAddrKey, "0.0.0.0:9862");
+    conf.set(omNode3RpcAddrKey, node3Hostname + ":9804");
+
+    conf.setInt(omNode3RatisPortKey, 9898);
+
+    startCluster();
+    om = cluster.getOzoneManager();
+    omRatisServer = om.getOmRatisServer();
+
+    // Verify Peer details
+    List<OMNodeDetails> peerNodes = om.getPeerNodes();
+    for (OMNodeDetails peerNode : peerNodes) {
+      assertTrue(peerNode.isHostUnresolved());
+      assertNull(peerNode.getInetAddress());
+    }
+
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+
+    // OM's Ratis server should have 3 peers in its RaftGroup
+    Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
+    assertEquals(3, peers.size());
+
+    // Ratis server RaftPeerId should match with omNode2 ID as node2 is the
+    // localhost
+    assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+
+    // Verify peer details
+    for (RaftPeer peer : peers) {
+      String expectedPeerAddress = null;
+
+      switch (peer.getId().toString()) {
+      case omNode1Id :
+        // Ratis port is not set for node1. So it should take the default port
+        expectedPeerAddress = node1Hostname + ":" +
+            OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
+        break;
+      case omNode2Id :
+        expectedPeerAddress = "0.0.0.0:" +
+            OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
+        break;
+      case omNode3Id :
+        // Ratis port is not set for node3. So it should take the default port
+        expectedPeerAddress = node3Hostname + ":9898";
+        break;
+      default : fail("Unrecognized RaftPeerId");
+      }
+      assertEquals(expectedPeerAddress, peer.getAddress());
     }
   }
 
@@ -255,7 +345,7 @@ public class TestOzoneManagerConfiguration {
     String omNode2Id = "omNode2";
     String omNode3Id = "omNode3";
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
@@ -272,7 +362,7 @@ public class TestOzoneManagerConfiguration {
 
     try {
       startCluster();
-      Assert.fail("Wrong Configuration. OM initialization should have failed.");
+      fail("Wrong Configuration. OM initialization should have failed.");
     } catch (OzoneIllegalArgumentException e) {
       GenericTestUtils.assertExceptionContains("Configuration has no " +
           OMConfigKeys.OZONE_OM_ADDRESS_KEY + " address that matches local " +
@@ -293,10 +383,10 @@ public class TestOzoneManagerConfiguration {
 
     try {
       startCluster();
-      Assert.fail("Should have failed to start the cluster!");
+      fail("Should have failed to start the cluster!");
     } catch (OzoneIllegalArgumentException e) {
       // Expect error message
-      Assert.assertTrue(e.getMessage().contains(
+      assertTrue(e.getMessage().contains(
           "List of OM Node ID's should be specified"));
     }
   }
@@ -314,7 +404,7 @@ public class TestOzoneManagerConfiguration {
     String omNode2Id = "omNode2";
     String omNode3Id = "omNode3";
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
@@ -323,11 +413,11 @@ public class TestOzoneManagerConfiguration {
 
     try {
       startCluster();
-      Assert.fail("Should have failed to start the cluster!");
+      fail("Should have failed to start the cluster!");
     } catch (OzoneIllegalArgumentException e) {
       // Expect error message
-      Assert.assertTrue(e.getMessage().contains(
-          "OM Rpc Address should be set for all node"));
+      assertTrue(e.getMessage().contains(
+          "OM RPC Address should be set for all node"));
     }
   }
 
@@ -350,9 +440,9 @@ public class TestOzoneManagerConfiguration {
     // Set the node Ids for the 2 services. The nodeIds need to be
     // distinch within one service. The ids can overlap between
     // different services.
-    String om1NodesKey = OmUtils.addKeySuffixes(
+    String om1NodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, om1ServiceId);
-    String om2NodesKey = OmUtils.addKeySuffixes(
+    String om2NodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, om2ServiceId);
     conf.set(om1NodesKey, omNodesKeyValue);
     conf.set(om2NodesKey, omNodesKeyValue);
@@ -376,20 +466,20 @@ public class TestOzoneManagerConfiguration {
     om = cluster.getOzoneManager();
     omRatisServer = om.getOmRatisServer();
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     // OM's Ratis server should have 3 peers in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(3, peers.size());
+    assertEquals(3, peers.size());
 
     // Verify that the serviceId and nodeId match the node with the localhost
     // address - om-service-test2 and omNode2
-    Assert.assertEquals(om2ServiceId, om.getOMServiceId());
-    Assert.assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+    assertEquals(om2ServiceId, om.getOMServiceId());
+    assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
   }
 
   private String getOMAddrKeyWithSuffix(String serviceId, String nodeId) {
-    return OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    return ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceId, nodeId);
   }
 }

@@ -1,0 +1,84 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+
+syntax = "proto2";
+option java_package = "org.apache.hadoop.ozone.protocol.proto";
+option java_outer_classname = "OzoneManagerAdminProtocolProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+package hadoop.ozone;
+
+/**
+This file contains the admin protocol for Ozone Manager(s). These
+communications should be instantiated only via the Admin Cli or through an OM.
+*/
+
+message OMConfigurationRequest {
+}
+
+message OMConfigurationResponse {
+    required bool success = 1;
+    optional string errorMsg = 2;
+    // OM nodes present in OM's memory (does not include Decommissioned nodes)
+    repeated OMNodeInfo nodesInMemory = 3;
+    // OM nodes reloaded from new config on disk (includes Decommissioned nodes)
+    repeated OMNodeInfo nodesInNewConf = 4;
+}
+
+message OMNodeInfo {
+    required string nodeID = 1;
+    required string hostAddress = 2;
+    required uint32 rpcPort = 3;
+    required uint32 ratisPort = 4;
+    optional NodeState nodeState = 5 [default=ACTIVE];
+}
+
+enum NodeState {
+    ACTIVE = 1;
+    DECOMMISSIONED = 2;
+}
+
+message DecommissionOMRequest {
+    required string nodeId = 1;
+    required string nodeAddress = 2;
+}
+
+message DecommissionOMResponse {
+    required bool success = 1;
+    optional string errorMsg = 3;
+}
+
+/**
+ The service for OM admin operations.
+*/
+service OzoneManagerAdminService {
+    // RPC request to OM to return its confugration -  in memory OM nodes list
+    // and the anticipated nodes list from the config files (upon reloading).
+    rpc getOMConfiguration(OMConfigurationRequest)
+    returns(OMConfigurationResponse);
+
+    // RPC request from admin to remove an OM from the cluster
+    rpc decommission(DecommissionOMRequest)
+    returns(DecommissionOMResponse);
+}

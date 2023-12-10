@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.web.utils;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -42,8 +43,7 @@ import org.apache.ratis.util.TimeDuration;
 @InterfaceAudience.Private
 public final class OzoneUtils {
 
-  public static final String ENCODING_NAME = "UTF-8";
-  public static final Charset ENCODING = Charset.forName(ENCODING_NAME);
+  public static final Charset ENCODING = StandardCharsets.UTF_8;
 
   private OzoneUtils() {
     // Never constructed
@@ -54,15 +54,15 @@ public final class OzoneUtils {
    */
   private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT =
       new ThreadLocal<SimpleDateFormat>() {
-    @Override
-    protected SimpleDateFormat initialValue() {
-      SimpleDateFormat format = new SimpleDateFormat(
-          OzoneConsts.OZONE_DATE_FORMAT, Locale.US);
-      format.setTimeZone(TimeZone.getTimeZone(OzoneConsts.OZONE_TIME_ZONE));
+        @Override
+        protected SimpleDateFormat initialValue() {
+          SimpleDateFormat format = new SimpleDateFormat(
+              OzoneConsts.OZONE_DATE_FORMAT, Locale.US);
+          format.setTimeZone(TimeZone.getTimeZone(OzoneConsts.OZONE_TIME_ZONE));
 
-      return format;
-    }
-  };
+          return format;
+        }
+      };
 
   /**
    * Verifies that max key length is a valid value.

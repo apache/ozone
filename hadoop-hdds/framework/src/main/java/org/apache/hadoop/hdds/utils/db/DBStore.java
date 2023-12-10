@@ -19,13 +19,15 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
@@ -35,7 +37,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
  *
  */
 @InterfaceStability.Evolving
-public interface DBStore extends AutoCloseable, BatchOperationHandler {
+public interface DBStore extends Closeable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore.
@@ -49,8 +51,7 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore with implicit key/value conversion and
-   * with default cleanup policy for cache. Default cache clean up policy is
-   * manual.
+   * with default cache type for cache. Default cache type is partial cache.
    *
    * @param name - Name of the TableStore to get
    * @param keyType
@@ -63,12 +64,17 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore with implicit key/value conversion and
-   * with specified cleanup policy for cache.
+   * with specified cache type.
+   * @param name - Name of the TableStore to get
+   * @param keyType
+   * @param valueType
+   * @param cacheType
+   * @return - TableStore.
    * @throws IOException
    */
   <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
       Class<KEY> keyType, Class<VALUE> valueType,
-      TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException;
+      TableCache.CacheType cacheType) throws IOException;
 
   /**
    * Lists the Known list of Tables in a DB.
@@ -83,7 +89,18 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    * Flush the DB buffer onto persistent storage.
    * @throws IOException
    */
-  void flush() throws IOException;
+  void flushDB() throws IOException;
+
+  /**
+   * Flush the outstanding I/O operations of the DB.
+   * @param sync if true will sync the outstanding I/Os to the disk.
+   */
+  void flushLog(boolean sync) throws IOException;
+
+  /**
+   * Returns the RocksDB checkpoint differ.
+   */
+  RocksDBCheckpointDiffer getRocksDBCheckpointDiffer();
 
   /**
    * Compact the entire database.
@@ -164,17 +181,20 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
   Map<Integer, String> getTableNames();
 
   /**
-   * Get Codec registry.
-   * @return codec registry.
-   */
-  CodecRegistry getCodecRegistry();
-
-  /**
    * Get data written to DB since a specific sequence number.
-   * @param sequenceNumber
-   * @return
-   * @throws SequenceNumberNotFoundException
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws SequenceNumberNotFoundException;
+      throws IOException;
+
+  /**
+   * Get limited data written to DB since a specific sequence number.
+   */
+  DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
+      throws IOException;
+
+  /**
+   * Return if the underlying DB is closed. This call is thread safe.
+   * @return true if the DB is closed.
+   */
+  boolean isClosed();
 }

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 public class OzoneChecksumException extends IOException {
 
   /**
-   * OzoneChecksumException to throw when checksum verfication fails.
+   * OzoneChecksumException to throw when checksum verification fails.
    * @param index checksum list index at which checksum match failed
    */
   public OzoneChecksumException(int index) {

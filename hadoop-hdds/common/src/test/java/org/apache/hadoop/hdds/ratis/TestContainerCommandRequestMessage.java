@@ -17,8 +17,13 @@
  */
 package org.apache.hadoop.hdds.ratis;
 
+import java.util.Random;
+import java.util.UUID;
+import java.util.function.BiFunction;
+
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
@@ -29,13 +34,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
 
-import java.util.Random;
-import java.util.UUID;
-import java.util.function.BiFunction;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /** Testing {@link ContainerCommandRequestMessage}. */
 public class TestContainerCommandRequestMessage {
@@ -43,7 +45,7 @@ public class TestContainerCommandRequestMessage {
 
   static ByteString newData(int length) {
     final ByteString.Output out = ByteString.newOutput();
-    for(int i = 0; i < length; i++) {
+    for (int i = 0; i < length; i++) {
       out.write(RANDOM.nextInt());
     }
     return out.toByteString();
@@ -51,7 +53,8 @@ public class TestContainerCommandRequestMessage {
 
   static ChecksumData checksum(ByteString data) {
     try {
-      return new Checksum().computeChecksum(data.asReadOnlyByteBuffer());
+      return new Checksum(ChecksumType.CRC32, 1024 * 1024)
+          .computeChecksum(data.asReadOnlyByteBuffer());
     } catch (OzoneChecksumException e) {
       throw new IllegalStateException(e);
     }
@@ -125,10 +128,10 @@ public class TestContainerCommandRequestMessage {
   static void runTest(
       BiFunction<BlockID, ByteString, ContainerCommandRequestProto> method)
       throws Exception {
-    for(int i = 0; i < 2; i++) {
+    for (int i = 0; i < 2; i++) {
       runTest(i, method);
     }
-    for(int i = 2; i < 1 << 10;) {
+    for (int i = 2; i < 1 << 10;) {
       runTest(i + 1 + RANDOM.nextInt(i - 1), method);
       i <<= 1;
       runTest(i, method);
@@ -147,6 +150,6 @@ public class TestContainerCommandRequestMessage {
         = ContainerCommandRequestMessage.toMessage(original, null);
     final ContainerCommandRequestProto computed
         = ContainerCommandRequestMessage.toProto(message.getContent(), null);
-    Assert.assertEquals(original, computed);
+    Assertions.assertEquals(original, computed);
   }
 }

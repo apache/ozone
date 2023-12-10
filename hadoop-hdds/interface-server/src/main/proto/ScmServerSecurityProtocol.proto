@@ -1,0 +1,275 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+syntax = "proto2";
+
+option java_package = "org.apache.hadoop.hdds.protocol.proto";
+
+option java_outer_classname = "SCMSecurityProtocolProtos";
+
+option java_generic_services = true;
+
+option java_generate_equals_and_hash = true;
+
+package hadoop.hdds.security;
+
+import "hdds.proto";
+
+/**
+All commands is send as request and all response come back via
+Response class. If adding new functions please follow this protocol, since
+our tracing and visibility tools depend on this pattern.
+*/
+message SCMSecurityRequest {
+    required Type cmdType = 1; // Type of the command
+
+    optional string traceID = 2;
+
+    optional SCMGetDataNodeCertRequestProto getDataNodeCertRequest = 3;
+    optional SCMGetOMCertRequestProto getOMCertRequest = 4;
+    optional SCMGetCertificateRequestProto getCertificateRequest = 5;
+    optional SCMGetCACertificateRequestProto getCACertificateRequest = 6;
+    optional SCMListCertificateRequestProto listCertificateRequest = 7;
+    optional SCMGetSCMCertRequestProto getSCMCertificateRequest = 8;
+    optional SCMListCACertificateRequestProto listCACertificateRequestProto = 9;
+    optional SCMGetCrlsRequestProto getCrlsRequest = 10;
+    optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
+    optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
+    optional SCMGetCertRequestProto getCertRequest = 13;
+    optional SCMGetAllRootCaCertificatesRequestProto
+        getAllRootCaCertificatesRequestProto = 14;
+    optional SCMRemoveExpiredCertificatesRequestProto
+        removeExpiredCertificatesRequestProto = 15;
+}
+
+message SCMSecurityResponse {
+    required Type cmdType = 1; // Type of the command
+
+    // A string that identifies this command, we generate  Trace ID in Ozone
+    // frontend and this allows us to trace that command all over ozone.
+    optional string traceID = 2;
+
+    optional bool success = 3 [default = true];
+
+    optional string message = 4;
+
+    required Status status = 5;
+
+    optional SCMGetCertResponseProto getCertResponseProto = 6;
+
+    optional SCMListCertificateResponseProto listCertificateResponseProto = 7;
+
+    optional SCMGetCrlsResponseProto getCrlsResponseProto = 8;
+
+    optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
+
+    optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
+
+    optional SCMGetAllRootCaCertificatesResponseProto allRootCaCertificatesResponseProto = 11;
+
+    optional SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificatesResponseProto = 12;
+}
+
+enum Type {
+    GetDataNodeCertificate = 1;
+    GetOMCertificate = 2;
+    GetCertificate = 3;
+    GetCACertificate = 4;
+    ListCertificate = 5;
+    GetSCMCertificate = 6;
+    GetRootCACertificate = 7;
+    ListCACertificate = 8;
+    GetCrls = 9;
+    GetLatestCrlId = 10;
+    RevokeCertificates = 11;
+    GetCert = 12;
+    GetAllRootCaCertificates = 13;
+    RemoveExpiredCertificates = 14;
+}
+
+enum Status {
+    OK = 1;
+    INVALID_CSR = 2;
+    UNABLE_TO_ISSUE_CERTIFICATE = 3;
+    GET_DN_CERTIFICATE_FAILED = 4;
+    GET_OM_CERTIFICATE_FAILED = 5;
+    GET_SCM_CERTIFICATE_FAILED = 6;
+    GET_CERTIFICATE_FAILED = 7;
+    GET_CA_CERT_FAILED = 8;
+    CERTIFICATE_NOT_FOUND = 9;
+    PEM_ENCODE_FAILED = 10;
+    INTERNAL_ERROR = 11;
+    DEFAULT = 12;
+    MISSING_BLOCK_TOKEN = 13;
+    BLOCK_TOKEN_VERIFICATION_FAILED = 14;
+    GET_ROOT_CA_CERTIFICATE_FAILED = 15;
+    NOT_A_PRIMARY_SCM = 16;
+    REVOKE_CERTIFICATE_FAILED = 17;
+}
+/**
+* This message is send by data node to prove its identity and get an SCM
+* signed certificate.
+*/
+message SCMGetDataNodeCertRequestProto {
+    required DatanodeDetailsProto datanodeDetails = 1;
+    required string CSR = 2;
+}
+
+/**
+* This message is send by OzoneManager to prove its identity and get an SCM
+* signed certificate.
+*/
+message SCMGetOMCertRequestProto {
+    required OzoneManagerDetailsProto omDetails = 1;
+    required string CSR = 2;
+}
+
+message SCMGetCertRequestProto {
+    required NodeDetailsProto nodeDetails = 1;
+    required string CSR = 2;
+}
+
+message SCMGetSCMCertRequestProto {
+    required ScmNodeDetailsProto scmDetails = 1;
+    required string CSR = 2;
+    optional bool renew = 3[default = false];
+}
+
+/**
+* Proto request to get a certificate with given serial id.
+*/
+message SCMGetCertificateRequestProto {
+    required string certSerialId = 1;
+}
+
+/**
+* Proto request to get CA certificate.
+*/
+message SCMGetCACertificateRequestProto {
+}
+
+/**
+* Proto request to list certificates by node type or all.
+*/
+message SCMListCertificateRequestProto {
+    optional NodeType role = 1;
+    optional int64 startCertId = 2;
+    required uint32 count = 3; // Max
+    optional bool isRevoked = 4; // list revoked certs
+}
+
+/**
+ * Returns a certificate signed by SCM.
+ */
+message SCMGetCertResponseProto {
+    enum ResponseCode {
+        success = 1;
+        authenticationFailed = 2;
+        invalidCSR = 3;
+    }
+    required ResponseCode responseCode = 1;
+    required string x509Certificate = 2; // Base64 encoded X509 certificate.
+    optional string x509CACertificate = 3; // Base64 encoded CA X509 certificate.
+    // Base64 encoded Root CA X509 certificate.
+    optional string x509RootCACertificate = 4;
+}
+
+/**
+* Return a list of PEM encoded certificates.
+*/
+message SCMListCertificateResponseProto {
+    enum ResponseCode {
+        success = 1;
+        authenticationFailed = 2;
+    }
+    required ResponseCode responseCode = 1;
+    repeated string certificates = 2;
+}
+
+message SCMGetAllRootCaCertificatesResponseProto {
+    repeated string allX509RootCaCertificates = 1;
+}
+
+message SCMRemoveExpiredCertificatesResponseProto {
+    repeated string removedExpiredCertificates = 1;
+}
+
+message SCMGetRootCACertificateRequestProto {
+}
+
+message SCMListCACertificateRequestProto {
+}
+
+/**
+* Proto request to get CRL.
+*/
+message SCMGetCrlsRequestProto {
+    repeated int64 crlId = 1;
+}
+
+message SCMGetCrlsResponseProto {
+    repeated CRLInfoProto crlInfos = 1;
+}
+
+/**
+* Proto request to get latest CRL id.
+*/
+message SCMGetLatestCrlIdRequestProto {
+}
+
+message SCMGetLatestCrlIdResponseProto {
+    optional int64 crlId = 1;
+}
+
+message SCMRevokeCertificatesRequestProto {
+    // Match with org.bouncycastle.asn1.x509.CRLReason
+    enum Reason {
+        unspecified = 0;
+        keyCompromise = 1;
+        cACompromise = 2;
+        affiliationChanged = 3;
+        superseded = 4;
+        cessationOfOperation = 5;
+        certificateHold = 6;
+        removeFromCRL = 8;
+        privilegeWithdrawn = 9;
+        aACompromise = 10;
+    };
+    repeated string certIds = 1;
+    optional Reason reason = 2 [default = unspecified];
+    optional uint64 revokeTime = 3;
+}
+
+message SCMGetAllRootCaCertificatesRequestProto {
+}
+
+message SCMRevokeCertificatesResponseProto {
+    optional int64 crlId = 1;
+}
+
+message SCMRemoveExpiredCertificatesRequestProto {
+}
+
+service SCMSecurityProtocolService {
+    rpc submitRequest (SCMSecurityRequest) returns (SCMSecurityResponse);
+}

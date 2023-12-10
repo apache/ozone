@@ -19,22 +19,34 @@
 package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  * Ozone contract tests covering deletes.
  */
+@RunWith(Parameterized.class)
 public class ITestOzoneContractDelete extends AbstractContractDeleteTest {
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+  public ITestOzoneContractDelete(boolean fso) {
+    // Actual init done in initParam().
+  }
+
+  @Parameterized.BeforeParam
+  public static void initParam(boolean fso) throws IOException {
+    OzoneContract.createCluster(fso);
+  }
+
+  @Parameterized.AfterParam
+  public static void teardownParam() throws IOException {
+    OzoneContract.destroyCluster();
   }
 
   @AfterClass
@@ -45,5 +57,10 @@ public class ITestOzoneContractDelete extends AbstractContractDeleteTest {
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new OzoneContract(conf);
+  }
+
+  @Parameterized.Parameters
+  public static Collection<Boolean> data() {
+    return OzoneContract.getFsoCombinations();
   }
 }

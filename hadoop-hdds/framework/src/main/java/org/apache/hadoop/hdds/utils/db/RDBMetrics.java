@@ -53,10 +53,21 @@ public class RDBMetrics {
   private @Metric MutableCounterLong numDBKeyMayExistChecks;
   private @Metric MutableCounterLong numDBKeyMayExistMisses;
 
+  private @Metric MutableCounterLong numDBKeyGets;
   private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
   private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
   private @Metric MutableCounterLong numDBKeyGetIfExistGets;
+  // WAL Update data size and sequence count
+  private @Metric MutableCounterLong walUpdateDataSize;
+  private @Metric MutableCounterLong walUpdateSequenceCount;
 
+  public long getNumDBKeyGets() {
+    return numDBKeyGets.value();
+  }
+
+  public void incNumDBKeyGets() {
+    this.numDBKeyGets.incr();
+  }
 
   public long getNumDBKeyGetIfExistGets() {
     return numDBKeyGetIfExistGets.value();
@@ -101,7 +112,23 @@ public class RDBMetrics {
     return numDBKeyMayExistMisses.value();
   }
 
-  public static void unRegister() {
+  public void incWalUpdateDataSize(long size) {
+    walUpdateDataSize.incr(size);
+  }
+
+  public long getWalUpdateDataSize() {
+    return walUpdateDataSize.value();
+  }
+
+  public void incWalUpdateSequenceCount(long count) {
+    walUpdateSequenceCount.incr(count);
+  }
+
+  public long getWalUpdateSequenceCount() {
+    return walUpdateSequenceCount.value();
+  }
+
+  public static synchronized void unRegister() {
     instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);

@@ -20,11 +20,11 @@ package org.apache.hadoop.hdds.server.http;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.RequestLog;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Testing HttpRequestLog.
@@ -34,7 +34,7 @@ public class TestHttpRequestLog {
   @Test
   public void testAppenderUndefined() {
     RequestLog requestLog = HttpRequestLog.getRequestLog("test");
-    assertNull("RequestLog should be null", requestLog);
+    assertNull(requestLog, "RequestLog should be null");
   }
 
   @Test
@@ -44,8 +44,8 @@ public class TestHttpRequestLog {
     Logger.getLogger("http.requests.test").addAppender(requestLogAppender);
     RequestLog requestLog = HttpRequestLog.getRequestLog("test");
     Logger.getLogger("http.requests.test").removeAppender(requestLogAppender);
-    assertNotNull("RequestLog should not be null", requestLog);
-    assertEquals("Class mismatch",
-        CustomRequestLog.class, requestLog.getClass());
+    assertNotNull(requestLog, "RequestLog should not be null");
+    assertEquals(CustomRequestLog.class, requestLog.getClass(),
+        "Class mismatch");
   }
 }

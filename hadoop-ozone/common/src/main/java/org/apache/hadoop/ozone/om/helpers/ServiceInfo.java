@@ -23,9 +23,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
@@ -49,6 +49,11 @@ public final class ServiceInfo {
   private String hostname;
 
   /**
+   * Protocol version for client.
+   */
+  private OzoneManagerVersion omVersion;
+
+  /**
    * List of ports the service listens to.
    */
   private Map<ServicePort.Type, Integer> ports;
@@ -58,7 +63,7 @@ public final class ServiceInfo {
   /**
    * Default constructor for JSON deserialization.
    */
-  public ServiceInfo() {}
+  public ServiceInfo() { }
 
   /**
    * Constructs the ServiceInfo for the {@code nodeType}.
@@ -66,12 +71,16 @@ public final class ServiceInfo {
    * @param hostname hostname of the service
    * @param portList list of ports the service listens to
    */
-  private ServiceInfo(NodeType nodeType, String hostname,
-      List<ServicePort> portList, OMRoleInfo omRole) {
+  private ServiceInfo(NodeType nodeType,
+                      String hostname,
+                      List<ServicePort> portList,
+                      OzoneManagerVersion omVersion,
+                      OMRoleInfo omRole) {
     Preconditions.checkNotNull(nodeType);
     Preconditions.checkNotNull(hostname);
     this.nodeType = nodeType;
     this.hostname = hostname;
+    this.omVersion = omVersion;
     this.ports = new HashMap<>();
     for (ServicePort port : portList) {
       ports.put(port.getType(), port.getValue());
@@ -143,16 +152,21 @@ public final class ServiceInfo {
   public OzoneManagerProtocolProtos.ServiceInfo getProtobuf() {
     OzoneManagerProtocolProtos.ServiceInfo.Builder builder =
         OzoneManagerProtocolProtos.ServiceInfo.newBuilder();
+
+    List<ServicePort> servicePorts = new ArrayList<>();
+    for (Map.Entry<ServicePort.Type, Integer>
+        entry : ports.entrySet()) {
+      servicePorts.add(ServicePort.newBuilder()
+          .setType(entry.getKey())
+          .setValue(entry.getValue()).build());
+    }
+
     builder.setNodeType(nodeType)
         .setHostname(hostname)
-        .addAllServicePorts(
-            ports.entrySet().stream()
-                .map(
-                    entry ->
-                        ServicePort.newBuilder()
-                            .setType(entry.getKey())
-                            .setValue(entry.getValue()).build())
-                .collect(Collectors.toList()));
+        .addAllServicePorts(servicePorts);
+    if (omVersion != null) {
+      builder.setOMVersion(omVersion.toProtoValue());
+    }
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);
     }
@@ -170,6 +184,7 @@ public final class ServiceInfo {
     return new ServiceInfo(serviceInfo.getNodeType(),
         serviceInfo.getHostname(),
         serviceInfo.getServicePortsList(),
+        OzoneManagerVersion.fromProtoValue(serviceInfo.getOMVersion()),
         serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null);
   }
 
@@ -190,6 +205,24 @@ public final class ServiceInfo {
     private String host;
     private List<ServicePort> portList = new ArrayList<>();
     private OMRoleInfo omRoleInfo;
+    private OzoneManagerVersion omVersion;
+
+    /**
+     * Gets the Om Client Protocol Version.
+     * @return om client protocol version as a string.
+     */
+    public OzoneManagerVersion getOmVersion() {
+      return omVersion;
+    }
+
+    /**
+     * Sets the Om Client Protocol Version.
+     * @param omClientProtocolVer the client protocol version supported.
+     */
+    public Builder setOmVersion(OzoneManagerVersion omClientProtocolVer) {
+      this.omVersion = omClientProtocolVer;
+      return this;
+    }
 
     /**
      * Sets the node/service type.
@@ -231,7 +264,11 @@ public final class ServiceInfo {
      * @return {@link ServiceInfo}
      */
     public ServiceInfo build() {
-      return new ServiceInfo(node, host, portList, omRoleInfo);
+      return new ServiceInfo(node,
+          host,
+          portList,
+          omVersion,
+          omRoleInfo);
     }
   }
 

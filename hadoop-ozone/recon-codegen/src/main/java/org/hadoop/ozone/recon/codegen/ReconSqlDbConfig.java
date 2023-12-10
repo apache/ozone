@@ -97,7 +97,7 @@ public class ReconSqlDbConfig {
 
   @Config(key = "auto.commit",
       type = ConfigType.BOOLEAN,
-      defaultValue = "false",
+      defaultValue = "true",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
       description = "Sets the Ozone Recon database connection property of " +
           "auto-commit to true/false."
@@ -229,11 +229,4 @@ public class ReconSqlDbConfig {
     this.sqlDbDialect = sqlDbDialect;
   }
 
-  /**
-   * Class to hold config keys related to Recon SQL DB.
-   */
-  public static class ConfigKeys {
-    public static final String OZONE_RECON_SQL_DB_JDBC_URL =
-        "ozone.recon.sql.db.jdbc.url";
-  }
 }

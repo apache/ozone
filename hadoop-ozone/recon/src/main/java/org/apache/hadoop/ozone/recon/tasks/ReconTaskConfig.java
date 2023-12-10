@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -32,38 +32,73 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 public class ReconTaskConfig {
 
   @Config(key = "pipelinesync.interval",
-      type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
-      defaultValue = "600s",
+      type = ConfigType.TIME,
+      defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of periodic sync of pipeline state " +
           "from SCM to Recon."
   )
-  private long pipelineSyncTaskInterval;
+  private Duration pipelineSyncTaskInterval = Duration.ofMinutes(5);
 
-  public long getPipelineSyncTaskInterval() {
+  public Duration getPipelineSyncTaskInterval() {
     return pipelineSyncTaskInterval;
   }
 
-  public void setPipelineSyncTaskInterval(long pipelineSyncTaskInterval) {
-    this.pipelineSyncTaskInterval = pipelineSyncTaskInterval;
+  public void setPipelineSyncTaskInterval(Duration interval) {
+    this.pipelineSyncTaskInterval = interval;
   }
 
   @Config(key = "missingcontainer.interval",
-      type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
+      type = ConfigType.TIME,
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of the periodic check for " +
-          "containers with zero replicas in the cluster as reported by " +
-          "Datanodes."
+          "unhealthy containers in the cluster as reported " +
+          "by Datanodes."
   )
-  private long missingContainerTaskInterval;
+  private Duration missingContainerTaskInterval = Duration.ofMinutes(5);
 
-  public long getMissingContainerTaskInterval() {
+  public Duration getMissingContainerTaskInterval() {
     return missingContainerTaskInterval;
   }
 
-  public void setMissingContainerTaskInterval(long interval) {
+  public void setMissingContainerTaskInterval(Duration interval) {
     this.missingContainerTaskInterval = interval;
+  }
+
+  @Config(key = "safemode.wait.threshold",
+      type = ConfigType.TIME,
+      defaultValue = "300s",
+      tags = { ConfigTag.RECON, ConfigTag.OZONE },
+      description = "The time interval to wait for starting container " +
+          "health task and pipeline sync task before recon " +
+          "exits out of safe or warmup mode. "
+  )
+  private Duration safeModeWaitThreshold = Duration.ofMinutes(5);
+
+  public Duration getSafeModeWaitThreshold() {
+    return safeModeWaitThreshold;
+  }
+
+  public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
+    this.safeModeWaitThreshold = safeModeWaitThreshold;
+  }
+
+  @Config(key = "containercounttask.interval",
+      type = ConfigType.TIME,
+      defaultValue = "60s",
+      tags = { ConfigTag.RECON, ConfigTag.OZONE },
+      description = "The time interval to wait between each runs of " +
+          "container count task."
+  )
+  private Duration containerSizeCountTaskInterval = Duration.ofMinutes(1);
+
+  public Duration getContainerSizeCountTaskInterval() {
+    return containerSizeCountTaskInterval;
+  }
+
+  public void setContainerSizeCountTaskInterval(Duration interval) {
+    this.containerSizeCountTaskInterval = interval;
   }
 
 }

@@ -1,0 +1,171 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: flaky-test-check
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git Ref (Branch/Commit_ID/Tag)
+        default: master
+        required: true
+      test-class:
+        description: Test Class
+        default: NA
+        required: true
+      test-name:
+        description: Test Name
+        default:  ALL
+        required: false
+      iterations:
+        description: Number of Iterations per split
+        default: 10
+        required: true
+      splits:
+        description: Number of splits
+        default: 2
+        required: true
+      fail-fast:
+        description: Stop after first failure
+        default: false
+        required: true
+env:
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  TEST_CLASS: ${{ github.event.inputs.test-class}}
+  TEST_METHOD: ${{ github.event.inputs.test-name }}
+  ITERATIONS: ${{ github.event.inputs.iterations }}
+  FAIL_FAST: ${{ github.event.inputs.fail-fast }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
+jobs:
+  prepare-job:
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{steps.generate.outputs.matrix}}
+      test_type: ${{steps.check-test-existence.outputs.test_type}}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Check for Test File
+        id: check-test-existence
+        run: |
+          filename="$TEST_CLASS.java"
+          found_file=$(find . -name "$filename" -type f -print -quit)
+          test_type=unit
+          if [ -n "$found_file" ]; then
+              echo "File path : $found_file"
+              if [[ "$found_file" == *"integration-test"* ]]; then
+                  test_type=integration
+              fi 
+              if [ "$TEST_METHOD" != "ALL" ]; then
+                  if grep -q "public void $TEST_METHOD(" "$found_file"; then
+                      echo "Test method $TEST_METHOD exists in $filename"
+                  else
+                      echo "Test method $TEST_METHOD does not exist in $filename.Stopping!"
+                      exit 1
+                  fi
+              fi
+              echo "Test file $filename found. Continuing.."
+          else
+              echo "Test file $filename not found.Stopping!"
+              exit 1
+          fi
+          echo "test_type=$test_type" >> $GITHUB_OUTPUT
+      - id: generate
+        name: Generate test matrix
+        run: |
+          splits=()
+          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+              splits+=("$i")
+          done
+          printf -v x "%s," "${splits[@]}"
+          split_matrix="[${x%,}]"
+          echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
+  run-test:
+    needs: prepare-job
+    name: Run-Split
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
+      fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Cache for maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-single
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}-8
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 8
+      - name: Execute tests
+        run: |
+          test_type=${{ needs.prepare-job.outputs.test_type }}
+          args="-DexcludedGroups=unhealthy,org.apache.ozone.test.UnhealthyTest"
+          if [ "$test_type" = "integration" ]; then
+              args="$args -pl :ozone-integration-test,:mini-chaos-tests"
+          fi
+          if [ "$TEST_METHOD" = "ALL" ]; then
+              echo "Running all tests from $TEST_CLASS"
+              hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS
+          else
+              echo "Running test: $TEST_METHOD from $TEST_CLASS"
+              hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS#$TEST_METHOD
+          fi
+        continue-on-error: true
+        env:
+          CHECK: ${{ needs.prepare-job.outputs.test_type }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+      - name: Summary of failures
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
+        if: ${{ !cancelled() }}
+      - name: Archive build results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: result-${{ env.TEST_CLASS }}-split-${{ matrix.split }}
+          path: target/${{ needs.prepare-job.outputs.test_type }}
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+        if: always()
+  count-failures:
+    if: ${{ always() }}
+    needs: run-test
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Download build results
+        uses: actions/download-artifact@v3
+      - name: Count failures
+        run: |
+          failures=$(find . -name 'summary.txt' | grep -v 'iteration' | xargs grep -v 'exit code: 0' | wc -l)
+          echo "Total failures: $failures"
+          if [[ $failures -gt 0 ]]; then
+            echo ""
+            echo "Failed runs:"
+            grep 'exit code: 1' */summary.txt | grep -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
+            echo ""
+            exit 1
+          fi

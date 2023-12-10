@@ -17,19 +17,9 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import java.util.Optional;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -44,27 +34,36 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.slf4j.event.Level;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
+import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Recon's passive SCM integration tests.
  */
+@Timeout(180)
 public class TestReconAsPassiveScm {
-
-  private MiniOzoneCluster cluster = null;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
@@ -72,9 +71,10 @@ public class TestReconAsPassiveScm {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -98,17 +98,20 @@ public class TestReconAsPassiveScm {
       try {
         assertNotNull(reconPipelineManager.getPipeline(p.getId()));
       } catch (PipelineNotFoundException e) {
-        Assert.fail();
+        fail();
       }
     });
 
     // Verify we can never create a pipeline in Recon.
-    LambdaTestUtils.intercept(UnsupportedOperationException.class,
-        "Trying to create pipeline in Recon, which is prohibited!",
-        () -> reconPipelineManager.createPipeline(RATIS, ONE));
+    UnsupportedOperationException exception = assertThrows(
+        UnsupportedOperationException.class,
+        () -> reconPipelineManager
+            .createPipeline(RatisReplicationConfig.getInstance(ONE)));
+    assertTrue(exception.getMessage()
+        .contains("Trying to create pipeline in Recon, which is prohibited!"));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
-    assertTrue(scmContainerManager.getContainerIDs().isEmpty());
+    assertTrue(scmContainerManager.getContainers().isEmpty());
 
     // Verify if all the 3 nodes are registered with Recon.
     NodeManager reconNodeManager = reconScm.getScmNodeManager();
@@ -119,7 +122,8 @@ public class TestReconAsPassiveScm {
     // Create container
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -127,11 +131,12 @@ public class TestReconAsPassiveScm {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Verify Recon picked up the new container that was created.
-    assertEquals(scmContainerManager.getContainerIDs(),
-        reconContainerManager.getContainerIDs());
+    assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);
+    GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
     reconScm.getEventQueue().fireEvent(CLOSE_CONTAINER,
         containerInfo.containerID());
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
@@ -147,9 +152,9 @@ public class TestReconAsPassiveScm {
 
     // Stop Recon
     ContainerManager scmContainerManager = scm.getContainerManager();
-    assertTrue(scmContainerManager.getContainerIDs().isEmpty());
+    assertTrue(scmContainerManager.getContainers().isEmpty());
     ContainerManager reconContainerManager = reconScm.getContainerManager();
-    assertTrue(reconContainerManager.getContainerIDs().isEmpty());
+    assertTrue(reconContainerManager.getContainers().isEmpty());
 
     LambdaTestUtils.await(60000, 5000,
         () -> (reconScm.getScmNodeManager().getAllNodes().size() == 3));
@@ -158,23 +163,25 @@ public class TestReconAsPassiveScm {
 
     // Create container in SCM.
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager
+            .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
     XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
     runTestOzoneContainerViaDataNode(containerID, client);
-    assertFalse(scmContainerManager.getContainerIDs().isEmpty());
+    assertFalse(scmContainerManager.getContainers().isEmpty());
 
     // Close a pipeline
     Optional<Pipeline> pipelineToClose = scmPipelineManager
-        .getPipelines(RATIS, ONE)
+        .getPipelines(RatisReplicationConfig.getInstance(ONE))
         .stream()
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();
     assertTrue(pipelineToClose.isPresent());
-    scmPipelineManager.finalizeAndDestroyPipeline(pipelineToClose.get(), false);
+    scmPipelineManager.closePipeline(pipelineToClose.get().getId());
+    scmPipelineManager.deletePipeline(pipelineToClose.get().getId());
 
     // Start Recon
     cluster.startRecon();
@@ -195,6 +202,6 @@ public class TestReconAsPassiveScm {
 
     LambdaTestUtils.await(90000, 5000,
         () -> (newReconScm.getContainerManager()
-            .exists(ContainerID.valueof(containerID))));
+            .containerExist(ContainerID.valueOf(containerID))));
   }
 }

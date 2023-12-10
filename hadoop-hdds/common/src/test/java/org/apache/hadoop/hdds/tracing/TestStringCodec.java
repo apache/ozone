@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,33 +20,45 @@ package org.apache.hadoop.hdds.tracing;
 import io.jaegertracing.internal.JaegerSpanContext;
 import io.jaegertracing.internal.exceptions.EmptyTracerStateStringException;
 import io.jaegertracing.internal.exceptions.MalformedTracerStateStringException;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TestStringCodec {
 
   @Test
-  void testExtract() throws Exception {
+  void testExtract() {
     StringCodec codec = new StringCodec();
 
-    LambdaTestUtils.intercept(EmptyTracerStateStringException.class,
+    assertThrows(EmptyTracerStateStringException.class,
         () -> codec.extract(null));
 
     StringBuilder sb = new StringBuilder().append("123");
-    LambdaTestUtils.intercept(MalformedTracerStateStringException.class,
-        "String does not match tracer state format",
-        () -> codec.extract(sb));
+    MalformedTracerStateStringException malformedException =
+        assertThrows(MalformedTracerStateStringException.class,
+            () -> codec.extract(sb));
+    assertEquals("String does not match tracer state format: 123",
+        malformedException.getMessage());
 
     sb.append(":456:789");
-    LambdaTestUtils.intercept(MalformedTracerStateStringException.class,
-        "String does not match tracer state format",
-        () -> codec.extract(sb));
+    malformedException =
+        assertThrows(MalformedTracerStateStringException.class,
+            () -> codec.extract(sb));
+    assertEquals("String does not match tracer state format: 123:456:789",
+        malformedException.getMessage());
+
     sb.append(":66");
     JaegerSpanContext context = codec.extract(sb);
-    String expectedContextString = new String("123:456:789:66");
-    assertTrue(context.getTraceId().equals("123"));
-    assertTrue(context.toString().equals(expectedContextString));
+    StringBuilder injected = new StringBuilder();
+    codec.inject(context, injected);
+
+    String expectedTraceId = pad("123");
+    assertEquals(expectedTraceId, context.getTraceId());
+    assertEquals(expectedTraceId + ":456:789:66", injected.toString());
+  }
+
+  private static String pad(String s) {
+    return "0000000000000000".substring(s.length()) + s;
   }
 }

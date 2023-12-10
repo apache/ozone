@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to store pre-generated topology information for load-tests.
  */
+@SuppressWarnings("java:S2245") // no need for secure random
 public class FakeClusterTopology {
 
   private static final Logger LOGGER =

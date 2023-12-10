@@ -22,14 +22,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.LeaseRecoverable;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.SafeMode;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 /**
@@ -43,9 +46,13 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class OzoneFileSystem extends BasicOzoneFileSystem
-    implements KeyProviderTokenIssuer {
+    implements KeyProviderTokenIssuer, LeaseRecoverable, SafeMode {
 
   private OzoneFSStorageStatistics storageStatistics;
+
+  public OzoneFileSystem() {
+    this.storageStatistics = new OzoneFSStorageStatistics();
+  }
 
   @Override
   public KeyProvider getKeyProvider() throws IOException {
@@ -78,35 +85,64 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   }
 
   @Override
-  protected void incrementCounter(Statistic statistic) {
+  protected void incrementCounter(Statistic statistic, long count) {
     if (storageStatistics != null) {
-      storageStatistics.incrementCounter(statistic, 1);
+      storageStatistics.incrementCounter(statistic, count);
     }
   }
 
   @Override
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
-      String bucketStr,
-      String volumeStr, String omHost, int omPort,
-      boolean isolatedClassloader) throws IOException {
-
-    this.storageStatistics =
-        (OzoneFSStorageStatistics) GlobalStorageStatistics.INSTANCE
-            .put(OzoneFSStorageStatistics.NAME,
-                OzoneFSStorageStatistics::new);
-
-    if (isolatedClassloader) {
-      return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr,
-          storageStatistics);
-
-    } else {
-      return new OzoneClientAdapterImpl(omHost, omPort, conf,
-          volumeStr, bucketStr, storageStatistics);
-    }
+      String bucketStr, String volumeStr, String omHost, int omPort)
+      throws IOException {
+    return new OzoneClientAdapterImpl(omHost, omPort, conf, volumeStr,
+        bucketStr,
+        storageStatistics);
   }
 
   @Override
   protected InputStream createFSInputStream(InputStream inputStream) {
     return new CapableOzoneFSInputStream(inputStream, statistics);
+  }
+
+  @Override
+  protected OzoneFSOutputStream createFSOutputStream(
+          OzoneFSOutputStream outputStream) {
+    return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
+  }
+
+  @Override
+  public boolean hasPathCapability(final Path path, final String capability)
+      throws IOException {
+    // qualify the path to make sure that it refers to the current FS.
+    final Path p = makeQualified(path);
+    boolean cap =
+        OzonePathCapabilities.hasPathCapability(p, capability);
+    if (cap) {
+      return cap;
+    }
+    return super.hasPathCapability(p, capability);
+  }
+
+  @Override
+  public boolean recoverLease(Path f) throws IOException {
+    LOG.trace("isFileClosed() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().recoverLease(key);
+  }
+
+  @Override
+  public boolean isFileClosed(Path f) throws IOException {
+    LOG.trace("isFileClosed() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().isFileClosed(key);
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    return setSafeModeUtil(action, isChecked);
   }
 }

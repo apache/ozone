@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -66,6 +67,11 @@ public class SCMContainerMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Integer> stateCount = scmmxBean.getContainerStateCount();
 
+    int totalContainers = 0;
+    for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
+      totalContainers = totalContainers + stateCount.get(state.toString());
+    }
+
     collector.addRecord(SOURCE)
         .addGauge(Interns.info("OpenContainers",
             "Number of open containers"),
@@ -84,6 +90,9 @@ public class SCMContainerMetrics implements MetricsSource {
             stateCount.get(DELETING.toString()))
         .addGauge(Interns.info("DeletedContainers",
             "Number of containers in deleted state"),
-            stateCount.get(DELETED.toString()));
+            stateCount.get(DELETED.toString()))
+        .addGauge(Interns.info("TotalContainers",
+            "Number of all containers"),
+            totalContainers);
   }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.dn.ratis;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,18 +28,30 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test Datanode Ratis log parser.
  */
 public class TestDnRatisLogParser {
 
-  private static MiniOzoneCluster cluster = null;
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
+  private MiniOzoneCluster cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
@@ -48,8 +61,8 @@ public class TestDnRatisLogParser {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
     cluster.waitForClusterToBeReady();
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+    System.setOut(new PrintStream(out, false, UTF_8.name()));
+    System.setErr(new PrintStream(err, false, UTF_8.name()));
   }
 
   @After
@@ -64,7 +77,6 @@ public class TestDnRatisLogParser {
 
   @Test
   public void testRatisLogParsing() throws Exception {
-    cluster.stop();
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
@@ -81,6 +93,7 @@ public class TestDnRatisLogParser {
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
         DatanodeRatisLogParser::smToContainerLogString);
-    Assert.assertTrue(out.toString().contains("Num Total Entries:"));
+    Assert.assertTrue(out.toString(StandardCharsets.UTF_8.name())
+        .contains("Num Total Entries:"));
   }
 }

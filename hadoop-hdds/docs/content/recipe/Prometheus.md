@@ -46,9 +46,9 @@ _Note_: for Docker compose based pseudo cluster put the \
 
 * Restart the Ozone Manager and Storage Container Manager and check the prometheus endpoints:
 
- * http://scm:9874/prom
+ * http://scm:9876/prom
 
- * http://ozoneManager:9876/prom
+ * http://ozoneManager:9874/prom
 
 * Create a prometheus.yaml configuration with the previous endpoints:
 
@@ -87,9 +87,10 @@ http://localhost:9090/graph?g0.range_input=1h&g0.expr=om_metrics_num_key_allocat
 
 ## Note
 
-The ozone distribution contains a ready-to-use, dockerized environment to try out ozone and prometheus. It can be found under `compose/ozoneperf` directory.
+The ozone distribution contains a ready-to-use, dockerized environment to try out ozone and Prometheus. It can be found under `compose/ozone` directory.
 
 ```bash
-cd compose/ozoneperf
+cd compose/ozone
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml
 docker-compose up -d
 ```

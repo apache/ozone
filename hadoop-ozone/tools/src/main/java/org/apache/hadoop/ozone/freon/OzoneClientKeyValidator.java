@@ -49,7 +49,7 @@ public class OzoneClientKeyValidator extends BaseFreonGenerator
       LoggerFactory.getLogger(OzoneClientKeyValidator.class);
 
   @Option(names = {"-v", "--volume"},
-      description = "Name of the bucket which contains the test data. Will be"
+      description = "Name of the volume which contains the test data. Will be"
           + " created if missing.",
       defaultValue = "vol1")
   private String volumeName;
@@ -92,6 +92,8 @@ public class OzoneClientKeyValidator extends BaseFreonGenerator
     timer = getMetrics().timer("key-validate");
 
     runTests(this::validateKey);
+
+    rpcClient.close();
 
     return null;
   }

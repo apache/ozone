@@ -18,12 +18,17 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +38,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
@@ -70,8 +77,12 @@ public class OMHANodeDetails {
     return localNodeDetails;
   }
 
-  public List< OMNodeDetails > getPeerNodeDetails() {
-    return peerNodeDetails;
+  public Map<String, OMNodeDetails> getPeerNodesMap() {
+    Map<String, OMNodeDetails> peerNodesMap = new HashMap<>();
+    for (OMNodeDetails peeNode : peerNodeDetails) {
+      peerNodesMap.put(peeNode.getNodeId(), peeNode);
+    }
+    return peerNodesMap;
   }
 
 
@@ -116,13 +127,14 @@ public class OMHANodeDetails {
     boolean isOMAddressSet = false;
 
     for (String serviceId : omServiceIds) {
-      Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, serviceId);
+      Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
+          serviceId);
 
       if (omNodeIds.size() == 0) {
-        String msg = "Configuration does not have any value set for " +
-            OZONE_OM_NODES_KEY + " for service ID " + serviceId + ". List of " +
-            "OM Node ID's should be specified for the service ID";
-        throw new OzoneIllegalArgumentException(msg);
+        throwConfException("Configuration does not have any value set for %s " +
+            "for the service %s. List of OM Node ID's should be specified " +
+            "for an OM service", OZONE_OM_NODES_KEY, serviceId);
+        return null;
       }
 
       List<OMNodeDetails> peerNodesList = new ArrayList<>();
@@ -133,21 +145,21 @@ public class OMHANodeDetails {
         } else {
           isPeer = false;
         }
-        String rpcAddrKey = OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+        String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
             serviceId, nodeId);
         String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
         if (rpcAddrStr == null || rpcAddrStr.isEmpty()) {
-          String msg = "Configuration does not have any value set for " +
-              rpcAddrKey + "." + "OM Rpc Address should be set for all node " +
-              "IDs for a service ID.";
-          throw new OzoneIllegalArgumentException(msg);
+          throwConfException("Configuration does not have any value set for " +
+              "%s. OM RPC Address should be set for all nodes in an OM " +
+              "service.", rpcAddrKey);
+          return null;
         }
 
         // If OM address is set for any node id, we will not fallback to the
         // default
         isOMAddressSet = true;
 
-        String ratisPortKey = OmUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
+        String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_OM_RATIS_PORT_KEY,
             serviceId, nodeId);
         int ratisPort = conf.getInt(ratisPortKey, OZONE_OM_RATIS_PORT_DEFAULT);
 
@@ -155,46 +167,53 @@ public class OMHANodeDetails {
         try {
           addr = NetUtils.createSocketAddr(rpcAddrStr);
         } catch (Exception e) {
-          LOG.warn("Exception in creating socket address " + addr, e);
-          continue;
+          LOG.error("Couldn't create socket address for OM {} : {}", nodeId,
+              rpcAddrStr, e);
+          throw e;
         }
-        if (!addr.isUnresolved()) {
-          if (!isPeer && OmUtils.isAddressLocal(addr)) {
-            localRpcAddress = addr;
-            localOMServiceId = serviceId;
-            localOMNodeId = nodeId;
-            localRatisPort = ratisPort;
-            found++;
-          } else {
-            // This OMNode belongs to same OM service as the current OMNode.
-            // Add it to peerNodes list.
-            // This OMNode belongs to same OM service as the current OMNode.
-            // Add it to peerNodes list.
-            peerNodesList.add(getHAOMNodeDetails(conf, serviceId,
-                nodeId, addr, ratisPort));
-          }
+
+        boolean flexibleFqdnResolutionEnabled = conf.getBoolean(
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED,
+                OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT);
+        if (OzoneNetUtils.isUnresolved(flexibleFqdnResolutionEnabled, addr)) {
+          LOG.error("Address for OM {} : {} couldn't be resolved. Proceeding " +
+                  "with unresolved host to create Ratis ring.", nodeId,
+              rpcAddrStr);
+        }
+
+        if (!isPeer
+                && OzoneNetUtils
+                .isAddressLocal(flexibleFqdnResolutionEnabled, addr)) {
+          localRpcAddress = addr;
+          localOMServiceId = serviceId;
+          localOMNodeId = nodeId;
+          localRatisPort = ratisPort;
+          found++;
+        } else {
+          // This OMNode belongs to same OM service as the current OMNode.
+          // Add it to peerNodes list.
+          peerNodesList.add(getHAOMNodeDetails(conf, serviceId,
+              nodeId, addr, ratisPort));
         }
       }
       if (found == 1) {
-        LOG.debug("Found one matching OM address with service ID: {} and node" +
-            " ID: {}", localOMServiceId, localOMNodeId);
 
         LOG.info("Found matching OM address with OMServiceId: {}, " +
                 "OMNodeId: {}, RPC Address: {} and Ratis port: {}",
             localOMServiceId, localOMNodeId,
             NetUtils.getHostPortString(localRpcAddress), localRatisPort);
 
-
-        setOMNodeSpecificConfigs(conf, localOMServiceId, localOMNodeId);
+        ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
+            localOMServiceId, localOMNodeId, LOG);
         return new OMHANodeDetails(getHAOMNodeDetails(conf, localOMServiceId,
             localOMNodeId, localRpcAddress, localRatisPort), peerNodesList);
 
       } else if (found > 1) {
-        String msg = "Configuration has multiple " + OZONE_OM_ADDRESS_KEY +
-            " addresses that match local node's address. Please configure the" +
-            " system with " + OZONE_OM_SERVICE_IDS_KEY + " and " +
-            OZONE_OM_ADDRESS_KEY;
-        throw new OzoneIllegalArgumentException(msg);
+        throwConfException("Configuration has multiple %s addresses that " +
+            "match local node's address. Please configure the system with %s " +
+            "and %s", OZONE_OM_ADDRESS_KEY, OZONE_OM_SERVICE_IDS_KEY,
+            OZONE_OM_ADDRESS_KEY);
+        return null;
       }
     }
 
@@ -204,18 +223,16 @@ public class OMHANodeDetails {
       int ratisPort = conf.getInt(OZONE_OM_RATIS_PORT_KEY,
           OZONE_OM_RATIS_PORT_DEFAULT);
 
-      LOG.info("Configuration either no {} set. Falling back to the default " +
-          "OM address {}", OZONE_OM_ADDRESS_KEY, omAddress);
+      LOG.info("Configuration does not have {} set. Falling back to the " +
+          "default OM address {}", OZONE_OM_ADDRESS_KEY, omAddress);
 
-      return new OMHANodeDetails(getOMNodeDetails(conf, null,
+      return new OMHANodeDetails(getOMNodeDetailsForNonHA(conf, null,
           null, omAddress, ratisPort), new ArrayList<>());
 
     } else {
-      String msg = "Configuration has no " + OZONE_OM_ADDRESS_KEY + " " +
-          "address that matches local node's address. Please configure the " +
-          "system with " + OZONE_OM_ADDRESS_KEY;
-      LOG.info(msg);
-      throw new OzoneIllegalArgumentException(msg);
+      throwConfException("Configuration has no %s address that matches local " +
+          "node's address.", OZONE_OM_ADDRESS_KEY);
+      return null;
     }
   }
 
@@ -227,7 +244,7 @@ public class OMHANodeDetails {
    * @param ratisPort - Ratis port of the OM.
    * @return OMNodeDetails
    */
-  public static OMNodeDetails getOMNodeDetails(OzoneConfiguration conf,
+  public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
 
@@ -238,6 +255,12 @@ public class OMHANodeDetails {
           serviceId);
     }
 
+    if (nodeId == null) {
+      // If no nodeId is provided, set the default nodeID - om1
+      nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
+      LOG.info("OM Node ID is not set. Setting it to the default ID: {}",
+          nodeId);
+    }
 
     // We need to pass null for serviceID and nodeID as this is set for
     // non-HA cluster. This means one node OM cluster.
@@ -254,9 +277,7 @@ public class OMHANodeDetails {
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
         .build();
-
   }
-
 
   /**
    * Create Local OM Node Details.
@@ -285,39 +306,12 @@ public class OMHANodeDetails {
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
         .build();
-
   }
 
-
-  /**
-   * Check if any of the following configuration keys have been set using OM
-   * Node ID suffixed to the key. If yes, then set the base key with the
-   * configured valued.
-   *    1. {@link OMConfigKeys#OZONE_OM_HTTP_ADDRESS_KEY}
-   *    2. {@link OMConfigKeys#OZONE_OM_HTTPS_ADDRESS_KEY}
-   *    3. {@link OMConfigKeys#OZONE_OM_HTTP_BIND_HOST_KEY}
-   *    4. {@link OMConfigKeys#OZONE_OM_HTTPS_BIND_HOST_KEY}\
-   *    5. {@link OMConfigKeys#OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE}
-   *    6. {@link OMConfigKeys#OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY}
-   *    7. {@link OMConfigKeys#OZONE_OM_KERBEROS_KEYTAB_FILE_KEY}
-   *    8. {@link OMConfigKeys#OZONE_OM_KERBEROS_PRINCIPAL_KEY}
-   *    9. {@link OMConfigKeys#OZONE_OM_DB_DIRS}
-   *    10. {@link OMConfigKeys#OZONE_OM_ADDRESS_KEY}
-   */
-  private static void setOMNodeSpecificConfigs(
-      OzoneConfiguration ozoneConfiguration, String omServiceId,
-      String omNodeId) {
-
-    for (String confKey : genericConfigKeys) {
-      String confValue = OmUtils.getConfSuffixedWithOMNodeId(
-          ozoneConfiguration, confKey, omServiceId, omNodeId);
-      if (confValue != null) {
-        LOG.info("Setting configuration key {} with value of key {}: {}",
-            confKey, OmUtils.addKeySuffixes(confKey, omNodeId), confValue);
-        ozoneConfiguration.set(confKey, confValue);
-      }
-    }
+  private static void throwConfException(String message, String... arguments)
+      throws IllegalArgumentException {
+    String exceptionMsg = String.format(message, arguments);
+    LOG.error(exceptionMsg);
+    throw new OzoneIllegalArgumentException(exceptionMsg);
   }
-
-
 }

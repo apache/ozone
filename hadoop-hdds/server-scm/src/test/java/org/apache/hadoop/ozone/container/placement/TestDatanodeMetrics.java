@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.container.placement;
 
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests that test Metrics that support placement.
@@ -52,5 +52,9 @@ public class TestDatanodeMetrics {
     // Assert we can handle zero capacity.
     assertTrue(metric.isGreater(zeroMetric.get()));
 
+    // Another case when nodes have similar weight
+    SCMNodeStat stat1 = new SCMNodeStat(10000000L, 50L, 9999950L);
+    SCMNodeStat stat2 = new SCMNodeStat(10000000L, 51L, 9999949L);
+    assertTrue(new SCMNodeMetric(stat2).isGreater(stat1));
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,10 +17,17 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import javax.annotation.PostConstruct;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.time.Duration;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Reflection utilities for configuration injection.
@@ -30,111 +37,186 @@ public final class ConfigurationReflectionUtil {
   private ConfigurationReflectionUtil() {
   }
 
+  public static <T> Map<String, Field> mapReconfigurableProperties(
+      Class<T> configurationClass) {
+    Optional<String> prefix = getPrefix(configurationClass);
+    Map<String, Field> props =
+        mapReconfigurableProperties(configurationClass, prefix);
+    Class<? super T> superClass = configurationClass.getSuperclass();
+    while (superClass != null) {
+      props.putAll(mapReconfigurableProperties(superClass, prefix));
+      superClass = superClass.getSuperclass();
+    }
+    return props;
+  }
+
+  private static <T> Map<String, Field> mapReconfigurableProperties(
+      Class<T> configurationClass, Optional<String> prefix) {
+    Map<String, Field> props = new HashMap<>();
+    for (Field field : configurationClass.getDeclaredFields()) {
+      if (field.isAnnotationPresent(Config.class)) {
+        Config configAnnotation = field.getAnnotation(Config.class);
+
+        if (configAnnotation.reconfigurable()) {
+          checkNotFinal(configurationClass, field);
+          props.put(getFullKey(prefix, configAnnotation), field);
+        }
+      }
+    }
+    return props;
+  }
+
   public static <T> void injectConfiguration(
       ConfigurationSource configuration,
       Class<T> configurationClass,
-      T configObject, String prefix) {
+      T configObject, String prefix, boolean reconfiguration) {
     injectConfigurationToObject(configuration, configurationClass, configObject,
-        prefix);
+        prefix, reconfiguration);
     Class<? super T> superClass = configurationClass.getSuperclass();
     while (superClass != null) {
       injectConfigurationToObject(configuration, superClass, configObject,
-          prefix);
+          prefix, reconfiguration);
       superClass = superClass.getSuperclass();
     }
   }
 
-  public static <T> void injectConfigurationToObject(ConfigurationSource from,
+  private static <T> void injectConfigurationToObject(ConfigurationSource from,
       Class<T> configurationClass,
       T configuration,
-      String prefix) {
+      String prefix,
+      boolean reconfiguration
+  ) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
-
-        String fieldLocation =
-            configurationClass + "." + field.getName();
+        checkNotFinal(configurationClass, field);
 
         Config configAnnotation = field.getAnnotation(Config.class);
 
+        if (reconfiguration && !configAnnotation.reconfigurable()) {
+          continue;
+        }
+
         String key = prefix + "." + configAnnotation.key();
+        String defaultValue = configAnnotation.defaultValue();
+        String value = from.get(key, defaultValue);
 
-        ConfigType type = configAnnotation.type();
+        setField(configurationClass, configuration, field, configAnnotation,
+            key, value);
+      }
+    }
+  }
 
-        if (type == ConfigType.AUTO) {
-          type = detectConfigType(field.getType(), fieldLocation);
-        }
+  public static <T> void reconfigureProperty(T configuration, Field field,
+      String key, String value) {
+    Class<?> klass = field.getDeclaringClass();
+    if (!field.isAnnotationPresent(Config.class)) {
+      throw new ConfigurationException("Not configurable field: "
+          + klass + "." + field.getName());
+    }
+    Config configAnnotation = field.getAnnotation(Config.class);
 
-        //Note: default value is handled by ozone-default.xml. Here we can
-        //use any default.
-        try {
-          switch (type) {
-          case STRING:
-            forcedFieldSet(field, configuration, from.get(key));
-            break;
-          case INT:
-            forcedFieldSet(field, configuration, from.getInt(key, 0));
-            break;
-          case BOOLEAN:
-            forcedFieldSet(field, configuration, from.getBoolean(key, false));
-            break;
-          case LONG:
-            forcedFieldSet(field, configuration, from.getLong(key, 0));
-            break;
-          case TIME:
-            forcedFieldSet(field, configuration,
-                from.getTimeDuration(key, "0s", configAnnotation.timeUnit()));
-            break;
-          default:
-            throw new ConfigurationException(
-                "Unsupported ConfigType " + type + " on " + fieldLocation);
-          }
-        } catch (IllegalAccessException e) {
-          throw new ConfigurationException(
-              "Can't inject configuration to " + fieldLocation, e);
-        }
+    try {
+      final Object oldValue = forcedFieldGet(field, configuration);
+      setField(klass, configuration, field, configAnnotation, key, value);
+      try {
+        callPostConstruct(configuration);
+      } catch (Exception e) {
+        forcedFieldSet(field, configuration, oldValue);
+        throw e;
+      }
+    } catch (IllegalAccessException e) {
+      throw new ConfigurationException("Failed to inject configuration to "
+          + klass.getSimpleName() + "." + field.getName(), e);
+    }
+  }
 
+  private static <T> void setField(
+      Class<?> configurationClass, T configuration, Field field,
+      Config configAnnotation, String key, String value) {
+    ConfigType type = configAnnotation.type();
+    if (type == ConfigType.AUTO) {
+      type = detectConfigType(field);
+    }
+
+    try {
+      Object parsed = type.parse(value, configAnnotation, field.getType(), key);
+      forcedFieldSet(field, configuration, parsed);
+    } catch (Exception e) {
+      throw new ConfigurationException("Failed to inject configuration to "
+          + configurationClass.getSimpleName() + "." + field.getName(), e);
+    }
+  }
+
+  /**
+   * Set possibly private {@code field} to {@code value} in {@code object}.
+   */
+  private static <T> void forcedFieldSet(Field field, T object, Object value)
+      throws IllegalAccessException {
+    final boolean accessChanged = setAccessible(field);
+    try {
+      field.set(object, value);
+    } finally {
+      if (accessChanged) {
+        field.setAccessible(false);
       }
     }
   }
 
   /**
-   * Set the value of one field even if it's private.
+   * @return the value of possibly private {@code field} in {@code object}
    */
-  private static <T> void forcedFieldSet(Field field, T object, Object value)
+  private static <T> Object forcedFieldGet(Field field, T object)
       throws IllegalAccessException {
-    boolean accessChanged = false;
-    if (!field.isAccessible()) {
-      field.setAccessible(true);
-      accessChanged = true;
-    }
-    field.set(object, value);
-    if (accessChanged) {
-      field.setAccessible(false);
+    final boolean accessChanged = setAccessible(field);
+    try {
+      return field.get(object);
+    } finally {
+      if (accessChanged) {
+        field.setAccessible(false);
+      }
     }
   }
 
-  private static ConfigType detectConfigType(Class<?> parameterType,
-      String methodLocation) {
+  /**
+   * Make {@code field} accessible.
+   * @return true if access changed
+   */
+  private static boolean setAccessible(Field field) {
+    if (!field.isAccessible()) {
+      field.setAccessible(true);
+      return true;
+    }
+    return false;
+  }
+
+  private static ConfigType detectConfigType(Field field) {
     ConfigType type;
+    Class<?> parameterType = field.getType();
     if (parameterType == String.class) {
       type = ConfigType.STRING;
     } else if (parameterType == Integer.class || parameterType == int.class) {
       type = ConfigType.INT;
     } else if (parameterType == Long.class || parameterType == long.class) {
       type = ConfigType.LONG;
+    } else if (parameterType == Double.class || parameterType == double.class) {
+      type = ConfigType.DOUBLE;
     } else if (parameterType == Boolean.class
         || parameterType == boolean.class) {
       type = ConfigType.BOOLEAN;
+    } else if (parameterType == Duration.class) {
+      type = ConfigType.TIME;
+    } else if (parameterType == Class.class) {
+      type = ConfigType.CLASS;
     } else {
-      throw new ConfigurationException(
-          "Unsupported configuration type " + parameterType + " in "
-              + methodLocation);
+      throw new ConfigurationException("Unsupported configuration type "
+          + parameterType + " in "
+          + field.getDeclaringClass() + "." + field.getName());
     }
     return type;
   }
 
-  public static <T> void callPostConstruct(Class<T> configurationClass,
-      T configObject) {
+  static <T> void callPostConstruct(T configObject) {
+    Class<?> configurationClass = configObject.getClass();
     for (Method method : configurationClass.getMethods()) {
       if (method.isAnnotationPresent(PostConstruct.class)) {
         try {
@@ -156,4 +238,121 @@ public final class ConfigurationReflectionUtil {
       }
     }
   }
+
+  public static <T> void updateConfiguration(ConfigurationTarget config,
+      T object, String prefix) {
+
+    Class<?> configClass = object.getClass();
+    Deque<Class<?>> classes = new LinkedList<>();
+    classes.addLast(configClass);
+    Class<?> superclass = configClass.getSuperclass();
+    while (superclass != null) {
+      classes.addFirst(superclass);
+      superclass = superclass.getSuperclass();
+    }
+
+    for (Class<?> cl : classes) {
+      updateConfigurationFromObject(config, cl, object, prefix);
+    }
+  }
+
+  private static <T> void updateConfigurationFromObject(
+      ConfigurationTarget config, Class<?> configClass, T configObject,
+      String prefix) {
+
+    for (Field field : configClass.getDeclaredFields()) {
+      if (field.isAnnotationPresent(Config.class)) {
+        Config configAnnotation = field.getAnnotation(Config.class);
+        String fieldLocation = configClass + "." + field.getName();
+        String key = prefix + "." + configAnnotation.key();
+        ConfigType type = configAnnotation.type();
+
+        if (type == ConfigType.AUTO) {
+          type = detectConfigType(field);
+        }
+
+        //Note: default value is handled by ozone-default.xml. Here we can
+        //use any default.
+        try {
+          Object value = forcedFieldGet(field, configObject);
+          if (value == null) {
+            continue;
+          }
+          type.set(config, key, value, configAnnotation);
+        } catch (IllegalAccessException e) {
+          throw new ConfigurationException(
+              "Can't inject configuration to " + fieldLocation, e);
+        }
+      }
+    }
+  }
+
+  public static Optional<String> getDefaultValue(Class<?> configClass,
+      String fieldName) {
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(Config::defaultValue);
+  }
+
+  public static Optional<String> getKey(Class<?> configClass,
+      String fieldName) {
+    Optional<String> prefix = getPrefix(configClass);
+
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(config -> getFullKey(prefix, config));
+  }
+
+  public static Optional<ConfigType> getType(Class<?> configClass,
+      String fieldName) {
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(Config::type);
+  }
+
+  private static Optional<Config> findFieldConfigAnnotationByName(
+      final Class<?> configClass, String fieldName) {
+    Class<?> theClass = configClass;
+    while (theClass != null) {
+      Optional<Config> config = Stream.of(theClass.getDeclaredFields())
+          .filter(f -> f.getName().equals(fieldName))
+          .findFirst()
+          .map(f -> f.getAnnotation(Config.class));
+
+      if (config.isPresent()) {
+        return config;
+      }
+
+      theClass = theClass.getSuperclass();
+      if (Object.class.equals(theClass)) {
+        theClass = null;
+      }
+    }
+    return Optional.empty();
+  }
+
+  private static <T> void checkNotFinal(
+      Class<T> configurationClass, Field field) {
+
+    if ((field.getModifiers() & Modifier.FINAL) != 0) {
+      throw new ConfigurationException(String.format(
+          "Trying to set final field %s#%s, probably indicates misplaced " +
+              "@Config annotation",
+          configurationClass.getSimpleName(), field.getName()));
+    }
+  }
+
+  private static <T> Optional<String> getPrefix(Class<T> configurationClass) {
+    ConfigGroup configGroup =
+        configurationClass.getAnnotation(ConfigGroup.class);
+    return configGroup != null
+        ? Optional.of(configGroup.prefix())
+        : Optional.empty();
+  }
+
+  private static String getFullKey(
+      Optional<String> optionalPrefix, Config configAnnotation) {
+    String key = configAnnotation.key();
+    return optionalPrefix
+        .map(prefix -> prefix + "." + key)
+        .orElse(key);
+  }
+
 }

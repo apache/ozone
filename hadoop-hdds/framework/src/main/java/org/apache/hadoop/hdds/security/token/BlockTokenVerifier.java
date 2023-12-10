@@ -18,115 +18,86 @@
 
 package org.apache.hadoop.hdds.security.token;
 
-import com.google.common.base.Strings;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Time;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.security.cert.X509Certificate;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.DeleteBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.DeleteChunk;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.DELETE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 
 
 /**
  * Verify token and return a UGI with token if authenticated.
  */
-public class BlockTokenVerifier implements TokenVerifier {
-
-  private final CertificateClient caClient;
-  private final SecurityConfig conf;
-  private static boolean testStub = false;
-  private final static Logger LOGGER =
+public class BlockTokenVerifier extends
+    ShortLivedTokenVerifier<OzoneBlockTokenIdentifier> {
+  private static final Logger LOGGER =
       LoggerFactory.getLogger(BlockTokenVerifier.class);
 
-  public BlockTokenVerifier(SecurityConfig conf, CertificateClient caClient) {
-    this.conf = conf;
-    this.caClient = caClient;
+  public static String getTokenService(BlockID blockID) {
+    return getTokenService(blockID.getContainerBlockID());
   }
 
-  private boolean isExpired(long expiryDate) {
-    return Time.now() > expiryDate;
+  public static String getTokenService(ContainerBlockID blockID) {
+    return String.valueOf(blockID);
+  }
+
+  public BlockTokenVerifier(SecurityConfig conf,
+                            SecretKeyVerifierClient secretKeyClient) {
+    super(conf, secretKeyClient);
   }
 
   @Override
-  public void verify(String user, String tokenStr,
-      ContainerProtos.Type cmd, String id) throws SCMSecurityException {
-    if (!conf.isBlockTokenEnabled() || !HddsUtils.requireBlockToken(cmd)) {
-      return;
-    }
+  protected boolean isTokenRequired(ContainerProtos.Type cmdType) {
+    return getConf().isBlockTokenEnabled() &&
+        HddsUtils.requireBlockToken(cmdType);
+  }
 
-    // TODO: add audit logs.
-    if (Strings.isNullOrEmpty(tokenStr)) {
-      throw new BlockTokenException("Fail to find any token (empty or " +
-          "null.)");
-    }
+  @Override
+  protected OzoneBlockTokenIdentifier createTokenIdentifier() {
+    return new OzoneBlockTokenIdentifier();
+  }
 
-    final Token<OzoneBlockTokenIdentifier> token = new Token();
-    OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
-    try {
-      token.decodeFromUrlString(tokenStr);
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Verifying token:{} for user:{} ", token, user);
-      }
-      ByteArrayInputStream buf = new ByteArrayInputStream(
-          token.getIdentifier());
-      DataInputStream in = new DataInputStream(buf);
-      tokenId.readFields(in);
+  @Override
+  protected Object getService(ContainerCommandRequestProtoOrBuilder cmd) {
+    BlockID blockID = HddsUtils.getBlockID(cmd);
+    Preconditions.checkNotNull(blockID,
+        "no blockID in %s command", cmd.getCmdType());
+    return getTokenService(blockID);
+  }
 
-    } catch (IOException ex) {
-      throw new BlockTokenException("Failed to decode token : " + tokenStr);
-    }
-
-    if (caClient == null) {
-      throw new SCMSecurityException("Certificate client not available " +
-          "to validate token");
-    }
-
-    UserGroupInformation tokenUser = tokenId.getUser();
-    X509Certificate signerCert;
-    signerCert = caClient.getCertificate(tokenId.getOmCertSerialId());
-
-    if (signerCert == null) {
-      throw new BlockTokenException("Can't find signer certificate " +
-          "(OmCertSerialId: " + tokenId.getOmCertSerialId() +
-          ") of the block token for user: " + tokenUser);
-    }
-    boolean validToken = caClient.verifySignature(tokenId.getBytes(),
-        token.getPassword(), signerCert);
-    if (!validToken) {
-      throw new BlockTokenException("Invalid block token for user: " +
+  @Override
+  protected void verify(OzoneBlockTokenIdentifier tokenId,
+      ContainerCommandRequestProtoOrBuilder cmd) throws SCMSecurityException {
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Verifying token:{} for user:{} ", tokenId,
           tokenId.getUser());
     }
-    // check expiration
-    if (isExpired(tokenId.getExpiryDate())) {
-      throw new BlockTokenException("Expired block token for user: " +
-          tokenUser);
+
+    HddsProtos.BlockTokenSecretProto.AccessModeProto accessMode;
+    if (HddsUtils.isReadOnly(cmd)) {
+      accessMode = READ;
+    } else if (cmd.getCmdType() == DeleteBlock ||
+        cmd.getCmdType() == DeleteChunk) {
+      accessMode = DELETE;
+    } else {
+      accessMode = WRITE;
     }
-
-    // Token block id mismatch
-    if (!tokenId.getBlockId().equals(id)) {
-      throw new BlockTokenException("Block id mismatch. Token for block ID: " +
-          tokenId.getBlockId() + " can't be used to access block: " + id +
-          " by user: " + tokenUser);
+    if (!tokenId.getAccessModes().contains(accessMode)) {
+      throw new BlockTokenException("Block token with " + tokenId.getService()
+          + " doesn't have " + accessMode + " permission");
     }
-
-    // TODO: check cmd type and the permissions(AccessMode) in the token
-  }
-
-  public static boolean isTestStub() {
-    return testStub;
-  }
-
-  // For testing purpose only.
-  public static void setTestStub(boolean isTestStub) {
-    BlockTokenVerifier.testStub = isTestStub;
   }
 }

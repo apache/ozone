@@ -36,13 +36,15 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,8 +76,9 @@ import static org.junit.Assert.assertTrue;
  */
 @NotThreadSafe
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-@Ignore("Fix this after adding audit support for HA Acl code. This will be " +
-    "fixed by HDDS-2038")
+@Category(UnhealthyTest.class)
+@Unhealthy("Fix this after adding audit support for HA Acl code. This will " +
+    "be fixed by HDDS-2038")
 public class TestOzoneRpcClientForAclAuditLog {
 
   private static final Logger LOG =
@@ -162,7 +165,7 @@ public class TestOzoneRpcClientForAclAuditLog {
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
   private static void shutdownCluster() throws IOException {
-    if(ozClient != null) {
+    if (ozClient != null) {
       ozClient.close();
     }
 
@@ -246,28 +249,28 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     // xxxAcl will fail as current ugi user doesn't have the required access
     // for volume
-    try{
+    try {
       List<OzoneAcl> acls = store.getAcl(volObj);
     } catch (Exception ex) {
       verifyLog(OMAction.GET_ACL.name(), volumeName,
           AuditEventStatus.FAILURE.name());
     }
 
-    try{
+    try {
       store.addAcl(volObj, USER_ACL);
     } catch (Exception ex) {
       verifyLog(OMAction.ADD_ACL.name(), volumeName,
           AuditEventStatus.FAILURE.name());
     }
 
-    try{
+    try {
       store.removeAcl(volObj, USER_ACL);
     } catch (Exception ex) {
       verifyLog(OMAction.REMOVE_ACL.name(), volumeName,
           AuditEventStatus.FAILURE.name());
     }
 
-    try{
+    try {
       store.setAcl(volObj, aclListToAdd);
     } catch (Exception ex) {
       verifyLog(OMAction.SET_ACL.name(), volumeName, "johndoe", "jane",
@@ -279,19 +282,18 @@ public class TestOzoneRpcClientForAclAuditLog {
   private void verifyLog(String... expected) throws Exception {
     File file = new File("audit.log");
     final List<String> lines = FileUtils.readLines(file, (String)null);
-    GenericTestUtils.waitFor(() ->
-        (lines != null) ? true : false, 100, 60000);
+    GenericTestUtils.waitFor(() -> lines != null, 100, 60000);
 
-    try{
+    try {
       // When log entry is expected, the log file will contain one line and
       // that must be equal to the expected string
       assertTrue(lines.size() != 0);
-      for(String exp: expected){
+      for (String exp: expected) {
         assertTrue(lines.get(0).contains(exp));
       }
-    } catch (AssertionError ex){
+    } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);
-      if(lines.size() != 0){
+      if (lines.size() != 0) {
         LOG.error("Actual line ::: " + lines.get(0));
         LOG.error("Expected tokens ::: " + Arrays.toString(expected));
       }

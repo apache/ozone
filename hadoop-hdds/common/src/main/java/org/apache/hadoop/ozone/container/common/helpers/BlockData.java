@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.client.BlockID;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto3Codec;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -32,6 +35,15 @@ import java.util.ArrayList;
  * Helper class to convert Protobuf to Java classes.
  */
 public class BlockData {
+  private static final Codec<BlockData> CODEC = new DelegatedCodec<>(
+      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance()),
+      BlockData::getFromProtoBuf,
+      BlockData::getProtoBufMessage);
+
+  public static Codec<BlockData> getCodec() {
+    return CODEC;
+  }
+
   private final BlockID blockID;
   private final Map<String, String> metadata;
 
@@ -161,8 +173,8 @@ public class BlockData {
    * @return list of chunkinfo.
    */
   public List<ContainerProtos.ChunkInfo> getChunks() {
-    return chunkList == null? Collections.emptyList()
-        : chunkList instanceof ContainerProtos.ChunkInfo?
+    return chunkList == null ? Collections.emptyList()
+        : chunkList instanceof ContainerProtos.ChunkInfo ?
             Collections.singletonList((ContainerProtos.ChunkInfo)chunkList)
         : Collections.unmodifiableList(castChunkList());
   }
@@ -281,7 +293,7 @@ public class BlockData {
   public void appendTo(StringBuilder sb) {
     sb.append("[blockId=");
     blockID.appendTo(sb);
-    sb.append(",size=").append(size);
+    sb.append(", size=").append(size);
     sb.append("]");
   }
 }

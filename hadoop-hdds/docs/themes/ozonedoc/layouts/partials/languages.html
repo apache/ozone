@@ -18,7 +18,8 @@
 <div class="pull-right">
     {{ range .AllTranslations }}
     {{ if ne $.Language .Language}}
-    <a href="{{.Permalink}}"><span class="label label-success">{{ .Language.LanguageName }}</span></a>
+    {{ $permalink := cond (strings.HasSuffix .Permalink ".html") .Permalink (printf "%sindex.html" .Permalink)}}
+    <a href="{{$permalink}}"><span class="label label-success">{{ .Language.LanguageName }}</span></a>
     {{end}}
     {{ end }}
 </div>

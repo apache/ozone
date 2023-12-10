@@ -17,15 +17,17 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /** Buffer for a block chunk. */
 public interface ChunkBuffer {
@@ -57,6 +59,10 @@ public interface ChunkBuffer {
 
   /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
   static ChunkBuffer wrap(List<ByteBuffer> buffers) {
+    Objects.requireNonNull(buffers, "buffers == null");
+    if (buffers.size() == 1) {
+      return wrap(buffers.get(0));
+    }
     return new ChunkBufferImplWithByteBufferList(buffers);
   }
 
@@ -88,6 +94,12 @@ public interface ChunkBuffer {
     return put(ByteBuffer.wrap(b));
   }
 
+  /** Similar to {@link ByteBuffer#put(byte[])}. */
+  default ChunkBuffer put(byte b) {
+    final byte[] buf = {b};
+    return put(buf, 0, 1);
+  }
+
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */
   default ChunkBuffer put(byte[] b, int offset, int length) {
     return put(ByteBuffer.wrap(b, offset, length));
@@ -108,7 +120,6 @@ public interface ChunkBuffer {
 
   /**
    * Iterate the buffer from the current position to the current limit.
-   *
    * Upon the iteration complete,
    * the buffer's position will be equal to its limit.
    *
@@ -136,12 +147,26 @@ public interface ChunkBuffer {
     return toByteStringImpl(b -> applyAndAssertFunction(b, function, this));
   }
 
+  /**
+   * Convert this buffer(s) to a list of {@link ByteString}.
+   * The position and limit of this {@link ChunkBuffer} remains unchanged.
+   * The given function must preserve the position and limit
+   * of the input {@link ByteBuffer}.
+   */
+  default List<ByteString> toByteStringList(
+      Function<ByteBuffer, ByteString> function) {
+    return toByteStringListImpl(b -> applyAndAssertFunction(b, function, this));
+  }
+
   // for testing
   default ByteString toByteString() {
     return toByteString(ByteStringConversion::safeWrap);
   }
 
   ByteString toByteStringImpl(Function<ByteBuffer, ByteString> function);
+
+  List<ByteString> toByteStringListImpl(
+      Function<ByteBuffer, ByteString> function);
 
   static void assertInt(int expected, int computed, Supplier<String> prefix) {
     if (expected != computed) {

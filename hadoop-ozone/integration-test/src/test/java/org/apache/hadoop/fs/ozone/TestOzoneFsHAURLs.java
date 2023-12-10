@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -27,21 +28,24 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ratis.util.LifeCycle;
 import org.hamcrest.core.StringContains;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +54,10 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 
@@ -57,17 +65,23 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
  * Test client-side URI handling with Ozone Manager HA.
  */
 public class TestOzoneFsHAURLs {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   public static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
-  private MiniOzoneCluster cluster;
-  private String omId;
-  private String omServiceId;
-  private String clusterId;
-  private String scmId;
-  private OzoneManager om;
-  private int numOfOMs;
+  private static MiniOzoneCluster cluster;
+  private static String omId;
+  private static String omServiceId;
+  private static String clusterId;
+  private static String scmId;
+  private static OzoneManager om;
+  private static int numOfOMs;
 
   private String volumeName;
   private String bucketName;
@@ -77,10 +91,18 @@ public class TestOzoneFsHAURLs {
       "fs." + OzoneConsts.OZONE_URI_SCHEME + ".impl";
   private final String o3fsImplValue =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
+  private static OzoneClient client;
 
-  @Before
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
+  private final String ofsImplKey =
+      "fs." + OzoneConsts.OZONE_OFS_URI_SCHEME + ".impl";
+
+  private final String ofsImplValue =
+      "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
+
+
+  @BeforeClass
+  public static void initClass() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     omId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     numOfOMs = 3;
@@ -89,32 +111,42 @@ public class TestOzoneFsHAURLs {
     final String path = GenericTestUtils.getTempPath(omId);
     java.nio.file.Path metaDirPath = java.nio.file.Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
+
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId(clusterId);
-    omStore.setScmId(scmId);
     // writes the version file properties
     omStore.initialize();
 
     // Start the cluster
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setNumDatanodes(7)
-        .setTotalPipelineNumLimit(10)
+    cluster = MiniOzoneCluster.newOMHABuilder(conf)
+        .setNumDatanodes(5)
+        .setTotalPipelineNumLimit(3)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
 
     om = cluster.getOzoneManager();
+  }
+
+  @Before
+  public void init() throws Exception {
+    // Duplicate the conf for each test, so the client can change it, and each
+    // test will still get the same base conf used to start the cluster.
+    conf = new OzoneConfiguration(cluster.getConf());
+
     Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    ObjectStore objectStore =
-        OzoneClientFactory.getRpcClient(omServiceId, conf).getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
 
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
@@ -135,8 +167,9 @@ public class TestOzoneFsHAURLs {
     fs.mkdirs(dir2);
   }
 
-  @After
-  public void shutdown() {
+  @AfterClass
+  public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -152,7 +185,7 @@ public class TestOzoneFsHAURLs {
         omLeader);
     String omNodeId = omLeader.getOMNodeId();
     // omLeaderAddrKey=ozone.om.address.omServiceId.omNodeId
-    String omLeaderAddrKey = OmUtils.addKeySuffixes(
+    String omLeaderAddrKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
     String omLeaderAddr = conf.get(omLeaderAddrKey);
     LOG.info("OM leader: nodeId={}, {}={}", omNodeId, omLeaderAddrKey,
@@ -167,7 +200,7 @@ public class TestOzoneFsHAURLs {
    */
   private String getHostFromAddress(String addr) {
     Optional<String> hostOptional = getHostName(addr);
-    assert(hostOptional.isPresent());
+    assert (hostOptional.isPresent());
     return hostOptional.get();
   }
 
@@ -178,7 +211,7 @@ public class TestOzoneFsHAURLs {
    */
   private int getPortFromAddress(String addr) {
     OptionalInt portOptional = getHostPort(addr);
-    assert(portOptional.isPresent());
+    assert (portOptional.isPresent());
     return portOptional.getAsInt();
   }
 
@@ -328,5 +361,52 @@ public class TestOzoneFsHAURLs {
     String unqualifiedFs2 = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     testWithDefaultFS(unqualifiedFs2);
+  }
+
+  @Test
+  public void testIncorrectAuthorityInURI() throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(conf);
+    clientConf.setQuietMode(false);
+    clientConf.set(o3fsImplKey, o3fsImplValue);
+    clientConf.set(ofsImplKey, ofsImplValue);
+    FsShell shell = new FsShell(clientConf);
+    String incorrectSvcId = "dummy";
+    String o3fsPathWithCorrectSvcId =
+        String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+            bucketName, volumeName, omServiceId);
+    String o3fsPathWithInCorrectSvcId =
+        String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+            bucketName, volumeName, incorrectSvcId);
+    String ofsPathWithCorrectSvcId = "ofs://" + omServiceId + "/";
+    String ofsPathWithIncorrectSvcId = "ofs://" + incorrectSvcId + "/";
+    try {
+      int res = ToolRunner.run(shell,
+          new String[] {"-ls", ofsPathWithCorrectSvcId });
+      Assert.assertEquals(0, res);
+      res = ToolRunner.run(shell,
+          new String[] {"-ls", o3fsPathWithCorrectSvcId });
+      Assert.assertEquals(0, res);
+
+      try (GenericTestUtils.SystemErrCapturer capture = new
+          GenericTestUtils.SystemErrCapturer()) {
+        res = ToolRunner.run(shell,
+            new String[] {"-ls", ofsPathWithIncorrectSvcId });
+        Assert.assertEquals(1, res);
+        Assert.assertTrue(
+            capture.getOutput().contains("Cannot resolve OM host"));
+      }
+
+      try (GenericTestUtils.SystemErrCapturer capture = new
+          GenericTestUtils.SystemErrCapturer()) {
+        res = ToolRunner.run(shell,
+            new String[] {"-ls", o3fsPathWithInCorrectSvcId });
+        Assert.assertEquals(1, res);
+        Assert.assertTrue(
+            capture.getOutput().contains("Cannot resolve OM host"));
+      }
+    } finally {
+      shell.close();
+    }
+
   }
 }

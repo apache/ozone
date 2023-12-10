@@ -22,7 +22,7 @@ import java.util.Objects;
 
 /**
  * A class used to encapsulate a single OM DB update event.
- * Currently only PUT and DELETE are supported.
+ * Currently PUT, DELETE and UPDATE are supported.
  * @param <KEY> Type of Key.
  * @param <VALUE> Type of Value.
  */
@@ -83,12 +83,13 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
     }
     OMDBUpdateEvent that = (OMDBUpdateEvent) o;
     return this.updatedKey.equals(that.updatedKey) &&
+        this.table.equals(that.table) &&
         this.action.equals(that.action);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(updatedKey, action);
+    return Objects.hash(updatedKey, table, action);
   }
 
   /**

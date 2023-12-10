@@ -17,12 +17,16 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import static org.junit.Assert.*;
-
 import javax.servlet.http.HttpServletRequest;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Testing HTML Quoting.
@@ -48,7 +52,7 @@ public class TestHtmlQuoting {
     assertEquals("&amp;&amp;&amp;", HtmlQuoting.quoteHtmlChars("&&&"));
     assertEquals(" &apos;\n", HtmlQuoting.quoteHtmlChars(" '\n"));
     assertEquals("&quot;", HtmlQuoting.quoteHtmlChars("\""));
-    assertEquals(null, HtmlQuoting.quoteHtmlChars(null));
+    assertNull(HtmlQuoting.quoteHtmlChars(null));
   }
 
   private void runRoundTrip(String str) throws Exception {
@@ -77,20 +81,20 @@ public class TestHtmlQuoting {
         new HttpServer2.QuotingInputFilter.RequestQuoter(mockReq);
 
     Mockito.doReturn("a<b").when(mockReq).getParameter("x");
-    assertEquals("Test simple param quoting",
-        "a&lt;b", quoter.getParameter("x"));
+    assertEquals("a&lt;b", quoter.getParameter("x"),
+        "Test simple param quoting");
 
     Mockito.doReturn(null).when(mockReq).getParameter("x");
-    assertEquals("Test that missing parameters dont cause NPE",
-        null, quoter.getParameter("x"));
+    assertNull(quoter.getParameter("x"),
+        "Test that missing parameters dont cause NPE");
 
     Mockito.doReturn(new String[] {"a<b", "b"}).when(mockReq)
         .getParameterValues("x");
-    assertArrayEquals("Test escaping of an array",
-        new String[] {"a&lt;b", "b"}, quoter.getParameterValues("x"));
+    assertArrayEquals(new String[] {"a&lt;b", "b"},
+        quoter.getParameterValues("x"), "Test escaping of an array");
 
     Mockito.doReturn(null).when(mockReq).getParameterValues("x");
-    assertArrayEquals("Test that missing parameters dont cause NPE for array",
-        null, quoter.getParameterValues("x"));
+    assertNull(quoter.getParameterValues("x"),
+        "Test that missing parameters dont cause NPE for array");
   }
 }

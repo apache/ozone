@@ -18,30 +18,37 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import java.util.UUID;
+
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 
-import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test OM's snapshot provider service.
  */
+@Timeout(300)
 public class TestOzoneManagerSnapshotProvider {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -52,13 +59,12 @@ public class TestOzoneManagerSnapshotProvider {
   private String omServiceId;
   private int numOfOMs = 3;
 
-  @Rule
-  public Timeout timeout = new Timeout(300_000);
+  private OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -66,22 +72,23 @@ public class TestOzoneManagerSnapshotProvider {
     omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    objectStore = client.getObjectStore();
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -103,27 +110,38 @@ public class TestOzoneManagerSnapshotProvider {
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
 
     retVolumeinfo.createBucket(bucketName);
-    OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
-    OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
+
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM
-    String followerNodeId = ozoneManager.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Download latest checkpoint from leader OM to follower OM
     DBCheckpoint omSnapshot = followerOM.getOmSnapshotProvider()
-        .getOzoneManagerDBSnapshot(leaderOMNodeId);
+        .downloadDBSnapshotFromLeader(leaderOMNodeId);
 
-    long leaderSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
-    long downloadedSnapshotIndex = omSnapshot.getRatisSnapshotIndex();
+    long leaderSnapshotIndex = leaderOM.getRatisSnapshotIndex();
+    long downloadedSnapshotIndex = getDownloadedSnapshotIndex(omSnapshot);
 
     // The snapshot index downloaded from leader OM should match the ratis
     // snapshot index on the leader OM
-    Assert.assertEquals("The snapshot index downloaded from leader OM does " +
-        "not match its ratis snapshot index",
-        leaderSnapshotIndex, downloadedSnapshotIndex);
+    assertEquals(leaderSnapshotIndex, downloadedSnapshotIndex,
+        "The snapshot index downloaded from leader OM " +
+            "does not match its ratis snapshot index");
+  }
+
+  private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
+      throws Exception {
+
+    TransactionInfo trxnInfoFromCheckpoint =
+        OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
+            dbCheckpoint.getCheckpointLocation());
+
+    return trxnInfoFromCheckpoint.getTransactionIndex();
   }
 }

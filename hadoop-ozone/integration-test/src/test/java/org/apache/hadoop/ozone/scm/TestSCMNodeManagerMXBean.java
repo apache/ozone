@@ -18,14 +18,15 @@
 
 package org.apache.hadoop.ozone.scm;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -39,22 +40,24 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Class which tests the SCMNodeManagerInfo Bean.
  */
+@Timeout(300)
 public class TestSCMNodeManagerMXBean {
-  public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
+
+  public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
   private static int numOfDatanodes = 3;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
   private static MBeanServer mbs;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws IOException, TimeoutException,
       InterruptedException {
     conf = new OzoneConfiguration();
@@ -67,7 +70,7 @@ public class TestSCMNodeManagerMXBean {
     mbs = ManagementFactory.getPlatformMBeanServer();
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() {
     if (cluster != null) {
       cluster.shutdown();
@@ -92,17 +95,38 @@ public class TestSCMNodeManagerMXBean {
             + "name=SCMNodeManagerInfo");
 
     TabularData data = (TabularData) mbs.getAttribute(bean, "NodeCount");
-    Map<String, Integer> nodeCount = scm.getScmNodeManager().getNodeCount();
-    Map<String, Long> nodeCountLong = new HashMap<>();
-    nodeCount.forEach((k, v) -> nodeCountLong.put(k, new Long(v)));
-    verifyEquals(data, nodeCountLong);
+    Map<String, Map<String, Integer>> mbeanMap = convertNodeCountToMap(data);
+    Map<String, Map<String, Integer>> nodeMap =
+        scm.getScmNodeManager().getNodeCount();
+    assertTrue(nodeMap.equals(mbeanMap));
+  }
+
+  private Map<String, Map<String, Integer>> convertNodeCountToMap(
+      TabularData data) {
+    Map<String, Map<String, Integer>> map = new HashMap<>();
+    for (Object o : data.values()) {
+      CompositeData cds = (CompositeData) o;
+      Iterator<?> it = cds.values().iterator();
+      String opState = it.next().toString();
+      TabularData states = (TabularData) it.next();
+
+      Map<String, Integer> healthStates = new HashMap<>();
+      for (Object obj : states.values()) {
+        CompositeData stateData = (CompositeData) obj;
+        Iterator<?> stateIt = stateData.values().iterator();
+        String health = stateIt.next().toString();
+        Integer value = Integer.parseInt(stateIt.next().toString());
+        healthStates.put(health, value);
+      }
+      map.put(opState, healthStates);
+    }
+    return map;
   }
 
   private void verifyEquals(TabularData actualData, Map<String, Long>
       expectedData) {
-    if (actualData == null || expectedData == null) {
-      fail("Data should not be null.");
-    }
+    assertNotNull(actualData);
+    assertNotNull(expectedData);
     for (Object obj : actualData.values()) {
       assertTrue(obj instanceof CompositeData);
       CompositeData cds = (CompositeData) obj;

@@ -3,7 +3,7 @@ title: Recon server v2
 summary: Second phase of Recon development. Recon acts as a passive SCM.
 date: 2019-08-19
 jira: HDDS-1996
-status: implementing
+status: implemented
 author: Aravindan Vijayan, Vivek Ratnavel Subramanian, Sid Wagle
 ---
 <!--

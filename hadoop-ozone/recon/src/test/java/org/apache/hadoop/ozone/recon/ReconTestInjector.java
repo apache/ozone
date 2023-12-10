@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -35,14 +36,15 @@ import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
-import org.junit.Assert;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.ratis.util.Preconditions;
 import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
@@ -67,13 +69,17 @@ public class ReconTestInjector {
   private boolean withContainerDB = false;
   private List<Module> additionalModules = new ArrayList<>();
   private boolean withReconSqlDb = false;
-  private TemporaryFolder temporaryFolder;
+  private File tmpDir;
   private Map<Class, Class> extraInheritedBindings = new HashMap<>();
   private Map<Class, Object> extraInstanceBindings = new HashMap<>();
   private Set<Class> extraClassBindings = new HashSet<>();
 
-  public ReconTestInjector(TemporaryFolder temporaryFolder) {
-    this.temporaryFolder = temporaryFolder;
+  public ReconTestInjector(TemporaryFolder temporaryFolder) throws IOException {
+    this.tmpDir = temporaryFolder.newFolder();
+  }
+
+  public ReconTestInjector(File tmpDir) {
+    this.tmpDir = tmpDir;
   }
 
   public void setWithReconSqlDb(boolean withReconSqlDb) {
@@ -146,52 +152,53 @@ public class ReconTestInjector {
     return injector;
   }
 
-  void setupInjector() throws IOException {
+  void setupInjector() {
+    Preconditions.assertNotNull(tmpDir, "no temp dir");
+
     List<Module> modules = new ArrayList<>();
 
     modules.add(new AbstractModule() {
       @Override
       protected void configure() {
-        try {
-          bind(OzoneConfiguration.class).toInstance(
-              getTestOzoneConfiguration(temporaryFolder.newFolder()));
+        bind(OzoneConfiguration.class).toInstance(
+            getTestOzoneConfiguration(tmpDir));
 
-          if (reconOMMetadataManager != null) {
-            bind(ReconOMMetadataManager.class)
-                .toInstance(reconOMMetadataManager);
-          }
+        if (reconOMMetadataManager != null) {
+          bind(ReconOMMetadataManager.class)
+              .toInstance(reconOMMetadataManager);
+        }
 
-          if (ozoneManagerServiceProvider != null) {
-            bind(OzoneManagerServiceProvider.class)
-                .toInstance(ozoneManagerServiceProvider);
-          }
+        if (ozoneManagerServiceProvider != null) {
+          bind(OzoneManagerServiceProvider.class)
+              .toInstance(ozoneManagerServiceProvider);
+        }
 
-          if (reconScm != null) {
-            bind(OzoneStorageContainerManager.class).toInstance(reconScm);
-          }
+        if (reconScm != null) {
+          bind(OzoneStorageContainerManager.class).toInstance(reconScm);
+        }
 
-          if (withContainerDB) {
-            bind(ContainerDBServiceProvider.class)
-                .to(ContainerDBServiceProviderImpl.class).in(Singleton.class);
-            bind(DBStore.class).toProvider(ReconContainerDBProvider.class).
-                in(Singleton.class);
-          }
+        if (withContainerDB) {
+          bind(ReconContainerMetadataManager.class)
+              .to(ReconContainerMetadataManagerImpl.class)
+                  .in(Singleton.class);
+          bind(ReconNamespaceSummaryManager.class)
+                  .to(ReconNamespaceSummaryManagerImpl.class)
+                  .in(Singleton.class);
+          bind(ReconDBProvider.class).in(Singleton.class);
+        }
 
-          for (Map.Entry<Class, Object> entry :
-              extraInstanceBindings.entrySet()) {
-            bind(entry.getKey()).toInstance(entry.getValue());
-          }
+        for (Map.Entry<Class, Object> entry :
+            extraInstanceBindings.entrySet()) {
+          bind(entry.getKey()).toInstance(entry.getValue());
+        }
 
-          for (Map.Entry<Class, Class> entry :
-              extraInheritedBindings.entrySet()) {
-            bind(entry.getKey()).to(entry.getValue()).in(Singleton.class);
-          }
+        for (Map.Entry<Class, Class> entry :
+            extraInheritedBindings.entrySet()) {
+          bind(entry.getKey()).to(entry.getValue()).in(Singleton.class);
+        }
 
-          for (Class type : extraClassBindings) {
-            bind(type).in(Singleton.class);
-          }
-        } catch (IOException e) {
-          Assert.fail();
+        for (Class type : extraClassBindings) {
+          bind(type).in(Singleton.class);
         }
       }
     });
@@ -219,6 +226,8 @@ public class ReconTestInjector {
     configuration.set(OZONE_RECON_SCM_DB_DIR, dir.getAbsolutePath());
     configuration.set(OZONE_RECON_DATANODE_ADDRESS_KEY,
         "0.0.0.0:0");
+    configuration.set(OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
+        "http://localhost:6666");
     return configuration;
   }
 
@@ -229,8 +238,12 @@ public class ReconTestInjector {
   public static class Builder {
     private ReconTestInjector reconTestInjector;
 
-    public Builder(TemporaryFolder temporaryFolder) {
+    public Builder(TemporaryFolder temporaryFolder) throws IOException {
       reconTestInjector = new ReconTestInjector(temporaryFolder);
+    }
+
+    public Builder(File tmpDir) {
+      reconTestInjector = new ReconTestInjector(tmpDir);
     }
 
     /**

@@ -32,13 +32,54 @@ public final class ReconConfigKeys {
 
   public static final String RECON_SCM_CONFIG_PREFIX = "ozone.recon.scmconfig";
 
+  public static final String OZONE_RECON_DB_DIR = "ozone.recon.db.dir";
+
+  public static final String OZONE_RECON_DB_DIRS_PERMISSIONS =
+      "ozone.recon.db.dirs.permissions";
+
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =
       "ozone.recon.address";
+  // Fully qualified heatmap provider implementation class name key.
+  public static final String OZONE_RECON_HEATMAP_PROVIDER_KEY =
+      "ozone.recon.heatmap.provider";
+  public static final String OZONE_RECON_HEATMAP_ENABLE_KEY =
+      "ozone.recon.heatmap.enable";
+  public static final boolean OZONE_RECON_HEATMAP_ENABLE_DEFAULT = false;
+  public static final String OZONE_RECON_ADDRESS_DEFAULT =
+      "0.0.0.0:9891";
+  public static final String OZONE_RECON_HTTP_ADDRESS_KEY =
+      "ozone.recon.http-address";
+  public static final String OZONE_RECON_HTTP_ADDRESS_DEFAULT =
+      "0.0.0.0:9888";
+  public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
+      "ozone.recon.https-address";
+  public static final String OZONE_RECON_HTTPS_ADDRESS_DEFAULT =
+      "0.0.0.0:9889";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_KEY =
       "ozone.recon.datanode.bind.host";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_DATANODE_PORT_DEFAULT = 9891;
+  // Prometheus HTTP endpoint including port
+  // ex: http://prometheus:9090
+  public static final String OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT =
+      "ozone.recon.prometheus.http.endpoint";
+  /**
+   * Recon administrator users delimited by a comma.
+   * This is the list of users who can access admin only information from recon.
+   * Users defined in
+   * {@link org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS}
+   * will always be able to access all recon information regardless of this
+   * setting.
+   */
+  public static final String OZONE_RECON_ADMINISTRATORS =
+      "ozone.recon.administrators";
+
+  public static final String OZONE_RECON_ADMINISTRATORS_GROUPS =
+      "ozone.recon.administrators.groups";
+
+  public static final String OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD
+      = "ozone.recon.task.safemode.wait.threshold";
 }

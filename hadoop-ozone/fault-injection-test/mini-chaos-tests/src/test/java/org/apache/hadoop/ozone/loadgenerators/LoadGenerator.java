@@ -18,10 +18,27 @@
 
 package org.apache.hadoop.ozone.loadgenerators;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Interface for load generator.
  */
 public abstract class LoadGenerator {
+  public static List<Class<? extends LoadGenerator>> getClassList() {
+    List<Class<? extends LoadGenerator>> classList = new ArrayList<>();
+
+    classList.add(AgedDirLoadGenerator.class);
+    classList.add(AgedLoadGenerator.class);
+    classList.add(FilesystemLoadGenerator.class);
+    classList.add(NestedDirLoadGenerator.class);
+    classList.add(RandomDirLoadGenerator.class);
+    classList.add(RandomLoadGenerator.class);
+    classList.add(ReadOnlyLoadGenerator.class);
+
+    return classList;
+  }
+
   /*
    * The implemented LoadGenerators constructors should have the
    * constructor with the signature as following
@@ -33,14 +50,14 @@ public abstract class LoadGenerator {
    * }
    */
 
-  private final String keyNameDelimiter = "_";
+  private static final String KEY_NAME_DELIMITER = "_";
 
   public abstract void initialize() throws Exception;
 
   public abstract void generateLoad() throws Exception;
 
   String getKeyName(int keyIndex) {
-    return toString() + keyNameDelimiter + keyIndex;
+    return toString() + KEY_NAME_DELIMITER + keyIndex;
   }
 
   @Override

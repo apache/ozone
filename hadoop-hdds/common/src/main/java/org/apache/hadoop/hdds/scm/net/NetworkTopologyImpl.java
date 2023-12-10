@@ -27,12 +27,14 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Collectors;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
@@ -45,9 +47,9 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DE
  * (computers) and inner nodes represent datacenter/core-switches/routers that
  * manages traffic in/out of data centers or racks.
  */
-public class NetworkTopologyImpl implements NetworkTopology{
+public class NetworkTopologyImpl implements NetworkTopology {
   public static final Logger LOG =
-      LoggerFactory.getLogger(NetworkTopology.class);
+      LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
   /** The Inner node crate factory. */
   private final InnerNode.Factory factory;
@@ -57,12 +59,27 @@ public class NetworkTopologyImpl implements NetworkTopology{
   private final int maxLevel;
   /** Schema manager. */
   private final NodeSchemaManager schemaManager;
+  /** The algorithm to randomize nodes with equal distances. */
+  private final Consumer<List<? extends Node>> shuffleOperation;
   /** Lock to coordinate cluster tree access. */
-  private ReadWriteLock netlock = new ReentrantReadWriteLock(true);
+  private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
   public NetworkTopologyImpl(ConfigurationSource conf) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
+    shuffleOperation = Collections::shuffle;
+    maxLevel = schemaManager.getMaxLevel();
+    factory = InnerNodeImpl.FACTORY;
+    clusterTree = factory.newInnerNode(ROOT, null, null,
+        NetConstants.ROOT_LEVEL,
+        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+  }
+
+  @VisibleForTesting
+  public NetworkTopologyImpl(NodeSchemaManager manager,
+                             Consumer<List<? extends Node>> shuffleOperation) {
+    schemaManager = manager;
+    this.shuffleOperation = shuffleOperation;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -72,12 +89,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
 
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager) {
-    schemaManager = manager;
-    maxLevel = schemaManager.getMaxLevel();
-    factory = InnerNodeImpl.FACTORY;
-    clusterTree = factory.newInnerNode(ROOT, null, null,
-        NetConstants.ROOT_LEVEL,
-        schemaManager.getCost(NetConstants.ROOT_LEVEL));
+    this(manager, Collections::shuffle);
   }
 
   /**
@@ -86,11 +98,12 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @exception IllegalArgumentException if add a node to a leave or node to be
    * added is not a leaf
    */
+  @Override
   public void add(Node node) {
     Preconditions.checkArgument(node != null, "node cannot be null");
     if (node instanceof InnerNode) {
       throw new IllegalArgumentException(
-          "Not allowed to add an inner node: "+ node.getNetworkFullPath());
+          "Not allowed to add an inner node: " + node.getNetworkFullPath());
     }
     int newDepth = NetUtils.locationToDepth(node.getNetworkLocation()) + 1;
 
@@ -103,7 +116,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     boolean add;
     try {
       add = clusterTree.add(node);
-    }finally {
+    } finally {
       netlock.writeLock().unlock();
     }
 
@@ -116,20 +129,74 @@ public class NetworkTopologyImpl implements NetworkTopology{
   }
 
   /**
+   * Update a leaf node. It is called when a datanode needs to be updated.
+   * If the old datanode does not exist, then just add the new datanode.
+   * @param oldNode node to be updated; can be null
+   * @param newNode node to update to; cannot be null
+   */
+  @Override
+  public void update(Node oldNode, Node newNode) {
+    Preconditions.checkArgument(newNode != null, "newNode cannot be null");
+    if (oldNode instanceof InnerNode) {
+      throw new IllegalArgumentException(
+              "Not allowed to update an inner node: "
+                      + oldNode.getNetworkFullPath());
+    }
+
+    if (newNode instanceof InnerNode) {
+      throw new IllegalArgumentException(
+              "Not allowed to update a leaf node to an inner node: "
+                      + newNode.getNetworkFullPath());
+    }
+
+    int newDepth = NetUtils.locationToDepth(newNode.getNetworkLocation()) + 1;
+    // Check depth
+    if (maxLevel != newDepth) {
+      throw new InvalidTopologyException("Failed to update to " +
+              newNode.getNetworkFullPath()
+              + ": Its path depth is not "
+              + maxLevel);
+    }
+
+    netlock.writeLock().lock();
+    boolean add;
+    try {
+      boolean exist = false;
+      if (oldNode != null) {
+        exist = containsNode(oldNode);
+      }
+      if (exist) {
+        clusterTree.remove(oldNode);
+      }
+
+      add = clusterTree.add(newNode);
+    } finally {
+      netlock.writeLock().unlock();
+    }
+    if (add) {
+      LOG.info("Updated to the new node: {}", newNode.getNetworkFullPath());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("NetworkTopology became:\n{}", this);
+      }
+    }
+  }
+
+  /**
    * Remove a node from the network topology. This will be called when a
    * existing datanode is removed from the system.
    * @param node node to be removed; cannot be null
    */
+  @Override
   public void remove(Node node) {
     Preconditions.checkArgument(node != null, "node cannot be null");
     if (node instanceof InnerNode) {
       throw new IllegalArgumentException(
-          "Not allowed to remove an inner node: "+ node.getNetworkFullPath());
+          "Not allowed to remove an inner node: " + node.getNetworkFullPath());
     }
     netlock.writeLock().lock();
     try {
       clusterTree.remove(node);
-    }finally {
+    } finally {
       netlock.writeLock().unlock();
     }
     LOG.info("Removed a node: {}", node.getNetworkFullPath());
@@ -143,27 +210,30 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param node a node
    * @return true if <i>node</i> is already in the tree; false otherwise
    */
+  @Override
   public boolean contains(Node node) {
     Preconditions.checkArgument(node != null, "node cannot be null");
     netlock.readLock().lock();
     try {
-      Node parent = node.getParent();
-      while (parent != null && parent != clusterTree) {
-        parent = parent.getParent();
-      }
-      if (parent == clusterTree) {
-        return true;
-      }
+      return containsNode(node);
     } finally {
       netlock.readLock().unlock();
     }
-    return false;
+  }
+
+  private boolean containsNode(Node node) {
+    Node parent = node.getParent();
+    while (parent != null && parent != clusterTree) {
+      parent = parent.getParent();
+    }
+    return parent == clusterTree;
   }
 
   /**
    * Compare the specified ancestor generation of each node for equality.
    * @return true if their specified generation ancestor are equal
    */
+  @Override
   public boolean isSameAncestor(Node node1, Node node2, int ancestorGen) {
     if (node1 == null || node2 == null || ancestorGen <= 0) {
       return false;
@@ -180,6 +250,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * Compare the direct parent of each node for equality.
    * @return true if their parent are the same
    */
+  @Override
   public boolean isSameParent(Node node1, Node node2) {
     if (node1 == null || node2 == null) {
       return false;
@@ -201,6 +272,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param ancestorGen  the ancestor generation
    * @return the ancestor. If no ancestor is found, then null is returned.
    */
+  @Override
   public Node getAncestor(Node node, int ancestorGen) {
     if (node == null) {
       return null;
@@ -219,6 +291,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param loc a path string representing a node, can be leaf or inner node
    * @return a reference to the node, null if the node is not in the tree
    */
+  @Override
   public Node getNode(String loc) {
     loc = NetUtils.normalize(loc);
     netlock.readLock().lock();
@@ -239,6 +312,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @return the number of leaf nodes for InnerNode, 1 for leaf node, 0 if node
    * doesn't exist
    */
+  @Override
   public int getNumOfLeafNode(String loc) {
     netlock.readLock().lock();
     try {
@@ -256,6 +330,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * Return the max level of this tree, start from 1 for ROOT. For example,
    * topology like "/rack/node" has the max level '3'.
    */
+  @Override
   public int getMaxLevel() {
     return maxLevel;
   }
@@ -265,6 +340,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param level topology level, start from 1, which means ROOT
    * @return the number of nodes on the level
    */
+  @Override
   public int getNumOfNodes(int level) {
     Preconditions.checkArgument(level > 0 && level <= maxLevel,
         "Invalid level");
@@ -277,18 +353,36 @@ public class NetworkTopologyImpl implements NetworkTopology{
   }
 
   /**
+   * Return the node at level <i>level</i>.
+   * @param level topology level, start from 1, which means ROOT
+   * @return the nodes on the level
+   */
+  @Override
+  public List<Node> getNodes(int level) {
+    Preconditions.checkArgument(level > 0 && level <= maxLevel,
+        "Invalid level");
+    netlock.readLock().lock();
+    try {
+      return clusterTree.getNodes(level);
+    } finally {
+      netlock.readLock().unlock();
+    }
+  }
+
+  /**
    * Randomly choose a node in the scope.
    * @param scope range of nodes from which a node will be chosen. If scope
    *              starts with ~, choose one from the all nodes except for the
    *              ones in <i>scope</i>; otherwise, choose one from <i>scope</i>.
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope) {
     if (scope == null) {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, null, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -305,6 +399,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *                      starts with ~
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, List<String> excludedScopes) {
     return chooseRandom(scope, excludedScopes, null, null,
         ANCESTOR_GENERATION_DEFAULT);
@@ -322,12 +417,13 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, Collection<Node> excludedNodes) {
     if (scope == null) {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -355,13 +451,14 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, Collection<Node> excludedNodes,
       int ancestorGen) {
     if (scope == null) {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList();
+      ArrayList<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ancestorGen);
@@ -388,8 +485,10 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *                     excludedNodes if affinityNode is null
    * @return the chosen node
    */
+  @Override
   public Node chooseRandom(String scope, List<String> excludedScopes,
-      Collection<Node> excludedNodes, Node affinityNode, int ancestorGen) {
+      Collection<? extends Node> excludedNodes, Node affinityNode,
+      int ancestorGen) {
     if (scope == null) {
       scope = ROOT;
     }
@@ -457,6 +556,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
    *   from subtree /dc1. LeafIndex 1, so we pick the 2nd available node n4.
    *
    */
+  @Override
   public Node getNode(int leafIndex, String scope, List<String> excludedScopes,
       Collection<Node> excludedNodes, Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(leafIndex >= 0);
@@ -477,10 +577,19 @@ public class NetworkTopologyImpl implements NetworkTopology{
     }
   }
 
+  @SuppressWarnings("java:S2245") // no need for secure random
   private Node chooseNodeInternal(String scope, int leafIndex,
-      List<String> excludedScopes, Collection<Node> excludedNodes,
+      List<String> excludedScopes, Collection<? extends Node> excludedNodes,
       Node affinityNode, int ancestorGen) {
     Preconditions.checkArgument(scope != null);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = "
+              + "{}, excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
+          scope, leafIndex,
+          excludedScopes == null ? "" : excludedScopes,
+          excludedNodes == null ? "" : excludedNodes,
+          affinityNode == null ? "" : affinityNode, ancestorGen);
+    }
 
     String finalScope = scope;
     if (affinityNode != null && ancestorGen > 0) {
@@ -491,13 +600,18 @@ public class NetworkTopologyImpl implements NetworkTopology{
             " generation  " + ancestorGen);
       }
       // affinity ancestor should has overlap with scope
-      if (affinityAncestor.getNetworkFullPath().startsWith(scope)){
+      if (affinityAncestor.isDescendant(scope)) {
         finalScope = affinityAncestor.getNetworkFullPath();
       } else if (!scope.startsWith(affinityAncestor.getNetworkFullPath())) {
         return null;
       }
       // reset ancestor generation since the new scope is identified now
       ancestorGen = 0;
+    }
+    Node scopeNode = getNode(finalScope);
+    if (scopeNode == null) {
+      throw new IllegalArgumentException(String.format("No nodes with Scope: " +
+              "%s exists", finalScope));
     }
 
     // check overlap of excludedScopes and finalScope
@@ -506,12 +620,14 @@ public class NetworkTopologyImpl implements NetworkTopology{
       mutableExcludedScopes = new ArrayList<>();
       for (String s: excludedScopes) {
         // excludeScope covers finalScope
-        if (finalScope.startsWith(s)) {
+        if (scopeNode.isDescendant(s)) {
           return null;
         }
         // excludeScope and finalScope share nothing case
-        if (s.startsWith(finalScope)) {
-          if (mutableExcludedScopes.stream().noneMatch(s::startsWith)) {
+        if (scopeNode.isAncestor(s)) {
+          Node node = getNode(s);
+          if (node != null &&
+              mutableExcludedScopes.stream().noneMatch(node::isDescendant)) {
             mutableExcludedScopes.add(s);
           }
         }
@@ -519,12 +635,16 @@ public class NetworkTopologyImpl implements NetworkTopology{
     }
 
     // clone excludedNodes before remove duplicate in it
-    Collection<Node> mutableExNodes = null;
+    Collection<Node> mutableExNodes = new LinkedHashSet<>();
+
+    // add affinity node to mutableExNodes
+    if (affinityNode != null) {
+      mutableExNodes.add(affinityNode);
+    }
 
     // Remove duplicate in excludedNodes
     if (excludedNodes != null) {
-      mutableExNodes =
-          excludedNodes.stream().distinct().collect(Collectors.toList());
+      mutableExNodes.addAll(excludedNodes);
     }
 
     // remove duplicate in mutableExNodes and mutableExcludedScopes
@@ -532,7 +652,6 @@ public class NetworkTopologyImpl implements NetworkTopology{
         ancestorGen);
 
     // calculate available node count
-    Node scopeNode = getNode(finalScope);
     int availableNodes = getAvailableNodesCount(
         scopeNode.getNetworkFullPath(), mutableExcludedScopes, mutableExNodes,
         ancestorGen);
@@ -562,8 +681,9 @@ public class NetworkTopologyImpl implements NetworkTopology{
           mutableExNodes, ancestorGen);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Choosing node[index={},random={}] from \"{}\" available " +
-              "nodes, scope=\"{}\", excludedScope=\"{}\", excludeNodes=\"{}\".",
+      LOG.debug("Finish choosing node[index = {}, random = {}] from {} " +
+              "available nodes, scope = {}, excludedScope = {}," +
+              "excludeNodes = {}.",
           nodeIndex, (leafIndex == -1 ? "true" : "false"), availableNodes,
           scopeNode.getNetworkFullPath(), excludedScopes, excludedNodes);
       LOG.debug("Chosen node = {}", (ret == null ? "not found" :
@@ -582,8 +702,9 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * are the same or {@link Integer#MAX_VALUE} if node1 or node2 do not belong
    * to the cluster
    */
+  @Override
   public int getDistanceCost(Node node1, Node node2) {
-    if ((node1 != null && node2 != null && node1.equals(node2)) ||
+    if ((node1 != null && node1.equals(node2)) ||
         (node1 == null && node2 == null))  {
       return 0;
     }
@@ -591,34 +712,40 @@ public class NetworkTopologyImpl implements NetworkTopology{
       LOG.warn("One of the nodes is a null pointer");
       return Integer.MAX_VALUE;
     }
+
+    // verify levels are in range
+    int level1 = node1.getLevel();
+    int level2 = node2.getLevel();
+    if (level1 < NetConstants.ROOT_LEVEL || level2 < NetConstants.ROOT_LEVEL) {
+      return Integer.MAX_VALUE;
+    }
+    if (level1 > maxLevel || level2 > maxLevel) {
+      return Integer.MAX_VALUE;
+    }
+
     int cost = 0;
     netlock.readLock().lock();
     try {
-      if ((node1.getAncestor(maxLevel - 1) != clusterTree) ||
-          (node2.getAncestor(maxLevel - 1) != clusterTree)) {
+      if ((node1.getAncestor(level1 - 1) != clusterTree) ||
+          (node2.getAncestor(level2 - 1) != clusterTree)) {
         LOG.debug("One of the nodes is outside of network topology");
         return Integer.MAX_VALUE;
       }
-      int level1 = node1.getLevel();
-      int level2 = node2.getLevel();
-      if (level1 > maxLevel || level2 > maxLevel) {
-        return Integer.MAX_VALUE;
-      }
-      while(level1 > level2 && node1 != null) {
+      while (level1 > level2 && node1 != null) {
         node1 = node1.getParent();
         level1--;
-        cost += node1 == null? 0 : node1.getCost();
+        cost += node1 == null ? 0 : node1.getCost();
       }
-      while(level2 > level1 && node2 != null) {
+      while (level2 > level1 && node2 != null) {
         node2 = node2.getParent();
         level2--;
-        cost += node2 == null? 0 : node2.getCost();
+        cost += node2 == null ? 0 : node2.getCost();
       }
-      while(node1 != null && node2 != null && node1 != node2) {
+      while (node1 != null && node2 != null && node1 != node2) {
         node1 = node1.getParent();
         node2 = node2.getParent();
-        cost += node1 == null? 0 : node1.getCost();
-        cost += node2 == null? 0 : node2.getCost();
+        cost += node1 == null ? 0 : node1.getCost();
+        cost += node2 == null ? 0 : node2.getCost();
       }
       return cost;
     } finally {
@@ -636,37 +763,40 @@ public class NetworkTopologyImpl implements NetworkTopology{
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
    * @param activeLen Number of active nodes at the front of the array
+   *
+   * @return list of sorted nodes if reader is not null,
+   * or shuffled input nodes otherwise. The size of returned list is limited
+   * by activeLen parameter.
    */
-  public List<? extends Node> sortByDistanceCost(Node reader,
-      List<? extends Node> nodes, int activeLen) {
-    /** Sort weights for the nodes array */
+  @Override
+  public <N extends Node> List<N> sortByDistanceCost(Node reader,
+      List<N> nodes, int activeLen) {
+    // shuffle input list of nodes if reader is not defined
     if (reader == null) {
-      return nodes;
+      List<N> shuffledNodes =
+          new ArrayList<>(nodes.subList(0, activeLen));
+      shuffleOperation.accept(shuffledNodes);
+      return shuffledNodes;
     }
+    // Sort weights for the nodes array
     int[] costs = new int[activeLen];
     for (int i = 0; i < activeLen; i++) {
       costs[i] = getDistanceCost(reader, nodes.get(i));
     }
     // Add cost/node pairs to a TreeMap to sort
-    TreeMap<Integer, List<Node>> tree = new TreeMap<Integer, List<Node>>();
+    NavigableMap<Integer, List<N>> tree = new TreeMap<>();
     for (int i = 0; i < activeLen; i++) {
       int cost = costs[i];
-      Node node = nodes.get(i);
-      List<Node> list = tree.get(cost);
-      if (list == null) {
-        list = Lists.newArrayListWithExpectedSize(1);
-        tree.put(cost, list);
-      }
-      list.add(node);
+      N node = nodes.get(i);
+      tree.computeIfAbsent(cost, k -> Lists.newArrayListWithExpectedSize(1))
+          .add(node);
     }
 
-    List<Node> ret = new ArrayList<>();
-    for (List<Node> list: tree.values()) {
+    List<N> ret = new ArrayList<>();
+    for (List<N> list : tree.values()) {
       if (list != null) {
-        Collections.shuffle(list);
-        for (Node n: list) {
-          ret.add(n);
-        }
+        shuffleOperation.accept(list);
+        ret.addAll(list);
       }
     }
 
@@ -694,13 +824,12 @@ public class NetworkTopologyImpl implements NetworkTopology{
       return 0;
     }
     if (!CollectionUtils.isEmpty(mutableExcludedNodes)) {
-      mutableExcludedNodes.removeIf(
-          next -> !next.getNetworkFullPath().startsWith(scope));
+      mutableExcludedNodes.removeIf(next -> !next.isDescendant(scope));
     }
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
     for (Node ancestor : excludedAncestorList) {
-      if (scope.startsWith(ancestor.getNetworkFullPath())){
+      if (ancestor.isAncestor(scope)) {
         return 0;
       }
     }
@@ -710,9 +839,9 @@ public class NetworkTopologyImpl implements NetworkTopology{
       for (String excludedScope: excludedScopes) {
         Node excludedScopeNode = getNode(excludedScope);
         if (excludedScopeNode != null) {
-          if (excludedScope.startsWith(scope)) {
+          if (excludedScopeNode.isDescendant(scope)) {
             excludedCount += excludedScopeNode.getNumOfLeaves();
-          } else if (scope.startsWith(excludedScope)) {
+          } else if (excludedScopeNode.isAncestor(scope)) {
             return 0;
           }
         }
@@ -728,7 +857,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
         }
       } else {
         for (Node ancestor : excludedAncestorList) {
-          if (ancestor.getNetworkFullPath().startsWith(scope)) {
+          if (ancestor.isDescendant(scope)) {
             excludedCount += ancestor.getNumOfLeaves();
           }
         }
@@ -774,7 +903,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
 
   private void checkExcludedScopes(List<String> excludedScopes) {
     if (!CollectionUtils.isEmpty(excludedScopes)) {
-      excludedScopes.stream().forEach(scope -> {
+      excludedScopes.forEach(scope -> {
         if (scope.startsWith(SCOPE_REVERSE_STR)) {
           throw new IllegalArgumentException("excludedScope " + scope +
               " cannot start with " + SCOPE_REVERSE_STR);

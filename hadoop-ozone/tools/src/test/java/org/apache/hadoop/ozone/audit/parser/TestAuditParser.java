@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.audit.parser;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -37,9 +39,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests AuditParser.
@@ -53,9 +58,12 @@ public class TestAuditParser {
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
+  private static final String DEFAULT_CODING = UTF_8.name();
   private static String dbName;
   private static final String LOGS = TestAuditParser.class
       .getClassLoader().getResource("testaudit.log").getPath();
+  private static final String LOGS1 = TestAuditParser.class
+      .getClassLoader().getResource("testloadaudit.log").getPath();
   /**
    * Creates output directory which will be used by the test-cases.
    * If a test-case needs a separate directory, it has to create a random
@@ -63,7 +71,7 @@ public class TestAuditParser {
    *
    * @throws Exception In case of exception while creating output directory.
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     outputBaseDir = getRandomTempDir();
     dbName = getRandomTempDir() + "/testAudit.db";
@@ -72,13 +80,13 @@ public class TestAuditParser {
     execute(args, "");
   }
 
-  @Before
-  public void setup() {
-    System.setOut(new PrintStream(OUT));
-    System.setErr(new PrintStream(err));
+  @BeforeEach
+  public void setup() throws UnsupportedEncodingException {
+    System.setOut(new PrintStream(OUT, false, DEFAULT_CODING));
+    System.setErr(new PrintStream(err, false, DEFAULT_CODING));
   }
 
-  @After
+  @AfterEach
   public void reset() {
     // reset stream after each unit test
     OUT.reset();
@@ -92,7 +100,7 @@ public class TestAuditParser {
   /**
    * Cleans up the output base directory.
    */
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(outputBaseDir);
   }
@@ -118,7 +126,12 @@ public class TestAuditParser {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    Assert.assertTrue(OUT.toString().contains(msg));
+    try {
+      String output = OUT.toString(DEFAULT_CODING);
+      assertTrue(output.contains(msg),
+          "Output:\n" + output + "\nshould contain:\n" + msg);
+    } catch (UnsupportedEncodingException ignored) {
+    }
   }
 
   /**
@@ -131,8 +144,8 @@ public class TestAuditParser {
         "DELETE_KEY\t3\t\n" +
             "ALLOCATE_KEY\t2\t\n" +
             "COMMIT_KEY\t2\t\n" +
-            "CREATE_BUCKET\t1\t\n" +
-            "CREATE_VOLUME\t1\t\n\n");
+            "CREATE_BUCKET\t2\t\n" +
+            "CREATE_VOLUME\t2\t\n\n");
   }
 
   /**
@@ -141,7 +154,7 @@ public class TestAuditParser {
   @Test
   public void testTemplateTop5Users() {
     String[] args = new String[]{dbName, "template", "top5users"};
-    execute(args, "hadoop\t9\t\n");
+    execute(args, "hadoop\t12\t\n");
   }
 
   /**
@@ -153,9 +166,9 @@ public class TestAuditParser {
     execute(args,
         "2018-09-06 01:57:22\t3\t\n" +
             "2018-09-06 01:58:08\t1\t\n" +
+            "2018-09-06 01:58:09\t1\t\n" +
             "2018-09-06 01:58:18\t1\t\n" +
-            "2018-09-06 01:59:36\t1\t\n" +
-            "2018-09-06 01:59:41\t1\t\n");
+            "2018-09-06 01:59:18\t1\t\n");
   }
 
   /**
@@ -166,7 +179,22 @@ public class TestAuditParser {
     String[] args = new String[]{dbName, "query",
         "select count(*) from audit"};
     execute(args,
-        "9");
+        "12");
+  }
+
+  /**
+   * Test to execute load audit log.
+   */
+  @Test
+  public void testLoadCommand() {
+    String[] args1 = new String[]{dbName, "load", LOGS1};
+    try {
+      execute(args1, "");
+      fail("No exception thrown.");
+    } catch (Exception e) {
+      assertTrue(e.getCause() instanceof ArrayIndexOutOfBoundsException);
+      assertTrue(e.getMessage().contains(": 5"));
+    }
   }
 
   /**

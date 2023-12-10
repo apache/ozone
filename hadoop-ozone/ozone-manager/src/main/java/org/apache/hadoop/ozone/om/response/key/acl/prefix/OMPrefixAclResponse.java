@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key.acl.prefix;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -27,9 +28,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PREFIX_TABLE;
+
 /**
  * Response for Prefix Acl request.
  */
+@CleanupTableInfo(cleanupTables = {PREFIX_TABLE})
 public class OMPrefixAclResponse extends OMClientResponse {
 
   private OmPrefixInfo prefixInfo;
@@ -41,7 +45,7 @@ public class OMPrefixAclResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMPrefixAclResponse(@Nonnull OMResponse omResponse) {

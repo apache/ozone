@@ -21,7 +21,11 @@ package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
@@ -46,7 +50,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMPrefixAddAclRequest.class);
+      LoggerFactory.getLogger(OMPrefixSetAclRequest.class);
 
   private OzoneObj ozoneObj;
   private List<OzoneAcl> ozoneAcls;
@@ -84,25 +88,20 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMPrefixAclResponse(createErrorOMResponse(omResponse,
         exception));
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics, Result result, long trxnLogIndex) {
+  void onComplete(boolean operationResult, Exception exception,
+      OMMetrics omMetrics, Result result, long trxnLogIndex,
+      AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
         LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
             ozoneObj.getPath());
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
       }
       break;
     case FAILURE:
@@ -114,6 +113,12 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
       LOG.error("Unrecognized Result for OMPrefixSetAclRequest: {}",
           getOmRequest());
     }
+
+    if (ozoneAcls != null) {
+      auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
+    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
+        exception, getOmRequest().getUserInfo()));
   }
 
   @Override
@@ -122,5 +127,6 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
     return prefixManager.setAcl(ozoneObj, ozoneAcls, omPrefixInfo,
         trxnLogIndex);
   }
+
 }
 

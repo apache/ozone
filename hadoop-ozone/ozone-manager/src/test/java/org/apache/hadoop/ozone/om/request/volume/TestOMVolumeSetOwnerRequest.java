@@ -23,13 +23,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
 /**
@@ -42,14 +43,14 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String newOwner = "user1";
     OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
 
     OMRequest modifiedRequest = omVolumeSetQuotaRequest.preExecute(
         ozoneManager);
-    Assert.assertNotEquals(modifiedRequest, originalRequest);
+    Assertions.assertNotEquals(modifiedRequest, originalRequest);
   }
 
 
@@ -58,13 +59,13 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
 
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     String newOwner = "user2";
 
     OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);
@@ -83,29 +84,40 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getSetVolumePropertyResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getSetVolumePropertyResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
 
     String fromDBOwner = omMetadataManager
         .getVolumeTable().get(volumeKey).getOwnerName();
-    Assert.assertEquals(newOwner, fromDBOwner);
+    Assertions.assertEquals(newOwner, fromDBOwner);
 
+    // modificationTime should be greater than creationTime.
+    long creationTime = omMetadataManager.getVolumeTable()
+        .get(volumeKey).getCreationTime();
+    long modificationTime = omMetadataManager.getVolumeTable()
+        .get(volumeKey).getModificationTime();
 
-    OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList =
+    // creationTime and modificationTime can be the same to the precision of a
+    // millisecond - since there is no time-consuming operation between
+    // OMRequestTestUtils.addVolumeToDB (sets creationTime) and
+    // preExecute (sets modificationTime).
+    Assertions.assertTrue(modificationTime >= creationTime);
+
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);
 
-    Assert.assertNotNull(newOwnerVolumeList);
-    Assert.assertEquals(volumeName,
+    Assertions.assertNotNull(newOwnerVolumeList);
+    Assertions.assertEquals(volumeName,
         newOwnerVolumeList.getVolumeNamesList().get(0));
 
-    OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList =
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList =
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(ownerKey));
 
-    Assert.assertNotNull(oldOwnerVolumeList);
-    Assert.assertTrue(oldOwnerVolumeList.getVolumeNamesList().size() == 0);
+    Assertions.assertNotNull(oldOwnerVolumeList);
+    Assertions.assertEquals(0, oldOwnerVolumeList.getVolumeNamesList().size());
 
   }
 
@@ -117,7 +129,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     String ownerName = "user1";
 
     OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
             ownerName);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
@@ -131,8 +143,8 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
 
   }
@@ -143,8 +155,8 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
     // create request with quota set.
     OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            100L);
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
+            100L, 100L);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);
@@ -157,40 +169,9 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omResponse.getStatus());
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-    // create volume
-    String volumeName = UUID.randomUUID().toString();
-    String ownerName = "user1";
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-
-    // create request to set new owner
-    String newOwnerName = "user2";
-    OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            newOwnerName);
-    OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
-        new OMVolumeSetOwnerRequest(originalRequest);
-
-    // Execute the original request
-    omVolumeSetOwnerRequest.preExecute(ozoneManager);
-    omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 
 
@@ -198,13 +179,13 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
   public void testOwnSameVolumeTwice() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String owner = "user1";
-    TestOMRequestUtils.addVolumeToDB(volumeName, owner, omMetadataManager);
-    TestOMRequestUtils.addUserToDB(volumeName, owner, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, owner, omMetadataManager);
+    OMRequestTestUtils.addUserToDB(volumeName, owner, omMetadataManager);
     String newOwner = "user2";
 
     // Create request to set new owner
     OMRequest omRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
     OMVolumeSetOwnerRequest setOwnerRequest =
         new OMVolumeSetOwnerRequest(omRequest);
@@ -213,29 +194,29 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     OMClientResponse omClientResponse = setOwnerRequest.validateAndUpdateCache(
         ozoneManager, 1, ozoneManagerDoubleBufferHelper);
     // Response status should be OK and success flag should be true.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
+    Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
     // Execute the same request again but with higher index
     setOwnerRequest.preExecute(ozoneManager);
     omClientResponse = setOwnerRequest.validateAndUpdateCache(
         ozoneManager, 2, ozoneManagerDoubleBufferHelper);
     // Response status should be OK, but success flag should be false.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
 
     // Check volume names list
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo =
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
         omMetadataManager.getUserTable().get(newOwner);
-    Assert.assertNotNull(userVolumeInfo);
+    Assertions.assertNotNull(userVolumeInfo);
     List<String> volumeNamesList = userVolumeInfo.getVolumeNamesList();
-    Assert.assertEquals(1, volumeNamesList.size());
+    Assertions.assertEquals(1, volumeNamesList.size());
 
     Set<String> volumeNamesSet = new HashSet<>(volumeNamesList);
     // If the set size isn't equal to list size, there are duplicates
     // in the list (which was the bug before the fix).
-    Assert.assertEquals(volumeNamesList.size(), volumeNamesSet.size());
+    Assertions.assertEquals(volumeNamesList.size(), volumeNamesSet.size());
   }
 }

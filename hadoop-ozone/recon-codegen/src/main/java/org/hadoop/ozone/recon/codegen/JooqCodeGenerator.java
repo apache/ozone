@@ -151,6 +151,7 @@ public class JooqCodeGenerator {
         new AbstractModule() {
           @Override
           protected void configure() {
+            System.setProperty("org.jooq.no-logo", "true");
             bind(DataSource.class).toProvider(new LocalDataSourceProvider());
             bind(JooqCodeGenerator.class);
           }

@@ -18,21 +18,24 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.ratis.grpc.GrpcConfigKeys;
+
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 
 /**
  * Ratis Grpc Config Keys.
  */
-@ConfigGroup(prefix = HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY)
+@ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
+    + GrpcConfigKeys.PREFIX)
 public class DatanodeRatisGrpcConfig {
   @Config(key = "message.size.max",
       defaultValue = "32MB",
-      type = ConfigType.INT,
+      type = ConfigType.SIZE,
       tags = {OZONE, CLIENT, PERFORMANCE},
-      description = "Maximum message size allowed to be recieved by Grpc " +
+      description = "Maximum message size allowed to be received by Grpc " +
           "Channel (Server)."
   )
   private int maximumMessageSize = 32 * 1024 * 1024;
@@ -47,7 +50,7 @@ public class DatanodeRatisGrpcConfig {
 
   @Config(key = "flow.control.window",
       defaultValue = "5MB",
-      type = ConfigType.INT,
+      type = ConfigType.SIZE,
       tags =  {OZONE, CLIENT, PERFORMANCE},
       description = "This parameter tells how much data grpc client can send " +
           "to grpc server with out receiving any ack(WINDOW_UPDATE) packet " +

@@ -36,6 +36,8 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 public class OMClientConfig {
 
   public static final String OM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
+  public static final String OM_TRASH_EMPTIER_CORE_POOL_SIZE
+      = "trash.core.pool.size";
 
   @Config(key = OM_CLIENT_RPC_TIME_OUT,
       defaultValue = "15m",
@@ -51,6 +53,21 @@ public class OMClientConfig {
   )
   private long rpcTimeOut = 15 * 60 * 1000;
 
+  @Config(key = OM_TRASH_EMPTIER_CORE_POOL_SIZE,
+      defaultValue = "5",
+      type = ConfigType.INT,
+      tags = {OZONE, OM, CLIENT},
+      description = "Total number of threads in pool for the Trash Emptier")
+  private int trashEmptierPoolSize = 5;
+
+
+  public int getTrashEmptierPoolSize() {
+    return trashEmptierPoolSize;
+  }
+
+  public void setTrashEmptierPoolSize(int trashEmptierPoolSize) {
+    this.trashEmptierPoolSize = trashEmptierPoolSize;
+  }
 
   public long getRpcTimeOut() {
     return rpcTimeOut;

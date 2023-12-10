@@ -21,11 +21,12 @@ package org.apache.hadoop.ozone.client;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -51,7 +52,7 @@ public final class OzoneClientFactory {
   /**
    * Private constructor, class is not meant to be initialized.
    */
-  private OzoneClientFactory(){}
+  private OzoneClientFactory() { }
 
 
   /**
@@ -83,11 +84,12 @@ public final class OzoneClientFactory {
    * @throws IOException
    */
   public static OzoneClient getRpcClient(String omHost, Integer omRpcPort,
-      ConfigurationSource config)
+      MutableConfigurationSource config)
       throws IOException {
     Preconditions.checkNotNull(omHost);
     Preconditions.checkNotNull(omRpcPort);
     Preconditions.checkNotNull(config);
+    OmUtils.resolveOmHost(omHost, omRpcPort);
     config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
     return getRpcClient(getClientProtocol(config), config);
   }
@@ -137,13 +139,17 @@ public final class OzoneClientFactory {
     // configuration, we don't fall back to default ozone.om.address defined
     // in ozone-default.xml.
 
-    if (OmUtils.isServiceIdsDefined(config)) {
+    String[] serviceIds = config.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
+    if (serviceIds.length > 1) {
       throw new IOException("Following ServiceID's " +
           config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
           " defined in the configuration. Use the method getRpcClient which " +
           "takes serviceID and configuration as param");
+    } else if (serviceIds.length == 1) {
+      return getRpcClient(getClientProtocol(config, serviceIds[0]), config);
+    } else {
+      return getRpcClient(getClientProtocol(config), config);
     }
-    return getRpcClient(getClientProtocol(config), config);
   }
 
   /**
@@ -157,12 +163,7 @@ public final class OzoneClientFactory {
    */
   private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
                                        ConfigurationSource config) {
-    OzoneClientInvocationHandler clientHandler =
-        new OzoneClientInvocationHandler(clientProtocol);
-    ClientProtocol proxy = (ClientProtocol) Proxy.newProxyInstance(
-        OzoneClientInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{ClientProtocol.class}, clientHandler);
-    return new OzoneClient(config, proxy);
+    return new OzoneClient(config, clientProtocol);
   }
 
   /**
@@ -248,7 +249,9 @@ public final class OzoneClientFactory {
     } catch (Exception e) {
       final String message = "Couldn't create RpcClient protocol";
       LOG.error(message + " exception: ", e);
-      if (e.getCause() instanceof IOException) {
+      if (e instanceof RemoteException) {
+        throw ((RemoteException) e).unwrapRemoteException();
+      } else if (e.getCause() instanceof IOException) {
         throw (IOException) e.getCause();
       } else {
         throw new IOException(message, e);

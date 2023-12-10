@@ -21,9 +21,9 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the json object printer.
@@ -32,16 +32,21 @@ public class TestJsonUtils {
 
   @Test
   public void printObjectAsJson() throws IOException {
-    OzoneQuota quota = new OzoneQuota(123, OzoneQuota.Units.MB);
+    OzoneQuota spaceQuota = OzoneQuota.parseSpaceQuota("123MB");
 
-    String result = JsonUtils.toJsonStringWithDefaultPrettyPrinter(quota);
+    String spaceStr =
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(spaceQuota);
+    assertContains(spaceStr, "\"rawSize\" : 123");
+    assertContains(spaceStr, "\"unit\" : \"MB\"");
 
-    assertContains(result, "\"size\" : 123");
-    assertContains(result, "\"unit\" : \"MB\"");
+    OzoneQuota nameSpace = OzoneQuota.parseNameSpaceQuota("1000");
+    String nameSpaceStr =
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(nameSpace);
+    assertContains(nameSpaceStr, "\"quotaInNamespace\" : 1000");
   }
 
   private static void assertContains(String str, String part) {
-    assertTrue("Expected JSON to contain '" + part + "', but didn't: " + str,
-        str.contains(part));
+    assertTrue(str.contains(part),
+        "Expected JSON to contain '" + part + "', but didn't: " + str);
   }
 }

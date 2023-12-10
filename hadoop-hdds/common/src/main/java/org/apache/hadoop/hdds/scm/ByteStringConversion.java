@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
-
 import java.nio.ByteBuffer;
 import java.util.function.Function;
+
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * Helper class to create a conversion function from ByteBuffer to ByteString
@@ -32,23 +32,19 @@ import java.util.function.Function;
  * Ozone configuration.
  */
 public final class ByteStringConversion {
-  private ByteStringConversion(){} // no instantiation.
+  private ByteStringConversion() { } // no instantiation.
 
   /**
    * Creates the conversion function to be used to convert ByteBuffers to
    * ByteString instances to be used in protobuf messages.
    *
-   * @param config the Ozone configuration
    * @return the conversion function defined by
-   *          {@link OzoneConfigKeys#OZONE_UNSAFEBYTEOPERATIONS_ENABLED}
+   * {@link OzoneConfigKeys#OZONE_UNSAFEBYTEOPERATIONS_ENABLED}
    * @see ByteBuffer
    */
   public static Function<ByteBuffer, ByteString> createByteBufferConversion(
-      ConfigurationSource config){
-    boolean unsafeEnabled =
-        config!=null && config.getBoolean(
-            OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
-            OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT);
+      boolean unsafeEnabled
+  ) {
     if (unsafeEnabled) {
       return UnsafeByteOperations::unsafeWrap;
     } else {

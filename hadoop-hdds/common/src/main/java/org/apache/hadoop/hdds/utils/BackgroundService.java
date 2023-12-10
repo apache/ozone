@@ -18,22 +18,17 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * An abstract class for a background service in ozone.
@@ -48,34 +43,52 @@ public abstract class BackgroundService {
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
-  private final ScheduledExecutorService exec;
+  private final ScheduledThreadPoolExecutor exec;
   private final ThreadGroup threadGroup;
-  private final ThreadFactory threadFactory;
   private final String serviceName;
   private final long interval;
-  private final long serviceTimeout;
+  private final long serviceTimeoutInNanos;
   private final TimeUnit unit;
   private final PeriodicalTask service;
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
+    this(serviceName, interval, unit, threadPoolSize, serviceTimeout, "");
+  }
+
+  public BackgroundService(String serviceName, long interval,
+      TimeUnit unit, int threadPoolSize, long serviceTimeout,
+      String threadNamePrefix) {
     this.interval = interval;
     this.unit = unit;
     this.serviceName = serviceName;
-    this.serviceTimeout = serviceTimeout;
+    this.serviceTimeoutInNanos = TimeDuration.valueOf(serviceTimeout, unit)
+            .toLong(TimeUnit.NANOSECONDS);
     threadGroup = new ThreadGroup(serviceName);
-    ThreadFactory tf = r -> new Thread(threadGroup, r);
-    threadFactory = new ThreadFactoryBuilder()
-        .setThreadFactory(tf)
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setThreadFactory(r -> new Thread(threadGroup, r))
         .setDaemon(true)
-        .setNameFormat(serviceName + "#%d")
+        .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
-    exec = Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
+    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(
+        threadPoolSize, threadFactory);
     service = new PeriodicalTask();
   }
 
-  protected ExecutorService getExecutorService() {
+  @VisibleForTesting
+  public ExecutorService getExecutorService() {
     return this.exec;
+  }
+
+  public void setPoolSize(int size) {
+    if (size <= 0) {
+      throw new IllegalArgumentException("Pool size must be positive.");
+    }
+
+    // In ScheduledThreadPoolExecutor, maximumPoolSize is Integer.MAX_VALUE
+    // the corePoolSize will always less maximumPoolSize.
+    // So we can directly set the corePoolSize
+    exec.setCorePoolSize(size);
   }
 
   @VisibleForTesting
@@ -84,9 +97,13 @@ public abstract class BackgroundService {
   }
 
   @VisibleForTesting
-  public void triggerBackgroundTaskForTesting() {
-    service.run();
+  public void runPeriodicalTaskNow() throws Exception {
+    BackgroundTaskQueue tasks = getTasks();
+    while (tasks.size() > 0) {
+      tasks.poll().call();
+    }
   }
+
 
   // start service
   public void start() {
@@ -114,41 +131,27 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-      CompletionService<BackgroundTaskResult> taskCompletionService =
-          new ExecutorCompletionService<>(exec);
 
-      List<Future<BackgroundTaskResult>> results = Lists.newArrayList();
       while (tasks.size() > 0) {
         BackgroundTask task = tasks.poll();
-        Future<BackgroundTaskResult> result =
-            taskCompletionService.submit(task);
-        results.add(result);
-      }
-
-      results.parallelStream().forEach(taskResultFuture -> {
-        try {
-          // Collect task results
-          BackgroundTaskResult result = serviceTimeout > 0
-              ? taskResultFuture.get(serviceTimeout, unit)
-              : taskResultFuture.get();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("task execution result size {}", result.getSize());
+        CompletableFuture.runAsync(() -> {
+          long startTime = System.nanoTime();
+          try {
+            BackgroundTaskResult result = task.call();
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("task execution result size {}", result.getSize());
+            }
+          } catch (Exception e) {
+            LOG.warn("Background task execution failed", e);
+          } finally {
+            long endTime = System.nanoTime();
+            if (endTime - startTime > serviceTimeoutInNanos) {
+              LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
+                  serviceName, endTime - startTime, serviceTimeoutInNanos);
+            }
           }
-        } catch (InterruptedException e) {
-          LOG.warn(
-              "Background task failed due to interruption, retrying in " +
-                  "next interval", e);
-          // Re-interrupt the thread while catching InterruptedException
-          Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-          LOG.warn(
-              "Background task fails to execute, "
-                  + "retrying in next interval", e);
-        } catch (TimeoutException e) {
-          LOG.warn("Background task executes timed out, "
-              + "retrying in next interval", e);
-        }
-      });
+        }, exec);
+      }
     }
   }
 

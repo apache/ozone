@@ -18,28 +18,52 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import com.google.common.base.Strings;
+import com.google.protobuf.BlockingService;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.utils.IOUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
+import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SingleSecretKeyProtocolProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -49,12 +73,15 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.common.base.Strings;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getSingleSCMAddress;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT;
@@ -62,9 +89,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_W
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
+
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,38 +110,23 @@ public final class HddsServerUtil {
   private HddsServerUtil() {
   }
 
+  public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
+      "OZONE_RATIS_SNAPSHOT_COMPLETE";
+
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);
 
   /**
-   * Retrieve the socket address that should be used by DataNodes to connect
-   * to the SCM.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM service endpoint.
+   * Add protobuf-based protocol to the {@link RPC.Server}.
+   * @param conf configuration
+   * @param protocol Protocol interface
+   * @param service service that implements the protocol
+   * @param server RPC server to which the protocol & implementation is added to
    */
-  public static InetSocketAddress getScmAddressForDataNodes(
-      ConfigurationSource conf) {
-    // We try the following settings in decreasing priority to retrieve the
-    // target host.
-    // - OZONE_SCM_DATANODE_ADDRESS_KEY
-    // - OZONE_SCM_CLIENT_ADDRESS_KEY
-    // - OZONE_SCM_NAMES
-    //
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
+  public static void addPBProtocol(Configuration conf, Class<?> protocol,
+      BlockingService service, RPC.Server server) throws IOException {
+    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
+    server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
   }
 
   /**
@@ -125,7 +144,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -145,7 +165,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -191,7 +212,8 @@ public final class HddsServerUtil {
 
     return NetUtils.createSocketAddr(
         host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+            port.orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
 
@@ -238,6 +260,18 @@ public final class HddsServerUtil {
   public static long getScmHeartbeatInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
+   * Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getReconHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
+        HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -309,6 +343,29 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Max retry count of rpcProxy for EndpointStateMachine of SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - Max retry count.
+   */
+  public static int getScmRpcRetryCount(ConfigurationSource conf) {
+    return conf.getInt(OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT,
+        OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
+  }
+
+  /**
+   * Fixed datanode rpc retry interval, which is used by datanode to connect
+   * the SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - Rpc retry interval.
+   */
+  public static long getScmRpcRetryInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL,
+        OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
    * Log Warn interval.
    *
    * @param conf - Ozone Config
@@ -329,15 +386,36 @@ public final class HddsServerUtil {
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
   }
 
-  public static String getOzoneDatanodeRatisDirectory(
+  public static Collection<String> getOzoneDatanodeRatisDirectory(
       ConfigurationSource conf) {
-    String storageDir = conf.get(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
 
-    if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    if (rawLocations.isEmpty()) {
+      rawLocations = new ArrayList<>(1);
+      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf));
     }
-    return storageDir;
+    return rawLocations;
+  }
+
+  public static Collection<String> getDatanodeStorageDirs(
+      ConfigurationSource conf) {
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_KEY);
+    if (rawLocations.isEmpty()) {
+      rawLocations = conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
+    }
+    if (rawLocations.isEmpty()) {
+      throw new IllegalArgumentException("No location configured in either "
+          + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
+    }
+    return rawLocations;
+  }
+
+  public static Collection<String> getDatanodeDbDirs(
+      ConfigurationSource conf) {
+    // No fallback here, since this config is optional.
+    return conf.getTrimmedStringCollection(HDDS_DATANODE_CONTAINER_DB_DIR);
   }
 
   /**
@@ -348,8 +426,8 @@ public final class HddsServerUtil {
    */
   public static String getDatanodeIdFilePath(ConfigurationSource conf) {
     String dataNodeIDDirPath =
-        conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-    if (dataNodeIDDirPath == null) {
+        conf.getTrimmed(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
+    if (Strings.isNullOrEmpty(dataNodeIDDirPath)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {
         // this means meta data is not found, in theory should not happen at
@@ -372,72 +450,115 @@ public final class HddsServerUtil {
    * @throws IOException
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
-      OzoneConfiguration conf) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress address =
-        getScmAddressForSecurityProtocol(conf);
-    RetryPolicy retryPolicy =
-        RetryPolicies.retryForeverWithFixedSleep(
-            1000, TimeUnit.MILLISECONDS);
+      ConfigurationSource conf) throws IOException {
     return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProtocolProxy(SCMSecurityProtocolPB.class, scmVersion,
-            address, UserGroupInformation.getCurrentUser(),
-            conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf), retryPolicy).getProxy());
+        new SCMSecurityProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser()));
   }
 
+  public static SCMSecurityProtocolClientSideTranslatorPB
+      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf,
+      UserGroupInformation ugi) throws IOException {
+    // Certificate from SCM is required for DN startup to succeed, so retry
+    // for ever. In this way DN start up is resilient to SCM service running
+    // status.
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    SCMClientConfig scmClientConfig =
+        conf.getObject(SCMClientConfig.class);
+    int retryCount = Integer.MAX_VALUE;
+    scmClientConfig.setRetryCount(retryCount);
+    configuration.setFromObject(scmClientConfig);
 
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for
-   * {@link org.apache.hadoop.hdds.protocol.SCMSecurityProtocol}. If
-   * {@link ScmConfigKeys#OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined or invalid
-   */
-  public static InetSocketAddress getScmAddressForSecurityProtocol(
-      ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        new SCMSecurityProtocolFailoverProxyProvider(configuration,
+            ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
   }
+
   /**
    * Create a scm block client, used by putKey() and getKey().
    *
    * @return {@link ScmBlockLocationProtocol}
    * @throws IOException
    */
-  public static SCMSecurityProtocol getScmSecurityClient(
+  public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress scmSecurityProtoAdd =
-        getScmAddressForSecurityProtocol(conf);
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
-            scmSecurityProtoAdd, ugi, conf,
-            NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf)));
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+        new SCMSecurityProtocolClientSideTranslatorPB(
+            new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
+    return TracingUtil.createProxy(scmSecurityClient,
+        SCMSecurityProtocolClientSideTranslatorPB.class, conf);
+  }
+
+  /**
+   * Creates a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm}
+   * intended to be used by clients under the SCM identity.
+   *
+   * @param conf - Ozone configuration
+   * @return {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm}
+   * @throws IOException
+   */
+  public static SecretKeyProtocolScm getSecretKeyClientForSCM(
+      ConfigurationSource conf) throws IOException {
+    SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
+        new SecretKeyProtocolClientSideTranslatorPB(
+            new SecretKeyProtocolFailoverProxyProvider(conf,
+                UserGroupInformation.getCurrentUser(),
+                SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
+
+    return TracingUtil.createProxy(scmSecretClient,
+        SecretKeyProtocolScm.class, conf);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * datanode service, should be use only if user is the Datanode identity.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForDatanode(ConfigurationSource conf)
+      throws IOException {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SecretKeyProtocolDatanodePB.class),
+        SecretKeyProtocolDatanodePB.class);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * OM service, should be use only if user is the OM identity.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForOm(ConfigurationSource conf) throws IOException {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SecretKeyProtocolOmPB.class),
+        SecretKeyProtocolOmPB.class);
+  }
+
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForDatanode(ConfigurationSource conf,
+      UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf, ugi,
+            SecretKeyProtocolDatanodePB.class),
+        SecretKeyProtocolDatanodePB.class);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * SCM service, should be use only if user is the Datanode identity.
+   *
+   * The protocol returned by this method only target a single destination
+   * SCM node.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForScm(ConfigurationSource conf,
+      String scmNodeId, UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SingleSecretKeyProtocolProxyProvider(conf, ugi,
+            SecretKeyProtocolScmPB.class, scmNodeId),
+        SecretKeyProtocolScmPB.class);
   }
 
   /**
@@ -452,9 +573,105 @@ public final class HddsServerUtil {
       JvmMetrics.create(serverName,
           configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
+      CpuMetrics.create();
     } catch (MetricsException e) {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }
     return metricsSystem;
+  }
+
+  /**
+   * Write DB Checkpoint to an output stream as a compressed file (tar).
+   *
+   * @param checkpoint    checkpoint file
+   * @param destination   destination output stream.
+   * @param toExcludeList the files to be excluded
+   * @param excludedList  the files excluded
+   * @throws IOException
+   */
+  public static void writeDBCheckpointToStream(
+      DBCheckpoint checkpoint,
+      OutputStream destination,
+      List<String> toExcludeList,
+      List<String> excludedList)
+      throws IOException {
+    try (TarArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(destination);
+        Stream<Path> files =
+            Files.list(checkpoint.getCheckpointLocation())) {
+      archiveOutputStream.setBigNumberMode(
+          TarArchiveOutputStream.BIGNUMBER_POSIX);
+      for (Path path : files.collect(Collectors.toList())) {
+        if (path != null) {
+          Path fileNamePath = path.getFileName();
+          if (fileNamePath != null) {
+            String fileName = fileNamePath.toString();
+            if (!toExcludeList.contains(fileName)) {
+              includeFile(path.toFile(), fileName, archiveOutputStream);
+            } else {
+              excludedList.add(fileName);
+            }
+          }
+        }
+      }
+      includeRatisSnapshotCompleteFlag(archiveOutputStream);
+    }
+  }
+
+  public static void includeFile(File file, String entryName,
+                                 ArchiveOutputStream archiveOutputStream)
+      throws IOException {
+    ArchiveEntry archiveEntry =
+        archiveOutputStream.createArchiveEntry(file, entryName);
+    archiveOutputStream.putArchiveEntry(archiveEntry);
+    try (FileInputStream fis = new FileInputStream(file)) {
+      IOUtils.copy(fis, archiveOutputStream);
+    }
+    archiveOutputStream.closeArchiveEntry();
+  }
+
+  // Mark tarball completed.
+  public static void includeRatisSnapshotCompleteFlag(
+      ArchiveOutputStream archiveOutput) throws IOException {
+    File file = File.createTempFile(
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, "");
+    String entryName = OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
+    includeFile(file, entryName, archiveOutput);
+  }
+
+  static boolean ratisSnapshotComplete(Path dir) {
+    return new File(dir.toString(),
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME).exists();
+  }
+
+  // optimize ugi lookup for RPC operations to avoid a trip through
+  // UGI.getCurrentUser which is synch'ed
+  public static UserGroupInformation getRemoteUser() throws IOException {
+    UserGroupInformation ugi = Server.getRemoteUser();
+    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
+  }
+
+  /**
+   * Converts RocksDB exception to IOE.
+   * @param msg  - Message to add to exception.
+   * @param e - Original Exception.
+   * @return  IOE.
+   */
+  public static IOException toIOException(String msg, RocksDBException e) {
+    String statusCode = e.getStatus() == null ? "N/A" :
+        e.getStatus().getCodeString();
+    String errMessage = e.getMessage() == null ? "Unknown error" :
+        e.getMessage();
+    String output = msg + "; status : " + statusCode
+        + "; message : " + errMessage;
+    return new IOException(output, e);
+  }
+
+  /**
+   * Add exception classes which server won't log at all.
+   * @param server
+   */
+  public static void addSuppressedLoggingExceptions(RPC.Server server) {
+    server.addSuppressedLoggingExceptions(ServerNotLeaderException.class);
   }
 }

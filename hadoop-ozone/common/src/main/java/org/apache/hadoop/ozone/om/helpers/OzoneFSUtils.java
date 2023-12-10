@@ -18,9 +18,14 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 
+import javax.annotation.Nonnull;
 import java.nio.file.Paths;
+import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
@@ -28,7 +33,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 public final class OzoneFSUtils {
 
-  private OzoneFSUtils() {}
+  private OzoneFSUtils() { }
 
   /**
    * Returns string representation of path after removing the leading slash.
@@ -85,5 +90,206 @@ public final class OzoneFSUtils {
 
   public static boolean isFile(String keyName) {
     return !keyName.endsWith(OZONE_URI_DELIMITER);
+  }
+
+  /**
+   * Whether the pathname is valid.  Currently prohibits relative paths,
+   * names which contain a ":" or "//", or other non-canonical paths.
+   */
+  public static boolean isValidName(String src) {
+    // Path must be absolute.
+    if (!src.startsWith(Path.SEPARATOR)) {
+      return false;
+    }
+
+    // Check for ".." "." ":" "/"
+    String[] components = StringUtils.split(src, '/');
+    for (int i = 0; i < components.length; i++) {
+      String element = components[i];
+      if (element.equals(".")  ||
+          (element.contains(":"))  ||
+          (element.contains("/") || element.equals(".."))) {
+        return false;
+      }
+      // The string may start or end with a /, but not have
+      // "//" in the middle.
+      if (element.isEmpty() && i != components.length - 1 &&
+          i != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Checks whether the bucket layout is valid for File System operations
+   * otherwise throws IllegalArgumentException.
+   * Allowed bucket layouts are FILE_SYSTEM_OPTIMIZED and LEGACY.
+   */
+  public static void validateBucketLayout(String bucketName,
+                                          BucketLayout bucketLayout) {
+    if (bucketLayout.equals(BucketLayout.OBJECT_STORE)) {
+      throw new IllegalArgumentException(
+          "Bucket: " + bucketName + " has layout: " + bucketLayout +
+              ", which does not support" +
+              " file system semantics. Bucket Layout must be " +
+              BucketLayout.FILE_SYSTEM_OPTIMIZED + " or "
+              + BucketLayout.LEGACY + ".");
+    }
+  }
+
+  /**
+   * The function returns leaf node name from the given absolute path. For
+   * example, the given key path '/a/b/c/d/e/file1' then it returns leaf node
+   * name 'file1'.
+   */
+  public static String getFileName(@Nonnull String keyName) {
+    java.nio.file.Path fileName = Paths.get(keyName).getFileName();
+    if (fileName != null) {
+      return fileName.toString();
+    }
+    // failed to converts a path key
+    return keyName;
+  }
+
+  /**
+   * Verifies whether the childKey is a sibling of a given
+   * parentKey.
+   *
+   * @param parentKey parent key name
+   * @param childKey  child key name
+   * @return true if childKey is a sibling of parentKey
+   */
+  public static boolean isSibling(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
+  public static boolean isAncestorPath(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.startsWith(parentParent) ||
+          childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
+
+  /**
+   * Verifies whether the childKey is an immediate path under the given
+   * parentKey.
+   *
+   * @param parentKey parent key name
+   * @param childKey  child key name
+   * @return true if childKey is an immediate path under the given parentKey
+   */
+  public static boolean isImmediateChild(String parentKey, String childKey) {
+
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+
+    // Following are the valid parentKey formats:
+    // parentKey="" or parentKey="/" or parentKey="/a" or parentKey="a"
+    // Following are the valid childKey formats:
+    // childKey="/" or childKey="/a/b" or childKey="a/b"
+    if (org.apache.commons.lang3.StringUtils.isBlank(parentKey)) {
+      return childParent == null ||
+              OM_KEY_PREFIX.equals(childParent.toString());
+    }
+
+    return parentPath.equals(childParent);
+  }
+
+  /**
+   * The function returns parent directory from the given absolute path. For
+   * example, the given key path '/a/b/c/d/e/file1' then it returns parent
+   * directory name as 'e'.
+   *
+   * @param keyName key name
+   * @return parent directory. If not found then return keyName itself.
+   */
+  public static String getParentDir(@Nonnull String keyName) {
+    java.nio.file.Path fileName = Paths.get(keyName).getParent();
+    if (fileName != null) {
+      return fileName.toString();
+    }
+    // no parent directory.
+    return "";
+  }
+
+  /**
+   * This function appends the given file name to the given key name path.
+   *
+   * @param keyName key name
+   * @param fileName  file name
+   * @return full path
+   */
+  public static String appendFileNameToKeyPath(String keyName,
+                                               String fileName) {
+    StringBuilder newToKeyName = new StringBuilder(keyName);
+    newToKeyName.append(OZONE_URI_DELIMITER);
+    newToKeyName.append(fileName);
+    return newToKeyName.toString();
+  }
+
+  /**
+   * Returns the number of path components in the given keyName.
+   *
+   * @param keyName keyname
+   * @return path components count
+   */
+  public static int getFileCount(String keyName) {
+    java.nio.file.Path keyPath = Paths.get(keyName);
+    return keyPath.getNameCount();
+  }
+
+  public static String removeTrailingSlashIfNeeded(String key) {
+    if (key.endsWith(OZONE_URI_DELIMITER)) {
+      java.nio.file.Path keyPath = Paths.get(key);
+      return keyPath.toString();
+    } else {
+      return key;
+    }
+  }
+
+  public static String generateUniqueTempSnapshotName() {
+    return "temp" + UUID.randomUUID() + SnapshotInfo.generateName(Time.now());
+  }
+
+  public static Path trimPathToDepth(Path path, int maxDepth) {
+    Path res = path;
+    while (res.depth() > maxDepth) {
+      res = res.getParent();
+    }
+    return res;
   }
 }

@@ -26,52 +26,47 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability.Evolving;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 
 /**
  * Cache used for RocksDB tables.
- * @param <CACHEKEY>
- * @param <CACHEVALUE>
+ * @param <KEY>
+ * @param <VALUE>
  */
-
 @Private
 @Evolving
-public interface TableCache<CACHEKEY extends CacheKey,
-    CACHEVALUE extends CacheValue> {
+public interface TableCache<KEY, VALUE> {
 
   /**
    * Return the value for the key if it is present, otherwise return null.
-   * @param cacheKey
-   * @return CACHEVALUE
    */
-  CACHEVALUE get(CACHEKEY cacheKey);
+  CacheValue<VALUE> get(CacheKey<KEY> cacheKey);
 
   /**
-   * This method should be called for tables with cache cleanup policy
-   * {@link TableCacheImpl.CacheCleanupPolicy#NEVER} after system restart to
-   * fill up the cache.
-   * @param cacheKey
-   * @param cacheValue
+   * This method should be called for tables with cache type full cache.
+   * {@link TableCache.CacheType#FULL_CACHE} after system
+   * restart to fill up the cache.
    */
-  void loadInitial(CACHEKEY cacheKey, CACHEVALUE cacheValue);
+  void loadInitial(CacheKey<KEY> cacheKey, CacheValue<VALUE> cacheValue);
 
   /**
    * Add an entry to the cache, if the key already exists it overrides.
-   * @param cacheKey
-   * @param value
    */
-  void put(CACHEKEY cacheKey, CACHEVALUE value);
+  void put(CacheKey<KEY> cacheKey, CacheValue<VALUE> value);
 
   /**
    * Removes all the entries from the cache which are matching with epoch
    * provided in the epoch list.
    *
    * If clean up policy is NEVER, this is a do nothing operation.
-   * If clean up policy is MANUAL, it is caller responsibility to cleanup the
+   * If clean up policy is MANUAL, it is caller responsibility to clean up the
    * cache before calling cleanup.
-   * @param epochs
    */
   void cleanup(List<Long> epochs);
+
+  @VisibleForTesting
+  void evictCache(List<Long> epochs);
 
   /**
    * Return the size of the cache.
@@ -83,7 +78,7 @@ public interface TableCache<CACHEKEY extends CacheKey,
    * Return an iterator for the cache.
    * @return iterator of the underlying cache for the table.
    */
-  Iterator<Map.Entry<CACHEKEY, CACHEVALUE>> iterator();
+  Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> iterator();
 
   /**
    * Check key exist in cache or not.
@@ -92,21 +87,36 @@ public interface TableCache<CACHEKEY extends CacheKey,
    * {@link CacheResult.CacheStatus#EXISTS}
    *
    * If it does not exist:
-   *  If cache clean up policy is
-   *  {@link TableCacheImpl.CacheCleanupPolicy#NEVER} it means table cache is
-   *  full cache. It return's {@link CacheResult} with null
-   *  and status as {@link CacheResult.CacheStatus#NOT_EXIST}.
+   *  If cache type is
+   *  {@link TableCache.CacheType#FULL_CACHE}. It return's {@link CacheResult}
+   *  with null and status as {@link CacheResult.CacheStatus#NOT_EXIST}.
    *
-   *  If cache clean up policy is
-   *  {@link TableCacheImpl.CacheCleanupPolicy#MANUAL} it means
-   *  table cache is partial cache. It return's {@link CacheResult} with
-   *  null and status as MAY_EXIST.
-   *
-   * @param cachekey
+   *  If cache type is
+   *  {@link TableCache.CacheType#PARTIAL_CACHE}.
+   *  It returns {@link CacheResult} with null and status as MAY_EXIST.
    */
-  CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey);
-
+  CacheResult<VALUE> lookup(CacheKey<KEY> cachekey);
 
   @VisibleForTesting
-  Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
+  NavigableMap<Long, Set<CacheKey<KEY>>> getEpochEntries();
+
+  /**
+   * Return the stat counters.
+   */
+  CacheStats getStats();
+
+  /**
+   * Return the cache type.
+   */
+  CacheType getCacheType();
+
+  /**
+   * Cache completeness.
+   */
+  enum CacheType {
+    FULL_CACHE, //  This mean's the table maintains full cache. Cache and DB
+    // state are same.
+    PARTIAL_CACHE // This is partial table cache, cache state is partial state
+    // compared to DB state.
+  }
 }

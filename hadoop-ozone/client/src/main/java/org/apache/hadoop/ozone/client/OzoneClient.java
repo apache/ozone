@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 
 import java.io.Closeable;
@@ -74,6 +75,7 @@ public class OzoneClient implements Closeable {
 
   private final ClientProtocol proxy;
   private final ObjectStore objectStore;
+  private  ConfigurationSource conf;
 
   /**
    * Creates a new OzoneClient object, generally constructed
@@ -84,12 +86,16 @@ public class OzoneClient implements Closeable {
   public OzoneClient(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = proxy;
     this.objectStore = new ObjectStore(conf, this.proxy);
+    this.conf = conf;
   }
 
   @VisibleForTesting
-  protected OzoneClient(ObjectStore objectStore) {
+  protected OzoneClient(ObjectStore objectStore,
+                        ClientProtocol clientProtocol) {
     this.objectStore = objectStore;
-    this.proxy = null;
+    this.proxy = clientProtocol;
+    // For the unit test
+    this.conf = new OzoneConfiguration();
   }
   /**
    * Returns the object store associated with the Ozone Cluster.
@@ -100,11 +106,27 @@ public class OzoneClient implements Closeable {
   }
 
   /**
+   * Returns the configuration of client.
+   * @return ConfigurationSource
+   */
+  public ConfigurationSource getConfiguration() {
+    return conf;
+  }
+
+  /**
    * Closes the client and all the underlying resources.
    * @throws IOException
    */
   @Override
   public void close() throws IOException {
     proxy.close();
+  }
+
+  /**
+   * Return the ClientProtocol associated with the Ozone Cluster.
+   * @return ClientProtocol
+   */
+  public ClientProtocol getProxy() {
+    return proxy;
   }
 }

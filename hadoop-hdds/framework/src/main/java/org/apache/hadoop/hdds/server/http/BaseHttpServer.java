@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import java.util.Map;
 import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -24,13 +25,14 @@ import java.net.URI;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
@@ -42,8 +44,11 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.createDir;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
@@ -68,9 +73,10 @@ public abstract class BaseHttpServer {
   static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
   private static final String JETTY_BASETMPDIR =
       "org.eclipse.jetty.webapp.basetempdir";
+  public static final String SERVER_DIR = "/webserver";
 
   private HttpServer2 httpServer;
-  private final ConfigurationSource conf;
+  private final MutableConfigurationSource conf;
 
   private InetSocketAddress httpAddress;
   private InetSocketAddress httpsAddress;
@@ -84,7 +90,7 @@ public abstract class BaseHttpServer {
 
   private boolean profilerSupport;
 
-  public BaseHttpServer(ConfigurationSource conf, String name)
+  public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
     this.name = name;
     this.conf = conf;
@@ -101,8 +107,6 @@ public abstract class BaseHttpServer {
       HttpServer2.Builder builder = newHttpServer2BuilderForOzone(
           conf, httpAddress, httpsAddress, name);
 
-      boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
-          OzoneSecurityUtil.isHttpSecurityEnabled(conf);
       LOG.info("Hadoop Security Enabled: {} " +
               "Ozone Security Enabled: {} " +
               "Ozone HTTP Security Enabled: {} ",
@@ -112,12 +116,14 @@ public abstract class BaseHttpServer {
           conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
               OZONE_HTTP_SECURITY_ENABLED_DEFAULT));
 
-      if (isSecurityEnabled) {
+      if (isSecurityEnabled()) {
         String httpAuthType = conf.get(getHttpAuthType(), "simple");
         LOG.info("HttpAuthType: {} = {}", getHttpAuthType(), httpAuthType);
+        // Ozone config prefix must be set to avoid AuthenticationFilter
+        // fall back to default one form hadoop.http.authentication.
+        builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
         if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
-          builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
           builder.setUsernameConfKey(getSpnegoPrincipal());
           builder.setKeytabConfKey(getKeytabFile());
         }
@@ -144,11 +150,11 @@ public abstract class BaseHttpServer {
           conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
 
       if (prometheusSupport) {
-        prometheusMetricsSink = new PrometheusMetricsSink();
+        prometheusMetricsSink = new PrometheusMetricsSink(name);
         httpServer.getWebAppContext().getServletContext()
             .setAttribute(PROMETHEUS_SINK, prometheusMetricsSink);
         HddsPrometheusConfig prometheusConfig =
-            OzoneConfiguration.of(conf).getObject(HddsPrometheusConfig.class);
+            conf.getObject(HddsPrometheusConfig.class);
         String token = prometheusConfig.getPrometheusEndpointToken();
         if (StringUtils.isNotEmpty(token)) {
           httpServer.getWebAppContext().getServletContext()
@@ -174,11 +180,20 @@ public abstract class BaseHttpServer {
       }
 
       String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
-      if (!StringUtils.isEmpty(baseDir)) {
-        httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
-        LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
+
+      if (StringUtils.isEmpty(baseDir)) {
+        baseDir = getOzoneMetaDirPath(conf) + SERVER_DIR;
       }
+      createDir(baseDir);
+      httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
+      LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }
+  }
+
+  @VisibleForTesting
+  public String getJettyBaseTmpDir() {
+    return httpServer.getWebAppContext().getAttribute(JETTY_BASETMPDIR)
+        .toString();
   }
 
   /**
@@ -186,13 +201,16 @@ public abstract class BaseHttpServer {
    * Recon to initialize their HTTP / HTTPS server.
    */
   public static HttpServer2.Builder newHttpServer2BuilderForOzone(
-      ConfigurationSource conf, final InetSocketAddress httpAddr,
+      MutableConfigurationSource conf, final InetSocketAddress httpAddr,
       final InetSocketAddress httpsAddr, String name) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
 
+    String userString = conf.get(OZONE_ADMINISTRATORS, "");
+    String groupString = conf.get(OZONE_ADMINISTRATORS_GROUPS, "");
+
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
-        .setConf(conf).setACL(new AccessControlList(conf.get(
-            OZONE_ADMINISTRATORS, " ")));
+        .setConf(conf)
+        .setACL(new AccessControlList(userString, groupString));
 
     // initialize the webserver for uploading/downloading files.
     if (policy.isHttpEnabled()) {
@@ -238,6 +256,17 @@ public abstract class BaseHttpServer {
     httpServer.addInternalServlet(servletName, pathSpec, clazz);
   }
 
+  /**
+   * Add a filter to BaseHttpServer.
+   *
+   * @param filterName The name of the filter
+   * @param classname  The filter class
+   * @param parameters The filter parameters
+   */
+  protected void addFilter(String filterName, String classname,
+      Map<String, String> parameters) {
+    httpServer.addFilter(filterName, classname, parameters);
+  }
 
   /**
    * Returns the WebAppContext associated with this HttpServer.
@@ -357,7 +386,7 @@ public abstract class BaseHttpServer {
    * clear text in config - if falling back is allowed.
    *
    * @param conf  Configuration instance
-   * @param alias name of the credential to retreive
+   * @param alias name of the credential to retrieve
    * @return String credential value or null
    */
   static String getPassword(ConfigurationSource conf, String alias) {
@@ -415,6 +444,11 @@ public abstract class BaseHttpServer {
 
   public InetSocketAddress getHttpsAddress() {
     return httpsAddress;
+  }
+
+  public boolean isSecurityEnabled() {
+    return UserGroupInformation.isSecurityEnabled() &&
+        OzoneSecurityUtil.isHttpSecurityEnabled(conf);
   }
 
   protected abstract String getHttpAddressKey();

@@ -39,16 +39,20 @@ public class OzoneKeyLocation {
    * Offset of this key.
    */
   private final long offset;
-
+  /**
+   * KeyOffset of this key.
+   */
+  private final long keyOffset;
   /**
    * Constructs OzoneKeyLocation.
    */
   public OzoneKeyLocation(long containerID, long localID,
-                  long length, long offset) {
+                          long length, long offset, long keyOffset) {
     this.containerID = containerID;
     this.localID = localID;
     this.length = length;
     this.offset = offset;
+    this.keyOffset = keyOffset;
   }
 
   /**
@@ -77,6 +81,13 @@ public class OzoneKeyLocation {
    */
   public long getOffset() {
     return offset;
+  }
+
+  /**
+   * Returns the KeyOffset of this Key.
+   */
+  public long getKeyOffset() {
+    return keyOffset;
   }
 
 }

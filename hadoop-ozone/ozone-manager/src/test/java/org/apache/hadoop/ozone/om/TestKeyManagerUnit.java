@@ -19,34 +19,40 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -59,16 +65,31 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ratis.util.ExitUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
+
+import static com.google.common.collect.Sets.newHashSet;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.toList;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit test key manager.
@@ -76,26 +97,44 @@ import org.mockito.Mockito;
 public class TestKeyManagerUnit {
 
   private OzoneConfiguration configuration;
-  private OmMetadataManagerImpl metadataManager;
+  private OMMetadataManager metadataManager;
+  private StorageContainerLocationProtocol containerClient;
   private KeyManagerImpl keyManager;
 
   private Instant startDate;
+  private File testDir;
+  private ScmBlockLocationProtocol blockClient;
 
-  @Before
-  public void setup() throws IOException {
+  private OzoneManagerProtocol writeClient;
+  private OzoneManager om;
+
+  @BeforeAll
+  public static void setup() {
+    ExitUtils.disableSystemExit();
+  }
+  
+  @BeforeEach
+  public void init() throws Exception {
     configuration = new OzoneConfiguration();
+    testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTestDir().toString());
-    metadataManager = new OmMetadataManagerImpl(configuration);
-    keyManager = new KeyManagerImpl(
-        Mockito.mock(ScmBlockLocationProtocol.class),
-        metadataManager,
-        configuration,
-        "omtest",
-        Mockito.mock(OzoneBlockTokenSecretManager.class)
-    );
+        testDir.toString());
+    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
+    blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
 
-    startDate = Instant.now();
+    OmTestManagers omTestManagers
+        = new OmTestManagers(configuration, blockClient, containerClient);
+    om = omTestManagers.getOzoneManager();
+    metadataManager = omTestManagers.getMetadataManager();
+    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    startDate = Instant.ofEpochMilli(Time.now());
+  }
+
+  @AfterEach
+  public void cleanup() throws Exception {
+    om.stop();
+    FileUtils.deleteDirectory(testDir);
   }
 
   @Test
@@ -104,17 +143,15 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
 
     OmMultipartInfo omMultipartInfo =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
+        initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
 
     //WHEN
     OmMultipartUploadListParts omMultipartUploadListParts = keyManager
         .listParts("vol1", "bucket1", "dir/key1", omMultipartInfo.getUploadID(),
             0, 10);
 
-    Assert.assertEquals(0,
+    Assertions.assertEquals(0,
         omMultipartUploadListParts.getPartInfoList().size());
-
-    this.startDate = Instant.now();
   }
 
   @Test
@@ -124,14 +161,9 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    OmMultipartInfo upload1 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
-
-    OmMultipartInfo upload2 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
-
-    OmMultipartInfo upload3 =
-        initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key2");
+    initMultipartUpload(writeClient, "vol1", "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -139,14 +171,16 @@ public class TestKeyManagerUnit {
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
-    Assert.assertEquals(2, uploads.size());
-    Assert.assertEquals("dir/key1", uploads.get(0).getKeyName());
-    Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
+    Assertions.assertEquals(2, uploads.size());
+    Assertions.assertEquals("dir/key1", uploads.get(0).getKeyName());
+    Assertions.assertEquals("dir/key2", uploads.get(1).getKeyName());
 
-    Assert.assertNotNull(uploads.get(1));
-    Assert.assertNotNull(uploads.get(1).getCreationTime());
-    Assert.assertTrue("Creation date is too old",
-        uploads.get(1).getCreationTime().compareTo(startDate) > 0);
+    Assertions.assertNotNull(uploads.get(1));
+    Instant creationTime = uploads.get(1).getCreationTime();
+    Assertions.assertNotNull(creationTime);
+    Assertions.assertFalse(creationTime.isBefore(startDate),
+        "Creation date is too old: "
+            + creationTime + " < " + startDate);
   }
 
   @Test
@@ -162,11 +196,11 @@ public class TestKeyManagerUnit {
     // Add few to cache and few to DB.
     addinitMultipartUploadToCache(volume, bucket, "dir/key1");
 
-    initMultipartUpload(keyManager, volume, bucket, "dir/key2");
+    initMultipartUpload(writeClient, volume, bucket, "dir/key2");
 
     addinitMultipartUploadToCache(volume, bucket, "dir/key3");
 
-    initMultipartUpload(keyManager, volume, bucket, "dir/key4");
+    initMultipartUpload(writeClient, volume, bucket, "dir/key4");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -174,23 +208,23 @@ public class TestKeyManagerUnit {
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
-    Assert.assertEquals(4, uploads.size());
-    Assert.assertEquals("dir/key1", uploads.get(0).getKeyName());
-    Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
-    Assert.assertEquals("dir/key3", uploads.get(2).getKeyName());
-    Assert.assertEquals("dir/key4", uploads.get(3).getKeyName());
+    Assertions.assertEquals(4, uploads.size());
+    Assertions.assertEquals("dir/key1", uploads.get(0).getKeyName());
+    Assertions.assertEquals("dir/key2", uploads.get(1).getKeyName());
+    Assertions.assertEquals("dir/key3", uploads.get(2).getKeyName());
+    Assertions.assertEquals("dir/key4", uploads.get(3).getKeyName());
 
     // Add few more to test prefix.
 
     // Same way add few to cache and few to DB.
     addinitMultipartUploadToCache(volume, bucket, "dir/ozonekey1");
 
-    initMultipartUpload(keyManager, volume, bucket, "dir/ozonekey2");
+    initMultipartUpload(writeClient, volume, bucket, "dir/ozonekey2");
 
-    OmMultipartInfo omMultipartInfo3 =addinitMultipartUploadToCache(volume,
+    OmMultipartInfo omMultipartInfo3 = addinitMultipartUploadToCache(volume,
         bucket, "dir/ozonekey3");
 
-    OmMultipartInfo omMultipartInfo4 = initMultipartUpload(keyManager,
+    OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,
         volume, bucket, "dir/ozonekey4");
 
     omMultipartUploadList =
@@ -198,11 +232,11 @@ public class TestKeyManagerUnit {
 
     //THEN
     uploads = omMultipartUploadList.getUploads();
-    Assert.assertEquals(4, uploads.size());
-    Assert.assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
-    Assert.assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
-    Assert.assertEquals("dir/ozonekey3", uploads.get(2).getKeyName());
-    Assert.assertEquals("dir/ozonekey4", uploads.get(3).getKeyName());
+    Assertions.assertEquals(4, uploads.size());
+    Assertions.assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
+    Assertions.assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
+    Assertions.assertEquals("dir/ozonekey3", uploads.get(2).getKeyName());
+    Assertions.assertEquals("dir/ozonekey4", uploads.get(3).getKeyName());
 
     // Abort multipart upload for key in DB.
     abortMultipart(volume, bucket, "dir/ozonekey4",
@@ -214,10 +248,10 @@ public class TestKeyManagerUnit {
 
     //THEN
     uploads = omMultipartUploadList.getUploads();
-    Assert.assertEquals(3, uploads.size());
-    Assert.assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
-    Assert.assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
-    Assert.assertEquals("dir/ozonekey3", uploads.get(2).getKeyName());
+    Assertions.assertEquals(3, uploads.size());
+    Assertions.assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
+    Assertions.assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
+    Assertions.assertEquals("dir/ozonekey3", uploads.get(2).getKeyName());
 
     // abort multipart upload for key in cache.
     abortMultipart(volume, bucket, "dir/ozonekey3",
@@ -229,9 +263,9 @@ public class TestKeyManagerUnit {
 
     //THEN
     uploads = omMultipartUploadList.getUploads();
-    Assert.assertEquals(2, uploads.size());
-    Assert.assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
-    Assert.assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
+    Assertions.assertEquals(2, uploads.size());
+    Assertions.assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
+    Assertions.assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
 
   }
 
@@ -242,14 +276,13 @@ public class TestKeyManagerUnit {
     createBucket(metadataManager, "vol1", "bucket1");
     createBucket(metadataManager, "vol1", "bucket2");
 
-    OmMultipartInfo upload1 =
-        initMultipartUpload(keyManager, "vol1", "bucket1", "dip/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dip/key1");
 
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key1");
-    initMultipartUpload(keyManager, "vol1", "bucket1", "dir/key2");
-    initMultipartUpload(keyManager, "vol1", "bucket1", "key3");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key2");
+    initMultipartUpload(writeClient, "vol1", "bucket1", "key3");
 
-    initMultipartUpload(keyManager, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(writeClient, "vol1", "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -257,12 +290,12 @@ public class TestKeyManagerUnit {
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
-    Assert.assertEquals(2, uploads.size());
-    Assert.assertEquals("dir/key1", uploads.get(0).getKeyName());
-    Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
+    Assertions.assertEquals(2, uploads.size());
+    Assertions.assertEquals("dir/key1", uploads.get(0).getKeyName());
+    Assertions.assertEquals("dir/key2", uploads.get(1).getKeyName());
   }
 
-  private void createBucket(OmMetadataManagerImpl omMetadataManager,
+  private void createBucket(OMMetadataManager omMetadataManager,
       String volume, String bucket)
       throws IOException {
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
@@ -272,62 +305,153 @@ public class TestKeyManagerUnit {
         .setIsVersionEnabled(false)
         .setAcls(new ArrayList<>())
         .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, omBucketInfo);
+    OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }
 
-  private OmMultipartInfo initMultipartUpload(KeyManagerImpl omtest,
+  private OmMultipartInfo initMultipartUpload(OzoneManagerProtocol omtest,
       String volume, String bucket, String key)
       throws IOException {
     OmKeyArgs key1 = new Builder()
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(key)
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setAcls(new ArrayList<>())
         .build();
-    return omtest.initiateMultipartUpload(key1);
+    OmMultipartInfo omMultipartInfo = omtest.initiateMultipartUpload(key1);
+    return omMultipartInfo;
   }
 
   private OmMultipartInfo addinitMultipartUploadToCache(
       String volume, String bucket, String key) {
-    Map<Integer, OzoneManagerProtocolProtos.PartKeyInfo > partKeyInfoMap =
-        new HashMap<>();
     String uploadID = UUID.randomUUID().toString();
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
-        .setPartKeyInfoList(partKeyInfoMap)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .build();
 
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), new CacheValue<>(Optional.of(multipartKeyInfo),
-            RandomUtils.nextInt()));
+            uploadID)),
+        CacheValue.get(RandomUtils.nextInt(), multipartKeyInfo));
     return new OmMultipartInfo(volume, bucket, key, uploadID);
   }
 
   private void abortMultipart(
       String volume, String bucket, String key, String uploadID) {
-    Map<Integer, OzoneManagerProtocolProtos.PartKeyInfo > partKeyInfoMap =
-        new HashMap<>();
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), new CacheValue<>(Optional.absent(),
-            RandomUtils.nextInt()));
+            uploadID)), CacheValue.get(RandomUtils.nextInt()));
+  }
+
+  @Test
+  @SuppressWarnings ({"unchecked", "varargs"})
+  public void testGetKeyInfo() throws IOException {
+    final DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+    final long containerID = 1L;
+    Set<Long> containerIDs = newHashSet(containerID);
+
+    final Pipeline pipeline1 = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(Pipeline.PipelineState.OPEN)
+        .setLeaderId(dn1.getUuid())
+        .setNodes(Arrays.asList(dn1, dn2, dn3))
+        .build();
+
+    final Pipeline pipeline2 = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(Pipeline.PipelineState.OPEN)
+        .setLeaderId(dn1.getUuid())
+        .setNodes(Arrays.asList(dn2, dn3, dn4))
+        .build();
+
+    ContainerInfo ci = Mockito.mock(ContainerInfo.class);
+    when(ci.getContainerID()).thenReturn(1L);
+
+    // Setup SCM containerClient so that 1st call returns pipeline1 and
+    // 2nd call returns pipeline2.
+    when(containerClient.getContainerWithPipelineBatch(containerIDs))
+        .thenReturn(
+            singletonList(new ContainerWithPipeline(ci, pipeline1)),
+            singletonList(new ContainerWithPipeline(ci, pipeline2)));
+
+    insertVolume("volumeOne");
+
+    insertBucket("volumeOne", "bucketOne");
+
+    BlockID blockID1 = new BlockID(containerID, 1L);
+    insertKey(null, "volumeOne", "bucketOne", "keyOne", blockID1);
+    BlockID blockID2 = new BlockID(containerID, 2L);
+    insertKey(null, "volumeOne", "bucketOne", "keyTwo", blockID2);
+
+    // 1st call to get key1.
+    OmKeyArgs keyArgs = new Builder()
+        .setVolumeName("volumeOne")
+        .setBucketName("bucketOne")
+        .setKeyName("keyOne")
+        .build();
+    OmKeyInfo keyInfo = keyManager.getKeyInfo(keyArgs,
+        resolveBucket(keyArgs), "test");
+    final OmKeyLocationInfo blockLocation1 = keyInfo
+        .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
+    Assertions.assertEquals(blockID1, blockLocation1.getBlockID());
+    Assertions.assertEquals(pipeline1, blockLocation1.getPipeline());
+    // Ensure SCM is called.
+    verify(containerClient, times(1))
+        .getContainerWithPipelineBatch(containerIDs);
+
+    // subsequent call to key2 in same container sound result no scm calls.
+    keyArgs = new Builder()
+        .setVolumeName("volumeOne")
+        .setBucketName("bucketOne")
+        .setKeyName("keyTwo")
+        .build();
+    OmKeyInfo keyInfo2 = keyManager.getKeyInfo(keyArgs,
+        resolveBucket(keyArgs), "test");
+    OmKeyLocationInfo blockLocation2 = keyInfo2
+        .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
+    Assertions.assertEquals(blockID2, blockLocation2.getBlockID());
+    Assertions.assertEquals(pipeline1, blockLocation2.getPipeline());
+    // Ensure SCM is not called.
+    verify(containerClient, times(1))
+        .getContainerWithPipelineBatch(containerIDs);
+
+    // Yet, another call with forceCacheUpdate should trigger a call to SCM.
+    keyArgs = new Builder()
+        .setVolumeName("volumeOne")
+        .setBucketName("bucketOne")
+        .setKeyName("keyTwo")
+        .setForceUpdateContainerCacheFromSCM(true)
+        .build();
+    keyInfo2 = keyManager.getKeyInfo(keyArgs,
+        resolveBucket(keyArgs), "test");
+    blockLocation2 = keyInfo2
+        .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
+    Assertions.assertEquals(blockID2, blockLocation2.getBlockID());
+    Assertions.assertEquals(pipeline2, blockLocation2.getPipeline());
+    // Ensure SCM is called.
+    verify(containerClient, times(2))
+        .getContainerWithPipelineBatch(containerIDs);
+  }
+
+  private ResolvedBucket resolveBucket(OmKeyArgs keyArgs) {
+    return new ResolvedBucket(keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getVolumeName(), keyArgs.getBucketName(), "",
+        BucketLayout.DEFAULT);
   }
 
   @Test
   public void testLookupFileWithDnFailure() throws IOException {
-    final StorageContainerLocationProtocol containerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
-    final KeyManager manager = new KeyManagerImpl(null,
-        new ScmClient(Mockito.mock(ScmBlockLocationProtocol.class),
-            containerClient), metadataManager, configuration, "test-om",
-        Mockito.mock(OzoneBlockTokenSecretManager.class), null, null);
-
     final DatanodeDetails dnOne = MockDatanodeDetails.randomDatanodeDetails();
     final DatanodeDetails dnTwo = MockDatanodeDetails.randomDatanodeDetails();
     final DatanodeDetails dnThree = MockDatanodeDetails.randomDatanodeDetails();
@@ -338,8 +462,8 @@ public class TestKeyManagerUnit {
 
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -347,8 +471,8 @@ public class TestKeyManagerUnit {
 
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
@@ -359,90 +483,221 @@ public class TestKeyManagerUnit {
 
     List<ContainerWithPipeline> cps = new ArrayList<>();
     ContainerInfo ci = Mockito.mock(ContainerInfo.class);
-    Mockito.when(ci.getContainerID()).thenReturn(1L);
+    when(ci.getContainerID()).thenReturn(1L);
     cps.add(new ContainerWithPipeline(ci, pipelineTwo));
 
-    Mockito.when(containerClient.getContainerWithPipelineBatch(containerIDs))
+    when(containerClient.getContainerWithPipelineBatch(containerIDs))
         .thenReturn(cps);
 
-    final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
-        .setVolume("volumeOne")
-        .setAdminName("admin")
-        .setOwnerName("admin")
-        .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
+    insertVolume("volumeOne");
 
-    final OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
-          .setVolumeName("volumeOne")
-          .setBucketName("bucketOne")
-          .build();
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
+    insertBucket("volumeOne", "bucketOne");
 
-    final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(1L, 1L))
-        .setPipeline(pipelineOne)
-        .setOffset(0)
-        .setLength(256000)
-        .build();
-
-    final OmKeyInfo keyInfo = new OmKeyInfo.Builder()
-        .setVolumeName("volumeOne")
-        .setBucketName("bucketOne")
-        .setKeyName("keyOne")
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0,
-                Collections.singletonList(keyLocationInfo))))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
-        .setDataSize(256000)
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
-        .setAcls(Collections.emptyList())
-        .build();
-    TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);
+    insertKey(pipelineOne, "volumeOne", "bucketOne", "keyOne",
+        new BlockID(1L, 1L));
 
     final OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
         .setVolumeName("volumeOne")
         .setBucketName("bucketOne")
         .setKeyName("keyOne");
 
-    keyArgs.setRefreshPipeline(false);
-    final OmKeyInfo oldKeyInfo = manager
-        .lookupFile(keyArgs.build(), "test");
-
-    final OmKeyLocationInfo oldBlockLocation = oldKeyInfo
-        .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
-
-    Assert.assertEquals(1L, oldBlockLocation.getContainerID());
-    Assert.assertEquals(1L, oldBlockLocation
-        .getBlockID().getLocalID());
-    Assert.assertEquals(pipelineOne.getId(),
-        oldBlockLocation.getPipeline().getId());
-    Assert.assertTrue(oldBlockLocation.getPipeline()
-        .getNodes().contains(dnOne));
-    Assert.assertTrue(oldBlockLocation.getPipeline()
-        .getNodes().contains(dnTwo));
-    Assert.assertTrue(oldBlockLocation.getPipeline()
-        .getNodes().contains(dnThree));
-
-    keyArgs.setRefreshPipeline(true);
-    final OmKeyInfo newKeyInfo = manager
+    final OmKeyInfo newKeyInfo = keyManager
         .lookupFile(keyArgs.build(), "test");
 
     final OmKeyLocationInfo newBlockLocation = newKeyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
 
-    Assert.assertEquals(1L, newBlockLocation.getContainerID());
-    Assert.assertEquals(1L, newBlockLocation
+    Assertions.assertEquals(1L, newBlockLocation.getContainerID());
+    Assertions.assertEquals(1L, newBlockLocation
         .getBlockID().getLocalID());
-    Assert.assertEquals(pipelineTwo.getId(),
+    Assertions.assertEquals(pipelineTwo.getId(),
         newBlockLocation.getPipeline().getId());
-    Assert.assertTrue(newBlockLocation.getPipeline()
+    Assertions.assertTrue(newBlockLocation.getPipeline()
         .getNodes().contains(dnFour));
-    Assert.assertTrue(newBlockLocation.getPipeline()
+    Assertions.assertTrue(newBlockLocation.getPipeline()
         .getNodes().contains(dnFive));
-    Assert.assertTrue(newBlockLocation.getPipeline()
+    Assertions.assertTrue(newBlockLocation.getPipeline()
         .getNodes().contains(dnSix));
+  }
+
+  private void insertKey(Pipeline pipeline, String volumeName,
+                         String bucketName, String keyName,
+                         BlockID blockID) throws IOException {
+    final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(blockID)
+        .setPipeline(pipeline)
+        .setOffset(0)
+        .setLength(256000)
+        .build();
+
+    final OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setOmKeyLocationInfos(singletonList(
+            new OmKeyLocationInfoGroup(0,
+                singletonList(keyLocationInfo))))
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(256000)
+        .setReplicationConfig(
+                    RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+            .setAcls(Collections.emptyList())
+        .build();
+    OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
+  }
+
+  private void insertBucket(String volumeName, String bucketName)
+      throws IOException {
+    final OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .build();
+    OMRequestTestUtils.addBucketToOM(metadataManager, bucketInfo);
+  }
+
+  private void insertVolume(String volumeName) throws IOException {
+    final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName("admin")
+        .setOwnerName("admin")
+        .build();
+    OMRequestTestUtils.addVolumeToOM(metadataManager, volumeArgs);
+  }
+
+  @Test
+  public void listStatus() throws Exception {
+    String volume = "vol";
+    String bucket = "bucket";
+    String keyPrefix = "key";
+    String client = "client.host";
+
+    OMRequestTestUtils.addVolumeToDB(volume, OzoneConsts.OZONE,
+        metadataManager);
+
+    OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager);
+
+    final Pipeline pipeline = MockPipeline.createPipeline(3);
+    final List<String> nodes = pipeline.getNodes().stream()
+        .map(DatanodeDetails::getUuidString)
+        .collect(toList());
+
+    Set<Long> containerIDs = new HashSet<>();
+    List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
+    for (long i = 1; i <= 10; i++) {
+      final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(i, 1L))
+          .setPipeline(pipeline)
+          .setOffset(0)
+          .setLength(256000)
+          .build();
+
+      ContainerInfo containerInfo = new ContainerInfo.Builder()
+          .setContainerID(i)
+          .build();
+      containersWithPipeline.add(
+          new ContainerWithPipeline(containerInfo, pipeline));
+      containerIDs.add(i);
+
+      OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+          .setVolumeName(volume)
+          .setBucketName(bucket)
+          .setCreationTime(Time.now())
+          .setOmKeyLocationInfos(singletonList(
+              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+          .setReplicationConfig(RatisReplicationConfig
+              .getInstance(ReplicationFactor.THREE))
+          .setKeyName(keyPrefix + i)
+          .setObjectID(i)
+          .setUpdateID(i)
+          .build();
+      keyInfo.appendNewBlocks(singletonList(keyLocationInfo), false);
+      OMRequestTestUtils.addKeyToOM(metadataManager, keyInfo);
+    }
+
+    when(containerClient.getContainerWithPipelineBatch(containerIDs))
+        .thenReturn(containersWithPipeline);
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName("")
+        .setSortDatanodesInPipeline(true);
+    List<OzoneFileStatus> fileStatusList =
+        keyManager.listStatus(builder.build(), false,
+            null, Long.MAX_VALUE, client);
+
+    Assertions.assertEquals(10, fileStatusList.size());
+    verify(containerClient).getContainerWithPipelineBatch(containerIDs);
+    verify(blockClient).sortDatanodes(nodes, client);
+
+    // call list status the second time, and verify no more calls to
+    // SCM.
+    keyManager.listStatus(builder.build(), false,
+        null, Long.MAX_VALUE, client);
+    verify(containerClient, times(1)).getContainerWithPipelineBatch(anySet());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"anyhost", ""})
+  public void sortDatanodes(String client) throws Exception {
+    // GIVEN
+    int pipelineCount = 3;
+    int keysPerPipeline = 5;
+    OmKeyInfo[] keyInfos = new OmKeyInfo[pipelineCount * keysPerPipeline];
+    List<List<String>> expectedSortDatanodesInvocations = new ArrayList<>();
+    Map<Pipeline, List<DatanodeDetails>> expectedSortedNodes = new HashMap<>();
+    int ki = 0;
+    for (int p = 0; p < pipelineCount; p++) {
+      final Pipeline pipeline = MockPipeline.createPipeline(3);
+      final List<String> nodes = pipeline.getNodes().stream()
+          .map(DatanodeDetails::getUuidString)
+          .collect(toList());
+      expectedSortDatanodesInvocations.add(nodes);
+      final List<DatanodeDetails> sortedNodes = pipeline.getNodes().stream()
+          .sorted(comparing(DatanodeDetails::getUuidString))
+          .collect(toList());
+      expectedSortedNodes.put(pipeline, sortedNodes);
+
+      when(blockClient.sortDatanodes(nodes, client))
+          .thenReturn(sortedNodes);
+
+      for (int i = 1; i <= keysPerPipeline; i++) {
+        OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
+            .setBlockID(new BlockID(i, 1L))
+            .setPipeline(pipeline)
+            .setOffset(0)
+            .setLength(256000)
+            .build();
+
+        OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+            .setOmKeyLocationInfos(Arrays.asList(
+                new OmKeyLocationInfoGroup(0, emptyList()),
+                new OmKeyLocationInfoGroup(1, singletonList(keyLocationInfo))))
+            .build();
+        keyInfos[ki++] = keyInfo;
+      }
+    }
+
+    // WHEN
+    keyManager.sortDatanodes(client, keyInfos);
+
+    // THEN
+    // verify all key info locations got updated
+    for (OmKeyInfo keyInfo : keyInfos) {
+      OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
+      Assertions.assertNotNull(locations);
+      for (OmKeyLocationInfo locationInfo : locations.getLocationList()) {
+        Pipeline pipeline = locationInfo.getPipeline();
+        List<DatanodeDetails> expectedOrder = expectedSortedNodes.get(pipeline);
+        Assertions.assertEquals(expectedOrder, pipeline.getNodesInOrder());
+      }
+    }
+
+    // expect one invocation per pipeline
+    for (List<String> nodes : expectedSortDatanodesInvocations) {
+      verify(blockClient).sortDatanodes(nodes, client);
+    }
   }
 
 }

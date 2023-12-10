@@ -20,15 +20,13 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.apache.hadoop.ozone.s3.SignatureProcessor;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class test HeadBucket functionality.
@@ -38,7 +36,7 @@ public class TestRootList {
   private OzoneClient clientStub;
   private RootEndpoint rootEndpoint;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
@@ -54,29 +52,13 @@ public class TestRootList {
   @Test
   public void testListBucket() throws Exception {
 
-    rootEndpoint.setSignatureProcessor(new SignatureProcessor() {
-      @Override
-      public String getStringToSign() {
-        return null;
-      }
-
-      @Override
-      public String getSignature() {
-        return null;
-      }
-
-      @Override
-      public String getAwsAccessId() {
-        return OzoneConsts.OZONE;
-      }
-    });
     // List operation should succeed even there is no bucket.
     ListBucketResponse response =
         (ListBucketResponse) rootEndpoint.get().getEntity();
     assertEquals(0, response.getBucketsNum());
 
     String bucketBaseName = "bucket-" + getClass().getName();
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       clientStub.getObjectStore().createS3Bucket(bucketBaseName + i);
     }
     response = (ListBucketResponse) rootEndpoint.get().getEntity();

@@ -22,6 +22,8 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -30,27 +32,41 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+
 /**
  * Response for CreateBucket request.
  */
+@CleanupTableInfo(cleanupTables = {BUCKET_TABLE, VOLUME_TABLE})
 public final class OMBucketCreateResponse extends OMClientResponse {
 
   private final OmBucketInfo omBucketInfo;
+  private final OmVolumeArgs omVolumeArgs;
+
+  public OMBucketCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull OmVolumeArgs omVolumeArgs) {
+    super(omResponse);
+    this.omBucketInfo = omBucketInfo;
+    this.omVolumeArgs = omVolumeArgs;
+  }
 
   public OMBucketCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omBucketInfo = omBucketInfo;
+    this.omVolumeArgs = null;
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMBucketCreateResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
     omBucketInfo = null;
+    omVolumeArgs = null;
   }
 
   @Override
@@ -62,6 +78,12 @@ public final class OMBucketCreateResponse extends OMClientResponse {
             omBucketInfo.getBucketName());
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         dbBucketKey, omBucketInfo);
+    // update volume usedNamespace
+    if (omVolumeArgs != null) {
+      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+              omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+              omVolumeArgs);
+    }
   }
 
   @Nullable

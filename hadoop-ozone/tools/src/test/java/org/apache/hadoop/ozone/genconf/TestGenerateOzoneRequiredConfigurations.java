@@ -21,13 +21,15 @@ package org.apache.hadoop.ozone.genconf;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -40,10 +42,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests GenerateOzoneRequiredConfigurations.
@@ -57,6 +62,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
+  private static final String DEFAULT_ENCODING = UTF_8.name();
   /**
    * Creates output directory which will be used by the test-cases.
    * If a test-case needs a separate directory, it has to create a random
@@ -64,20 +70,20 @@ public class TestGenerateOzoneRequiredConfigurations {
    *
    * @throws Exception In case of exception while creating output directory.
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     outputBaseDir = GenericTestUtils.getTestDir();
     FileUtils.forceMkdir(outputBaseDir);
     genconfTool = new GenerateOzoneRequiredConfigurations();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
+    System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void reset() {
     // reset stream after each unit test
     out.reset();
@@ -91,12 +97,13 @@ public class TestGenerateOzoneRequiredConfigurations {
   /**
    * Cleans up the output base directory.
    */
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(outputBaseDir);
   }
 
-  private void execute(String[] args, String msg) {
+  private void execute(String[] args, String msg)
+      throws UnsupportedEncodingException {
     List<String> arguments = new ArrayList(Arrays.asList(args));
     LOG.info("Executing shell command with args {}", arguments);
     CommandLine cmd = genconfTool.getCmd();
@@ -117,7 +124,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    Assert.assertTrue(out.toString().contains(msg));
+    assertTrue(out.toString(DEFAULT_ENCODING).contains(msg));
   }
 
   private void executeWithException(String[] args, String msg) {
@@ -139,11 +146,12 @@ public class TestGenerateOzoneRequiredConfigurations {
             throw ex;
           }
         };
-    try{
+    try {
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
-    }catch(Exception ex){
-      Assert.assertTrue(ex.getMessage().contains(msg));
+    }  catch (Exception ex) {
+      assertTrue(ex.getMessage().contains(msg),
+          "Expected " + msg + ", but got: " + ex.getMessage());
     }
   }
 
@@ -170,9 +178,55 @@ public class TestGenerateOzoneRequiredConfigurations {
 
     //Asserts all properties have a non-empty value
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertTrue(p.getValue() != null && p.getValue().length() > 0);
     }
+  }
+
+  /**
+   * Tests a valid path and generates secure ozone-site.xml by calling
+   * {@code GenerateOzoneRequiredConfigurations#generateConfigurations}.
+   * Further verifies that all properties have a default value.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testGenerateSecurityConfigurations() throws Exception {
+    int ozoneConfigurationCount, ozoneSecurityConfigurationCount;
+
+    // Generate default Ozone Configuration
+    File tempPath = getRandomTempDir();
+    String[] args = new String[]{tempPath.getAbsolutePath()};
+    execute(args, "ozone-site.xml has been generated at " +
+        tempPath.getAbsolutePath());
+
+    URL url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+        .toURI().toURL();
+    OzoneConfiguration oc = new OzoneConfiguration();
+    List<OzoneConfiguration.Property> allProperties =
+        oc.readPropertyFromXml(url);
+
+    for (OzoneConfiguration.Property p : allProperties) {
+      assertTrue(p.getValue() != null && p.getValue().length() > 0);
+    }
+    ozoneConfigurationCount = allProperties.size();
+
+    // Generate secure Ozone Configuration
+    tempPath = getRandomTempDir();
+    args = new String[]{"--security", tempPath.getAbsolutePath()};
+    execute(args, "ozone-site.xml has been generated at " +
+        tempPath.getAbsolutePath());
+
+    url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+        .toURI().toURL();
+    oc = new OzoneConfiguration();
+    allProperties = oc.readPropertyFromXml(url);
+
+    for (OzoneConfiguration.Property p : allProperties) {
+      assertTrue(p.getValue() != null && p.getValue().length() > 0);
+    }
+    ozoneSecurityConfigurationCount = allProperties.size();
+
+    assertNotEquals(ozoneConfigurationCount, ozoneSecurityConfigurationCount);
   }
 
   /**
@@ -225,7 +279,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   public void genconfPathNotSpecified() throws Exception {
     File tempPath = getRandomTempDir();
     String[] args = new String[]{};
-    executeWithException(args, "Missing required parameter: <path>");
+    executeWithException(args, "Missing required parameter: '<path>'");
   }
 
   /**
@@ -236,7 +290,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   public void genconfHelp() throws Exception {
     File tempPath = getRandomTempDir();
     String[] args = new String[]{"--help"};
-    execute(args, "Usage: ozone genconf [-hV] [--verbose]");
+    execute(args, "Usage: ozone genconf [-hV] [--security] [--verbose]");
   }
 
   private File getRandomTempDir() throws IOException {

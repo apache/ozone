@@ -19,61 +19,71 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateKeyResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 /**
  * Handles CreateKey request.
  */
 
 public class OMKeyCreateRequest extends OMKeyRequest {
+
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateRequest.class);
 
-  public OMKeyCreateRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMKeyCreateRequest(OMRequest omRequest, BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -82,6 +92,19 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     Preconditions.checkNotNull(createKeyRequest);
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+
+    // Verify key name
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if (checkKeyNameEnabled) {
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
+
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with
@@ -104,44 +127,53 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       final long requestedSize = keyArgs.getDataSize() > 0 ?
           keyArgs.getDataSize() : scmBlockSize;
 
-      boolean useRatis = ozoneManager.shouldUseRatis();
-
       HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
-      if (factor == null) {
-        factor = useRatis ? HddsProtos.ReplicationFactor.THREE :
-            HddsProtos.ReplicationFactor.ONE;
-      }
-
       HddsProtos.ReplicationType type = keyArgs.getType();
-      if (type == null) {
-        type = useRatis ? HddsProtos.ReplicationType.RATIS :
-            HddsProtos.ReplicationType.STAND_ALONE;
-      }
+
+      final OmBucketInfo bucketInfo = ozoneManager
+          .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
+      final ReplicationConfig repConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(type, factor,
+              keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager);
 
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
-
-      List< OmKeyLocationInfo > omKeyLocationInfoList =
+      UserInfo userInfo = getUserInfo();
+      List<OmKeyLocationInfo> omKeyLocationInfoList =
           allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), type, factor,
+              ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId());
+              ozoneManager.getOMServiceId(),
+              ozoneManager.getMetrics(),
+              keyArgs.getSortDatanodes(),
+              userInfo);
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
               .setDataSize(requestedSize);
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
-          .map(OmKeyLocationInfo::getProtobuf).collect(Collectors.toList()));
+          .map(info -> info.getProtobuf(false,
+              getOmRequest().getVersion()))
+          .collect(Collectors.toList()));
     } else {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
     }
 
-    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+    newKeyArgs.setKeyName(keyPath);
+
+    if (keyArgs.getIsMultipartKey()) {
+      getFileEncryptionInfoForMpuKey(keyArgs, newKeyArgs, ozoneManager);
+    } else {
+      generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+    }
+
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -152,11 +184,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -166,6 +200,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     omMetrics.incNumKeyAllocates();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
     OmKeyInfo omKeyInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
 
@@ -173,15 +208,23 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
+    List<OmKeyInfo> missingParentInfos = null;
+    int numMissingParents = 0;
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
+              bucketName, keyName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -190,32 +233,57 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Check if Key already exists
       String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo =
-          omMetadataManager.getKeyTable().getIfExist(dbKeyName);
-      if (dbKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        // We check only the KeyTable here and not the OpenKeyTable. In case
-        // this transaction is a replay but the transaction was not committed
-        // to the KeyTable, then we recreate the key in OpenKey table. This is
-        // okay as all the subsequent transactions would also be replayed and
-        // the openKey table would eventually reach the same state.
-        // The reason we do not check the OpenKey table is to avoid a DB read
-        // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          throw new OMReplayException();
-        }
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+          .getIfExist(dbKeyName);
+
+      OmBucketInfo bucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
+
+      // If FILE_EXISTS we just override like how we used to do for Key Create.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("BucketName: {}, BucketLayout: {}",
+            bucketInfo.getBucketName(), bucketInfo.getBucketLayout());
       }
 
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
+      OMFileRequest.OMPathInfo pathInfo = null;
+
+      if (bucketInfo.getBucketLayout()
+          .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+        pathInfo = OMFileRequest.verifyFilesInPath(omMetadataManager,
+            volumeName, bucketName, keyName, Paths.get(keyName));
+        OMFileRequest.OMDirectoryResult omDirectoryResult =
+            pathInfo.getDirectoryResult();
+
+        // Check if a file or directory exists with same key name.
+        if (omDirectoryResult == DIRECTORY_EXISTS) {
+          throw new OMException("Cannot write to " +
+              "directory. createIntermediateDirs behavior is enabled and " +
+              "hence / has special interpretation: " + keyName, NOT_A_FILE);
+        } else
+          if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+            throw new OMException("Can not create file: " + keyName +
+                " as there is already file in the given path", NOT_A_FILE);
+          }
+
+        missingParentInfos = OMDirectoryCreateRequest
+            .getAllParentInfo(ozoneManager, keyArgs,
+                pathInfo.getMissingParents(), bucketInfo,
+                pathInfo, trxnLogIndex);
+
+        numMissingParents = missingParentInfos.size();
+      }
+
+      ReplicationConfig replicationConfig = OzoneConfigUtil
+          .resolveReplicationConfigPreference(keyArgs.getType(),
+              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+              bucketInfo.getDefaultReplicationConfig(),
+              ozoneManager);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+          keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
+          ozoneManager.getPrefixManager(), bucketInfo, pathInfo, trxnLogIndex,
+          ozoneManager.getObjectIdFromTxId(trxnLogIndex),
+          ozoneManager.isRatisEnabled(), replicationConfig);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
@@ -223,76 +291,157 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           bucketName, keyName, clientID);
 
       // Append new blocks
-      omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
-          .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()), false);
+      List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
+          .stream().map(OmKeyLocationInfo::getFromProtobuf)
+          .collect(Collectors.toList());
+      omKeyInfo.appendNewBlocks(newLocationList, false);
+
+      // Here we refer to the implementation of HDFS:
+      // If the key size is 600MB, when createKey, keyLocationInfo in
+      // keyLocationList is 3, and  the every pre-allocated block length is
+      // 256MB. If the number of factor  is 3, the total pre-allocated block
+      // ize is 256MB * 3 * 3. We will allocate more 256MB * 3 * 3 - 600mb * 3
+      // = 504MB in advance, and we  will subtract this part when we finally
+      // commitKey.
+      long preAllocatedSpace = newLocationList.size()
+          * ozoneManager.getScmBlockSize()
+          * replicationConfig.getRequiredNodes();
+      // check bucket and volume quota
+      checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
+          preAllocatedSpace);
+      checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      bucketInfo.incrUsedNamespace(numMissingParents);
+
+      if (numMissingParents > 0) {
+        // Add cache entries for the prefix directories.
+        // Skip adding for the file key itself, until Key Commit.
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, bucketInfo.getBucketLayout(),
+            null, missingParentInfos, trxnLogIndex);
+      }
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(dbOpenKeyName),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+          dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getProtobuf())
+          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+              keyArgs.getLatestVersionLocation()))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, null, clientID);
+          omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMKeyCreateResponse(createReplayOMResponse(
-            omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omMetrics.incNumKeyAllocateFails();
-        omResponse.setCmdType(Type.CreateKey);
-        omClientResponse = new OMKeyCreateResponse(createErrorOMResponse(
-            omResponse, exception));
-      }
+    } catch (IOException | InvalidPathException ex) {
+      result = Result.FAILURE;
+      exception = ex;
+      omMetrics.incNumKeyAllocateFails();
+      omResponse.setCmdType(Type.CreateKey);
+      omClientResponse = new OMKeyCreateResponse(
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(ozoneLockStrategy
+            .releaseWriteLock(omMetadataManager, volumeName,
+                bucketName, keyName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
     // Audit Log outside the lock
-    if (result != Result.REPLAY) {
-      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-      auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-          OMAction.ALLOCATE_KEY, auditMap, exception,
-          getOmRequest().getUserInfo()));
-    }
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.ALLOCATE_KEY, auditMap, exception,
+        getOmRequest().getUserInfo()));
 
+    logResult(createKeyRequest, omMetrics, exception, result,
+            numMissingParents);
+
+    return omClientResponse;
+  }
+
+  protected void logResult(CreateKeyRequest createKeyRequest,
+      OMMetrics omMetrics, Exception exception, Result result,
+       int numMissingParents) {
     switch (result) {
     case SUCCESS:
-      LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
-          bucketName, keyName);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          createKeyRequest);
+      // Missing directories are created immediately, counting that here.
+      // The metric for the key is incremented as part of the key commit.
+      omMetrics.incNumKeys(numMissingParents);
+      LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}",
+              createKeyRequest.getKeyArgs().getVolumeName(),
+              createKeyRequest.getKeyArgs().getBucketName(),
+              createKeyRequest.getKeyArgs().getKeyName());
       break;
     case FAILURE:
-      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
-              "Exception:{}", volumeName, bucketName, keyName, exception);
+      if (createKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeyCreateFailsTotal();
+      }
+      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key:{}. ",
+              createKeyRequest.getKeyArgs().getVolumeName(),
+              createKeyRequest.getKeyArgs().getBucketName(),
+              createKeyRequest.getKeyArgs().getKeyName(), exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
           createKeyRequest);
     }
-
-    return omClientResponse;
   }
 
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateKey
+  )
+  public static OMRequest disallowCreateKeyWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getCreateKeyRequest().getKeyArgs().hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates key create requests.
+   * We do not want to allow older clients to create keys in buckets which use
+   * non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateKey
+  )
+  public static OMRequest blockCreateKeyWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCreateKeyRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCreateKeyRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
+  }
 }

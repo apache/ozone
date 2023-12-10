@@ -18,61 +18,64 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test to verify pipeline is closed on readStateMachine failure.
  */
-@Ignore("see HDDS-3294")
 public class TestContainerStateMachineFailureOnRead {
   private MiniOzoneCluster cluster;
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
   private OzoneConfiguration conf;
+  private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     String path = GenericTestUtils
@@ -86,36 +89,30 @@ public class TestContainerStateMachineFailureOnRead {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1200, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-            DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
-        1000, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-            DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
-        1000, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-            DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
-        3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-            DatanodeRatisServerConfig.
-                RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-        3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-            "rpc.request.timeout",
-        3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-            "watch.request.timeout",
-        3, TimeUnit.SECONDS);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
+    ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
+    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    conf.setFromObject(ratisServerConfig);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
+    conf.setFromObject(raftClientConfig);
+
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
+    conf.setFromObject(ratisClientConfig);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -123,7 +120,7 @@ public class TestContainerStateMachineFailureOnRead {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
     bucketName = volumeName;
@@ -132,21 +129,22 @@ public class TestContainerStateMachineFailureOnRead {
     Logger.getLogger(GrpcLogAppender.class).setLevel(Level.WARN);
   }
 
-  @After
+  @AfterEach
   public void teardown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Test(timeout = 300000)
+  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 300000)
   @SuppressWarnings("squid:S3655")
   public void testReadStateMachineFailureClosesPipeline() throws Exception {
     // Stop one follower datanode
     List<Pipeline> pipelines =
-        cluster.getStorageContainerManager().getPipelineManager().getPipelines(
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE));
     Assert.assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 
@@ -154,7 +152,7 @@ public class TestContainerStateMachineFailureOnRead {
         cluster.getHddsDatanodes().stream().filter(
             s -> {
               try {
-                return ContainerTestHelper.isRatisFollower(s, ratisPipeline);
+                return RatisTestHelper.isRatisFollower(s, ratisPipeline);
               } catch (Exception e) {
                 e.printStackTrace();
                 return false;
@@ -164,10 +162,11 @@ public class TestContainerStateMachineFailureOnRead {
     Assert.assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
     // Verify healthy pipeline before creating key
-    XceiverClientRatis xceiverClientRatis =
-        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
-    xceiverClientRatis.connect();
-    TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    try (XceiverClientRatis xceiverClientRatis =
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
+      xceiverClientRatis.connect();
+      TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    }
 
     OmKeyLocationInfo omKeyLocationInfo;
     OzoneOutputStream key = objectStore.getVolume(volumeName)
@@ -175,7 +174,7 @@ public class TestContainerStateMachineFailureOnRead {
         .createKey("ratis", 1024, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>());
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write("ratis".getBytes(UTF_8));
     key.flush();
     
     // get the name of a valid container
@@ -191,7 +190,7 @@ public class TestContainerStateMachineFailureOnRead {
     Optional<HddsDatanodeService> leaderDn =
         cluster.getHddsDatanodes().stream().filter(dn -> {
           try {
-            return ContainerTestHelper.isRatisLeader(dn, ratisPipeline);
+            return RatisTestHelper.isRatisLeader(dn, ratisPipeline);
           } catch (Exception e) {
             e.printStackTrace();
             return false;

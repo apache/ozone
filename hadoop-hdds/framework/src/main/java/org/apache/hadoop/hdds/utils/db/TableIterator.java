@@ -24,9 +24,10 @@ import java.io.IOException;
 import java.util.Iterator;
 
 /**
- * Iterator for MetaDataStore DB.
+ * To iterate a {@link Table}.
  *
- * @param <T>
+ * @param <KEY> The key type to support {@link #seek(Object)}.
+ * @param <T> The type to be iterated.
  */
 public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
 
@@ -49,15 +50,11 @@ public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
   T seek(KEY key) throws IOException;
 
   /**
-   * Returns the key value at the current position.
-   * @return KEY
+   * Remove the actual value of the iterator from the database table on
+   * which the iterator is working on.
+   *
+   * @throws IOException when there is an error occurred during deletion.
    */
-  KEY key() throws IOException;
-
-  /**
-   * Returns the VALUE at the current position.
-   * @return VALUE
-   */
-  T value();
+  void removeFromDB() throws IOException;
 
 }

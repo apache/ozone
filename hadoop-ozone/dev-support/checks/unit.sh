@@ -14,23 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o pipefail
+#checks:unit
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR/../../.." || exit 1
-
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/unit"}
-mkdir -p "$REPORT_DIR"
-
-export MAVEN_OPTS="-Xmx4096m"
-mvn -B -DskipShade -Dskip.yarn -fae test -pl \!:hadoop-ozone-integration-test,\!:mini-chaos-tests "$@" \
-  | tee "${REPORT_DIR}/output.log"
-rc=$?
-
-# shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
-source "$DIR/_mvn_unit_report.sh"
-
-if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
-    exit 1
-fi
-exit ${rc}
+CHECK=unit
+source "${DIR}/junit.sh" -pl \!:ozone-integration-test,\!:mini-chaos-tests \
+-DexcludedGroups="native | unhealthy | org.apache.ozone.test.UnhealthyTest" "$@"

@@ -18,42 +18,47 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Response for DeleteKey request.
  */
-public class OMKeyDeleteResponse extends OMClientResponse {
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
+public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
+
   private OmKeyInfo omKeyInfo;
-  private boolean isRatisEnabled;
+  private OmBucketInfo omBucketInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled) {
-    super(omResponse);
+      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
+      @Nonnull OmBucketInfo omBucketInfo) {
+    super(omResponse, isRatisEnabled, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
-    this.isRatisEnabled = isRatisEnabled;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyDeleteResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
-    checkStatusNotOK();
+  public OMKeyDeleteResponse(@Nonnull OMResponse omResponse, @Nonnull
+                             BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override
@@ -62,51 +67,24 @@ public class OMKeyDeleteResponse extends OMClientResponse {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-          omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          ozoneKey);
+    String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+    Table<String, OmKeyInfo> keyTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
+    addDeletionToBatch(omMetadataManager, batchOperation, keyTable, ozoneKey,
+        omKeyInfo);
 
-      // If Key is not empty add this to delete table.
-      if (!isKeyEmpty(omKeyInfo)) {
-        // If a deleted key is put in the table where a key with the same
-        // name already exists, then the old deleted key information would be
-        // lost. To avoid this, first check if a key with same name exists.
-        // deletedTable in OM Metadata stores <KeyName, RepeatedOMKeyInfo>.
-        // The RepeatedOmKeyInfo is the structure that allows us to store a
-        // list of OmKeyInfo that can be tied to same key name. For a keyName
-        // if RepeatedOMKeyInfo structure is null, we create a new instance,
-        // if it is not null, then we simply add to the list and store this
-        // instance in deletedTable.
-        RepeatedOmKeyInfo repeatedOmKeyInfo =
-            omMetadataManager.getDeletedTable().get(ozoneKey);
-        repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
-            isRatisEnabled);
-        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            ozoneKey, repeatedOmKeyInfo);
-      }
-    }
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 
-  /**
-   * Check if the key is empty or not. Key will be empty if it does not have
-   * blocks.
-   *
-   * @param keyInfo
-   * @return if empty true, else false.
-   */
-  private boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
-    if (keyInfo == null) {
-      return true;
-    }
-    for (OmKeyLocationInfoGroup keyLocationList : keyInfo
-        .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationList().size() != 0) {
-        return false;
-      }
-    }
-    return true;
+  protected OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
   }
 }

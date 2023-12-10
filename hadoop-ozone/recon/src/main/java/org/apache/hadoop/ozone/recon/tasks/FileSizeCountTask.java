@@ -18,27 +18,34 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
+import org.jooq.DSLContext;
+import org.jooq.Record3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
 /**
  * Class to iterate over the OM DB and store the counts of existing/new
@@ -49,33 +56,15 @@ public class FileSizeCountTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(FileSizeCountTask.class);
 
-  private int maxBinSize = -1;
-  private long maxFileSizeUpperBound = 1125899906842624L; // 1 PB
-  private long[] upperBoundCount;
-  private long oneKb = 1024L;
   private FileCountBySizeDao fileCountBySizeDao;
+  private DSLContext dslContext;
 
   @Inject
-  public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao) {
+  public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao,
+                           UtilizationSchemaDefinition
+                               utilizationSchemaDefinition) {
     this.fileCountBySizeDao = fileCountBySizeDao;
-    upperBoundCount = new long[getMaxBinSize()];
-  }
-
-  long getOneKB() {
-    return oneKb;
-  }
-
-  long getMaxFileSizeUpperBound() {
-    return maxFileSizeUpperBound;
-  }
-
-  int getMaxBinSize() {
-    if (maxBinSize == -1) {
-      // extra bin to add files > 1PB.
-      // 1 KB (2 ^ 10) is the smallest tracked file.
-      maxBinSize = nextClosestPowerIndexOfTwo(maxFileSizeUpperBound) - 10 + 1;
-    }
-    return maxBinSize;
+    this.dslContext = utilizationSchemaDefinition.getDSLContext();
   }
 
   /**
@@ -87,21 +76,52 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        keyIter = omKeyInfoTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        handlePutKeyEvent(kv.getValue());
-      }
-    } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count in Recon DB. ", ioEx);
+    // Map to store the count of files based on file size
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+
+    // Delete all records from FILE_COUNT_BY_SIZE table
+    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
+    LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+
+    // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
+    boolean statusFSO =
+        reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+            omMetadataManager,
+            fileSizeCountMap);
+    // Call reprocessBucket method for LEGACY bucket layout
+    boolean statusOBS =
+        reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
+            fileSizeCountMap);
+    if (!statusFSO && !statusOBS) {
       return new ImmutablePair<>(getTaskName(), false);
     }
-    writeCountsToDB();
-
+    writeCountsToDB(true, fileSizeCountMap);
     LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  private boolean reprocessBucketLayout(BucketLayout bucketLayout,
+                               OMMetadataManager omMetadataManager,
+                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    Table<String, OmKeyInfo> omKeyInfoTable =
+        omMetadataManager.getKeyTable(bucketLayout);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             keyIter = omKeyInfoTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+        //  The time complexity of .size() method is constant time, O(1)
+        if (fileSizeCountMap.size() >= 100000) {
+          writeCountsToDB(true, fileSizeCountMap);
+          fileSizeCountMap.clear();
+        }
+      }
+    } catch (IOException ioEx) {
+      LOG.error("Unable to populate File Size Count for " + bucketLayout +
+          " in Recon DB. ", ioEx);
+      return false;
+    }
+    return true;
   }
 
   @Override
@@ -109,22 +129,11 @@ public class FileSizeCountTask implements ReconOmTask {
     return "FileSizeCountTask";
   }
 
-  @Override
   public Collection<String> getTaskTables() {
-    return Collections.singletonList(KEY_TABLE);
-  }
-
-  private void readCountsFromDB() {
-    // Read - Write operations to DB are in ascending order
-    // of file size upper bounds.
-    List<FileCountBySize> resultSet = fileCountBySizeDao.findAll();
-    int index = 0;
-    if (resultSet != null) {
-      for (FileCountBySize row : resultSet) {
-        upperBoundCount[index] = row.getCount();
-        index++;
-      }
-    }
+    List<String> taskTables = new ArrayList<>();
+    taskTables.add(KEY_TABLE);
+    taskTables.add(FILE_TABLE);
+    return taskTables;
   }
 
   /**
@@ -137,68 +146,60 @@ public class FileSizeCountTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+    final Collection<String> taskTables = getTaskTables();
 
-    //update array with file size count from DB
-    readCountsFromDB();
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
+      // Filter event inside process method to avoid duping
+      if (!taskTables.contains(omdbUpdateEvent.getTable())) {
+        continue;
+      }
       String updatedKey = omdbUpdateEvent.getKey();
-      OmKeyInfo omKeyInfo = omdbUpdateEvent.getValue();
+      Object value = omdbUpdateEvent.getValue();
+      Object oldValue = omdbUpdateEvent.getOldValue();
 
-      try{
-        switch (omdbUpdateEvent.getAction()) {
-        case PUT:
-          handlePutKeyEvent(omKeyInfo);
-          break;
+      if (value instanceof OmKeyInfo) {
+        OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
 
-        case DELETE:
-          handleDeleteKeyEvent(updatedKey, omKeyInfo);
-          break;
+        try {
+          switch (omdbUpdateEvent.getAction()) {
+          case PUT:
+            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            break;
 
-        case UPDATE:
-          handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue());
-          handlePutKeyEvent(omKeyInfo);
-          break;
+          case DELETE:
+            handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
+            break;
 
-        default: LOG.trace("Skipping DB update event : {}",
-            omdbUpdateEvent.getAction());
+          case UPDATE:
+            if (omKeyInfoOld != null) {
+              handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
+              handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.",
+                  updatedKey);
+            }
+            break;
+
+          default:
+            LOG.trace("Skipping DB update event : {}",
+                omdbUpdateEvent.getAction());
+          }
+        } catch (Exception e) {
+          LOG.error("Unexpected exception while processing key {}.",
+              updatedKey, e);
+          return new ImmutablePair<>(getTaskName(), false);
         }
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while processing key {}.",
-                updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), false);
+      } else {
+        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+            value.getClass().getName(), updatedKey);
       }
     }
-    writeCountsToDB();
+    writeCountsToDB(false, fileSizeCountMap);
     LOG.info("Completed a 'process' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
-  }
-
-  /**
-   * Calculate the bin index based on size of the Key.
-   * index is calculated as the number of right shifts
-   * needed until dataSize becomes zero.
-   *
-   * @param dataSize Size of the key.
-   * @return int bin index in upperBoundCount
-   */
-  public int calculateBinIndex(long dataSize) {
-    if (dataSize >= getMaxFileSizeUpperBound()) {
-      return getMaxBinSize() - 1;
-    }
-    int index = nextClosestPowerIndexOfTwo(dataSize);
-    // The smallest file size being tracked for count
-    // is 1 KB i.e. 1024 = 2 ^ 10.
-    return index < 10 ? 0 : index - 10;
-  }
-
-  int nextClosestPowerIndexOfTwo(long dataSize) {
-    int index = 0;
-    while(dataSize != 0) {
-      dataSize >>= 1;
-      index += 1;
-    }
-    return index;
   }
 
   /**
@@ -206,61 +207,117 @@ public class FileSizeCountTask implements ReconOmTask {
    * using the dao.
    *
    */
-  void writeCountsToDB() {
-    for (int i = 0; i < upperBoundCount.length; i++) {
-      long fileSizeUpperBound = (i == upperBoundCount.length - 1) ?
-          Long.MAX_VALUE : (long) Math.pow(2, (10 + i));
-      FileCountBySize fileCountRecord =
-          fileCountBySizeDao.findById(fileSizeUpperBound);
-      FileCountBySize newRecord = new
-          FileCountBySize(fileSizeUpperBound, upperBoundCount[i]);
-      if (fileCountRecord == null) {
-        fileCountBySizeDao.insert(newRecord);
-      } else {
-        fileCountBySizeDao.update(newRecord);
+  private void writeCountsToDB(boolean isDbTruncated,
+                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    List<FileCountBySize> insertToDb = new ArrayList<>();
+    List<FileCountBySize> updateInDb = new ArrayList<>();
+
+    fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
+      FileCountBySize newRecord = new FileCountBySize();
+      newRecord.setVolume(key.volume);
+      newRecord.setBucket(key.bucket);
+      newRecord.setFileSize(key.fileSizeUpperBound);
+      newRecord.setCount(fileSizeCountMap.get(key));
+      if (!isDbTruncated) {
+        // Get the current count from database and update
+        Record3<String, String, Long> recordToFind =
+            dslContext.newRecord(
+                FILE_COUNT_BY_SIZE.VOLUME,
+                FILE_COUNT_BY_SIZE.BUCKET,
+                FILE_COUNT_BY_SIZE.FILE_SIZE)
+                .value1(key.volume)
+                .value2(key.bucket)
+                .value3(key.fileSizeUpperBound);
+        FileCountBySize fileCountRecord =
+            fileCountBySizeDao.findById(recordToFind);
+        if (fileCountRecord == null && newRecord.getCount() > 0L) {
+          // insert new row only for non-zero counts.
+          insertToDb.add(newRecord);
+        } else if (fileCountRecord != null) {
+          newRecord.setCount(fileCountRecord.getCount() +
+              fileSizeCountMap.get(key));
+          updateInDb.add(newRecord);
+        }
+      } else if (newRecord.getCount() > 0) {
+        // insert new row only for non-zero counts.
+        insertToDb.add(newRecord);
       }
-    }
+    });
+    fileCountBySizeDao.insert(insertToDb);
+    fileCountBySizeDao.update(updateInDb);
+  }
+
+  private FileSizeCountKey getFileSizeCountKey(OmKeyInfo omKeyInfo) {
+    return new FileSizeCountKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(),
+            ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
   }
 
   /**
    * Calculate and update the count of files being tracked by
-   * upperBoundCount[].
+   * fileSizeCountMap.
    * Used by reprocess() and process().
    *
    * @param omKeyInfo OmKey being updated for count
    */
-  void handlePutKeyEvent(OmKeyInfo omKeyInfo) {
-    int binIndex = calculateBinIndex(omKeyInfo.getDataSize());
-    upperBoundCount[binIndex]++;
+  private void handlePutKeyEvent(OmKeyInfo omKeyInfo,
+                                 Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    FileSizeCountKey key = getFileSizeCountKey(omKeyInfo);
+    Long count = fileSizeCountMap.containsKey(key) ?
+        fileSizeCountMap.get(key) + 1L : 1L;
+    fileSizeCountMap.put(key, count);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 
   /**
    * Calculate and update the count of files being tracked by
-   * upperBoundCount[].
+   * fileSizeCountMap.
    * Used by reprocess() and process().
    *
    * @param omKeyInfo OmKey being updated for count
    */
-  void handleDeleteKeyEvent(String key, OmKeyInfo omKeyInfo) {
+  private void handleDeleteKeyEvent(String key, OmKeyInfo omKeyInfo,
+                                    Map<FileSizeCountKey, Long>
+                                        fileSizeCountMap) {
     if (omKeyInfo == null) {
-      LOG.warn("Unexpected error while handling DELETE key event. Key not " +
-          "found in Recon OM DB : {}", key);
+      LOG.warn("Deleting a key not found while handling DELETE key event. Key" +
+          " not found in Recon OM DB : {}", key);
     } else {
-      int binIndex = calculateBinIndex(omKeyInfo.getDataSize());
-      if (upperBoundCount[binIndex] > 0) {
-        //decrement only if it had files before, default DB value is 0
-        upperBoundCount[binIndex]--;
-      } else {
-        LOG.warn("Unexpected error while updating bin count. Found 0 count " +
-            "for index : {} while processing DELETE event for {}", binIndex,
-            omKeyInfo.getKeyName());
-      }
+      FileSizeCountKey countKey = getFileSizeCountKey(omKeyInfo);
+      Long count = fileSizeCountMap.containsKey(countKey) ?
+          fileSizeCountMap.get(countKey) - 1L : -1L;
+      fileSizeCountMap.put(countKey, count);
     }
   }
 
-  @VisibleForTesting
-  protected long[] getUpperBoundCount() {
-    return upperBoundCount;
-  }
+  private static class FileSizeCountKey {
+    private String volume;
+    private String bucket;
+    private Long fileSizeUpperBound;
 
+    FileSizeCountKey(String volume, String bucket,
+                     Long fileSizeUpperBound) {
+      this.volume = volume;
+      this.bucket = bucket;
+      this.fileSizeUpperBound = fileSizeUpperBound;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof FileSizeCountKey) {
+        FileSizeCountKey s = (FileSizeCountKey) obj;
+        return volume.equals(s.volume) && bucket.equals(s.bucket) &&
+            fileSizeUpperBound.equals(s.fileSizeUpperBound);
+      }
+      return false;
+    }
+
+    @Override
+    public int hashCode() {
+      return (volume  + bucket + fileSizeUpperBound).hashCode();
+    }
+  }
 }

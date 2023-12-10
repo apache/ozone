@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.segmentparser;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
+
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
@@ -30,19 +34,20 @@ import picocli.CommandLine;
     subcommands = {
         DatanodeRatisLogParser.class,
         GenericRatisLogParser.class,
-        OMRatisLogParser.class
-        //TODO: After SCM HA implementation, we can add log parser for SCM.
+        OMRatisLogParser.class,
+        SCMRatisLogParser.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class RatisLogParser extends GenericCli {
-
-  @Override
-  public void execute(String[] argv) {
-    super.execute(argv);
-  }
+@MetaInfServices(SubcommandWithParent.class)
+public class RatisLogParser extends GenericCli implements SubcommandWithParent {
 
   public static void main(String[] args) {
     new RatisLogParser().run(args);
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneDebug.class;
   }
 }

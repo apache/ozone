@@ -16,8 +16,10 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB
     .StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.slf4j.Logger;
@@ -27,6 +29,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.ZonedDateTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -51,6 +55,11 @@ public class EndpointStateMachine
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
+  private final ExecutorService executorService;
+
+  private static final String RECON_TYPE = "Recon";
+
+  private static final String SCM_TYPE = "SCM";
 
   /**
    * Constructs RPC Endpoints.
@@ -59,13 +68,18 @@ public class EndpointStateMachine
    */
   public EndpointStateMachine(InetSocketAddress address,
       StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, String threadNamePrefix) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
     state = EndPointStates.getInitState();
     lock = new ReentrantLock();
     this.conf = conf;
+    executorService = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "EndpointStateMachineTaskThread-"
+                + this.address + "-%d ")
+            .build());
   }
 
   /**
@@ -93,7 +107,7 @@ public class EndpointStateMachine
   }
 
   /**
-   * Sets the Version reponse we recieved from the SCM.
+   * Sets the Version response we received from the SCM.
    *
    * @param version VersionResponse
    */
@@ -106,6 +120,7 @@ public class EndpointStateMachine
    *
    * @return - getState.
    */
+  @Override
   public EndPointStates getState() {
     return state;
   }
@@ -130,6 +145,13 @@ public class EndpointStateMachine
   }
 
   /**
+   * Returns the endpoint specific ExecutorService.
+   */
+  public ExecutorService getExecutorService() {
+    return executorService;
+  }
+
+  /**
    * Closes the connection.
    *
    * @throws IOException
@@ -139,6 +161,7 @@ public class EndpointStateMachine
     if (endPoint != null) {
       endPoint.close();
     }
+    executorService.shutdown();
   }
 
   /**
@@ -155,6 +178,7 @@ public class EndpointStateMachine
    *
    * @return int
    */
+  @Override
   public long getMissedCount() {
     return this.missedCount.get();
   }
@@ -192,6 +216,7 @@ public class EndpointStateMachine
    *
    * @return - String
    */
+  @Override
   public String toString() {
     return address.toString();
   }
@@ -311,6 +336,7 @@ public class EndpointStateMachine
     }
   }
 
+  @Override
   public long getLastSuccessfulHeartbeat() {
     return lastSuccessfulHeartbeat == null ?
         0 :
@@ -320,5 +346,14 @@ public class EndpointStateMachine
   public void setLastSuccessfulHeartbeat(
       ZonedDateTime lastSuccessfulHeartbeat) {
     this.lastSuccessfulHeartbeat = lastSuccessfulHeartbeat;
+  }
+
+  @Override
+  public String getType() {
+    if (endPoint.getUnderlyingProxyObject()
+            instanceof ReconDatanodeProtocolPB) {
+      return RECON_TYPE;
+    }
+    return SCM_TYPE;
   }
 }

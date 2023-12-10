@@ -22,11 +22,14 @@ import:
       image: "@docker.image@"
     - type: PublishStatefulSet
     - type: ozone/emptydir
+    - type: ozone/onenode
   - path: ozone/freon
     destination: freon
     transformations:
     - type: Image
       image: "@docker.image@"
+transformations:
+ - type: kustomize
 header: |-
   # Licensed to the Apache Software Foundation (ASF) under one
   # or more contributor license agreements.  See the NOTICE file

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -27,12 +25,14 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import com.google.common.primitives.Ints;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ChecksumType;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.Ints;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +61,7 @@ public class Checksum {
   }
 
   public static ByteString int2ByteString(int n) {
-    return ByteString.copyFrom(Ints.toByteArray(n));
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(n));
   }
 
   private static Function<ByteBuffer, ByteString> newChecksumByteBufferFunction(
@@ -77,8 +77,10 @@ public class Checksum {
   /** The algorithms for {@link ChecksumType}. */
   enum Algorithm {
     NONE(() -> data -> ByteString.EMPTY),
-    CRC32(() -> newChecksumByteBufferFunction(PureJavaCrc32ByteBuffer::new)),
-    CRC32C(() -> newChecksumByteBufferFunction(PureJavaCrc32CByteBuffer::new)),
+    CRC32(() ->
+        newChecksumByteBufferFunction(ChecksumByteBufferFactory::crc32Impl)),
+    CRC32C(() ->
+        newChecksumByteBufferFunction(ChecksumByteBufferFactory::crc32CImpl)),
     SHA256(() -> newMessageDigestFunction("SHA-256")),
     MD5(() -> newMessageDigestFunction("MD5"));
 
@@ -111,18 +113,6 @@ public class Checksum {
   }
 
   /**
-   * Constructs a Checksum object with default ChecksumType and default
-   * BytesPerChecksum.
-   */
-  @VisibleForTesting
-  public Checksum() {
-    this.checksumType = ChecksumType.valueOf(
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE_DEFAULT);
-    this.bytesPerChecksum = OzoneConfigKeys
-        .OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT_BYTES; // Default is 1MB
-  }
-
-  /**
    * Computes checksum for give data.
    * @param data input data.
    * @return ChecksumData computed for input data.
@@ -150,10 +140,22 @@ public class Checksum {
    */
   public ChecksumData computeChecksum(ByteBuffer data)
       throws OzoneChecksumException {
+    // If type is set to NONE, we do not need to compute the checksums. We also
+    // need to avoid unnecessary conversions.
+    if (checksumType == ChecksumType.NONE) {
+      return new ChecksumData(checksumType, bytesPerChecksum);
+    }
     if (!data.isReadOnly()) {
       data = data.asReadOnlyBuffer();
     }
     return computeChecksum(ChunkBuffer.wrap(data));
+  }
+
+  public ChecksumData computeChecksum(List<ByteString> byteStrings)
+      throws OzoneChecksumException {
+    final List<ByteBuffer> buffers =
+        BufferUtils.getReadOnlyByteBuffers(byteStrings);
+    return computeChecksum(ChunkBuffer.wrap(buffers));
   }
 
   public ChecksumData computeChecksum(ChunkBuffer data)
@@ -229,6 +231,11 @@ public class Checksum {
     return verifyChecksum(ByteBuffer.wrap(data), checksumData, 0);
   }
 
+  private static boolean verifyChecksum(ByteBuffer data,
+      ChecksumData checksumData, int startIndex) throws OzoneChecksumException {
+    return verifyChecksum(ChunkBuffer.wrap(data), checksumData, startIndex);
+  }
+
   /**
    * Computes the ChecksumData for the input data and verifies that it
    * matches with that of the input checksumData.
@@ -238,7 +245,7 @@ public class Checksum {
    *                   data's computed checksum.
    * @throws OzoneChecksumException is thrown if checksums do not match
    */
-  private static boolean verifyChecksum(ByteBuffer data,
+  public static boolean verifyChecksum(ChunkBuffer data,
       ChecksumData checksumData,
       int startIndex) throws OzoneChecksumException {
     ChecksumType checksumType = checksumData.getChecksumType();
@@ -250,6 +257,46 @@ public class Checksum {
     int bytesPerChecksum = checksumData.getBytesPerChecksum();
     Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
     final ChecksumData computed = checksum.computeChecksum(data);
+    return checksumData.verifyChecksumDataMatches(computed, startIndex);
+  }
+
+  /**
+   * Computes the ChecksumData for the input byteStrings and verifies that
+   * the checksums match with that of the input checksumData.
+   * @param byteStrings input data buffers list. Each byteString should
+   *                    correspond to one checksum.
+   * @param checksumData checksumData to match with
+   * @param startIndex index of first checksum in checksumData to match with
+   *                   data's computed checksum.
+   * @param isSingleByteString if true, there is only one byteString in the
+   *                           input list and it should be processes
+   *                           accordingly
+   * @throws OzoneChecksumException is thrown if checksums do not match
+   */
+  public static boolean verifyChecksum(List<ByteString> byteStrings,
+      ChecksumData checksumData, int startIndex, boolean isSingleByteString)
+      throws OzoneChecksumException {
+    ChecksumType checksumType = checksumData.getChecksumType();
+    if (checksumType == ChecksumType.NONE) {
+      // Checksum is set to NONE. No further verification is required.
+      return true;
+    }
+
+    if (isSingleByteString) {
+      // The data is a single ByteString (old format).
+      return verifyChecksum(byteStrings.get(0), checksumData, startIndex);
+    }
+
+    // The data is a list of ByteStrings. Each ByteString length should be
+    // the same as the number of bytes per checksum (except the last
+    // ByteString which could be smaller).
+    final List<ByteBuffer> buffers =
+        BufferUtils.getReadOnlyByteBuffers(byteStrings);
+
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
+    final ChecksumData computed = checksum.computeChecksum(
+        ChunkBuffer.wrap(buffers));
     return checksumData.verifyChecksumDataMatches(computed, startIndex);
   }
 

@@ -478,8 +478,8 @@ public enum StorageUnit {
    * @return -- returns a double that represents this value
    */
   private static double divide(double value, double divisor) {
-    BigDecimal val = new BigDecimal(value);
-    BigDecimal bDivisor = new BigDecimal(divisor);
+    BigDecimal val = BigDecimal.valueOf(value);
+    BigDecimal bDivisor = BigDecimal.valueOf(divisor);
     return val.divide(bDivisor).setScale(PRECISION, RoundingMode.HALF_UP)
         .doubleValue();
   }
@@ -492,8 +492,8 @@ public enum StorageUnit {
    * @return Returns a double
    */
   private static double multiply(double first, double second) {
-    BigDecimal firstVal = new BigDecimal(first);
-    BigDecimal secondVal = new BigDecimal(second);
+    BigDecimal firstVal = BigDecimal.valueOf(first);
+    BigDecimal secondVal = BigDecimal.valueOf(second);
     return firstVal.multiply(secondVal)
         .setScale(PRECISION, RoundingMode.HALF_UP).doubleValue();
   }
@@ -522,6 +522,7 @@ public enum StorageUnit {
 
   public abstract double fromBytes(double value);
 
+  @Override
   public String toString() {
     return getLongName();
   }

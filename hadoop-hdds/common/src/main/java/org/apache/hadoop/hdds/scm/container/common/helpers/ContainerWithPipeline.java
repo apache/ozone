@@ -56,12 +56,12 @@ public class ContainerWithPipeline implements Comparator<ContainerWithPipeline>,
         Pipeline.getFromProtobuf(allocatedContainer.getPipeline()));
   }
 
-  public HddsProtos.ContainerWithPipeline getProtobuf()
+  public HddsProtos.ContainerWithPipeline getProtobuf(int clientVersion)
       throws UnknownPipelineStateException {
     HddsProtos.ContainerWithPipeline.Builder builder =
         HddsProtos.ContainerWithPipeline.newBuilder();
     builder.setContainerInfo(getContainerInfo().getProtobuf())
-        .setPipeline(getPipeline().getProtobufMessage());
+        .setPipeline(getPipeline().getProtobufMessage(clientVersion));
 
     return builder.build();
   }

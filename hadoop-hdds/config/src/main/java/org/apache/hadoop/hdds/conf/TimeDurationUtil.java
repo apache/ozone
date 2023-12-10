@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -44,93 +47,147 @@ public final class TimeDurationUtil {
    */
   public static long getTimeDurationHelper(String name, String vStr,
       TimeUnit unit) {
+    final long millis = getDuration(name, vStr, unit).toMillis();
+    return unit.convert(millis, TimeUnit.MILLISECONDS);
+  }
+
+  public static Duration getDuration(String name, String vStr, TimeUnit unit) {
     vStr = vStr.trim();
     vStr = vStr.toLowerCase();
     ParsedTimeDuration vUnit = ParsedTimeDuration.unitFor(vStr);
     if (null == vUnit) {
       LOG.warn("No unit for " + name + "(" + vStr + ") assuming " + unit);
       vUnit = ParsedTimeDuration.unitFor(unit);
+      if (null == vUnit) {
+        throw new IllegalArgumentException("Unexpected unit: " + unit);
+      }
     } else {
       vStr = vStr.substring(0, vStr.lastIndexOf(vUnit.suffix()));
     }
 
     long raw = Long.parseLong(vStr);
-    long converted = unit.convert(raw, vUnit.unit());
-    if (vUnit.unit().convert(converted, unit) < raw) {
-      LOG.warn("Possible loss of precision converting " + vStr
-          + vUnit.suffix() + " to " + unit + " for " + name);
-    }
-    return converted;
+    return Duration.of(raw, vUnit.temporalUnit());
   }
 
   enum ParsedTimeDuration {
     NS {
+      @Override
       TimeUnit unit() {
         return TimeUnit.NANOSECONDS;
       }
 
+      @Override
       String suffix() {
         return "ns";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.NANOS;
+      }
     },
     US {
+      @Override
       TimeUnit unit() {
         return TimeUnit.MICROSECONDS;
       }
 
+      @Override
       String suffix() {
         return "us";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.MICROS;
+      }
     },
     MS {
+      @Override
       TimeUnit unit() {
         return TimeUnit.MILLISECONDS;
       }
 
+      @Override
       String suffix() {
         return "ms";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.MILLIS;
+      }
     },
     S {
+      @Override
       TimeUnit unit() {
         return TimeUnit.SECONDS;
       }
 
+      @Override
       String suffix() {
         return "s";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.SECONDS;
+      }
     },
     M {
+      @Override
       TimeUnit unit() {
         return TimeUnit.MINUTES;
       }
 
+      @Override
       String suffix() {
         return "m";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.MINUTES;
+      }
     },
     H {
+      @Override
       TimeUnit unit() {
         return TimeUnit.HOURS;
       }
 
+      @Override
       String suffix() {
         return "h";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.HOURS;
+      }
     },
     D {
+      @Override
       TimeUnit unit() {
         return TimeUnit.DAYS;
       }
 
+      @Override
       String suffix() {
         return "d";
+      }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.DAYS;
       }
     };
 
     abstract TimeUnit unit();
 
     abstract String suffix();
+
+    abstract TemporalUnit temporalUnit();
 
     static ParsedTimeDuration unitFor(String s) {
       for (ParsedTimeDuration ptd : values()) {
@@ -145,6 +202,15 @@ public final class TimeDurationUtil {
     static ParsedTimeDuration unitFor(TimeUnit unit) {
       for (ParsedTimeDuration ptd : values()) {
         if (ptd.unit() == unit) {
+          return ptd;
+        }
+      }
+      return null;
+    }
+
+    static ParsedTimeDuration unitFor(TemporalUnit unit) {
+      for (ParsedTimeDuration ptd : values()) {
+        if (ptd.temporalUnit() == unit) {
           return ptd;
         }
       }

@@ -47,7 +47,7 @@ docker-compose exec rm bash
 kinit -kt /etc/security/keytabs/hadoop.keytab hadoop/rm@EXAMPLE.COM
 export HADOOP_MAPRED_HOME=/opt/hadoop/share/hadoop/mapreduce
 
-export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/opt/hadoop/share/hadoop/mapreduce/*:/opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:/opt/hadoop/share/hadoop/mapreduce/*:/opt/ozone/share/ozone/lib/ozone-filesystem-lib-current-@project.version@.jar
 
 hadoop fs -mkdir /user
 hadoop fs -mkdir /user/hadoop

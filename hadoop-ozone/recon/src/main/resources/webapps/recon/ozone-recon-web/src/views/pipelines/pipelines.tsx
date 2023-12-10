@@ -17,8 +17,7 @@
  */
 
 import React from 'react';
-import axios from 'axios';
-import {Table, Tabs} from 'antd';
+import {Table, Tabs, Tooltip, Icon} from 'antd';
 import './pipelines.less';
 import {PaginationConfig} from 'antd/lib/pagination';
 import prettyMilliseconds from 'pretty-ms';
@@ -28,9 +27,13 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
 import {IAxiosResponse} from 'types/axios.types';
+import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const {TabPane} = Tabs;
-export type PipelineStatus = 'active' | 'inactive';
+const PipelineStatusList = ['OPEN', 'CLOSING', 'QUASI_CLOSED', 'CLOSED', 'UNHEALTHY', 'INVALID', 'DELETED', 'DORMANT'] as const;
+type PipelineStatusTuple = typeof PipelineStatusList;
+export type PipelineStatus = PipelineStatusTuple[number]; // 'OPEN' | 'CLOSING' | 'QUASI_CLOSED' | 'CLOSED' | 'UNHEALTHY' | 'INVALID' | 'DELETED';
 
 interface IPipelineResponse {
   pipelineId: string;
@@ -41,7 +44,7 @@ interface IPipelineResponse {
   lastLeaderElection: number;
   duration: number;
   leaderElections: number;
-  replicationFactor: number;
+  replicationFactor: string;
   containers: number;
 }
 
@@ -62,7 +65,9 @@ const COLUMNS = [
     title: 'Pipeline ID',
     dataIndex: 'pipelineId',
     key: 'pipelineId',
-    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
+    isSearchable: true,
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId),
+    fixed: 'left'
   },
   {
     title: 'Replication Type & Factor',
@@ -72,7 +77,11 @@ const COLUMNS = [
       const replicationFactor = record.replicationFactor;
       return (
         <span>
-          <ReplicationIcon replicationFactor={replicationFactor} replicationType={replicationType}/>
+          <ReplicationIcon
+            replicationFactor={replicationFactor}
+            replicationType={replicationType}
+            leaderNode={record.leaderNode}
+            isLeader={false}/>
           {replicationType} ({replicationFactor})
         </span>
       );
@@ -85,32 +94,52 @@ const COLUMNS = [
     title: 'Status',
     dataIndex: 'status',
     key: 'status',
+    filterMultiple: true,
+    filters: PipelineStatusList.map(status => ({text: status, value: status})),
+    onFilter: (value: PipelineStatus, record: IPipelineResponse) => record.status === value,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.status.localeCompare(b.status)
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
     key: 'containers',
+    isSearchable: true,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.containers - b.containers
   },
   {
     title: 'Datanodes',
     dataIndex: 'datanodes',
     key: 'datanodes',
-    render: (datanodes: string[]) => <div>{datanodes.map(datanode => <div key={datanode}>{datanode}</div>)}</div>
+    isSearchable: true,
+    render: (datanodes: string[]) => <div> {datanodes && datanodes.map(datanode =>
+      <div key={datanode.hostName}>
+        <div className='uuidtooltip'>
+          <Tooltip placement='top' title={`UUID: ${datanode && datanode.uuid}`} getPopupContainer={(triggerNode) => triggerNode}>
+            {datanode && datanode.hostName}
+          </Tooltip>
+        </div>
+      </div>)}
+    </div>
   },
   {
     title: 'Leader',
     dataIndex: 'leaderNode',
     key: 'leaderNode',
+    isSearchable: true,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderNode.localeCompare(b.leaderNode)
   },
   {
-    title: 'Last Leader Election',
+    title:
+  <span>
+    Last Leader Election&nbsp;
+    <Tooltip title='Elapsed time since the current leader got elected. Only available if any metrics service providers like Prometheus is configured.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-      moment(lastLeaderElection).format('lll') : 'NA',
+      prettyMilliseconds(lastLeaderElection, {compact: true}) + " ago" : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
@@ -121,12 +150,23 @@ const COLUMNS = [
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.duration - b.duration
   },
   {
-    title: 'No. of Elections',
+    title:
+  <span>
+    No. of Elections&nbsp;
+    <Tooltip title='Number of elections in this pipeline. Only available if any metrics service providers like Prometheus is configured.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'leaderElections',
     key: 'leaderElections',
+    isSearchable: true,
+    render: (leaderElections: number) => leaderElections > 0 ?
+          leaderElections : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderElections - b.leaderElections
   }
 ];
+
+let cancelPipelineSignal: AbortController;
 
 export class Pipelines extends React.Component<Record<string, object>, IPipelinesState> {
   autoReload: AutoReloadHelper;
@@ -146,7 +186,10 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
     this.setState({
       activeLoading: true
     });
-    axios.get('/api/v1/pipelines').then((response: IAxiosResponse<IPipelinesResponse>) => {
+    const { request, controller } = AxiosGetHelper('/api/v1/pipelines', cancelPipelineSignal);
+    cancelPipelineSignal = controller;
+
+    request.then((response: IAxiosResponse<IPipelinesResponse>) => {
       const pipelinesResponse: IPipelinesResponse = response.data;
       const totalCount = pipelinesResponse.totalCount;
       const pipelines: IPipelineResponse[] = pipelinesResponse.pipelines;
@@ -172,6 +215,9 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelRequests([
+      cancelPipelineSignal
+    ])
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -196,14 +242,32 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
       <div className='pipelines-container'>
         <div className='page-header'>
           Pipelines ({activeTotalCount})
-          <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={activeLoading} lastRefreshed={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
         <div className='content-div'>
           <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
-            <TabPane key='1' tab='Active'>
-              <Table dataSource={activeDataSource} columns={COLUMNS} loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
+            <TabPane key='1'>
+              <Table
+                dataSource={activeDataSource}
+                columns={COLUMNS.reduce<any[]>((filtered, column) => {
+                  if (column.isSearchable) {
+                    const newColumn = {
+                      ...column,
+                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+                    };
+                    filtered.push(newColumn);
+                  } else {
+                    filtered.push(column);
+                  }
+
+                  return filtered;
+                }, [])}
+                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
+                scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+                locale={{filterTitle: ""}}
+                />
             </TabPane>
-            <TabPane key='2' tab='Inactive'/>
+
           </Tabs>
         </div>
       </div>
