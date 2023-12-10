@@ -56,6 +56,8 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
+import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getByteString;
+
 /**
  * Utilities for converting protobuf classes.
  */
@@ -82,11 +84,6 @@ public final class OMPBHelper {
         setPassword(getByteString(tok.getPassword())).
         setKind(tok.getKind().toString()).
         setService(tok.getService().toString()).build();
-  }
-
-  public static ByteString getByteString(byte[] bytes) {
-    // return singleton to reduce object allocation
-    return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
   }
 
   /**
