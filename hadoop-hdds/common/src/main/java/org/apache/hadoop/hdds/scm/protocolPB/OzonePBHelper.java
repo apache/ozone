@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -44,8 +45,8 @@ public final class OzonePBHelper {
    * This map should not be accessed directly. Used the getFixedByteString
    * methods instead.
    */
-  private static final ConcurrentHashMap<Object, ByteString>
-      FIXED_BYTESTRING_CACHE = new ConcurrentHashMap<>();
+  private static final Map<Object, ByteString>
+      FIXED_BYTE_STRING_CACHE = new ConcurrentHashMap<>();
 
   /**
    * Get the ByteString for frequently used fixed and small set strings.
@@ -53,7 +54,7 @@ public final class OzonePBHelper {
    * @param key string
    */
   public static ByteString getFixedByteString(Text key) {
-    return FIXED_BYTESTRING_CACHE.computeIfAbsent(key,
+    return FIXED_BYTE_STRING_CACHE.computeIfAbsent(key,
         k -> ByteString.copyFromUtf8(k.toString()));
   }
 
