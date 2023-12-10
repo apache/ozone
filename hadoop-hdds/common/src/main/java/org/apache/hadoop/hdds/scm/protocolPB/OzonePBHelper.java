@@ -63,6 +63,9 @@ public final class OzonePBHelper {
     return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
   }
 
+  /**
+   * Convert {@link TokenProto} (used for container tokens) to {@link Token}.
+   */
   public static <T extends TokenIdentifier> Token<T> tokenFromProto(
       TokenProto tokenProto) {
     return new Token<>(
@@ -72,6 +75,9 @@ public final class OzonePBHelper {
         new Text(tokenProto.getService()));
   }
 
+  /**
+   * Convert {@link Token} to {@link TokenProto} (used for container tokens).
+   */
   public static TokenProto protoFromToken(Token<?> token) {
     return TokenProto.newBuilder()
         .setIdentifier(getByteString(token.getIdentifier()))

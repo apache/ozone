@@ -71,6 +71,10 @@ public final class OMPBHelper {
     // no instances
   }
 
+  /**
+   * Convert {@link TokenProto} (used for delegation tokens and block tokens)
+   * to {@link Token}.
+   */
   public static <T extends TokenIdentifier> Token<T> tokenFromProto(
       TokenProto tokenProto) {
     return new Token<>(
@@ -80,6 +84,10 @@ public final class OMPBHelper {
         new Text(tokenProto.getService()));
   }
 
+  /**
+   * Convert {@link Token} to {@link TokenProto} (used for delegation tokens
+   * and block tokens).
+   */
   public static TokenProto protoFromToken(Token<?> token) {
     if (token == null) {
       throw new IllegalArgumentException("Invalid argument: token is null");
