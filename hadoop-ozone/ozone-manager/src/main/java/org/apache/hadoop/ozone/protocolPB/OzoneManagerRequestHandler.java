@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -410,7 +411,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     DBUpdates dbUpdatesWrapper =
         impl.getDBUpdates(dbUpdatesRequest);
     for (int i = 0; i < dbUpdatesWrapper.getData().size(); i++) {
-      builder.addData(OMPBHelper.getByteString(
+      builder.addData(OzonePBHelper.getByteString(
           dbUpdatesWrapper.getData().get(i)));
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
