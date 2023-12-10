@@ -182,8 +182,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       LOG.debug("Connecting to pipeline:{} leaderDatanode:{}, " +
           "primaryDatanode:{}", getPipeline().getId(),
           RatisHelper.toRaftPeerId(pipeline.getLeaderNode()),
-          // TODO (HDDS-9392): Update this to getClosestNode
-          RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
+          RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
     if (!client.compareAndSet(null,

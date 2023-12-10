@@ -1401,6 +1401,7 @@ public class RpcClient implements ClientProtocol {
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
         .addAllMetadataGdpr(metadata)
+        .setSortDatanodesInPipeline(true)
         .setAcls(getAclList());
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
@@ -1797,7 +1798,8 @@ public class RpcClient implements ClientProtocol {
 
   private OpenKeySession newMultipartOpenKey(
       String volumeName, String bucketName, String keyName,
-      long size, int partNumber, String uploadID) throws IOException {
+      long size, int partNumber, String uploadID,
+      boolean sortDatanodesInPipeline) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1819,6 +1821,7 @@ public class RpcClient implements ClientProtocol {
         .setIsMultipartKey(true)
         .setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
+        .setSortDatanodesInPipeline(sortDatanodesInPipeline)
         .setAcls(getAclList())
         .build();
     return ozoneManagerClient.openKey(keyArgs);
@@ -1829,7 +1832,7 @@ public class RpcClient implements ClientProtocol {
       String volumeName, String bucketName, String keyName,
       long size, int partNumber, String uploadID) throws IOException {
     final OpenKeySession openKey = newMultipartOpenKey(
-        volumeName, bucketName, keyName, size, partNumber, uploadID);
+        volumeName, bucketName, keyName, size, partNumber, uploadID, false);
     KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(uploadID)
@@ -1849,7 +1852,7 @@ public class RpcClient implements ClientProtocol {
       String uploadID)
       throws IOException {
     final OpenKeySession openKey = newMultipartOpenKey(
-        volumeName, bucketName, keyName, size, partNumber, uploadID);
+        volumeName, bucketName, keyName, size, partNumber, uploadID, true);
     // Amazon S3 never adds partial objects, So for S3 requests we need to
     // set atomicKeyCreation to true
     // refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
@@ -2099,6 +2102,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setSortDatanodesInPipeline(true)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
