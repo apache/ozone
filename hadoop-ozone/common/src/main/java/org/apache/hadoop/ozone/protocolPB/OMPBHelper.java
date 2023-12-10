@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileEnc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MD5MD5Crc32FileChecksumProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -92,24 +91,6 @@ public final class OMPBHelper {
         .setKindBytes(getFixedByteString(token.getKind()))
         .setServiceBytes(getByteString(token.getService().getBytes()))
         .build();
-  }
-
-  /**
-   * Converts Ozone delegation token to @{@link TokenProto}.
-   * @return tokenProto
-   */
-  public static TokenProto convertToTokenProto(Token<?> tok) {
-    return protoFromToken(tok);
-  }
-
-  /**
-   * Converts @{@link TokenProto} to Ozone delegation token.
-   *
-   * @return Ozone
-   */
-  public static Token<OzoneTokenIdentifier> convertToDelegationToken(
-      TokenProto tokenProto) {
-    return tokenFromProto(tokenProto);
   }
 
   public static BucketEncryptionKeyInfo convert(
