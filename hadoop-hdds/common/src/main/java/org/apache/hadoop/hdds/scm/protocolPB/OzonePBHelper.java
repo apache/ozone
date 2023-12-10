@@ -63,7 +63,7 @@ public final class OzonePBHelper {
     return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
   }
 
-  public static Token<? extends TokenIdentifier> tokenFromProto(
+  public static <T extends TokenIdentifier> Token<T> tokenFromProto(
       TokenProto tokenProto) {
     return new Token<>(
         tokenProto.getIdentifier().toByteArray(),

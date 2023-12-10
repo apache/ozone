@@ -147,8 +147,9 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         .setCreateVersion(keyLocation.getCreateVersion())
         .setPartNumber(keyLocation.getPartNumber());
     if (keyLocation.hasToken()) {
-      builder.setToken((Token<OzoneBlockTokenIdentifier>)
-          OzonePBHelper.tokenFromProto(keyLocation.getToken()));
+      Token<OzoneBlockTokenIdentifier> token =
+          OzonePBHelper.tokenFromProto(keyLocation.getToken());
+      builder.setToken(token);
     }
     return builder.build();
   }
