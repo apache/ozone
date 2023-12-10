@@ -38,14 +38,29 @@ public final class OmGetKey {
   private long clientID;
   private String errMsg;
 
+  private String fileName;
+  private Iterator<Path> pathComponents;
+  private long volumeId;
+  private long bucketId;
+  private long parentID;
+
+
   private OmGetKey(String volumeName, String bucketName, String keyName, 
-      OMMetadataManager omMetadataManager, long clientID, String errMsg) {
+      OMMetadataManager omMetadataManager, long clientID, String errMsg, 
+      String fileName, Iterator<Path> pathComponents, long volumeId, long bucketId, long parentID
+      ) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.omMetadataManager = omMetadataManager;
     this.clientID = clientID;
     this.errMsg = errMsg;
+
+    this.fileName = fileName;
+    this.pathComponents = pathComponents;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
+    this.parentID = parentID;
   }
 
   /**
@@ -94,8 +109,18 @@ public final class OmGetKey {
     }
 
     public OmGetKey build() {
+      String fileName = OzoneFSUtils.getFileName(this.keyName);
+      Iterator<Path> pathComponents = Paths.get(this.keyName).iterator();
+      final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
+      final long bucketId = omMetadataManager.getBucketId(this.volumeName,
+          this.bucketName);
+      long parentID = OMFileRequest
+        .getParentID(volumeId, bucketId, pathComponents, this.keyName,
+        this.omMetadataManager, this.errMsg);
+
       return new OmGetKey(volumeName, bucketName, keyName, 
-          omMetadataManager, clientID, errMsg);
+          omMetadataManager, clientID, errMsg, fileName, pathComponents, 
+          volumeId, bucketId, parentID);
     }
   }
 
@@ -119,31 +144,29 @@ public final class OmGetKey {
     return this.clientID;
   }
 
-  public String getOpenKey() throws IOException {
-    String fileName = OzoneFSUtils.getFileName(this.keyName);
-    Iterator<Path> pathComponents = Paths.get(this.keyName).iterator();
-    final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
-    final long bucketId = omMetadataManager.getBucketId(this.volumeName,
-        this.bucketName);
-    long parentID = OMFileRequest
-        .getParentID(volumeId, bucketId, pathComponents, this.keyName,
-        this.omMetadataManager, this.errMsg);
+  public String fileName() {
+    return this.fileName;
+  }
 
-    return omMetadataManager.getOpenFileName(volumeId, bucketId,
-        parentID, fileName, this.clientID);
+  public long getVolumeId() {
+    return this.volumeId;
+  }
+
+  public long getBucketId() {
+    return this.bucketId;
+  }
+
+  public long getParentID() {
+    return this.parentID;
+  }
+
+  public String getOpenKey() throws IOException {
+    return omMetadataManager.getOpenFileName(this.volumeId, this.bucketId,
+        this.parentID, this.fileName, this.clientID);
   }
 
   public String getOzonePathKey() throws IOException {
-    String fileName = OzoneFSUtils.getFileName(this.keyName);
-    Iterator<Path> pathComponents = Paths.get(this.keyName).iterator();
-    final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
-    final long bucketId = omMetadataManager.getBucketId(this.volumeName,
-        this.bucketName);
-    long parentID = OMFileRequest
-        .getParentID(volumeId, bucketId, pathComponents, this.keyName,
-        this.omMetadataManager, this.errMsg);
-
-    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
-        parentID, fileName);
+    return omMetadataManager.getOzonePathKey(this.volumeId, this.bucketId,
+        this.parentID, this.fileName);
   }
 }
