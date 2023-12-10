@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.CrcUtil;
 import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
@@ -57,6 +58,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getByteString;
+import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getFixedByteString;
 
 /**
  * Utilities for converting protobuf classes.
@@ -70,20 +72,34 @@ public final class OMPBHelper {
     // no instances
   }
 
+  public static <T extends TokenIdentifier> Token<T> tokenFromProto(
+      TokenProto tokenProto) {
+    return new Token<>(
+        tokenProto.getIdentifier().toByteArray(),
+        tokenProto.getPassword().toByteArray(),
+        new Text(tokenProto.getKind()),
+        new Text(tokenProto.getService()));
+  }
+
+  public static TokenProto protoFromToken(Token<?> token) {
+    if (token == null) {
+      throw new IllegalArgumentException("Invalid argument: token is null");
+    }
+
+    return TokenProto.newBuilder()
+        .setIdentifier(getByteString(token.getIdentifier()))
+        .setPassword(getByteString(token.getPassword()))
+        .setKindBytes(getFixedByteString(token.getKind()))
+        .setServiceBytes(getByteString(token.getService().getBytes()))
+        .build();
+  }
+
   /**
    * Converts Ozone delegation token to @{@link TokenProto}.
    * @return tokenProto
    */
   public static TokenProto convertToTokenProto(Token<?> tok) {
-    if (tok == null) {
-      throw new IllegalArgumentException("Invalid argument: token is null");
-    }
-
-    return TokenProto.newBuilder().
-        setIdentifier(getByteString(tok.getIdentifier())).
-        setPassword(getByteString(tok.getPassword())).
-        setKind(tok.getKind().toString()).
-        setService(tok.getService().toString()).build();
+    return protoFromToken(tok);
   }
 
   /**
@@ -93,9 +109,7 @@ public final class OMPBHelper {
    */
   public static Token<OzoneTokenIdentifier> convertToDelegationToken(
       TokenProto tokenProto) {
-    return new Token<>(tokenProto.getIdentifier()
-        .toByteArray(), tokenProto.getPassword().toByteArray(), new Text(
-        tokenProto.getKind()), new Text(tokenProto.getService()));
+    return tokenFromProto(tokenProto);
   }
 
   public static BucketEncryptionKeyInfo convert(
