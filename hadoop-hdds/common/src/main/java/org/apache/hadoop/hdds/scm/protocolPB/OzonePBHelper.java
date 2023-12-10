@@ -73,11 +73,11 @@ public final class OzonePBHelper {
   }
 
   public static TokenProto protoFromToken(Token<?> token) {
-    TokenProto.Builder builder = TokenProto.newBuilder().
-        setIdentifier(getByteString(token.getIdentifier())).
-        setPassword(getByteString(token.getPassword())).
-        setKindBytes(getFixedByteString(token.getKind())).
-        setServiceBytes(getByteString(token.getService().getBytes()));
-    return builder.build();
+    return TokenProto.newBuilder()
+        .setIdentifier(getByteString(token.getIdentifier()))
+        .setPassword(getByteString(token.getPassword()))
+        .setKindBytes(getFixedByteString(token.getKind()))
+        .setServiceBytes(getByteString(token.getService().getBytes()))
+        .build();
   }
 }
