@@ -67,7 +67,7 @@ public final class OMPBHelper {
       ByteString.copyFromUtf8("<redacted>");
 
   private OMPBHelper() {
-    /** Hidden constructor */
+    // no instances
   }
 
   /**
