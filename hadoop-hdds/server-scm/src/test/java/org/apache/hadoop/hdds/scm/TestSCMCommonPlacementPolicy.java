@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -51,8 +50,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -469,15 +466,9 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
     NodeManager nodeMngr = mock(NodeManager.class);
-    ConfigurationSource confing = mock(ConfigurationSource.class);
-    when(confing.isConfigured(eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE)))
-        .thenReturn(true);
-    when(confing.getStorageSize(eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE),
-            eq(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT),
-            eq(StorageUnit.BYTES))).thenReturn(100000.0);
     UUID datanodeUuid = UUID.randomUUID();
     DummyPlacementPolicy placementPolicy =
-        new DummyPlacementPolicy(nodeMngr, confing, 1);
+        new DummyPlacementPolicy(nodeMngr, conf, 1);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     when(datanodeDetails.getUuid()).thenReturn(datanodeUuid);
 
@@ -491,12 +482,16 @@ public class TestSCMCommonPlacementPolicy {
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
         HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
-            .setCommitted(500).build();
+            .setCommitted(500)
+            .setFreeSpaceToSpare(10000)
+            .build();
     // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
         HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
                 200000, 90000, 101000, DISK).toBuilder()
-            .setCommitted(1000).build();
+            .setCommitted(1000)
+            .setFreeSpaceToSpare(100000)
+            .build();
     StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
         metaReport = HddsTestUtils.createMetadataStorageReport("/data/metadata",
           200);
@@ -511,13 +506,9 @@ public class TestSCMCommonPlacementPolicy {
     //
     //   101000       500
     //     |           |
-    // (remaining - committed) > Math.max(4000,
-    //        VolumeUsage.getMinVolumeFreeSpace(conf,volumeCapacity))
+    // (remaining - committed) > Math.max(4000, freeSpaceToSpare)
     //                                                    |
-    //                                                  200000
-    //
-    // VolumeUsage.getMinVolumeFreeSpace(conf,volumeCapacity) == 100000
-    // (take a look to ConfigurationSource mock above)
+    //                                                  100000
     //
     // Summary: 101000 - 500 > 100000 == true
     assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
