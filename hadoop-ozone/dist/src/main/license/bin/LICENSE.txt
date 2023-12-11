@@ -210,6 +210,7 @@ See licenses/ for text of these licenses.
 EDL 1.0
 =====================
 
+   com.sun.activation:jakarta.activation
    jakarta.activation:jakarta.activation-api
    jakarta.xml.bind:jakarta.xml.bind-api
 
@@ -258,7 +259,6 @@ CDDL 1.1 + GPLv2 with classpath exception
    org.glassfish.jersey.inject:jersey-hk2
    org.glassfish.jersey.media:jersey-media-jaxb
    org.glassfish.jersey.media:jersey-media-json-jackson
-   org.jvnet.staxex:stax-ex
 
 
 Apache License 2.0
@@ -297,7 +297,6 @@ Apache License 2.0
    com.nimbusds:nimbus-jose-jwt
    com.squareup.okhttp3:okhttp
    com.squareup.okio:okio
-   com.sun.xml.fastinfoset:FastInfoset
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
