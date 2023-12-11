@@ -31,7 +31,7 @@ import java.io.IOException;
  * ozone sh snapshot info.
  */
 @CommandLine.Command(name = "info",
-    description = "returns information about an existing snapshot")
+    description = "Returns information about an existing snapshot")
 public class InfoSnapshotHandler extends Handler {
 
   @CommandLine.Mixin
@@ -56,7 +56,7 @@ public class InfoSnapshotHandler extends Handler {
         .getSnapshotInfo(volumeName, bucketName, snapshotName);
 
     if (isVerbose()) {
-      err().printf("Snapshot info for snapshot: %d under o3://%s/ %s ",
+      err().printf("Snapshot info for snapshot: %s under o3://%s/%s %n ",
           snapshotName, volumeName, bucketName);
     }
     printObjectAsJson(ozoneSnapshot);
