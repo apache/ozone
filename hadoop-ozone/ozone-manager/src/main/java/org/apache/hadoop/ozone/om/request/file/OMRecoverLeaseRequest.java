@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OmGetKey;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -52,9 +52,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -189,17 +186,19 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String doWork(OzoneManager ozoneManager, long transactionLogIndex)
       throws IOException {
 
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(
-        volumeName, bucketName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-        pathComponents, keyName, omMetadataManager,
-        "Cannot recover file : " + keyName
-            + " as parent directory doesn't exist");
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-        parentID, fileName);
+    String errMsg = "Cannot recover file : " + keyName 
+        + " as parent directory doesn't exist";
+
+    OmGetKey getKey =  new OmGetKey.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setOmMetadataManager(omMetadataManager)
+        .setErrMsg(errMsg)
+        .build();
+  
+    String fileName = getKey.getFileName();
+    dbFileKey = getKey.getOzonePathKey();
 
     keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
@@ -212,8 +211,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       LOG.warn("Key:" + keyName + " is already closed");
       return null;
     }
-    String openFileDBKey = omMetadataManager.getOpenFileName(
-            volumeId, bucketId, parentID, fileName, Long.parseLong(clientId));
+    String openFileDBKey = getKey.getOpenKey();
     if (openFileDBKey != null) {
       commitKey(dbFileKey, keyInfo, fileName, ozoneManager,
           transactionLogIndex);

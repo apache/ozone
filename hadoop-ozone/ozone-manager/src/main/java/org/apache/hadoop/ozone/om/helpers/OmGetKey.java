@@ -145,7 +145,7 @@ public final class OmGetKey {
     return this.clientID;
   }
 
-  public String fileName() {
+  public String getFileName() {
     return this.fileName;
   }
 
