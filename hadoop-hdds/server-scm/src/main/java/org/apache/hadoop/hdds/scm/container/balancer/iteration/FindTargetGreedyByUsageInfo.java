@@ -27,8 +27,7 @@ import java.util.Collection;
 import java.util.TreeSet;
 
 /**
- * an implementation of FindTargetGreedy, which will always select the
- * target with the lowest space usage.
+ * An implementation of FindTargetGreedy, which will always select the target with the lowest space usage.
  */
 class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
   private final TreeSet<DatanodeUsageInfo> potentialTargets;

@@ -37,15 +37,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Container balancer is a service in SCM to move containers between over- and
- * under-utilized datanodes.
+ * Container balancer is a service in SCM to move containers between over- and under-utilized datanodes.
  */
 public class ContainerBalancer extends StatefulService {
-
+  public static final Logger LOG = LoggerFactory.getLogger(ContainerBalancer.class);
   private static final AtomicInteger ID = new AtomicInteger();
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ContainerBalancer.class);
   private final StorageContainerManager scm;
   private final SCMContext scmContext;
   private final OzoneConfiguration ozoneConfiguration;
@@ -56,9 +52,8 @@ public class ContainerBalancer extends StatefulService {
   private final ReentrantLock lock;
 
   /**
-   * Constructs ContainerBalancer with the specified arguments. Initializes
-   * ContainerBalancerMetrics. Container Balancer does not start on
-   * construction.
+   * Constructs ContainerBalancer with the specified arguments.
+   * Initializes ContainerBalancerMetrics. Container Balancer does not start on construction.
    *
    * @param scm the storage container manager
    */
@@ -66,20 +61,17 @@ public class ContainerBalancer extends StatefulService {
     super(scm.getStatefulServiceStateManager());
     this.scm = scm;
     this.ozoneConfiguration = scm.getConfiguration();
-    this.config = ozoneConfiguration.getObject(
-        ContainerBalancerConfiguration.class);
+    this.config = ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
     this.scmContext = scm.getScmContext();
     this.metrics = ContainerBalancerMetrics.create();
-
     this.lock = new ReentrantLock();
     scm.getSCMServiceManager().register(this);
   }
 
   /**
    * Receives a notification for raft or safe mode related status changes.
-   * Stops ContainerBalancer if it's running and the current SCM becomes a
-   * follower or enters safe mode. Starts ContainerBalancer if the current
-   * SCM becomes leader, is out of safe mode and balancer should run.
+   * Stops ContainerBalancer if it's running and the current SCM becomes a follower or enters safe mode.
+   * Starts ContainerBalancer if the current SCM becomes leader, is out of safe mode and balancer should run.
    */
   @Override
   public void notifyStatusChanged() {
@@ -103,17 +95,14 @@ public class ContainerBalancer extends StatefulService {
       // else check for start
       boolean shouldRun = shouldRun();
       if (shouldRun && !canBalancerStart()) {
-        LOG.warn("Could not start ContainerBalancer on notify," +
-            " might be stopped");
+        LOG.warn("Could not start ContainerBalancer on notify, might be stopped");
       }
       if (shouldRun && canBalancerStart()) {
         LOG.info("Starting ContainerBalancer in this scm on status change");
         try {
           start();
-        } catch (IllegalContainerBalancerStateException |
-                 InvalidContainerBalancerConfigurationException e) {
-          LOG.warn("Could not start ContainerBalancer on raft/safe-mode " +
-              "status change.", e);
+        } catch (IllegalContainerBalancerStateException | InvalidContainerBalancerConfigurationException e) {
+          LOG.warn("Could not start ContainerBalancer on raft/safe-mode status change.", e);
         }
       }
     } finally {
@@ -122,27 +111,23 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Checks if ContainerBalancer should start (after a leader change, restart
-   * etc.) by reading persisted state.
+   * Checks if ContainerBalancer should start (after a leader change, restart etc.) by reading persisted state.
    *
    * @return true if the persisted state is true, otherwise false
    */
   @Override
   public boolean shouldRun() {
     try {
-      ContainerBalancerConfigurationProto proto =
-          readConfiguration(ContainerBalancerConfigurationProto.class);
+      ContainerBalancerConfigurationProto proto = readConfiguration(ContainerBalancerConfigurationProto.class);
       if (proto == null) {
-        LOG.warn("Could not find persisted configuration for {} when checking" +
-            " if ContainerBalancer should run. ContainerBalancer should not " +
-            "run now.", this.getServiceName());
+        LOG.warn("Could not find persisted configuration for {} when checking if ContainerBalancer should run." +
+            " ContainerBalancer should not run now.", this.getServiceName());
         return false;
       }
       return proto.getShouldRun();
     } catch (IOException e) {
-      LOG.warn("Could not read persisted configuration for checking if " +
-          "ContainerBalancer should start. ContainerBalancer should not start" +
-          " now.", e);
+      LOG.warn("Could not read persisted configuration for checking if ContainerBalancer should start." +
+          " ContainerBalancer should not start now.", e);
       return false;
     }
   }
@@ -153,8 +138,7 @@ public class ContainerBalancer extends StatefulService {
    * @return true if balancer started, otherwise false
    */
   public boolean isBalancerRunning() {
-    return (null != task
-        && task.getBalancerStatus() == ContainerBalancerTask.Status.RUNNING);
+    return (null != task && task.getBalancerStatus() == ContainerBalancerTask.Status.RUNNING);
   }
 
   /**
@@ -163,18 +147,16 @@ public class ContainerBalancer extends StatefulService {
    * @return true if balancer can be started, otherwise false
    */
   private boolean canBalancerStart() {
-    return (null == task
-        || task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED);
+    return (null == task || task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED);
   }
 
   /**
    * get the Container Balancer state.
    *
-   * @return true if balancer started, otherwise false
+   * @return ContainerBalancerTask.Status if balancer started, otherwise false
    */
   public @Nonnull ContainerBalancerTask.Status getBalancerStatus() {
-    return null != task ? task.getBalancerStatus()
-        : ContainerBalancerTask.Status.STOPPED;
+    return null != task ? task.getBalancerStatus() : ContainerBalancerTask.Status.STOPPED;
   }
 
   /**
@@ -195,20 +177,15 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Starts ContainerBalancer as an SCMService. Validates state, reads and
-   * validates persisted configuration, and then starts the balancing
-   * thread.
+   * Starts ContainerBalancer as an SCMService. Validates state, reads and validates persisted configuration,
+   * and then starts the balancing thread.
    *
-   * @throws IllegalContainerBalancerStateException
-   *        if balancer should not run according to persisted configuration
-   * @throws InvalidContainerBalancerConfigurationException
-   *        if failed to retrieve persisted configuration,
-   *        or the configuration is null
+   * @throws IllegalContainerBalancerStateException if balancer should not run according to persisted configuration
+   * @throws InvalidContainerBalancerConfigurationException if failed to retrieve persisted configuration,
+   *                                                        or the configuration is null
    */
   @Override
-  public void start()
-      throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException {
+  public void start() throws IllegalContainerBalancerStateException, InvalidContainerBalancerConfigurationException {
     lock.lock();
     try {
       // should be leader-ready, out of safe mode, and not running already
@@ -217,22 +194,20 @@ public class ContainerBalancer extends StatefulService {
       try {
         proto = readConfiguration(ContainerBalancerConfigurationProto.class);
       } catch (IOException e) {
-        throw new InvalidContainerBalancerConfigurationException("Could not " +
-            "retrieve persisted configuration while starting " +
-            "Container Balancer as an SCMService. Will not start now.", e);
+        throw new InvalidContainerBalancerConfigurationException(
+            "Could not retrieve persisted configuration while starting Container Balancer as an SCMService. " +
+                "Will not start now.", e);
       }
       if (proto == null) {
-        throw new InvalidContainerBalancerConfigurationException("Persisted " +
-            "configuration for ContainerBalancer is null during start. Will " +
-            "not start now.");
+        throw new InvalidContainerBalancerConfigurationException(
+            "Persisted configuration for ContainerBalancer is null during start. Will not start now.");
       }
       if (!proto.getShouldRun()) {
-        throw new IllegalContainerBalancerStateException("According to " +
-            "persisted configuration, ContainerBalancer should not run.");
+        throw new IllegalContainerBalancerStateException(
+            "According to persisted configuration, ContainerBalancer should not run.");
       }
       ContainerBalancerConfiguration configuration =
-          ContainerBalancerConfiguration.fromProtobuf(proto,
-              ozoneConfiguration);
+          ContainerBalancerConfiguration.fromProtobuf(proto, ozoneConfiguration);
       validateConfiguration(configuration);
       this.config = configuration;
       startBalancingThread(proto.getNextIterationIndex(), true);
@@ -242,16 +217,12 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Starts Container Balancer after checking its state and validating
-   * configuration.
+   * Starts Container Balancer after checking its state and validating configuration.
    *
-   * @throws IllegalContainerBalancerStateException
-   *            if ContainerBalancer is not in a start-appropriate state
-   * @throws InvalidContainerBalancerConfigurationException
-   *            if {@link ContainerBalancerConfiguration} config file
-   *            is incorrectly configured
-   * @throws IOException
-   *            on failure to persist {@link ContainerBalancerConfiguration}
+   * @throws IllegalContainerBalancerStateException         if ContainerBalancer is not in a start-appropriate state
+   * @throws InvalidContainerBalancerConfigurationException if {@link ContainerBalancerConfiguration} config file
+   *                                                        is incorrectly configured
+   * @throws IOException                                    on failure to persist {@link ContainerBalancerConfiguration}
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
@@ -274,9 +245,7 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Starts a new balancing thread asynchronously.
    */
-  private void startBalancingThread(int nextIterationIndex,
-                                    boolean delayStart
-  ) {
+  private void startBalancingThread(int nextIterationIndex, boolean delayStart) {
     String prefix = scmContext.threadNamePrefix();
     task = new ContainerBalancerTask(scm, this, config);
     Thread thread = new Thread(() -> task.run(nextIterationIndex, delayStart));
@@ -291,18 +260,15 @@ public class ContainerBalancer extends StatefulService {
    * Validates balancer's state based on the specified expectedRunning.
    * Confirms SCM is leader-ready and out of safe mode.
    *
-   * @param expectedRunning true if ContainerBalancer is expected to be
-   *                        running, else false
-   * @throws IllegalContainerBalancerStateException
-   *            if SCM is not leader-ready, is in safe mode, or state
-   *            does not match the specified expected state
+   * @param expectedRunning true if ContainerBalancer is expected to be running, else false
+   *
+   * @throws IllegalContainerBalancerStateException if SCM is not leader-ready, is in safe mode, or state
+   *                                                does not match the specified expected state
    */
-  private void validateState(boolean expectedRunning)
-      throws IllegalContainerBalancerStateException {
+  private void validateState(boolean expectedRunning) throws IllegalContainerBalancerStateException {
     if (!scmContext.isLeaderReady()) {
       LOG.warn("SCM is not leader ready");
-      throw new IllegalContainerBalancerStateException("SCM is not leader " +
-          "ready");
+      throw new IllegalContainerBalancerStateException("SCM is not leader ready");
     }
     if (scmContext.isInSafeMode()) {
       LOG.warn("SCM is in safe mode");
@@ -310,13 +276,11 @@ public class ContainerBalancer extends StatefulService {
     }
     if (!expectedRunning && !canBalancerStart()) {
       throw new IllegalContainerBalancerStateException(
-          "Expect ContainerBalancer as not running state" +
-              ", but running state is actually " + getBalancerStatus());
+          "Expect ContainerBalancer as not running state, but running state is actually " + getBalancerStatus());
     }
     if (expectedRunning && !canBalancerStop()) {
       throw new IllegalContainerBalancerStateException(
-          "Expect ContainerBalancer as running state" +
-              ", but running state is actually " + getBalancerStatus());
+          "Expect ContainerBalancer as running state, but running state is actually " + getBalancerStatus());
     }
   }
 
@@ -329,8 +293,7 @@ public class ContainerBalancer extends StatefulService {
     Thread balancingThread;
     try {
       if (!canBalancerStop()) {
-        LOG.warn("Cannot stop Container Balancer because it's not running or " +
-            "stopping");
+        LOG.warn("Cannot stop Container Balancer because it's not running or stopping");
         return;
       }
       LOG.info("Trying to stop ContainerBalancer in this SCM.");
@@ -344,8 +307,7 @@ public class ContainerBalancer extends StatefulService {
   }
 
   private static void blockTillTaskStop(@Nonnull Thread balancingThread) {
-    // NOTE: join should be called outside the lock in hierarchy
-    // to avoid locking others waiting
+    // NOTE: join should be called outside the lock in hierarchy to avoid locking others waiting
     // wait for balancingThread to die with interrupt
     balancingThread.interrupt();
     LOG.info("Container Balancer waiting for {} to stop", balancingThread);
@@ -358,12 +320,10 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * Stops ContainerBalancer gracefully. Persists state such that
-   * {@link ContainerBalancer#shouldRun()} will return false. This is the
-   * "stop" command.
+   * Stops ContainerBalancer gracefully.
+   * Persists state such that {@link ContainerBalancer#shouldRun()} will return false. This is the "stop" command.
    */
-  public void stopBalancer() throws IOException,
-      IllegalContainerBalancerStateException {
+  public void stopBalancer() throws IOException, IllegalContainerBalancerStateException {
     Thread balancingThread;
     lock.lock();
     try {
@@ -384,57 +344,51 @@ public class ContainerBalancer extends StatefulService {
       int index
   ) throws IOException {
     config = configuration;
-    saveConfiguration(configuration.toProtobufBuilder()
+    saveConfiguration(configuration
+        .toProtobufBuilder()
         .setShouldRun(shouldRun)
         .setNextIterationIndex(index)
         .build());
   }
 
-  private void validateConfiguration(
-      @Nonnull ContainerBalancerConfiguration conf
-  ) throws InvalidContainerBalancerConfigurationException {
-    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be
-    // greater than container size
+  private void validateConfiguration(@Nonnull ContainerBalancerConfiguration conf)
+      throws InvalidContainerBalancerConfigurationException {
+    // maxSizeEnteringTarget and maxSizeLeavingSource should by default be greater than container size
     long size = (long) ozoneConfiguration.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     if (conf.getMaxSizeEnteringTarget() <= size) {
-      LOG.warn("hdds.container.balancer.size.entering.target.max {} should " +
-              "be greater than ozone.scm.container.size {}",
+      LOG.warn("hdds.container.balancer.size.entering.target.max {} should be greater than ozone.scm.container.size {}",
           conf.getMaxSizeEnteringTarget(), size);
       throw new InvalidContainerBalancerConfigurationException(
-          "hdds.container.balancer.size.entering.target.max should be greater" +
-              " than ozone.scm.container.size");
+          "hdds.container.balancer.size.entering.target.max should be greater than ozone.scm.container.size");
     }
     if (conf.getMaxSizeLeavingSource() <= size) {
-      LOG.warn("hdds.container.balancer.size.leaving.source.max {} should " +
-              "be greater than ozone.scm.container.size {}",
+      LOG.warn("hdds.container.balancer.size.leaving.source.max {} should be greater than ozone.scm.container.size {}",
           conf.getMaxSizeLeavingSource(), size);
       throw new InvalidContainerBalancerConfigurationException(
-          "hdds.container.balancer.size.leaving.source.max should be greater" +
-              " than ozone.scm.container.size");
+          "hdds.container.balancer.size.leaving.source.max should be greater than ozone.scm.container.size");
     }
 
     // balancing interval should be greater than DUFactory refresh period
     DUFactory.Conf duConf = ozoneConfiguration.getObject(DUFactory.Conf.class);
     long refreshPeriod = duConf.getRefreshPeriod().toMillis();
     if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
-      LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
-              "should be greater than hdds.datanode.du.refresh.period {}",
+      LOG.warn("hdds.container.balancer.balancing.iteration.interval {} should be greater than " +
+              "hdds.datanode.du.refresh.period {}",
           conf.getBalancingInterval().toMillis(), refreshPeriod);
     }
 
     // "move.replication.timeout" should be lesser than "move.timeout"
     if (conf.getMoveReplicationTimeout().toMillis() >=
         conf.getMoveTimeout().toMillis()) {
-      LOG.warn("hdds.container.balancer.move.replication.timeout {} should " +
-              "be less than hdds.container.balancer.move.timeout {}.",
+      LOG.warn("hdds.container.balancer.move.replication.timeout {} should be less than " +
+              "hdds.container.balancer.move.timeout {}.",
           conf.getMoveReplicationTimeout().toMinutes(),
           conf.getMoveTimeout().toMinutes());
       throw new InvalidContainerBalancerConfigurationException(
-          "hdds.container.balancer.move.replication.timeout should " +
-              "be less than hdds.container.balancer.move.timeout.");
+          "hdds.container.balancer.move.replication.timeout should be less than hdds.container.balancer.move.timeout.");
     }
   }
 

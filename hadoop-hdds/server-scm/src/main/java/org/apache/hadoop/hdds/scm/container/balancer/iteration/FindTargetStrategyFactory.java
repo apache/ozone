@@ -30,12 +30,10 @@ final class FindTargetStrategyFactory {
   private FindTargetStrategyFactory() { }
 
   /**
-   * @param scm                       StorageContainerManager instance.
-   * @param isNetworkTopologyEnabled Value from
-   *                                 {@link ContainerBalancerConfiguration}.
-   *                                 specifies the instance of
-   *                                 ITargetFindStrategy that will be created
-   * @return the instance of ITargetFindStrategy
+   * @param scm                      StorageContainerManager instance.
+   * @param isNetworkTopologyEnabled Value from {@link ContainerBalancerConfiguration}.
+   *                                 Specifies the instance of FindTargetStrategy that will be created
+   * @return the instance of FindTargetStrategy
    */
   public static @Nonnull FindTargetStrategy create(
       @Nonnull StorageContainerManager scm,

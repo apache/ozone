@@ -59,9 +59,7 @@ import java.util.function.Supplier;
  *  The step is responsible for moving containers for source to target nodes
  */
 public class ContainerBalanceIteration {
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(ContainerBalanceIteration.class);
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(ContainerBalanceIteration.class);
   private final int maxDatanodeCountToUseInIteration;
   private final long maxSizeToMovePerIteration;
   private final double upperLimit;
@@ -69,14 +67,10 @@ public class ContainerBalanceIteration {
   private final long maxSizeEnteringTarget;
   private final List<DatanodeUsageInfo> overUtilizedNodes = new ArrayList<>();
   private final List<DatanodeUsageInfo> underUtilizedNodes = new ArrayList<>();
-  private final List<DatanodeUsageInfo> withinThresholdUtilizedNodes =
-      new ArrayList<>();
-
+  private final List<DatanodeUsageInfo> withinThresholdUtilizedNodes = new ArrayList<>();
   private final MoveManager moveManager;
-
   private final FindTargetStrategy findTargetStrategy;
   private final FindSourceStrategy findSourceStrategy;
-
   private final IterationState currentState = new IterationState();
   private final ContainerSelectionCriteria selectionCriteria;
 
@@ -84,10 +78,8 @@ public class ContainerBalanceIteration {
     Since a container can be selected only once during an iteration, these maps
     use it as a primary key to track source to target pairings.
   */
-  private final Map<ContainerID, DatanodeDetails> containerToSourceMap =
-      new HashMap<>();
-  private final Map<ContainerID, DatanodeDetails> containerToTargetMap =
-      new HashMap<>();
+  private final Map<ContainerID, DatanodeDetails> containerToSourceMap = new HashMap<>();
+  private final Map<ContainerID, DatanodeDetails> containerToTargetMap = new HashMap<>();
 
   private final Set<DatanodeDetails> selectedTargets = new HashSet<>();
   private final Set<DatanodeDetails> selectedSources = new HashSet<>();
@@ -106,18 +98,14 @@ public class ContainerBalanceIteration {
 
     maxSizeToMovePerIteration = config.getMaxSizeToMovePerIteration();
     int totalNodesInCluster = datanodeUsageInfos.size();
-    maxDatanodeCountToUseInIteration =
-        (int) (config.getMaxDatanodesRatioToInvolvePerIteration() *
-            totalNodesInCluster);
+    maxDatanodeCountToUseInIteration = (int) (config.getMaxDatanodesRatioToInvolvePerIteration() * totalNodesInCluster);
 
     moveManager = scm.getMoveManager();
     moveManager.setMoveTimeout(config.getMoveTimeout().toMillis());
-    moveManager.setReplicationTimeout(
-        config.getMoveReplicationTimeout().toMillis());
+    moveManager.setReplicationTimeout(config.getMoveReplicationTimeout().toMillis());
 
     double clusterAvgUtilisation = calculateAvgUtilization(datanodeUsageInfos);
-    LOGGER.debug("Average utilization of the cluster is {}",
-        clusterAvgUtilisation);
+    LOGGER.debug("Average utilization of the cluster is {}", clusterAvgUtilisation);
 
     double threshold = config.getThresholdAsRatio();
     // over utilized nodes have utilization greater than upper limit
@@ -126,11 +114,9 @@ public class ContainerBalanceIteration {
     lowerLimit = clusterAvgUtilisation - threshold;
 
     findSourceStrategy = new FindSourceGreedy(scm.getScmNodeManager());
-    findTargetStrategy = FindTargetStrategyFactory.create(scm,
-        config.getNetworkTopologyEnable());
+    findTargetStrategy = FindTargetStrategyFactory.create(scm, config.getNetworkTopologyEnable());
 
-    LOGGER.debug("Lower limit for utilization is {} and " +
-            "Upper limit for utilization is {}", lowerLimit, upperLimit);
+    LOGGER.debug("Lower limit for utilization is {} and Upper limit for utilization is {}", lowerLimit, upperLimit);
 
     selectionCriteria = new ContainerSelectionCriteria(config, scm);
     maxSizeEnteringTarget = config.getMaxSizeEnteringTarget();
@@ -164,8 +150,7 @@ public class ContainerBalanceIteration {
       SCMNodeStat scmNodeStat = datanodeUsageInfo.getScmNodeStat();
       long capacity = scmNodeStat.getCapacity().get();
 
-      LOGGER.debug("Utilization for node {} with capacity {}B, used {}B, and " +
-              "remaining {}B is {}",
+      LOGGER.debug("Utilization for node {} with capacity {}B, used {}B, and remaining {}B is {}",
           datanodeUsageInfo.getDatanodeDetails().getUuidString(),
           capacity,
           scmNodeStat.getScmUsed().get(),
@@ -176,32 +161,28 @@ public class ContainerBalanceIteration {
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes greater than upper limit in this node
-        long overUtilizedBytes = ratioToBytes(capacity, utilization) -
-            ratioToBytes(capacity, upperLimit);
+        long overUtilizedBytes = ratioToBytes(capacity, utilization) - ratioToBytes(capacity, upperLimit);
         totalOverUtilizedBytes += overUtilizedBytes;
       } else if (Double.compare(utilization, lowerLimit) < 0) {
         underUtilizedNodes.add(datanodeUsageInfo);
         metrics.incrementNumDatanodesUnbalanced(1);
 
         // amount of bytes lesser than lower limit in this node
-        long underUtilizedBytes = ratioToBytes(capacity, lowerLimit) -
-            ratioToBytes(capacity, utilization);
+        long underUtilizedBytes = ratioToBytes(capacity, lowerLimit) - ratioToBytes(capacity, utilization);
         totalUnderUtilizedBytes += underUtilizedBytes;
       } else {
         withinThresholdUtilizedNodes.add(datanodeUsageInfo);
       }
     }
-    metrics.incrementDataSizeUnbalancedGB(
-        Math.max(totalOverUtilizedBytes, totalUnderUtilizedBytes) /
-            OzoneConsts.GB);
+    metrics.incrementDataSizeUnbalancedGB(Math.max(totalOverUtilizedBytes, totalUnderUtilizedBytes) / OzoneConsts.GB);
 
     if (overUtilizedNodes.isEmpty() && underUtilizedNodes.isEmpty()) {
       LOGGER.info("Did not find any unbalanced Datanodes.");
       return false;
     }
 
-    LOGGER.info("Container Balancer has identified {} Over-Utilized and {} " +
-            "Under-Utilized Datanodes that need to be balanced.",
+    LOGGER.info("Container Balancer has identified {} Over-Utilized and {} Under-Utilized Datanodes " +
+            "that need to be balanced.",
         overUtilizedNodes.size(), underUtilizedNodes.size());
 
     if (LOGGER.isDebugEnabled()) {
@@ -226,8 +207,7 @@ public class ContainerBalanceIteration {
       @Nonnull ContainerBalancerConfiguration config
   ) {
     // potential and selected targets are updated in the following loop
-    //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
-    // source and target
+    // TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both source and target
     findTargetStrategy.reInitialize(getPotentialTargets());
     findSourceStrategy.reInitialize(getPotentialSources());
 
@@ -239,8 +219,7 @@ public class ContainerBalanceIteration {
     // match each source node with a target
     while (true) {
       if (!isTaskRunning.get()) {
-        currentState.result =
-            ContainerBalancerTask.IterationResult.ITERATION_INTERRUPTED;
+        currentState.result = ContainerBalancerTask.IterationResult.ITERATION_INTERRUPTED;
         break;
       }
 
@@ -249,8 +228,8 @@ public class ContainerBalanceIteration {
         break;
       }
 
-      /* if balancer is approaching the iteration limits for max datanodes to
-       involve, take some action in adaptWhenNearingIterationLimits()
+      /* if balancer is approaching the iteration limits for max datanodes to involve,
+         take some action in adaptWhenNearingIterationLimits()
       */
       if (canAdaptWhenNearingLimits) {
         if (adaptWhenNearingIterationLimits()) {
@@ -265,8 +244,7 @@ public class ContainerBalanceIteration {
         }
       }
 
-      DatanodeDetails source =
-          findSourceStrategy.getNextCandidateSourceDataNode();
+      DatanodeDetails source = findSourceStrategy.getNextCandidateSourceDataNode();
       if (source == null) {
         // no more source DNs are present
         break;
@@ -285,15 +263,12 @@ public class ContainerBalanceIteration {
 
     if (!isMoveGeneratedInThisIteration) {
       /*
-       If no move was generated during this iteration then we don't need
-       to check the move results
+       If no move was generated during this iteration then we don't need to check the move results
        */
-      currentState.result =
-          ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      currentState.result = ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE;
     } else {
       checkIterationMoveResults(config.getMoveTimeout().toMillis());
-      currentState.datanodeCountUsedIteration =
-          selectedSources.size() + selectedTargets.size();
+      currentState.datanodeCountUsedIteration = selectedSources.size() + selectedTargets.size();
       collectMetrics();
     }
     metrics.incrementNumIterations(1);
@@ -301,38 +276,30 @@ public class ContainerBalanceIteration {
   }
 
   /**
-   * Match a source datanode with a target datanode and identify the container
-   * to move.
+   * Match a source datanode with a target datanode and identify the container to move.
    *
    * @return ContainerMoveSelection containing the selected target and container
    */
-  private @Nullable ContainerMoveSelection matchSourceWithTarget(
-      @Nonnull DatanodeDetails source
-  ) {
-    Set<ContainerID> candidateContainers =
-        selectionCriteria.getCandidateContainers(source, findSourceStrategy,
-            currentState.sizeScheduledForMoveInLatestIteration, lowerLimit);
+  private @Nullable ContainerMoveSelection matchSourceWithTarget(@Nonnull DatanodeDetails source) {
+    Set<ContainerID> candidateContainers = selectionCriteria.getCandidateContainers(
+        source, findSourceStrategy, currentState.sizeScheduledForMoveInLatestIteration, lowerLimit);
 
     if (candidateContainers.isEmpty()) {
-      LOGGER.debug("ContainerBalancer could not find any candidate " +
-          "containers for datanode {}", source.getUuidString());
+      LOGGER.debug("ContainerBalancer could not find any candidate containers for datanode {}", source.getUuidString());
       return null;
     }
 
-    LOGGER.debug("ContainerBalancer is finding suitable target for " +
-            "source datanode {}", source.getUuidString());
+    LOGGER.debug("ContainerBalancer is finding suitable target for source datanode {}", source.getUuidString());
 
-    ContainerMoveSelection moveSelection =
-        findTargetStrategy.findTargetForContainerMove(
+    ContainerMoveSelection moveSelection = findTargetStrategy.findTargetForContainerMove(
             source, candidateContainers, maxSizeEnteringTarget, upperLimit);
 
     if (moveSelection == null) {
-      LOGGER.debug("ContainerBalancer could not find a suitable target " +
-              "for source node {}.", source.getUuidString());
+      LOGGER.debug("ContainerBalancer could not find a suitable target for source node {}.", source.getUuidString());
       return null;
     }
-    LOGGER.info("ContainerBalancer matched source datanode {} with target " +
-            "datanode {} for container move.", source.getUuidString(),
+    LOGGER.info("ContainerBalancer matched source datanode {} with target datanode {} for container move.",
+        source.getUuidString(),
         moveSelection.getTargetNode().getUuidString());
 
     return moveSelection;
@@ -341,10 +308,9 @@ public class ContainerBalanceIteration {
   private boolean reachedMaxSizeToMovePerIteration() {
     // since candidate containers in ContainerBalancerSelectionCriteria are
     // filtered out according to this limit, balancer should not have crossed it
-    if (currentState.sizeScheduledForMoveInLatestIteration >=
-        maxSizeToMovePerIteration) {
-      LOGGER.warn("Reached max size to move limit. {} bytes have already been" +
-              " scheduled for balancing and the limit is {} bytes.",
+    if (currentState.sizeScheduledForMoveInLatestIteration >= maxSizeToMovePerIteration) {
+      LOGGER.warn("Reached max size to move limit. {} bytes have already been scheduled for balancing and " +
+              "the limit is {} bytes.",
           currentState.sizeScheduledForMoveInLatestIteration,
           maxSizeToMovePerIteration);
       return true;
@@ -354,24 +320,20 @@ public class ContainerBalanceIteration {
 
 
   /**
-   * Restricts potential target datanodes to nodes that have
-   * already been selected if balancer is one datanode away from
+   * Restricts potential target datanodes to nodes that have already been selected if balancer is one datanode away from
    * "datanodes.involved.max.percentage.per.iteration" limit.
    *
    * @return true if potential targets were restricted, else false
    */
   private boolean adaptWhenNearingIterationLimits() {
     // check if we're nearing max datanodes to involve
-    if (currentState.datanodeCountUsedIteration + 1 ==
-        maxDatanodeCountToUseInIteration) {
-      /* We're one datanode away from reaching the limit. Restrict potential
-      targets to targets that have already been selected.
+    if (currentState.datanodeCountUsedIteration + 1 == maxDatanodeCountToUseInIteration) {
+      /* We're one datanode away from reaching the limit. Restrict potential targets to targets
+         that have already been selected.
        */
       findTargetStrategy.resetPotentialTargets(selectedTargets);
-      LOGGER.debug("Approaching max datanodes to involve limit. {} datanodes " +
-              "have already been selected for balancing and the limit is " +
-              "{}. Only already selected targets can be selected as targets" +
-              " now.",
+      LOGGER.debug("Approaching max datanodes to involve limit. {} datanodes have already been selected for " +
+              "balancing and the limit is {}. Only already selected targets can be selected as targets now.",
           currentState.datanodeCountUsedIteration,
           maxDatanodeCountToUseInIteration);
       return true;
@@ -382,23 +344,19 @@ public class ContainerBalanceIteration {
   }
 
   /**
-   * Restricts potential source and target datanodes to nodes that have
-   * already been selected if balancer has reached
+   * Restricts potential source and target datanodes to nodes that have already been selected if balancer has reached
    * "datanodes.involved.max.percentage.per.iteration" limit.
    *
    * @return true if potential sources and targets were restricted, else false
    */
   private boolean adaptOnReachingIterationLimits() {
     // check if we've reached max datanodes to involve limit
-    if (currentState.datanodeCountUsedIteration ==
-        maxDatanodeCountToUseInIteration) {
+    if (currentState.datanodeCountUsedIteration >= maxDatanodeCountToUseInIteration) {
       // restrict both to already selected sources and targets
       findTargetStrategy.resetPotentialTargets(selectedTargets);
       findSourceStrategy.resetPotentialSources(selectedSources);
-      LOGGER.debug("Reached max datanodes to involve limit. {} datanodes " +
-              "have already been selected for balancing and the limit " +
-              "is {}. Only already selected sources and targets can be " +
-              "involved in balancing now.",
+      LOGGER.debug("Reached max datanodes to involve limit. {} datanodes have already been selected for balancing " +
+              "and the limit is {}. Only already selected sources and targets can be involved in balancing now.",
           currentState.datanodeCountUsedIteration,
           maxDatanodeCountToUseInIteration);
       return true;
@@ -414,12 +372,9 @@ public class ContainerBalanceIteration {
       @Nonnull ContainerMoveSelection moveSelection
   ) {
     ContainerID containerID = moveSelection.getContainerID();
-    if (containerToSourceMap.containsKey(containerID) ||
-        containerToTargetMap.containsKey(containerID)
-    ) {
-      LOGGER.warn(
-          "Container {} has already been selected for move from source " +
-              "{} to target {} earlier. Not moving this container again.",
+    if (containerToSourceMap.containsKey(containerID) || containerToTargetMap.containsKey(containerID)) {
+      LOGGER.warn("Container {} has already been selected for move from source {} to target {} earlier. " +
+              "Not moving this container again.",
           containerID,
           containerToSourceMap.get(containerID),
           containerToTargetMap.get(containerID));
@@ -430,12 +385,11 @@ public class ContainerBalanceIteration {
     try {
       containerInfo = scm.getContainerManager().getContainer(containerID);
     } catch (ContainerNotFoundException e) {
-      LOGGER.warn("Could not get container {} from Container Manager before " +
-          "starting a container move", containerID, e);
+      LOGGER.warn("Could not get container {} from Container Manager before starting a container move", containerID, e);
       return false;
     }
-    LOGGER.info("ContainerBalancer is trying to move container {} with size " +
-            "{}B from source datanode {} to target datanode {}",
+    LOGGER.info("ContainerBalancer is trying to move container {} with size {}B from source datanode {} " +
+            "to target datanode {}",
         containerID.toString(),
         containerInfo.getUsedBytes(),
         source.getUuidString(),
@@ -449,14 +403,13 @@ public class ContainerBalanceIteration {
   }
 
   /**
-   * Asks {@link ReplicationManager} or {@link MoveManager} to move the
-   * specified container from source to target.
+   * Asks {@link ReplicationManager} or {@link MoveManager} to move the specified container from source to target.
    *
    * @param sourceDnDetails        the source datanode
    * @param moveSelection the selected container to move and target datanode
-   * @return false if an exception occurred or the move completed with a
-   * result other than MoveManager.MoveResult.COMPLETED. Returns true
-   * if the move completed with MoveResult.COMPLETED or move is not yet done
+   * @return false if an exception occurred or the move completed with a result other than
+   *         MoveManager.MoveResult.COMPLETED.
+   *         Returns true if the move completed with MoveResult.COMPLETED or move is not yet done
    */
   private boolean moveContainer(
       @Nonnull DatanodeDetails sourceDnDetails,
@@ -465,21 +418,16 @@ public class ContainerBalanceIteration {
     ContainerID containerID = moveSelection.getContainerID();
     CompletableFuture<MoveManager.MoveResult> future;
     try {
-      ContainerInfo containerInfo =
-          scm.getContainerManager().getContainer(containerID);
-
+      ContainerInfo containerInfo =scm.getContainerManager().getContainer(containerID);
       /*
-      If LegacyReplicationManager is enabled, ReplicationManager will redirect
-      to it. Otherwise, use MoveManager.
+      If LegacyReplicationManager is enabled, ReplicationManager will redirect to it. Otherwise, use MoveManager.
        */
       ReplicationManager replicationManager = scm.getReplicationManager();
       DatanodeDetails targetDnDetails = moveSelection.getTargetNode();
       if (replicationManager.getConfig().isLegacyEnabled()) {
-        future = replicationManager.move(containerID, sourceDnDetails,
-            targetDnDetails);
+        future = replicationManager.move(containerID, sourceDnDetails, targetDnDetails);
       } else {
-        future = scm.getMoveManager().move(containerID, sourceDnDetails,
-            targetDnDetails);
+        future = scm.getMoveManager().move(containerID, sourceDnDetails, targetDnDetails);
       }
       metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
 
@@ -488,40 +436,32 @@ public class ContainerBalanceIteration {
         String sourceUUID = sourceDnDetails.getUuidString();
         String targetUUUID = targetDnDetails.getUuidString();
         if (ex != null) {
-          LOGGER.info("Container move for container {} from source {} to " +
-                  "target {} failed with exceptions.",
+          LOGGER.info("Container move for container {} from source {} to target {} failed with exceptions.",
               containerID.toString(), sourceUUID, targetUUUID, ex);
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
-            currentState.sizeActuallyMovedInLatestIteration +=
-                containerInfo.getUsedBytes();
-            LOGGER.debug("Container move completed for container {} " +
-                    "from source {} to target {}",
+            currentState.sizeActuallyMovedInLatestIteration += containerInfo.getUsedBytes();
+            LOGGER.debug("Container move completed for container {} from source {} to target {}",
                 containerID, sourceUUID, targetUUUID);
           } else {
-            LOGGER.warn("Container move for container {} from source {} " +
-                    "to target {} failed: {}",
+            LOGGER.warn("Container move for container {} from source {} to target {} failed: {}",
                 containerInfo, sourceUUID, targetUUUID, result);
           }
         }
       });
     } catch (ContainerNotFoundException e) {
-      LOGGER.warn("Could not find Container {} for container move",
-          containerID, e);
+      LOGGER.warn("Could not find Container {} for container move", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
-    } catch (NodeNotFoundException | TimeoutException |
-             ContainerReplicaNotFoundException e
-    ) {
+    } catch (NodeNotFoundException | TimeoutException | ContainerReplicaNotFoundException e) {
       LOGGER.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     }
 
     /*
-    If the future hasn't failed yet, put it in moveSelectionToFutureMap for
-    processing later
+    If the future hasn't failed yet, put it in moveSelectionToFutureMap for processing later
      */
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
@@ -568,9 +508,8 @@ public class ContainerBalanceIteration {
   }
 
   /**
-   * Updates conditions for balancing, such as total size moved by balancer,
-   * total size that has entered a datanode, and total size that has left a
-   * datanode in this iteration.
+   * Updates conditions for balancing, such as total size moved by balancer, total size that has entered a datanode,
+   * and total size that has left a datanode in this iteration.
    *
    * @param source        source datanode
    * @param moveSelection selected target datanode and container
@@ -580,8 +519,7 @@ public class ContainerBalanceIteration {
       @Nonnull ContainerMoveSelection moveSelection
   ) {
     try {
-      ContainerInfo container = scm.getContainerManager()
-          .getContainer(moveSelection.getContainerID());
+      ContainerInfo container = scm.getContainerManager().getContainer(moveSelection.getContainerID());
       long usedBytes = container.getUsedBytes();
       currentState.sizeScheduledForMoveInLatestIteration += usedBytes;
 
@@ -589,11 +527,9 @@ public class ContainerBalanceIteration {
       findSourceStrategy.increaseSizeLeaving(source, usedBytes);
 
       // update sizeEnteringNode map with the recent moveSelection
-      findTargetStrategy.increaseSizeEntering(moveSelection.getTargetNode(),
-          usedBytes, maxSizeEnteringTarget);
+      findTargetStrategy.increaseSizeEntering(moveSelection.getTargetNode(), usedBytes, maxSizeEnteringTarget);
     } catch (ContainerNotFoundException e) {
-      LOGGER.warn("Could not find Container {} while matching " +
-              "source and target nodes in ContainerBalancer",
+      LOGGER.warn("Could not find Container {} while matching source and target nodes in ContainerBalancer",
           moveSelection.getContainerID(), e);
     }
   }
@@ -603,13 +539,11 @@ public class ContainerBalanceIteration {
    */
   @SuppressWarnings("rawtypes")
   private void checkIterationMoveResults(long timeoutInMillis) {
-    CompletableFuture[] futureArray =
-        new CompletableFuture[moveStateList.size()];
+    CompletableFuture[] futureArray = new CompletableFuture[moveStateList.size()];
     for (int i = 0; i < moveStateList.size(); ++i) {
       futureArray[i] = moveStateList.get(i).result;
     }
-    CompletableFuture<Void> allFuturesResult =
-        CompletableFuture.allOf(futureArray);
+    CompletableFuture<Void> allFuturesResult = CompletableFuture.allOf(futureArray);
     try {
       allFuturesResult.get(timeoutInMillis, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
@@ -625,13 +559,11 @@ public class ContainerBalanceIteration {
   }
 
   /**
-   * Cancels container moves that are not yet done. Note that if a move
-   * command has already been sent out to a Datanode, we don't yet have the
-   * capability to cancel it. However, those commands in the DN should time out
-   * if they haven't been processed yet.
+   * Cancels container moves that are not yet done. Note that if a move command has already been sent out to a Datanode,
+   * we don't yet have the capability to cancel it.
+   * However, those commands in the DN should time out if they haven't been processed yet.
    *
-   * @return number of moves that did not complete (timed out) and were
-   * cancelled.
+   * @return number of moves that did not complete (timed out) and were cancelled.
    */
   private long cancelMovesThatExceedTimeoutDuration() {
     int numCancelled = 0;
@@ -641,8 +573,7 @@ public class ContainerBalanceIteration {
       if (!future.isDone()) {
         ContainerMoveSelection moveSelection = state.moveSelection;
         ContainerID containerID = moveSelection.getContainerID();
-        LOGGER.warn("Container move timed out for container {} " +
-                "from source {} to target {}.",
+        LOGGER.warn("Container move timed out for container {} from source {} to target {}.",
             containerID,
             containerToSourceMap.get(containerID).getUuidString(),
             moveSelection.getTargetNode().getUuidString()
@@ -657,20 +588,13 @@ public class ContainerBalanceIteration {
   }
 
   private void collectMetrics() {
-    metrics.incrementNumDatanodesInvolvedInLatestIteration(
-        currentState.datanodeCountUsedIteration);
-    metrics.incrementNumContainerMovesScheduled(
-        metrics.getNumContainerMovesScheduledInLatestIteration());
-    metrics.incrementNumContainerMovesCompleted(
-        metrics.getNumContainerMovesCompletedInLatestIteration());
-    metrics.incrementNumContainerMovesTimeout(
-        metrics.getNumContainerMovesTimeoutInLatestIteration());
-    metrics.incrementDataSizeMovedGBInLatestIteration(
-        currentState.sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
-    metrics.incrementDataSizeMovedGB(
-        metrics.getDataSizeMovedGBInLatestIteration());
-    metrics.incrementNumContainerMovesFailed(
-        metrics.getNumContainerMovesFailedInLatestIteration());
+    metrics.incrementNumDatanodesInvolvedInLatestIteration(currentState.datanodeCountUsedIteration);
+    metrics.incrementNumContainerMovesScheduled(metrics.getNumContainerMovesScheduledInLatestIteration());
+    metrics.incrementNumContainerMovesCompleted(metrics.getNumContainerMovesCompletedInLatestIteration());
+    metrics.incrementNumContainerMovesTimeout(metrics.getNumContainerMovesTimeoutInLatestIteration());
+    metrics.incrementDataSizeMovedGBInLatestIteration(currentState.sizeActuallyMovedInLatestIteration / OzoneConsts.GB);
+    metrics.incrementDataSizeMovedGB(metrics.getDataSizeMovedGBInLatestIteration());
+    metrics.incrementNumContainerMovesFailed(metrics.getNumContainerMovesFailedInLatestIteration());
     LOGGER.info("Iteration Summary. Number of Datanodes involved: {}." +
             " Size moved: {} ({} Bytes)." +
             " Number of Container moves completed: {}.",
@@ -681,26 +605,22 @@ public class ContainerBalanceIteration {
   }
 
   /**
-   * Get potential targets for container move. Potential targets are under
-   * utilized and within threshold utilized nodes.
+   * Get potential targets for container move. Potential targets are under utilized and within threshold utilized nodes.
    *
    * @return A list of potential target DatanodeUsageInfo.
    */
   private @Nonnull List<DatanodeUsageInfo> getPotentialTargets() {
-    //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
-    // source and target
+    // TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both source and target
     return getUnderUtilizedNodes();
   }
 
   /**
-   * Get potential sourecs for container move. Potential sourecs are over
-   * utilized and within threshold utilized nodes.
+   * Get potential sourecs for container move. Potential sourecs are over utilized and within threshold utilized nodes.
    *
    * @return A list of potential source DatanodeUsageInfo.
    */
   private @Nonnull List<DatanodeUsageInfo> getPotentialSources() {
-    //TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both
-    // source and target
+    // TODO(jacksonyao): take withinThresholdUtilizedNodes as candidate for both source and target
     return getOverUtilizedNodes();
   }
 
@@ -712,12 +632,9 @@ public class ContainerBalanceIteration {
    * @return Average utilization value
    */
   @VisibleForTesting
-  public static double calculateAvgUtilization(
-      @Nonnull List<DatanodeUsageInfo> nodes
-  ) {
+  public static double calculateAvgUtilization(@Nonnull List<DatanodeUsageInfo> nodes) {
     if (nodes.isEmpty()) {
-      LOGGER.warn("No nodes to calculate average utilization for " +
-          "ContainerBalancer.");
+      LOGGER.warn("No nodes to calculate average utilization for ContainerBalancer.");
       return 0;
     }
     SCMNodeStat aggregatedStats = new SCMNodeStat(0, 0, 0);
@@ -781,8 +698,7 @@ public class ContainerBalanceIteration {
    * Class represents the current state of iteration with some metrics.
    */
   public static final class IterationState {
-    private ContainerBalancerTask.IterationResult result =
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED;
+    private ContainerBalancerTask.IterationResult result = ContainerBalancerTask.IterationResult.ITERATION_COMPLETED;
     private int datanodeCountUsedIteration = 0;
     private long sizeScheduledForMoveInLatestIteration = 0;
     private long sizeActuallyMovedInLatestIteration = 0;

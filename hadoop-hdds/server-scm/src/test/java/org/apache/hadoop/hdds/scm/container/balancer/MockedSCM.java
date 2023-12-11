@@ -96,27 +96,22 @@ public final class MockedSCM {
   /**
    * Mock some instances that will be used for MockedStorageContainerManager.
    */
-  private void doMock()
-      throws IOException, NodeNotFoundException, TimeoutException {
+  private void doMock() throws IOException, NodeNotFoundException, TimeoutException {
     containerManager = mockContainerManager(cluster);
     mockedReplicaManager = MockedReplicationManager.doMock();
     moveManager = mockMoveManager();
-    StatefulServiceStateManager stateManager =
-        MockedServiceStateManager.doMock();
+    StatefulServiceStateManager stateManager = MockedServiceStateManager.doMock();
     SCMServiceManager scmServiceManager = mockSCMServiceManger();
 
-    mockedPlacementPolicies =
-        MockedPlacementPolicies.doMock(ozoneCfg, mockNodeManager);
+    mockedPlacementPolicies = MockedPlacementPolicies.doMock(ozoneCfg, mockNodeManager);
 
     when(scm.getConfiguration()).thenReturn(ozoneCfg);
     when(scm.getMoveManager()).thenReturn(moveManager);
     when(scm.getScmNodeManager()).thenReturn(mockNodeManager);
     when(scm.getContainerManager()).thenReturn(containerManager);
     when(scm.getReplicationManager()).thenReturn(mockedReplicaManager.manager);
-    when(scm.getContainerPlacementPolicy())
-        .thenReturn(mockedPlacementPolicies.placementPolicy);
-    when(scm.getPlacementPolicyValidateProxy())
-        .thenReturn(mockedPlacementPolicies.validateProxyPolicy);
+    when(scm.getContainerPlacementPolicy()).thenReturn(mockedPlacementPolicies.placementPolicy);
+    when(scm.getPlacementPolicyValidateProxy()).thenReturn(mockedPlacementPolicies.validateProxyPolicy);
     when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
     when(scm.getScmContext()).thenReturn(SCMContext.emptyContext());
     when(scm.getClusterMap()).thenReturn(null);
@@ -153,9 +148,7 @@ public final class MockedSCM {
     return task;
   }
 
-  public @Nonnull ContainerBalancerTask startBalancerTask(
-      @Nonnull ContainerBalancerConfiguration config
-  ) {
+  public @Nonnull ContainerBalancerTask startBalancerTask(@Nonnull ContainerBalancerConfiguration config) {
     return startBalancerTask(new ContainerBalancer(scm), config);
   }
 
@@ -187,9 +180,7 @@ public final class MockedSCM {
     return ozoneCfg;
   }
 
-  public @Nonnull ContainerBalancerConfiguration getBalancerConfigByOzoneConfig(
-      @Nonnull OzoneConfiguration config
-  ) {
+  public @Nonnull ContainerBalancerConfiguration getBalancerConfigByOzoneConfig(@Nonnull OzoneConfiguration config) {
     return config.getObject(ContainerBalancerConfiguration.class);
   }
 
@@ -212,9 +203,8 @@ public final class MockedSCM {
   public @Nonnull PlacementPolicy getEcPlacementPolicy() {
     return mockedPlacementPolicies.ecPlacementPolicy;
   }
-  private static @Nonnull ContainerManager mockContainerManager(
-      @Nonnull TestableCluster cluster
-  ) throws ContainerNotFoundException {
+  private static @Nonnull ContainerManager mockContainerManager(@Nonnull TestableCluster cluster)
+      throws ContainerNotFoundException {
     ContainerManager containerManager = mock(ContainerManager.class);
     Mockito
         .when(containerManager.getContainerReplicas(any(ContainerID.class)))
@@ -248,8 +238,7 @@ public final class MockedSCM {
   }
 
   private static @Nonnull MoveManager mockMoveManager()
-      throws NodeNotFoundException, ContainerReplicaNotFoundException,
-      ContainerNotFoundException {
+      throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     MoveManager moveManager = mock(MoveManager.class);
     Mockito
         .when(moveManager
@@ -271,15 +260,14 @@ public final class MockedSCM {
       manager = mock(ReplicationManager.class);
       conf = new ReplicationManager.ReplicationManagerConfiguration();
       /*
-      Disable LegacyReplicationManager. This means balancer should select RATIS
-      as well as EC containers for balancing. Also, MoveManager will be used.
+      Disable LegacyReplicationManager. This means balancer should select RATIS as well as EC containers for balancing.
+       Also, MoveManager will be used.
       */
       conf.setEnableLegacy(false);
     }
 
     private static @Nonnull MockedReplicationManager doMock()
-        throws NodeNotFoundException, ContainerNotFoundException,
-        TimeoutException {
+        throws NodeNotFoundException, ContainerNotFoundException, TimeoutException {
       MockedReplicationManager mockedManager = new MockedReplicationManager();
 
       Mockito
@@ -287,19 +275,15 @@ public final class MockedSCM {
           .thenReturn(mockedManager.conf);
 
       Mockito
-          .when(mockedManager.manager
-              .isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
+          .when(mockedManager.manager.isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
           .thenReturn(false);
 
       Mockito
-          .when(mockedManager.manager
-              .move(
+          .when(mockedManager.manager.move(
                 Mockito.any(ContainerID.class),
                 Mockito.any(DatanodeDetails.class),
                 Mockito.any(DatanodeDetails.class)))
-          .thenReturn(CompletableFuture
-              .completedFuture(MoveManager.MoveResult.COMPLETED)
-          );
+          .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
 
       Mockito
           .when(mockedManager.manager.getClock())
@@ -311,35 +295,23 @@ public final class MockedSCM {
 
   private static final class MockedServiceStateManager {
     private final Map<String, ByteString> serviceToConfigMap = new HashMap<>();
-    private final StatefulServiceStateManager serviceStateManager =
-        Mockito.mock(StatefulServiceStateManagerImpl.class);
+    private final StatefulServiceStateManager serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
 
-    private static @Nonnull StatefulServiceStateManager doMock()
-        throws IOException {
+    private static @Nonnull StatefulServiceStateManager doMock() throws IOException {
       MockedServiceStateManager manager = new MockedServiceStateManager();
-      /*
-          When StatefulServiceStateManager#saveConfiguration is called,
-        save to in-memory serviceToConfigMap instead.
-      */
+      // When StatefulServiceStateManager#saveConfiguration is called, save to in-memory serviceToConfigMap instead.
       Map<String, ByteString> map = manager.serviceToConfigMap;
 
       StatefulServiceStateManager stateManager = manager.serviceStateManager;
       Mockito
           .doAnswer(i -> {
-            map.put(
-                i.getArgument(0, String.class),
-                i.getArgument(1, ByteString.class));
+            map.put(i.getArgument(0, String.class), i.getArgument(1, ByteString.class));
             return null;
           })
           .when(stateManager)
-          .saveConfiguration(
-              Mockito.any(String.class),
-              Mockito.any(ByteString.class));
+          .saveConfiguration(Mockito.any(String.class), Mockito.any(ByteString.class));
 
-      /*
-          When StatefulServiceStateManager#readConfiguration is called,
-        read from serviceToConfigMap instead.
-      */
+      // When StatefulServiceStateManager#readConfiguration is called, read from serviceToConfigMap instead.
       Mockito
           .when(stateManager.readConfiguration(Mockito.anyString()))
           .thenAnswer(i -> map.get(i.getArgument(0, String.class)));
@@ -352,12 +324,10 @@ public final class MockedSCM {
     private final PlacementPolicy ecPlacementPolicy;
     private final PlacementPolicyValidateProxy validateProxyPolicy;
 
-    private MockedPlacementPolicies(PlacementPolicy policy,
-                                    PlacementPolicy ecPolicy) {
-      placementPolicy = policy;
+    private MockedPlacementPolicies(@Nonnull PlacementPolicy placementPolicy, @Nonnull PlacementPolicy ecPolicy) {
+      this.placementPolicy = placementPolicy;
       ecPlacementPolicy = ecPolicy;
-      validateProxyPolicy =
-          new PlacementPolicyValidateProxy(placementPolicy, ecPlacementPolicy);
+      validateProxyPolicy = new PlacementPolicyValidateProxy(this.placementPolicy, ecPlacementPolicy);
     }
 
     private static @Nonnull MockedPlacementPolicies doMock(

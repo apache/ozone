@@ -28,22 +28,19 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * This interface can be used to implement strategies to get a
- * source datanode.
+ * This interface can be used to implement strategies to get a source datanode.
  */
 interface FindSourceStrategy {
 
   /**
-   * get the next candidate source data node according to
-   * the strategy.
+   * get the next candidate source data node according to the strategy.
    *
    * @return the nex candidate source data node.
    */
   @Nullable DatanodeDetails getNextCandidateSourceDataNode();
 
   /**
-   * remove the specified data node from candidate source
-   * data nodes.
+   * remove the specified data node from candidate source data nodes.
    */
   void removeCandidateSourceDataNode(@Nonnull DatanodeDetails dui);
 
@@ -53,8 +50,7 @@ interface FindSourceStrategy {
   void increaseSizeLeaving(@Nonnull DatanodeDetails dui, long size);
 
   /**
-   * Checks if specified size can leave a specified source datanode
-   * according to {@link ContainerBalancerConfiguration}
+   * Checks if specified size can leave a specified source datanode according to {@link ContainerBalancerConfiguration}
    * "size.entering.target.max".
    *
    * @param source     target datanode in which size is entering
@@ -63,12 +59,7 @@ interface FindSourceStrategy {
    *                   clusterAvgUtilisation - threshold
    * @return true if size can leave, else false
    */
-  boolean canSizeLeaveSource(
-      @Nonnull DatanodeDetails source,
-      long size,
-      long maxSizeLeavingSource,
-      double lowerLimit
-  );
+  boolean canSizeLeaveSource(@Nonnull DatanodeDetails source, long size, long maxSizeLeavingSource, double lowerLimit);
 
   /**
    * reInitialize FindSourceStrategy.
@@ -76,11 +67,9 @@ interface FindSourceStrategy {
   void reInitialize(@Nonnull List<DatanodeUsageInfo> potentialDataNodes);
 
   /**
-   * Resets the collection of source {@link DatanodeUsageInfo} that can be
-   * selected for balancing.
+   * Resets the collection of source {@link DatanodeUsageInfo} that can be selected for balancing.
    *
-   * @param sources collection of source {@link DatanodeDetails}
-   *                that containers can move from
+   * @param sources collection of source {@link DatanodeDetails} that containers can move from
    */
   void resetPotentialSources(@Nonnull Collection<DatanodeDetails> sources);
 }

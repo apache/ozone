@@ -50,16 +50,13 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
  */
 public final class TestableCluster {
   static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestableCluster.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestableCluster.class);
   private final int nodeCount;
   private final double[] nodeUtilizationList;
   private final DatanodeUsageInfo[] nodesInCluster;
   private final Map<ContainerID, ContainerInfo> cidToInfoMap = new HashMap<>();
-  private final Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap =
-      new HashMap<>();
-  private final Map<DatanodeUsageInfo, Set<ContainerID>>
-      dnUsageToContainersMap = new HashMap<>();
+  private final Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap = new HashMap<>();
+  private final Map<DatanodeUsageInfo, Set<ContainerID>> dnUsageToContainersMap = new HashMap<>();
   private final double averageUtilization;
 
   TestableCluster(int numberOfNodes, long storageUnit) {
@@ -71,22 +68,19 @@ public final class TestableCluster {
     createReplicasForContainers();
     long clusterCapacity = 0, clusterUsedSpace = 0;
 
-    // for each node utilization, calculate that datanode's used space and
-    // capacity
+    // For each node utilization, calculate that datanode's used space and capacity
     for (int i = 0; i < nodeUtilizationList.length; i++) {
-      Set<ContainerID> containerIDSet =
-          dnUsageToContainersMap.get(nodesInCluster[i]);
+      Set<ContainerID> containerIDSet = dnUsageToContainersMap.get(nodesInCluster[i]);
       long datanodeUsedSpace = 0;
       for (ContainerID containerID : containerIDSet) {
         datanodeUsedSpace += cidToInfoMap.get(containerID).getUsedBytes();
       }
-      // use node utilization and used space to determine node capacity
+      // Use node utilization and used space to determine node capacity
       long datanodeCapacity = (nodeUtilizationList[i] == 0)
           ? storageUnit * RANDOM.nextInt(10, 60)
           : (long) (datanodeUsedSpace / nodeUtilizationList[i]);
 
-      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
-          datanodeCapacity - datanodeUsedSpace);
+      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace, datanodeCapacity - datanodeUsedSpace);
       nodesInCluster[i].setScmNodeStat(stat);
       clusterUsedSpace += datanodeUsedSpace;
       clusterCapacity += datanodeCapacity;
@@ -100,8 +94,7 @@ public final class TestableCluster {
     return "cluster of " + nodeCount + " nodes";
   }
 
-  @Nonnull
-  Map<DatanodeUsageInfo, Set<ContainerID>> getDatanodeToContainersMap() {
+  @Nonnull Map<DatanodeUsageInfo, Set<ContainerID>> getDatanodeToContainersMap() {
     return dnUsageToContainersMap;
   }
 
@@ -130,12 +123,11 @@ public final class TestableCluster {
   }
 
   /**
-   * Determines unBalanced nodes, that is, over and under utilized nodes,
-   * according to the generated utilization values for nodes and the threshold.
+   * Determines unBalanced nodes, that is, over and under utilized nodes, according to the generated utilization values
+   * for nodes and the threshold.
    *
    * @param threshold a percentage in the range 0 to 100
-   * @return list of DatanodeUsageInfo containing the expected(correct)
-   * unBalanced nodes.
+   * @return list of DatanodeUsageInfo containing the expected(correct) unBalanced nodes.
    */
   @Nonnull List<DatanodeUsageInfo> getUnBalancedNodes(double threshold) {
     threshold /= 100;
@@ -157,26 +149,24 @@ public final class TestableCluster {
    * Create some datanodes and containers for each node.
    */
   private void generateData(long storageUnit) {
-    // create datanodes and add containers to them
+    // Create datanodes and add containers to them
     for (int i = 0; i < nodeCount; i++) {
       DatanodeUsageInfo usageInfo =
-          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(),
-              new SCMNodeStat());
+          new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat());
       nodesInCluster[i] = usageInfo;
 
-      // create containers with varying used space
+      // Create containers with varying used space
       Set<ContainerID> containerIDSet = new HashSet<>();
       int sizeMultiple = 0;
       for (int j = 0; j < i; j++) {
         sizeMultiple %= 5;
         sizeMultiple++;
-        ContainerInfo container =
-            createContainer((long) i * i + j, storageUnit * sizeMultiple);
+        ContainerInfo container = createContainer((long) i * i + j, storageUnit * sizeMultiple);
 
         cidToInfoMap.put(container.containerID(), container);
         containerIDSet.add(container.containerID());
 
-        // create initial replica for this container and add it
+        // Create initial replica for this container and add it
         Set<ContainerReplica> containerReplicaSet = new HashSet<>();
         containerReplicaSet.add(createReplica(container.containerID(),
             usageInfo.getDatanodeDetails(), container.getUsedBytes()));
@@ -203,9 +193,8 @@ public final class TestableCluster {
   }
 
   /**
-   * Create the required number of replicas for each container. Note that one
-   * replica already exists and nodes with utilization value 0 should not
-   * have any replicas.
+   * Create the required number of replicas for each container. Note that one replica already exists and
+   * nodes with utilization value 0 should not have any replicas.
    */
   private void createReplicasForContainers() {
     for (ContainerInfo container : cidToInfoMap.values()) {
@@ -228,20 +217,15 @@ public final class TestableCluster {
   }
 
   /**
-   * Generates a range of equally spaced utilization(that is, used / capacity)
-   * values from 0 to 1.
+   * Generates a range of equally spaced utilization(that is, used / capacity) values from 0 to 1.
    *
-   * @param count Number of values to generate. Count must be greater than or
-   *              equal to 1.
+   * @param count Number of values to generate. Count must be greater than or equal to 1.
    * @return double array of node utilization values
-   * @throws IllegalArgumentException If the value of the parameter count is
-   *                                  less than 1.
+   * @throws IllegalArgumentException If the value of the parameter count is less than 1.
    */
-  private static double[] createUtilizationList(int count)
-      throws IllegalArgumentException {
+  private static double[] createUtilizationList(int count) throws IllegalArgumentException {
     if (count < 1) {
-      LOG.warn("The value of argument count is {}. However, count must be " +
-          "greater than 0.", count);
+      LOG.warn("The value of argument count is {}. However, count must be greater than 0.", count);
       throw new IllegalArgumentException();
     }
     double[] result = new double[count];

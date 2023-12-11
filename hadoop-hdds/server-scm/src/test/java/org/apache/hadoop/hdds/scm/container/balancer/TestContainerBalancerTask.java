@@ -129,55 +129,42 @@ public class TestContainerBalancerTask {
     double[] nodeUtilizationList = cluster.getNodeUtilizationList();
     assertEquals(nodesInCluster.length, nodeUtilizationList.length);
     for (int i = 0; i < nodesInCluster.length; i++) {
-      assertEquals(nodeUtilizationList[i],
-          nodesInCluster[i].calculateUtilization(), 0.0001);
+      assertEquals(nodeUtilizationList[i], nodesInCluster[i].calculateUtilization(), 0.0001);
     }
-    // should be equal to average utilization of the cluster
+    // Should be equal to average utilization of the cluster
     assertEquals(cluster.getAverageUtilization(),
-        ContainerBalanceIteration.calculateAvgUtilization(
-            Arrays.asList(nodesInCluster)), 0.0001);
+        ContainerBalanceIteration.calculateAvgUtilization(Arrays.asList(nodesInCluster)), 0.0001);
   }
 
   /**
-   * Checks whether ContainerBalancer is correctly updating the list of
-   * unBalanced nodes with varying values of Threshold.
+   * Checks whether ContainerBalancer is correctly updating the list of unBalanced nodes with
+   * varying values of Threshold.
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void testBalancerTaskAfterChangingThresholdValue(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
-    // check for random threshold values
+  public void testBalancerTaskAfterChangingThresholdValue(@Nonnull MockedSCM mockedSCM, boolean ignored) {
+    // Check for random threshold values
     ContainerBalancer balancer = mockedSCM.createContainerBalancer();
     TestableCluster cluster = mockedSCM.getCluster();
     for (int i = 0; i < 50; i++) {
       double randomThreshold = TestableCluster.RANDOM.nextDouble() * 100;
 
-      List<DatanodeUsageInfo> expectedUnBalancedNodes =
-          cluster.getUnBalancedNodes(randomThreshold);
-      // sort unbalanced nodes as it is done inside ContainerBalancerTask:337
-      //  in descending order by node utilization (most used node)
+      List<DatanodeUsageInfo> expectedUnBalancedNodes = cluster.getUnBalancedNodes(randomThreshold);
+      // Sort unbalanced nodes as it is done inside ContainerBalancerTask:337 in descending order by node utilization
+      // (most used node)
       expectedUnBalancedNodes.sort(
-          (d1, d2) ->
-              Double.compare(
-                  d2.calculateUtilization(),
-                  d1.calculateUtilization()
-              )
+          (d1, d2) -> Double.compare(d2.calculateUtilization(), d1.calculateUtilization())
       );
 
       ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
       config.setThreshold(randomThreshold);
-      ContainerBalancerTask task =
-          mockedSCM.startBalancerTask(balancer, config);
+      ContainerBalancerTask task = mockedSCM.startBalancerTask(balancer, config);
 
       List<DatanodeUsageInfo> actualUnBalancedNodes = new ArrayList<>();
       actualUnBalancedNodes.addAll(task.getOverUtilizedNodes());
       actualUnBalancedNodes.addAll(task.getUnderUtilizedNodes());
 
-      assertEquals(
-          expectedUnBalancedNodes.size(),
-          actualUnBalancedNodes.size());
+      assertEquals(expectedUnBalancedNodes.size(), actualUnBalancedNodes.size());
 
       for (int j = 0; j < expectedUnBalancedNodes.size(); j++) {
         assertEquals(
@@ -189,19 +176,19 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void testBalancerWithMoveManager(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws IOException, TimeoutException, NodeNotFoundException {
+  public void testBalancerWithMoveManager(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws IOException, TimeoutException, NodeNotFoundException {
     mockedSCM.disableLegacyReplicationManager();
     mockedSCM.startBalancerTask(mockedSCM.getBalancerConfig());
 
-    Mockito.verify(mockedSCM.getMoveManager(), atLeastOnce())
+    Mockito
+        .verify(mockedSCM.getMoveManager(), atLeastOnce())
         .move(
             any(ContainerID.class),
             any(DatanodeDetails.class),
             any(DatanodeDetails.class));
-    Mockito.verify(mockedSCM.getReplicationManager(), times(0))
+    Mockito
+        .verify(mockedSCM.getReplicationManager(), times(0))
         .move(
             any(ContainerID.class),
             any(DatanodeDetails.class),
@@ -209,15 +196,11 @@ public class TestContainerBalancerTask {
   }
 
   /**
-   * Checks whether the list of unBalanced nodes is empty when the cluster is
-   * balanced.
+   * Checks whether the list of unBalanced nodes is empty when the cluster is balanced.
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
+  public void unBalancedNodesListShouldBeEmptyWhenClusterIsBalanced(@Nonnull MockedSCM mockedSCM, boolean ignored) {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(99.99);
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
@@ -228,8 +211,7 @@ public class TestContainerBalancerTask {
   }
 
   /**
-   * ContainerBalancer should not involve more datanodes than the
-   * maxDatanodesRatioToInvolvePerIteration limit.
+   * ContainerBalancer should not involve more datanodes than the maxDatanodesRatioToInvolvePerIteration limit.
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
@@ -258,13 +240,9 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void containerBalancerShouldSelectOnlyClosedContainers(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
-    // make all containers open, balancer should not select any of them
-    Collection<ContainerInfo> containers = mockedSCM.getCluster().
-        getCidToInfoMap().values();
+  public void containerBalancerShouldSelectOnlyClosedContainers(@Nonnull MockedSCM mockedSCM, boolean ignored) {
+    // Make all containers open, balancer should not select any of them
+    Collection<ContainerInfo> containers = mockedSCM.getCluster().getCidToInfoMap().values();
     for (ContainerInfo containerInfo : containers) {
       containerInfo.setState(HddsProtos.LifeCycleState.OPEN);
     }
@@ -273,23 +251,20 @@ public class TestContainerBalancerTask {
     config.setThreshold(10);
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    // balancer should have identified unbalanced nodes
+    // Balancer should have identified unbalanced nodes
     assertTrue(stillHaveUnbalancedNodes(task));
-    // no container should have been selected
+    // No container should have been selected
     assertTrue(task.getContainerToSourceMap().isEmpty());
-    /*
-    Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
-    move is generated
-     */
+    // Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container move is generated
     assertTrue(canNotBalanceAnyMore(task));
 
-    // now, close all containers
+    // Now, close all containers
     for (ContainerInfo containerInfo : containers) {
       containerInfo.setState(HddsProtos.LifeCycleState.CLOSED);
     }
     mockedSCM.startBalancerTask(config);
 
-    // check whether all selected containers are closed
+    // Check whether all selected containers are closed
     for (ContainerInfo cid : containers) {
       Assertions.assertSame(cid.getState(), HddsProtos.LifeCycleState.CLOSED);
     }
@@ -300,21 +275,17 @@ public class TestContainerBalancerTask {
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void balancerShouldNotSelectNonClosedContainerReplicas(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws IOException {
-    // let's mock such that all replicas have CLOSING state
+  public void balancerShouldNotSelectNonClosedContainerReplicas(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws IOException {
+    // Let's mock such that all replicas have CLOSING state
     ContainerManager containerManager = mockedSCM.getContainerManager();
-    Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap =
-        mockedSCM.getCluster().getCidToReplicasMap();
+    Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap = mockedSCM.getCluster().getCidToReplicasMap();
     Mockito
         .when(containerManager.getContainerReplicas(any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
           ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
           Set<ContainerReplica> replicas = cidToReplicasMap.get(cid);
-          Set<ContainerReplica> replicasToReturn =
-              new HashSet<>(replicas.size());
+          Set<ContainerReplica> replicasToReturn = new HashSet<>(replicas.size());
           for (ContainerReplica replica : replicas) {
             ContainerReplica newReplica = replica.toBuilder()
                 .setContainerState(ContainerReplicaProto.State.CLOSING)
@@ -332,9 +303,9 @@ public class TestContainerBalancerTask {
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    // balancer should have identified unbalanced nodes
+    // Balancer should have identified unbalanced nodes
     assertTrue(stillHaveUnbalancedNodes(task));
-    // no container should have moved because all replicas are CLOSING
+    // No container should have moved because all replicas are CLOSING
     assertTrue(task.getContainerToSourceMap().isEmpty());
   }
 
@@ -353,7 +324,7 @@ public class TestContainerBalancerTask {
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    // balancer should not have moved more size than the limit
+    // Balancer should not have moved more size than the limit
     long sizeForMove = task.getSizeScheduledForMoveInLatestIteration();
     assertFalse(sizeForMove > 10 * MockedSCM.STORAGE_UNIT);
 
@@ -368,18 +339,14 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void targetDatanodeShouldNotAlreadyContainSelectedContainer(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
+  public void targetDatanodeShouldNotAlreadyContainSelectedContainer(@Nonnull MockedSCM mockedSCM, boolean ignored) {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(100 * MockedSCM.STORAGE_UNIT);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap =
-        mockedSCM.getCluster().getCidToReplicasMap();
+    Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap = mockedSCM.getCluster().getCidToReplicasMap();
     Map<ContainerID, DatanodeDetails> map = task.getContainerToTargetMap();
     for (Map.Entry<ContainerID, DatanodeDetails> entry : map.entrySet()) {
       ContainerID container = entry.getKey();
@@ -393,33 +360,25 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void containerMoveSelectionShouldFollowPlacementPolicy(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
+  public void containerMoveSelectionShouldFollowPlacementPolicy(@Nonnull MockedSCM mockedSCM, boolean ignored) {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(10);
     config.setMaxSizeToMovePerIteration(50 * MockedSCM.STORAGE_UNIT);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     config.setIterations(1);
 
-    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
     TestableCluster cluster = mockedSCM.getCluster();
     Map<ContainerID, ContainerInfo> cidToInfoMap = cluster.getCidToInfoMap();
-
-    Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap = cluster
-        .getCidToReplicasMap();
-    Map<ContainerID, DatanodeDetails> containerToTargetMap =
-        task.getContainerToTargetMap();
+    Map<ContainerID, Set<ContainerReplica>> cidToReplicasMap = cluster.getCidToReplicasMap();
 
     PlacementPolicy policy = mockedSCM.getPlacementPolicy();
     PlacementPolicy ecPolicy = mockedSCM.getEcPlacementPolicy();
 
-    // for each move selection, check if {replicas - source + target}
-    // satisfies placement policy
-    Set<Map.Entry<ContainerID, DatanodeDetails>> cnToDnDetailsMap =
-        task.getContainerToSourceMap().entrySet();
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
+    Map<ContainerID, DatanodeDetails> containerToTargetMap = task.getContainerToTargetMap();
+    Set<Map.Entry<ContainerID, DatanodeDetails>> cnToDnDetailsMap = task.getContainerToSourceMap().entrySet();
+    // For each move selection, check if {replicas - source + target} satisfies placement policy
     for (Map.Entry<ContainerID, DatanodeDetails> entry : cnToDnDetailsMap) {
       ContainerID container = entry.getKey();
       DatanodeDetails source = entry.getValue();
@@ -435,8 +394,7 @@ public class TestContainerBalancerTask {
 
       ContainerInfo info = cidToInfoMap.get(container);
       int requiredNodes = info.getReplicationConfig().getRequiredNodes();
-      ContainerPlacementStatus status =
-          (info.getReplicationType() == HddsProtos.ReplicationType.RATIS)
+      ContainerPlacementStatus status = (info.getReplicationType() == HddsProtos.ReplicationType.RATIS)
               ? policy.validateContainerPlacement(replicas, requiredNodes)
               : ecPolicy.validateContainerPlacement(replicas, requiredNodes);
 
@@ -446,10 +404,8 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void targetDatanodeShouldBeInServiceHealthy(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws NodeNotFoundException {
+  public void targetDatanodeShouldBeInServiceHealthy(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws NodeNotFoundException {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(10);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
@@ -461,18 +417,15 @@ public class TestContainerBalancerTask {
     MockNodeManager nodeManager = mockedSCM.getNodeManager();
     for (DatanodeDetails target : task.getSelectedTargets()) {
       NodeStatus status = nodeManager.getNodeStatus(target);
-      Assertions.assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
-          status.getOperationalState());
+      Assertions.assertSame(HddsProtos.NodeOperationalState.IN_SERVICE, status.getOperationalState());
       assertTrue(status.isHealthy());
     }
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void selectedContainerShouldNotAlreadyHaveBeenSelected(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws IOException, NodeNotFoundException, TimeoutException {
+  public void selectedContainerShouldNotAlreadyHaveBeenSelected(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws IOException, NodeNotFoundException, TimeoutException {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(10);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
@@ -485,28 +438,24 @@ public class TestContainerBalancerTask {
 
     int numContainers = task.getContainerToTargetMap().size();
 
-  /*
-  Assuming move is called exactly once for each unique container, number of
-   calls to move should equal number of unique containers. If number of
-   calls to move is more than number of unique containers, at least one
-   container has been re-selected. It's expected that number of calls to
-   move should equal number of unique, selected containers (from
-   containerToTargetMap).
-   */
-    Mockito.verify(mockedSCM.getReplicationManager(), times(numContainers))
+    // Assuming move is called exactly once for each unique container, number of calls to move should equal
+    // number of unique containers. If number of calls to move is more than number of unique containers, at least one
+    // container has been re-selected. It's expected that number of calls to move should equal number of unique,
+    // selected containers (from containerToTargetMap).
+    Mockito
+        .verify(mockedSCM.getReplicationManager(), times(numContainers))
         .move(
             any(ContainerID.class),
             any(DatanodeDetails.class),
             any(DatanodeDetails.class));
-    /*
-     Try the same test by disabling LegacyReplicationManager so that
-     MoveManager is used.
-     */
+
+    // Try the same test by disabling LegacyReplicationManager so that MoveManager is used.
     mockedSCM.disableLegacyReplicationManager();
     task = mockedSCM.startBalancerTask(config);
 
     numContainers = task.getContainerToTargetMap().size();
-    Mockito.verify(mockedSCM.getMoveManager(), times(numContainers))
+    Mockito
+        .verify(mockedSCM.getMoveManager(), times(numContainers))
         .move(
             any(ContainerID.class),
             any(DatanodeDetails.class),
@@ -515,10 +464,7 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void balancerShouldNotSelectConfiguredExcludeContainers(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
+  public void balancerShouldNotSelectConfiguredExcludeContainers(@Nonnull MockedSCM mockedSCM, boolean ignored) {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(10);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
@@ -536,37 +482,32 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void balancerShouldObeyMaxSizeEnteringTargetLimit(
-      @Nonnull MockedSCM mockedSCM,
-      boolean useDatanodeLimits
-  ) {
+  public void balancerShouldObeyMaxSizeEnteringTargetLimit(@Nonnull MockedSCM mockedSCM, boolean useDatanodeLimits) {
     OzoneConfiguration ozoneConfig = mockedSCM.getOzoneConfig();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
-    ContainerBalancerConfiguration config =
-        mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
+    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
     config.setThreshold(10);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     config.setMaxSizeToMovePerIteration(50 * MockedSCM.STORAGE_UNIT);
     config.setAdaptBalanceWhenCloseToLimit(useDatanodeLimits);
     config.setAdaptBalanceWhenReachTheLimit(useDatanodeLimits);
 
-    // no containers should be selected when the limit is just 2 MB
+    // No containers should be selected when the limit is just 2 MB
     config.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
     assertTrue(stillHaveUnbalancedNodes(task));
     assertTrue(task.getContainerToSourceMap().isEmpty());
 
-    // some containers should be selected when using default values
-    ContainerBalancerConfiguration balancerConfig =
-        mockedSCM.getBalancerConfigByOzoneConfig(new OzoneConfiguration());
+    // Some containers should be selected when using default values
+    ContainerBalancerConfiguration balancerConfig = mockedSCM.getBalancerConfigByOzoneConfig(new OzoneConfiguration());
     balancerConfig.setBalancingInterval(1);
     balancerConfig.setAdaptBalanceWhenCloseToLimit(useDatanodeLimits);
     balancerConfig.setAdaptBalanceWhenReachTheLimit(useDatanodeLimits);
 
     task = mockedSCM.startBalancerTask(balancerConfig);
 
-    // balancer should have identified unbalanced nodes
+    // Balancer should have identified unbalanced nodes
     assertTrue(stillHaveUnbalancedNodes(task));
     if (canNotBalanceAnyMore(task)) {
       assertTrue(task.getContainerToSourceMap().isEmpty());
@@ -577,28 +518,24 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void balancerShouldObeyMaxSizeLeavingSourceLimit(
-      @Nonnull MockedSCM mockedSCM,
-      boolean useDatanodeLimits
-  ) {
+  public void balancerShouldObeyMaxSizeLeavingSourceLimit(@Nonnull MockedSCM mockedSCM, boolean useDatanodeLimits) {
     OzoneConfiguration ozoneConfig = mockedSCM.getOzoneConfig();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
-    ContainerBalancerConfiguration config =
-        mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
+    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
     config.setThreshold(10);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
     config.setMaxSizeToMovePerIteration(50 * MockedSCM.STORAGE_UNIT);
     config.setAdaptBalanceWhenCloseToLimit(useDatanodeLimits);
     config.setAdaptBalanceWhenReachTheLimit(useDatanodeLimits);
 
-    // no source containers should be selected when the limit is just 2 MB
+    // No source containers should be selected when the limit is just 2 MB
     config.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
     assertTrue(stillHaveUnbalancedNodes(task));
     assertTrue(task.getContainerToSourceMap().isEmpty());
 
-    // some containers should be selected when using default values
+    // Some containers should be selected when using default values
     ContainerBalancerConfiguration newBalancerConfig =
         mockedSCM.getBalancerConfigByOzoneConfig(new OzoneConfiguration());
     newBalancerConfig.setBalancingInterval(1);
@@ -607,7 +544,7 @@ public class TestContainerBalancerTask {
 
     task = mockedSCM.startBalancerTask(newBalancerConfig);
 
-    // balancer should have identified unbalanced nodes
+    // Balancer should have identified unbalanced nodes
     assertTrue(stillHaveUnbalancedNodes(task));
 
     if (canNotBalanceAnyMore(task)) {
@@ -621,28 +558,22 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void testMetrics(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws IOException, NodeNotFoundException {
+  public void testMetrics(@Nonnull MockedSCM mockedSCM, boolean ignored) throws IOException, NodeNotFoundException {
     OzoneConfiguration ozoneConfig = mockedSCM.getOzoneConfig();
     ozoneConfig.set("ozone.scm.container.size", "1MB");
-    ContainerBalancerConfiguration config =
-        mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
+    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
     config.setBalancingInterval(Duration.ofMillis(2));
     config.setThreshold(10);
     config.setIterations(1);
     config.setMaxSizeEnteringTarget(6 * MockedSCM.STORAGE_UNIT);
-    // deliberately set max size per iteration to a low value, 6 GB
+    // Deliberately set max size per iteration to a low value, 6 GB
     config.setMaxSizeToMovePerIteration(6 * MockedSCM.STORAGE_UNIT);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
     Mockito
         .when(mockedSCM.getMoveManager().move(any(), any(), any()))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.COMPLETED));
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
@@ -654,8 +585,7 @@ public class TestContainerBalancerTask {
     assertTrue(metrics.getDataSizeMovedGB() > 0);
     assertEquals(1, metrics.getNumIterations());
     assertTrue(metrics.getNumContainerMovesScheduledInLatestIteration() > 0);
-    assertEquals(metrics.getNumContainerMovesScheduled(),
-        metrics.getNumContainerMovesScheduledInLatestIteration());
+    assertEquals(metrics.getNumContainerMovesScheduled(), metrics.getNumContainerMovesScheduledInLatestIteration());
     assertEquals(metrics.getNumContainerMovesScheduled(),
         metrics.getNumContainerMovesCompleted() +
             metrics.getNumContainerMovesFailed() +
@@ -665,12 +595,10 @@ public class TestContainerBalancerTask {
   }
 
   /**
-   * Tests if {@link ContainerBalancer} follows the includeNodes and
-   * excludeNodes configurations in {@link ContainerBalancerConfiguration}.
-   * If the includeNodes configuration is not empty, only the specified
-   * includeNodes should be included in balancing. excludeNodes should be
-   * excluded from balancing. If a datanode is specified in both include and
-   * exclude configurations, then it should be excluded.
+   * Tests if {@link ContainerBalancer} follows the includeNodes and excludeNodes configurations in
+   * {@link ContainerBalancerConfiguration}. If the includeNodes configuration is not empty, only the specified
+   * includeNodes should be included in balancing. excludeNodes should be excluded from balancing.
+   * If a datanode is specified in both include and exclude configurations, then it should be excluded.
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
@@ -685,11 +613,9 @@ public class TestContainerBalancerTask {
     config.setMaxSizeToMovePerIteration(100 * MockedSCM.STORAGE_UNIT);
     config.setMaxDatanodesPercentageToInvolvePerIteration(100);
 
-    DatanodeUsageInfo[] nodesInCluster =
-        mockedSCM.getCluster().getNodesInCluster();
+    DatanodeUsageInfo[] nodesInCluster = mockedSCM.getCluster().getNodesInCluster();
 
-    // only these nodes should be included
-    // the ones also specified in excludeNodes should be excluded
+    // Only these nodes should be included the ones also specified in excludeNodes should be excluded
     int firstIncludeIndex = 0, secondIncludeIndex = 1;
     int thirdIncludeIndex = nodesInCluster.length - 2;
     int fourthIncludeIndex = nodesInCluster.length - 1;
@@ -699,7 +625,7 @@ public class TestContainerBalancerTask {
         nodesInCluster[thirdIncludeIndex].getDatanodeDetails().getHostName(),
         nodesInCluster[fourthIncludeIndex].getDatanodeDetails().getHostName());
 
-    // these nodes should be excluded
+    // These nodes should be excluded
     int firstExcludeIndex = 0, secondExcludeIndex = nodesInCluster.length - 1;
     String excludeNodes = String.join(", ",
         nodesInCluster[firstExcludeIndex].getDatanodeDetails().getIpAddress(),
@@ -709,18 +635,12 @@ public class TestContainerBalancerTask {
     config.setIncludeNodes(includeNodes);
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    // finally, these should be the only nodes included in balancing
-    // (included - excluded)
-    DatanodeDetails dn1 =
-        nodesInCluster[secondIncludeIndex].getDatanodeDetails();
-    DatanodeDetails dn2 =
-        nodesInCluster[thirdIncludeIndex].getDatanodeDetails();
-    Map<ContainerID, DatanodeDetails> containerFromSourceMap =
-        task.getContainerToSourceMap();
-    Map<ContainerID, DatanodeDetails> containerToTargetMap =
-        task.getContainerToTargetMap();
-    for (Map.Entry<ContainerID, DatanodeDetails> entry :
-        containerFromSourceMap.entrySet()) {
+    // Finally, these should be the only nodes included in balancing (included - excluded)
+    DatanodeDetails dn1 = nodesInCluster[secondIncludeIndex].getDatanodeDetails();
+    DatanodeDetails dn2 = nodesInCluster[thirdIncludeIndex].getDatanodeDetails();
+    Map<ContainerID, DatanodeDetails> containerFromSourceMap = task.getContainerToSourceMap();
+    Map<ContainerID, DatanodeDetails> containerToTargetMap = task.getContainerToTargetMap();
+    for (Map.Entry<ContainerID, DatanodeDetails> entry : containerFromSourceMap.entrySet()) {
       DatanodeDetails source = entry.getValue();
       DatanodeDetails target = containerToTargetMap.get(entry.getKey());
       assertTrue(source.equals(dn1) || source.equals(dn2));
@@ -730,44 +650,32 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void testContainerBalancerConfiguration(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
+  public void testContainerBalancerConfiguration(@Nonnull MockedSCM mockedSCM, boolean ignored) {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set("ozone.scm.container.size", "5GB");
-    ozoneConfiguration.setDouble(
-        "hdds.container.balancer.utilization.threshold", 1);
+    ozoneConfiguration.setDouble("hdds.container.balancer.utilization.threshold", 1);
     long maxSizeLeavingSource = 26;
-    ozoneConfiguration.setStorageSize(
-        "hdds.container.balancer.size.leaving.source.max", maxSizeLeavingSource,
+    ozoneConfiguration.setStorageSize("hdds.container.balancer.size.leaving.source.max", maxSizeLeavingSource,
         StorageUnit.GB);
     long moveTimeout = 90;
-    ozoneConfiguration.setTimeDuration("hdds.container.balancer.move.timeout",
-        moveTimeout, TimeUnit.MINUTES);
+    ozoneConfiguration.setTimeDuration("hdds.container.balancer.move.timeout", moveTimeout, TimeUnit.MINUTES);
     long replicationTimeout = 60;
-    ozoneConfiguration.setTimeDuration(
-        "hdds.container.balancer.move.replication.timeout",
-        replicationTimeout, TimeUnit.MINUTES);
+    ozoneConfiguration.setTimeDuration("hdds.container.balancer.move.replication.timeout", replicationTimeout,
+        TimeUnit.MINUTES);
 
-    ContainerBalancerConfiguration cbConf =
-        mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfiguration);
+    ContainerBalancerConfiguration cbConf = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfiguration);
     assertEquals(1, cbConf.getThreshold(), 0.001);
 
     // Expected is 26 GB
-    assertEquals(maxSizeLeavingSource * 1024 * 1024 * 1024,
-        cbConf.getMaxSizeLeavingSource());
+    assertEquals(maxSizeLeavingSource * 1024 * 1024 * 1024, cbConf.getMaxSizeLeavingSource());
     assertEquals(moveTimeout, cbConf.getMoveTimeout().toMinutes());
-    assertEquals(replicationTimeout,
-        cbConf.getMoveReplicationTimeout().toMinutes());
+    assertEquals(replicationTimeout, cbConf.getMoveReplicationTimeout().toMinutes());
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void checkIterationResult(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws NodeNotFoundException, IOException, TimeoutException {
+  public void checkIterationResult(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws NodeNotFoundException, IOException, TimeoutException {
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
     config.setThreshold(10);
     config.setIterations(1);
@@ -777,50 +685,37 @@ public class TestContainerBalancerTask {
 
     mockedSCM.enableLegacyReplicationManager();
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
-    /*
-    According to the setup and configurations, this iteration's result should
-    be ITERATION_COMPLETED.
-     */
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
-    /*
-    Now, limit maxSizeToMovePerIteration but fail all container moves. The
-    result should still be ITERATION_COMPLETED.
-     */
+
+    // According to the setup and configurations, this iteration's result should be ITERATION_COMPLETED.
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
+
+    // Now, limit maxSizeToMovePerIteration but fail all container moves.
+    // The result should still be ITERATION_COMPLETED.
     Mockito
         .when(mockedSCM.getReplicationManager()
             .move(
                 any(ContainerID.class),
                 any(DatanodeDetails.class),
                 any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
+        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
+
     config.setMaxSizeToMovePerIteration(10 * MockedSCM.STORAGE_UNIT);
-
     mockedSCM.startBalancerTask(config);
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
 
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
-
-    /*
-    Try the same but use MoveManager for container move instead of legacy RM.
-     */
+    // Try the same but use MoveManager for container move instead of legacy RM.
     mockedSCM.disableLegacyReplicationManager();
     mockedSCM.startBalancerTask(config);
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
   }
 
   /**
-   * Tests the situation where some container moves time out because they
-   * take longer than "move.timeout".
+   * Tests the situation where some container moves time out because they take longer than "move.timeout".
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void checkIterationResultTimeout(
-      @Nonnull MockedSCM mockedSCM,
-      boolean useDatanodeLimits
-  ) throws NodeNotFoundException, IOException, TimeoutException {
+  public void checkIterationResultTimeout(@Nonnull MockedSCM mockedSCM, boolean useDatanodeLimits)
+      throws NodeNotFoundException, IOException, TimeoutException {
     CompletableFuture<MoveManager.MoveResult> completedFuture =
         CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
     Mockito
@@ -845,22 +740,16 @@ public class TestContainerBalancerTask {
     mockedSCM.enableLegacyReplicationManager();
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    /*
-    According to the setup and configurations, this iteration's result should
-    be ITERATION_COMPLETED.
-     */
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
+    // According to the setup and configurations, this iteration's result should be ITERATION_COMPLETED.
+     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
 
     ContainerBalancerMetrics metrics = task.getMetrics();
     assertEquals(1, metrics.getNumContainerMovesCompletedInLatestIteration());
     assertTrue(metrics.getNumContainerMovesTimeoutInLatestIteration() >= 1);
 
-    /*
-    Test the same but use MoveManager instead of LegacyReplicationManager.
-    The first move being 10ms falls within the timeout duration of 500ms. It
-    should be successful. The rest should fail.
-     */
+    // Test the same but use MoveManager instead of LegacyReplicationManager.
+    // The first move being 10ms falls within the timeout duration of 500ms.
+    // It should be successful. The rest should fail.
     mockedSCM.disableLegacyReplicationManager();
     Mockito
         .when(mockedSCM.getMoveManager()
@@ -871,18 +760,15 @@ public class TestContainerBalancerTask {
         .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(2000, false));
 
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
     assertEquals(1, metrics.getNumContainerMovesCompletedInLatestIteration());
     assertTrue(metrics.getNumContainerMovesTimeoutInLatestIteration() >= 1);
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void checkIterationResultTimeoutFromReplicationManager(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws NodeNotFoundException, IOException, TimeoutException {
+  public void checkIterationResultTimeoutFromReplicationManager(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws NodeNotFoundException, IOException, TimeoutException {
     CompletableFuture<MoveManager.MoveResult> future = CompletableFuture
         .supplyAsync(() -> MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT);
     CompletableFuture<MoveManager.MoveResult> future2 = CompletableFuture
@@ -910,9 +796,7 @@ public class TestContainerBalancerTask {
     assertTrue(metrics.getNumContainerMovesTimeoutInLatestIteration() > 0);
     assertEquals(0, metrics.getNumContainerMovesCompletedInLatestIteration());
 
-    /*
-    Try the same test with MoveManager instead of LegacyReplicationManager.
-     */
+    // Try the same test with MoveManager instead of LegacyReplicationManager.
     Mockito
         .when(mockedSCM.getMoveManager()
             .move(
@@ -930,12 +814,9 @@ public class TestContainerBalancerTask {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void checkIterationResultException(
-      @Nonnull MockedSCM mockedSCM,
-      boolean useDatanodeLimits
-  ) throws NodeNotFoundException, IOException, TimeoutException {
-    CompletableFuture<MoveManager.MoveResult> future =
-        new CompletableFuture<>();
+  public void checkIterationResultException(@Nonnull MockedSCM mockedSCM, boolean useDatanodeLimits)
+      throws NodeNotFoundException, IOException, TimeoutException {
+    CompletableFuture<MoveManager.MoveResult> future = new CompletableFuture<>();
     future.completeExceptionally(new RuntimeException("Runtime Exception"));
     Mockito
         .when(mockedSCM.getReplicationManager()
@@ -959,17 +840,13 @@ public class TestContainerBalancerTask {
 
     mockedSCM.enableLegacyReplicationManager();
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
-
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
 
     int nodeCount = mockedSCM.getCluster().getNodeCount();
     int expectedMovesFailed = (nodeCount > 6) ? 3 : 1;
-    assertTrue(task.getMetrics().getNumContainerMovesFailed()
-        >= expectedMovesFailed);
-    /*
-    Try the same test but with MoveManager instead of ReplicationManager.
-     */
+    assertTrue(task.getMetrics().getNumContainerMovesFailed() >= expectedMovesFailed);
+
+    // Try the same test but with MoveManager instead of ReplicationManager.
     Mockito
         .when(mockedSCM.getMoveManager()
             .move(
@@ -983,68 +860,50 @@ public class TestContainerBalancerTask {
     mockedSCM.disableLegacyReplicationManager();
     task = mockedSCM.startBalancerTask(config);
 
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        task.getIterationResult());
-    assertTrue(task.getMetrics().getNumContainerMovesFailed()
-            >= expectedMovesFailed);
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
+    assertTrue(task.getMetrics().getNumContainerMovesFailed() >= expectedMovesFailed);
   }
 
   @Unhealthy("HDDS-8941")
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void testDelayedStart(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) throws InterruptedException, TimeoutException {
+  public void testDelayedStart(@Nonnull MockedSCM mockedSCM, boolean ignored)
+      throws InterruptedException, TimeoutException {
     OzoneConfiguration ozoneConfig = mockedSCM.getOzoneConfig();
-    ozoneConfig.setTimeDuration(
-        "hdds.scm.wait.time.after.safemode.exit", 10, TimeUnit.SECONDS);
-    ContainerBalancerConfiguration config =
-        mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
+    ozoneConfig.setTimeDuration("hdds.scm.wait.time.after.safemode.exit", 10, TimeUnit.SECONDS);
+    ContainerBalancerConfiguration config = mockedSCM.getBalancerConfigByOzoneConfig(ozoneConfig);
 
     StorageContainerManager scm = mockedSCM.getStorageContainerManager();
     ContainerBalancer balancer = new ContainerBalancer(scm);
-    ContainerBalancerTask task =
-        new ContainerBalancerTask(scm, balancer, config);
+    ContainerBalancerTask task = new ContainerBalancerTask(scm, balancer, config);
     Thread balancingThread = new Thread(() -> task.run(2, true));
-    // start the thread and assert that balancer is RUNNING
+
+    // Start the thread and assert that balancer is RUNNING
     balancingThread.start();
-    assertEquals(ContainerBalancerTask.Status.RUNNING,
-        task.getBalancerStatus());
+    assertEquals(ContainerBalancerTask.Status.RUNNING, task.getBalancerStatus());
 
-    /*
-     Wait for the thread to start sleeping and assert that it's sleeping.
-     This is the delay before it starts balancing.
-     */
-    GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
-    assertEquals(
-        Thread.State.TIMED_WAITING, balancingThread.getState());
+    // Wait for the thread to start sleeping and assert that it's sleeping.
+    // This is the delay before it starts balancing.
+    GenericTestUtils.waitFor(() -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
+    assertEquals(Thread.State.TIMED_WAITING, balancingThread.getState());
 
-    // interrupt the thread from its sleep, wait and assert that balancer has
-    // STOPPED
+    // Interrupt the thread from its sleep, wait and assert that balancer has STOPPED
     balancingThread.interrupt();
-    GenericTestUtils.waitFor(() -> task.getBalancerStatus() ==
-        ContainerBalancerTask.Status.STOPPED, 1, 20);
-    assertEquals(ContainerBalancerTask.Status.STOPPED,
-        task.getBalancerStatus());
+    GenericTestUtils.waitFor(() -> task.getBalancerStatus() == ContainerBalancerTask.Status.STOPPED, 1, 20);
+    assertEquals(ContainerBalancerTask.Status.STOPPED, task.getBalancerStatus());
 
-    // ensure the thread dies
+    // Ensure the thread dies
     GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
     assertFalse(balancingThread.isAlive());
   }
 
   /**
-   * The expectation is that only RATIS containers should be selected for
-   * balancing when LegacyReplicationManager is enabled. This is because
-   * LegacyReplicationManager does not support moving EC containers.
+   * The expectation is that only RATIS containers should be selected for balancing when LegacyReplicationManager
+   * is enabled. This is because LegacyReplicationManager does not support moving EC containers.
    */
   @ParameterizedTest(name = "MockedSCM #{index}: {0}; use datanode limits: {1}")
   @MethodSource("createMockedSCMWithDatanodeLimits")
-  public void balancerShouldExcludeECContainersWhenLegacyRmIsEnabled(
-      @Nonnull MockedSCM mockedSCM,
-      boolean ignored
-  ) {
+  public void balancerShouldExcludeECContainersWhenLegacyRmIsEnabled(@Nonnull MockedSCM mockedSCM, boolean ignored) {
     // Enable LegacyReplicationManager
     mockedSCM.enableLegacyReplicationManager();
     ContainerBalancerConfiguration config = mockedSCM.getBalancerConfig();
@@ -1056,25 +915,19 @@ public class TestContainerBalancerTask {
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
 
-    /*
-     Get all containers that were selected by balancer and assert none of
-     them is an EC container.
-     */
-    Map<ContainerID, DatanodeDetails> containerToSource =
-        task.getContainerToSourceMap();
+    // Get all containers that were selected by balancer and assert none of them is an EC container.
+    Map<ContainerID, DatanodeDetails> containerToSource = task.getContainerToSourceMap();
     assertFalse(containerToSource.isEmpty());
-    Map<ContainerID, ContainerInfo> cidToInfoMap =
-        mockedSCM.getCluster().getCidToInfoMap();
+    Map<ContainerID, ContainerInfo> cidToInfoMap = mockedSCM.getCluster().getCidToInfoMap();
     for (ContainerID containerID : containerToSource.keySet()) {
       ContainerInfo containerInfo = cidToInfoMap.get(containerID);
-      Assertions.assertNotSame(HddsProtos.ReplicationType.EC,
-          containerInfo.getReplicationType());
+      Assertions.assertNotSame(HddsProtos.ReplicationType.EC, containerInfo.getReplicationType());
     }
   }
 
-  private static
-      @Nonnull CompletableFuture<MoveManager.MoveResult> genCompletableFuture(
-          int sleepMilSec, boolean doThrowException
+  private static @Nonnull CompletableFuture<MoveManager.MoveResult> genCompletableFuture(
+      int sleepMilSec,
+      boolean doThrowException
   ) {
     return CompletableFuture.supplyAsync(() -> {
       try {
@@ -1090,16 +943,10 @@ public class TestContainerBalancerTask {
     });
   }
 
-  private static boolean canNotBalanceAnyMore(
-      @Nonnull ContainerBalancerTask task
-  ) {
-    return task.getIterationResult() ==
-        ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+  private static boolean canNotBalanceAnyMore(@Nonnull ContainerBalancerTask task) {
+    return task.getIterationResult() == ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE;
   }
-  private static boolean stillHaveUnbalancedNodes(
-      @Nonnull ContainerBalancerTask task
-  ) {
-    return !task.getOverUtilizedNodes().isEmpty() ||
-        !task.getUnderUtilizedNodes().isEmpty();
+  private static boolean stillHaveUnbalancedNodes(@Nonnull ContainerBalancerTask task) {
+    return !task.getOverUtilizedNodes().isEmpty() || !task.getUnderUtilizedNodes().isEmpty();
   }
 }

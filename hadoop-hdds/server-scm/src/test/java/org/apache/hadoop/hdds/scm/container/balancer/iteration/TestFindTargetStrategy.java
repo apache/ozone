@@ -48,50 +48,39 @@ import static org.mockito.Mockito.when;
  */
 public class TestFindTargetStrategy {
   /**
-   * Checks whether FindTargetGreedyByUsage always choose target
-   * for a given source by Usage.
+   * Checks whether FindTargetGreedyByUsage always choose target for a given source by Usage.
    */
   @Test
   public void testFindTargetGreedyByUsage() {
     StorageContainerManager scm = Mockito.mock(StorageContainerManager.class);
-    FindTargetGreedyByUsageInfo findTargetStrategyByUsageInfo =
-        new FindTargetGreedyByUsageInfo(scm);
+    FindTargetGreedyByUsageInfo findTargetStrategyByUsageInfo = new FindTargetGreedyByUsageInfo(scm);
     List<DatanodeUsageInfo> overUtilizedDatanodes = new ArrayList<>();
 
     //create three datanodes with different usageinfo
-    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 40));
-    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 60));
-    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 80));
+    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(100, 0, 40));
+    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(100, 0, 60));
+    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(100, 0, 80));
 
     //insert in ascending order
     overUtilizedDatanodes.add(dui1);
     overUtilizedDatanodes.add(dui2);
     overUtilizedDatanodes.add(dui3);
-    findTargetStrategyByUsageInfo.reInitialize(
-        overUtilizedDatanodes);
+    findTargetStrategyByUsageInfo.reInitialize(overUtilizedDatanodes);
 
     //no need to set the datanode usage for source.
-    findTargetStrategyByUsageInfo.sortTargetForSource(
-        MockDatanodeDetails.randomDatanodeDetails());
+    findTargetStrategyByUsageInfo.sortTargetForSource(MockDatanodeDetails.randomDatanodeDetails());
 
-    Collection<DatanodeUsageInfo> potentialTargets =
-        findTargetStrategyByUsageInfo.getPotentialTargets();
-
+    Collection<DatanodeUsageInfo> potentialTargets = findTargetStrategyByUsageInfo.getPotentialTargets();
     Object[] sortedPotentialTargetArray = potentialTargets.toArray();
+    assertEquals(sortedPotentialTargetArray.length, 3);
 
-    Assertions.assertEquals(sortedPotentialTargetArray.length, 3);
-
-    //make sure after sorting target for source, the potentialTargets is
-    //sorted in descending order of usage
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[0])
-        .getDatanodeDetails(), dui3.getDatanodeDetails());
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[1])
-        .getDatanodeDetails(), dui2.getDatanodeDetails());
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[2])
-        .getDatanodeDetails(), dui1.getDatanodeDetails());
+    // Make sure after sorting target for source, the potentialTargets is sorted in descending order of usage
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[0]).getDatanodeDetails(), dui3.getDatanodeDetails());
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[1]).getDatanodeDetails(), dui2.getDatanodeDetails());
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[2]).getDatanodeDetails(), dui1.getDatanodeDetails());
 
   }
 
@@ -101,12 +90,12 @@ public class TestFindTargetStrategy {
   @Test
   public void testResetPotentialTargets() {
     // create three datanodes with different usage infos
-    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70));
-    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80));
-    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90));
+    DatanodeUsageInfo dui1 = new DatanodeUsageInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(100, 30, 70));
+    DatanodeUsageInfo dui2 = new DatanodeUsageInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(100, 20, 80));
+    DatanodeUsageInfo dui3 = new DatanodeUsageInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(100, 10, 90));
 
     List<DatanodeUsageInfo> potentialTargets = new ArrayList<>();
     potentialTargets.add(dui1);
@@ -117,27 +106,24 @@ public class TestFindTargetStrategy {
     StorageContainerManager scm = Mockito.mock(StorageContainerManager.class);
     when(scm.getScmNodeManager()).thenReturn(mockNodeManager);
 
-    FindTargetGreedyByUsageInfo
-        findTargetGreedyByUsageInfo = new FindTargetGreedyByUsageInfo(scm);
+    FindTargetGreedyByUsageInfo findTargetGreedyByUsageInfo = new FindTargetGreedyByUsageInfo(scm);
     findTargetGreedyByUsageInfo.reInitialize(potentialTargets);
 
     // now, reset potential targets to only the first datanode
     List<DatanodeDetails> newPotentialTargets = new ArrayList<>(1);
     newPotentialTargets.add(dui1.getDatanodeDetails());
     findTargetGreedyByUsageInfo.resetPotentialTargets(newPotentialTargets);
-    Assertions.assertEquals(1,
-        findTargetGreedyByUsageInfo.getPotentialTargets().size());
-    Assertions.assertEquals(dui1,
-        findTargetGreedyByUsageInfo.getPotentialTargets().iterator().next());
+    assertEquals(1, findTargetGreedyByUsageInfo.getPotentialTargets().size());
+    assertEquals(dui1, findTargetGreedyByUsageInfo.getPotentialTargets().iterator().next());
   }
 
   /**
-   * Checks whether FindTargetGreedyByNetworkTopology always choose target
-   * for a given source by network topology distance.
+   * Checks whether FindTargetGreedyByNetworkTopology always choose target for a given source
+   * by network topology distance.
    */
   @Test
   public void testFindTargetGreedyByNetworkTopology() {
-    // network topology with default cost
+    // Network topology with default cost
     List<NodeSchema> schemas = new ArrayList<>();
     schemas.add(ROOT_SCHEMA);
     schemas.add(RACK_SCHEMA);
@@ -146,26 +132,19 @@ public class TestFindTargetStrategy {
 
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
-    NetworkTopology newCluster =
-        new NetworkTopologyImpl(manager);
+    NetworkTopology newCluster = new NetworkTopologyImpl(manager);
 
-    DatanodeDetails source =
-        MockDatanodeDetails.createDatanodeDetails("1.1.1.1", "/r1/ng1");
-    //create one target in the same rack and same node group
-    DatanodeDetails target1 =
-        MockDatanodeDetails.createDatanodeDetails("2.2.2.2", "/r1/ng1");
-    //create tree targets in the same rack but different node group
-    DatanodeDetails target2 =
-        MockDatanodeDetails.createDatanodeDetails("3.3.3.3", "/r1/ng2");
-    DatanodeDetails target3 =
-        MockDatanodeDetails.createDatanodeDetails("4.4.4.4", "/r1/ng2");
-    DatanodeDetails target4 =
-        MockDatanodeDetails.createDatanodeDetails("5.5.5.5", "/r1/ng2");
-    //create one target in different rack
-    DatanodeDetails target5 =
-        MockDatanodeDetails.createDatanodeDetails("6.6.6.6", "/r2/ng1");
+    DatanodeDetails source =  MockDatanodeDetails.createDatanodeDetails("1.1.1.1", "/r1/ng1");
+    // Create one target in the same rack and same node group
+    DatanodeDetails target1 = MockDatanodeDetails.createDatanodeDetails("2.2.2.2", "/r1/ng1");
+    // Create tree targets in the same rack but different node group
+    DatanodeDetails target2 = MockDatanodeDetails.createDatanodeDetails("3.3.3.3", "/r1/ng2");
+    DatanodeDetails target3 = MockDatanodeDetails.createDatanodeDetails("4.4.4.4", "/r1/ng2");
+    DatanodeDetails target4 = MockDatanodeDetails.createDatanodeDetails("5.5.5.5", "/r1/ng2");
+    // Create one target in different rack
+    DatanodeDetails target5 = MockDatanodeDetails.createDatanodeDetails("6.6.6.6", "/r2/ng1");
 
-    //add all datanode to cluster map
+    // Add all datanode to cluster map
     newCluster.add(source);
     newCluster.add(target1);
     newCluster.add(target2);
@@ -173,7 +152,7 @@ public class TestFindTargetStrategy {
     newCluster.add(target4);
     newCluster.add(target5);
 
-    //make sure targets have different network topology distance to source
+    // Make sure targets have different network topology distance to source
     assertEquals(2, newCluster.getDistanceCost(source, target1));
     assertEquals(4, newCluster.getDistanceCost(source, target2));
     assertEquals(4, newCluster.getDistanceCost(source, target3));
@@ -181,56 +160,39 @@ public class TestFindTargetStrategy {
     assertEquals(6, newCluster.getDistanceCost(source, target5));
 
 
-    //insert in ascending order of network topology distance
+    // Insert in ascending order of network topology distance
     List<DatanodeUsageInfo> overUtilizedDatanodes = new ArrayList<>();
-    //set the farthest target with the lowest usage info
-    overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target5, new SCMNodeStat(100, 0, 90)));
-    //set the tree targets, which have the same network topology distance
-    //to source , with different usage info
-    overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target2, new SCMNodeStat(100, 0, 20)));
-    overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target3, new SCMNodeStat(100, 0, 40)));
-    overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target4, new SCMNodeStat(100, 0, 60)));
-    //set the nearest target with the highest usage info
-    overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target1, new SCMNodeStat(100, 0, 10)));
+    // Set the farthest target with the lowest usage info
+    overUtilizedDatanodes.add(new DatanodeUsageInfo(target5, new SCMNodeStat(100, 0, 90)));
+    // Set the tree targets, which have the same network topology distance to source , with different usage info
+    overUtilizedDatanodes.add(new DatanodeUsageInfo(target2, new SCMNodeStat(100, 0, 20)));
+    overUtilizedDatanodes.add(new DatanodeUsageInfo(target3, new SCMNodeStat(100, 0, 40)));
+    overUtilizedDatanodes.add(new DatanodeUsageInfo(target4, new SCMNodeStat(100, 0, 60)));
+    // Set the nearest target with the highest usage info
+    overUtilizedDatanodes.add(new DatanodeUsageInfo(target1, new SCMNodeStat(100, 0, 10)));
 
     StorageContainerManager scm = Mockito.mock(StorageContainerManager.class);
     when(scm.getClusterMap()).thenReturn(newCluster);
 
-    FindTargetGreedyByNetworkTopology
-        strategy = new FindTargetGreedyByNetworkTopology(scm);
-
+    FindTargetGreedyByNetworkTopology strategy = new FindTargetGreedyByNetworkTopology(scm);
     strategy.reInitialize(overUtilizedDatanodes);
     strategy.sortTargetForSource(source);
 
-    Collection<DatanodeUsageInfo> potentialTargets =
-        strategy.getPotentialTargets();
-
+    Collection<DatanodeUsageInfo> potentialTargets = strategy.getPotentialTargets();
     Object[] sortedPotentialTargetArray = potentialTargets.toArray();
     Assertions.assertEquals(sortedPotentialTargetArray.length, 5);
 
-    // although target1 has the highest usage, it has the nearest network
-    // topology distance to source, so it should be at the head of the
-    // sorted PotentialTargetArray
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[0])
-        .getDatanodeDetails(), target1);
+    // Although target1 has the highest usage, it has the nearest network topology distance to source,
+    // so it should be at the head of the sorted PotentialTargetArray
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[0]).getDatanodeDetails(), target1);
 
-    // these targets have same network topology distance to source,
-    // so they should be sorted by usage
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[1])
-        .getDatanodeDetails(), target4);
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[2])
-        .getDatanodeDetails(), target3);
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[3])
-        .getDatanodeDetails(), target2);
+    // These targets have same network topology distance to source, so they should be sorted by usage
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[1]).getDatanodeDetails(), target4);
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[2]).getDatanodeDetails(), target3);
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[3]).getDatanodeDetails(), target2);
 
-    //target5 has the lowest usage , but it has the farthest distance to source
-    //so it should be at the tail of the sorted PotentialTargetArray
-    Assertions.assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[4])
-        .getDatanodeDetails(), target5);
+    // Target5 has the lowest usage , but it has the farthest distance to source so
+    // it should be at the tail of the sorted PotentialTargetArray
+    assertEquals(((DatanodeUsageInfo) sortedPotentialTargetArray[4]).getDatanodeDetails(), target5);
   }
 }

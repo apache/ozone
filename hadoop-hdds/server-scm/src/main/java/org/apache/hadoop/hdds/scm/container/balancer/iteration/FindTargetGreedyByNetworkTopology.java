@@ -29,17 +29,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 /**
- * an implementation of FindTargetGreedy, which will always select the
- * target with the shortest distance according to network topology
- * distance to the give source datanode.
+ * An implementation of FindTargetGreedy, which will always select the target with the shortest distance according
+ * to network topology distance to the give source datanode.
  */
 class FindTargetGreedyByNetworkTopology extends AbstractFindTargetGreedy {
   private final NetworkTopology networkTopology;
   private final ArrayList<DatanodeUsageInfo> potentialTargets;
 
-  FindTargetGreedyByNetworkTopology(
-      @Nonnull StorageContainerManager scm
-  ) {
+  FindTargetGreedyByNetworkTopology(@Nonnull StorageContainerManager scm) {
     super(scm, FindTargetGreedyByNetworkTopology.class);
     networkTopology = scm.getClusterMap();
     potentialTargets = new ArrayList<>();
@@ -51,8 +48,7 @@ class FindTargetGreedyByNetworkTopology extends AbstractFindTargetGreedy {
   }
 
   /**
-   * Sort potentialTargets for specified source datanode according to network
-   * topology.
+   * Sort potentialTargets for specified source datanode according to network topology.
    *
    * @param source the specified source datanode
    */

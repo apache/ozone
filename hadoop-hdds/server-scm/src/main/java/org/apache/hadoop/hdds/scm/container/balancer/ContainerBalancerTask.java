@@ -48,9 +48,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
 public class ContainerBalancerTask {
 
   public static final Logger LOG = LoggerFactory.getLogger(ContainerBalancerTask.class);
+
   private final ContainerBalancer containerBalancer;
   private final StorageContainerManager scm;
-
   private final ContainerBalancerConfiguration config;
   private volatile Status taskStatus = Status.RUNNING;
   private ContainerBalanceIteration it;
@@ -82,9 +82,7 @@ public class ContainerBalancerTask {
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
             TimeUnit.SECONDS);
-        LOG.info("ContainerBalancer will sleep for {} seconds before" +
-                " starting balancing.",
-            delayDuration);
+        LOG.info("ContainerBalancer will sleep for {} seconds before starting balancing.", delayDuration);
         Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
       balance(nextIterationIndex, config.getIterations());
@@ -109,8 +107,7 @@ public class ContainerBalancerTask {
   }
 
   private void balance(int nextIterationIndex, int iterationCount) {
-    // nextIterationIndex is the iteration that balancer should start from on
-    // leader change or restart
+    // nextIterationIndex is the iteration that balancer should start from on leader change or restart
     for (int i = nextIterationIndex; i < iterationCount && isBalancerRunning(); ++i) {
       // reset some variables and metrics for this iteration
       if (it != null) {
@@ -126,25 +123,19 @@ public class ContainerBalancerTask {
         return;
       }
 
-      it = new ContainerBalanceIteration(containerBalancer.getMetrics(), config,
-          scm, datanodeUsageInfos);
+      it = new ContainerBalanceIteration(containerBalancer.getMetrics(), config, scm, datanodeUsageInfos);
 
       // initialize this iteration. stop balancing on initialization failure
       if (!it.findUnBalancedNodes(this::isBalancerRunning, datanodeUsageInfos)) {
         // Try to stop balancer
-        tryStopWithSaveConfiguration("Could not initialize " +
-            "ContainerBalancer's iteration number " + i);
+        tryStopWithSaveConfiguration("Could not initialize ContainerBalancer's iteration number " + i);
         return;
       }
 
-      IterationResult iterationResult =
-          it.doIteration(this::isBalancerRunning, config);
+      IterationResult iterationResult = it.doIteration(this::isBalancerRunning, config);
+      LOG.info("Result of this iteration of Container Balancer: {}", iterationResult);
 
-      LOG.info("Result of this iteration of Container Balancer: {}",
-          iterationResult);
-
-      // if no new move option is generated, it means the cluster cannot be
-      // balanced anymore; so just stop balancer
+      // if no new move option is generated, it means the cluster cannot be balanced anymore; so just stop balancer
       if (iterationResult == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
         tryStopWithSaveConfiguration(iterationResult.toString());
         return;
@@ -155,8 +146,8 @@ public class ContainerBalancerTask {
         try {
           saveConfiguration(config, true, i + 1);
         } catch (IOException | TimeoutException e) {
-          LOG.warn("Could not persist next iteration index value for " +
-              "ContainerBalancer after completing an iteration", e);
+          LOG.warn("Could not persist next iteration index value for ContainerBalancer after completing an iteration",
+              e);
         }
       }
 
@@ -165,14 +156,12 @@ public class ContainerBalancerTask {
         return;
       }
 
-      // wait for configured time before starting next iteration, unless
-      // this was the final iteration
+      // wait for configured time before starting next iteration, unless this was the final iteration
       if (i != iterationCount - 1) {
         try {
           Thread.sleep(config.getBalancingInterval().toMillis());
         } catch (InterruptedException e) {
-          LOG.info("Container Balancer was interrupted while waiting for" +
-              " next iteration.");
+          LOG.info("Container Balancer was interrupted while waiting for next iteration.");
           Thread.currentThread().interrupt();
           return;
         }
@@ -184,16 +173,13 @@ public class ContainerBalancerTask {
 
   private @Nullable List<DatanodeUsageInfo> getDatanodeUsageInfos() {
     // sorted list in order from most to least used
-    List<DatanodeUsageInfo> datanodeUsageInfos =
-        scm.getScmNodeManager().getMostOrLeastUsedDatanodes(true);
+    List<DatanodeUsageInfo> datanodeUsageInfos = scm.getScmNodeManager().getMostOrLeastUsedDatanodes(true);
     if (datanodeUsageInfos.isEmpty()) {
-      LOG.warn("Received an empty list of datanodes from Node Manager when " +
-          "trying to identify which nodes to balance");
+      LOG.warn("Received an empty list of datanodes from Node Manager when trying to identify which nodes to balance");
       return null;
     }
     // include/exclude nodes from balancing according to configs
-    datanodeUsageInfos.removeIf(dnUsageInfo -> shouldExcludeDatanode(config,
-        dnUsageInfo.getDatanodeDetails()));
+    datanodeUsageInfos.removeIf(dnUsageInfo -> shouldExcludeDatanode(config, dnUsageInfo.getDatanodeDetails()));
     return datanodeUsageInfos;
   }
 
@@ -204,12 +190,10 @@ public class ContainerBalancerTask {
   }
 
   private boolean runCommandDU() {
-    // before starting a new iteration, we trigger all the datanode
-    // to run `du`. this is an aggressive action, with which we can
-    // get more precise usage info of all datanodes before moving.
-    // this is helpful for container balancer to make more appropriate
-    // decisions. this will increase the disk io load of data nodes, so
-    // please enable it with caution.
+    // Before starting a new iteration, we trigger all the datanode to run `du`.
+    // This is an aggressive action, with which we can get more precise usage info of all datanodes before moving.
+    // This is helpful for container balancer to make more appropriate decisions.
+    // This will increase the disk io load of data nodes, so please enable it with caution.
     scm.getScmNodeManager().refreshAllHealthyDnUsageInfo();
     try {
       long nodeReportInterval = scm.getConfiguration().getTimeDuration(
@@ -217,17 +201,15 @@ public class ContainerBalancerTask {
           HDDS_NODE_REPORT_INTERVAL_DEFAULT,
           TimeUnit.MILLISECONDS
       );
-      // one for sending command , one for running du, and one for
-      // reporting back make it like this for now, a more suitable
-      // value. can be set in the future if needed
+      // One for sending command, one for running du, and one for reporting back make it like this for now,
+      // a more suitable value. can be set in the future if needed
       long sleepTime = 3 * nodeReportInterval;
-      LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
-          "for updated usage information from Datanodes.", sleepTime);
+      LOG.info("ContainerBalancer will sleep for {} ms while waiting for updated usage information from Datanodes.",
+          sleepTime);
       Thread.sleep(sleepTime);
       return true;
     } catch (InterruptedException e) {
-      LOG.info("Container Balancer was interrupted while waiting for" +
-          "datanodes refreshing volume usage info");
+      LOG.info("Container Balancer was interrupted while waiting for datanodes refreshing volume usage info");
       Thread.currentThread().interrupt();
       return false;
     }
@@ -245,8 +227,7 @@ public class ContainerBalancerTask {
         saveConfiguration(config, false, 0);
         stop();
       } catch (IOException | TimeoutException e) {
-        LOG.warn("Save configuration failed. Reason for " +
-            "stopping: {}", stopReason, e);
+        LOG.warn("Save configuration failed. Reason for stopping: {}", stopReason, e);
       }
     }
   }
@@ -287,6 +268,7 @@ public class ContainerBalancerTask {
    *
    * @param config
    * @param datanode DatanodeDetails to check
+   *
    * @return true if Datanode should be excluded, else false
    */
   private static boolean shouldExcludeDatanode(
@@ -300,10 +282,7 @@ public class ContainerBalancerTask {
       return true;
     } else {
       Set<String> includeNodes = config.getIncludeNodes();
-      return
-          !includeNodes.isEmpty() &&
-              !includeNodes.contains(hostName) &&
-              !includeNodes.contains(ipAddress);
+      return !includeNodes.isEmpty() && !includeNodes.contains(hostName) && !includeNodes.contains(ipAddress);
     }
   }
 
@@ -341,8 +320,7 @@ public class ContainerBalancerTask {
   /**
    * Gets a map with selected containers and target datanodes.
    *
-   * @return map with mappings from {@link ContainerID} to
-   * {@link DatanodeDetails}.
+   * @return map with mappings from {@link ContainerID} to {@link DatanodeDetails}.
    */
   @VisibleForTesting
   Map<ContainerID, DatanodeDetails> getContainerToTargetMap() {
