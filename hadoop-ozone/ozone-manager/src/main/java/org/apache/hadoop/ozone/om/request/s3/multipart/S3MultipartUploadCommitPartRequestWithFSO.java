@@ -55,7 +55,7 @@ public class S3MultipartUploadCommitPartRequestWithFSO
           .setKeyName(keyName)
           .setOmMetadataManager(omMetadataManager)
           .setClientID(clientID)
-          .build().getOpenKey();
+          .build().getOpenFileName();
   }
 
   @Override

@@ -36,7 +36,6 @@ public final class OmGetKey {
   private String keyName;
   private OMMetadataManager omMetadataManager;
   private long clientID;
-  private String errMsg;
 
   private String fileName;
   private Iterator<Path> pathComponents;
@@ -47,7 +46,7 @@ public final class OmGetKey {
 
   @SuppressWarnings("checkstyle:parameternumber")
   private OmGetKey(String volumeName, String bucketName, String keyName, 
-      OMMetadataManager omMetadataManager, long clientID, String errMsg, 
+      OMMetadataManager omMetadataManager, long clientID,
       String fileName, Iterator<Path> pathComponents, long volumeId,
       long bucketId, long parentID) {
     this.volumeName = volumeName;
@@ -55,7 +54,6 @@ public final class OmGetKey {
     this.keyName = keyName;
     this.omMetadataManager = omMetadataManager;
     this.clientID = clientID;
-    this.errMsg = errMsg;
 
     this.fileName = fileName;
     this.pathComponents = pathComponents;
@@ -120,7 +118,7 @@ public final class OmGetKey {
           this.omMetadataManager, this.errMsg);
 
       return new OmGetKey(volumeName, bucketName, keyName, 
-          omMetadataManager, clientID, errMsg, fileName, pathComponents, 
+          omMetadataManager, clientID, fileName, pathComponents, 
           volumeId, bucketId, parentID);
     }
   }
@@ -160,8 +158,12 @@ public final class OmGetKey {
   public long getParentID() {
     return this.parentID;
   }
+  
+  public Iterator<Path> getPathComponents() {
+    return this.pathComponents;
+  }
 
-  public String getOpenKey() {
+  public String getOpenFileName() {
     return omMetadataManager.getOpenFileName(this.volumeId, this.bucketId,
         this.parentID, this.fileName, this.clientID);
   }

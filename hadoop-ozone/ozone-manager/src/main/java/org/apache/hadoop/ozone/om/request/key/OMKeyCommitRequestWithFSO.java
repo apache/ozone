@@ -33,8 +33,8 @@ import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmGetKey;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -51,9 +51,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -127,7 +124,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               commitKeyRequest.getClientID());
 
 
-      Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
       List<OmKeyLocationInfo>
@@ -138,20 +134,23 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      String fileName = OzoneFSUtils.getFileName(keyName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      final long bucketId = omMetadataManager.getBucketId(
-              volumeName, bucketName);
-      long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-              pathComponents, keyName, omMetadataManager,
-              "Cannot create file : " + keyName
-              + " as parent directory doesn't exist");
-      String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, fileName);
-      dbOpenFileKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
-              parentID, fileName, commitKeyRequest.getClientID());
+
+      String errMsg = "Cannot create file : " + keyName
+              + " as parent directory doesn't exist";
+      OmGetKey getKey =  new OmGetKey.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setOmMetadataManager(omMetadataManager)
+          .setClientID(commitKeyRequest.getClientID())
+          .setErrMsg(errMsg)
+          .build();
+
+      String fileName = getKey.getFileName();
+      long volumeId = getKey.getVolumeId();
+      String dbFileKey = getKey.getOzonePathKey();
+      dbOpenFileKey = getKey.getOpenFileName();
 
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);
