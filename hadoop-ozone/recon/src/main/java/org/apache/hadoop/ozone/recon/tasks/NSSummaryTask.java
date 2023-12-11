@@ -98,16 +98,16 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    boolean success;
-    success = nsSummaryTaskWithFSO.processWithFSO(events);
-    if (success) {
-      success = nsSummaryTaskWithLegacy.processWithLegacy(events);
-    } else {
+    boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
+    if (!success) {
       LOG.error("processWithFSO failed.");
     }
-    if (success) {
-      success = nsSummaryTaskWithOBS.processWithOBS(events);
-    } else {
+    success = nsSummaryTaskWithLegacy.processWithLegacy(events);
+    if (!success) {
+      LOG.error("processWithLegacy failed.");
+    }
+    success = nsSummaryTaskWithOBS.processWithOBS(events);
+    if (!success) {
       LOG.error("processWithOBS failed.");
     }
     return new ImmutablePair<>(getTaskName(), success);
@@ -115,7 +115,10 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
+
+    long startTime = System.nanoTime(); // Record start time
 
     try {
       // reinit Recon RocksDB's namespace CF.
@@ -135,7 +138,7 @@ public class NSSummaryTask implements ReconOmTask {
 
     List<Future<Boolean>> results;
     ExecutorService executorService = Executors
-        .newFixedThreadPool(2,
+        .newFixedThreadPool(3,
             new ThreadFactoryBuilder().setNameFormat("NSSummaryTask - %d")
                 .build());
     try {
@@ -146,17 +149,23 @@ public class NSSummaryTask implements ReconOmTask {
         }
       }
     } catch (InterruptedException ex) {
-      LOG.error("Error while reprocessing NSSummary " +
-          "table in Recon DB. ", ex);
+      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
       return new ImmutablePair<>(getTaskName(), false);
     } catch (ExecutionException ex2) {
-      LOG.error("Error while reprocessing NSSummary " +
-          "table in Recon DB. ", ex2);
+      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex2);
       return new ImmutablePair<>(getTaskName(), false);
     } finally {
       executorService.shutdown();
+
+      long endTime = System.nanoTime(); // Record end time
+      long durationInMillis = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+
+      // Log performance metrics
+      LOG.info("Task execution time: {} milliseconds", durationInMillis);
     }
+
     return new ImmutablePair<>(getTaskName(), true);
   }
+
 }
 

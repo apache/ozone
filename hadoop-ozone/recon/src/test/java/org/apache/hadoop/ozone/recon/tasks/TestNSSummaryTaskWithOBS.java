@@ -236,6 +236,8 @@ public class TestNSSummaryTaskWithOBS {
 
     @BeforeEach
     public void setUp() throws IOException {
+      // reinit Recon RocksDB's namespace CF.
+      reconNamespaceSummaryManager.clearNSSummaryTable();
       nSSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
       nSSummaryTaskWithOBS.processWithOBS(processEventBatch());
 
@@ -368,6 +370,7 @@ public class TestNSSummaryTaskWithOBS {
       int[] expectedIndexes1 = {1, 3, 40};
       for (int index = 0; index < fileDistBucket1.length; index++) {
         if (contains(expectedIndexes1, index)) {
+          System.out.println("######## index: " + index + " value: " + fileDistBucket1[index]+"########");
           Assert.assertEquals(1, fileDistBucket1[index]);
         } else {
           Assert.assertEquals(0, fileDistBucket1[index]);
