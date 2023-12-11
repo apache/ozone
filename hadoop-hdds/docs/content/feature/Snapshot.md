@@ -57,7 +57,7 @@ SnapshotDiff CLI/API is asynchronous. The first time the API is invoked, OM star
 ozone sh snapshot listDiff [-ahV] [-s=<jobStatus>] <bucket>
 ```
 
-* Snapshot Info : Returns information about an existing snapshot
+* Snapshot Info: Returns information about an existing snapshot
 ```shell
 ozone sh snapshot info [-hV] <bucket> <snapshotName>
 ```
