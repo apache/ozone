@@ -45,10 +45,11 @@ public final class OmGetKey {
   private long parentID;
 
 
+  @SuppressWarnings("checkstyle:parameternumber")
   private OmGetKey(String volumeName, String bucketName, String keyName, 
       OMMetadataManager omMetadataManager, long clientID, String errMsg, 
-      String fileName, Iterator<Path> pathComponents, long volumeId, long bucketId, long parentID
-      ) {
+      String fileName, Iterator<Path> pathComponents, long volumeId,
+      long bucketId, long parentID) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -108,15 +109,15 @@ public final class OmGetKey {
       return this;
     }
 
-    public OmGetKey build() {
+    public OmGetKey build() throws IOException {
       String fileName = OzoneFSUtils.getFileName(this.keyName);
       Iterator<Path> pathComponents = Paths.get(this.keyName).iterator();
       final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
       final long bucketId = omMetadataManager.getBucketId(this.volumeName,
           this.bucketName);
       long parentID = OMFileRequest
-        .getParentID(volumeId, bucketId, pathComponents, this.keyName,
-        this.omMetadataManager, this.errMsg);
+          .getParentID(volumeId, bucketId, pathComponents, this.keyName,
+          this.omMetadataManager, this.errMsg);
 
       return new OmGetKey(volumeName, bucketName, keyName, 
           omMetadataManager, clientID, errMsg, fileName, pathComponents, 
@@ -160,12 +161,12 @@ public final class OmGetKey {
     return this.parentID;
   }
 
-  public String getOpenKey() throws IOException {
+  public String getOpenKey() {
     return omMetadataManager.getOpenFileName(this.volumeId, this.bucketId,
         this.parentID, this.fileName, this.clientID);
   }
 
-  public String getOzonePathKey() throws IOException {
+  public String getOzonePathKey() {
     return omMetadataManager.getOzonePathKey(this.volumeId, this.bucketId,
         this.parentID, this.fileName);
   }
