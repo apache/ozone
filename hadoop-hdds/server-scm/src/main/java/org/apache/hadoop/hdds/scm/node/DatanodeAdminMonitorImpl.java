@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -361,20 +362,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        if (replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager)) {
-          sufficientlyReplicated++;
-        } else {
-          if (LOG.isDebugEnabled()) {
-            underReplicatedIDs.add(cid);
-          }
-          if (underReplicated < containerDetailsLoggingLimit
-              || LOG.isDebugEnabled()) {
-            LOG.info("Under Replicated Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
-          }
-          underReplicated++;
-        }
-
         boolean isHealthy;
         /*
         If LegacyReplicationManager is enabled, then use the
@@ -398,10 +385,35 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
                 cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           unhealthy++;
+          continue;
+        }
+
+        // If we get here, the container is closed or quasi-closed and all the replicas match that
+        // state, except for any which are unhealthy. As the container is closed, we can check
+        // if it is sufficiently replicated using replicationManager, but this only works if the
+        // legacy RM is not enabled.
+        boolean replicatedOK;
+        if (legacyEnabled) {
+          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager);
+        } else {
+          ReplicationManagerReport report = new ReplicationManagerReport();
+          replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
+          replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
+        }
+
+        if (replicatedOK) {
+          sufficientlyReplicated++;
+        } else {
+          if (LOG.isDebugEnabled()) {
+            underReplicatedIDs.add(cid);
+          }
+          if (underReplicated < containerDetailsLoggingLimit || LOG.isDebugEnabled()) {
+            LOG.info("Under Replicated Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
+          }
+          underReplicated++;
         }
       } catch (ContainerNotFoundException e) {
-        LOG.warn("ContainerID {} present in node list for {} but not found " +
-            "in containerManager", cid, dn);
+        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid, dn);
       }
     }
     LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
