@@ -4182,7 +4182,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.native.lib.enabled.diff</name>
+    <name>ozone.om.snapshot.load.native.lib</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
