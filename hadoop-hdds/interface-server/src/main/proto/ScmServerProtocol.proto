@@ -151,6 +151,8 @@ message AllocateScmBlockRequestProto {
   //used for EC replicaiton instead of the replication factor
   optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
 
+  optional string client = 9;
+
 }
 
 /**

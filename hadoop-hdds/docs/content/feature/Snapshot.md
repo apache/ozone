@@ -57,6 +57,11 @@ SnapshotDiff CLI/API is asynchronous. The first time the API is invoked, OM star
 ozone sh snapshot listDiff [-ahV] [-s=<jobStatus>] <bucket>
 ```
 
+* Snapshot Info: Returns information about an existing snapshot
+```shell
+ozone sh snapshot info [-hV] <bucket> <snapshotName>
+```
+
 ## Architecture
 
 Ozone Snapshot architecture leverages the fact that data blocks once written, remain immutable for their lifetime. These data blocks are reclaimed only when the object key metadata that references them, is deleted from the Ozone namespace. All of this Ozone metadata is stored on the OM nodes in the Ozone cluster. When a user takes a snapshot of an Ozone bucket, internally the system takes snapshot of the Ozone metadata in OM nodes. Since Ozone doesn't allow updates to datanode blocks, integrity of data blocks referenced by Ozone metadata snapshot in OM nodes remains intact. Ozone key deletion service is also aware of Ozone snapshots.  Key deletion service does not reclaim any key as long as it is referenced by the active object store bucket or any of its snapshot. When the snapshots are deleted, a background garbage collection service reclaims any key that will not be part of any snapshot or active object store.

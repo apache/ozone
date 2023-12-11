@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -31,6 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -68,10 +67,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
-  private final ScmClientConfig clientConfig;
   private final Cache<String, XceiverClientSpi> clientCache;
   private final CacheMetrics cacheMetrics;
-  private List<X509Certificate> caCerts;
+  private ClientTrustManager trustManager;
 
   private static XceiverClientMetrics metrics;
   private boolean isSecurityEnabled;
@@ -89,16 +87,15 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   public XceiverClientManager(ConfigurationSource conf,
       ScmClientConfig clientConf,
-      List<X509Certificate> caCerts) throws IOException {
+      ClientTrustManager trustManager) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
-    this.clientConfig = clientConf;
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (isSecurityEnabled) {
-      Preconditions.checkNotNull(caCerts);
-      this.caCerts = caCerts;
+      Preconditions.checkNotNull(trustManager);
+      this.trustManager = trustManager;
     }
 
     this.clientCache = CacheBuilder.newBuilder()
@@ -132,7 +129,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   /**
    * Acquires a XceiverClientSpi connected to a container capable of
-   * storing the specified key.
+   * storing the specified key. It does not consider the topology
+   * of the datanodes in the pipeline (e.g. closest datanode to the
+   * client)
    *
    * If there is already a cached XceiverClientSpi, simply return
    * the cached otherwise create a new one.
@@ -160,18 +159,30 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   @Override
   public XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
       throws IOException {
-    return acquireClient(pipeline, true);
+    return acquireClient(pipeline, topologyAwareRead);
   }
 
-  private XceiverClientSpi acquireClient(Pipeline pipeline, boolean read)
-      throws IOException {
+  /**
+   * Acquires a XceiverClientSpi connected to a container capable of
+   * storing the specified key.
+   *
+   * If there is already a cached XceiverClientSpi, simply return
+   * the cached otherwise create a new one.
+   *
+   * @param pipeline the container pipeline for the client connection
+   * @return XceiverClientSpi connected to a container
+   * @throws IOException if a XceiverClientSpi cannot be acquired
+   */
+  @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline,
+      boolean topologyAware) throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
     Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
         NO_REPLICA_FOUND);
 
     synchronized (clientCache) {
-      XceiverClientSpi info = getClient(pipeline, read);
+      XceiverClientSpi info = getClient(pipeline, topologyAware);
       info.incrementReference();
       return info;
     }
@@ -197,17 +208,18 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   @Override
   public void releaseClientForReadData(XceiverClientSpi client,
       boolean invalidateClient) {
-    releaseClient(client, invalidateClient, true);
+    releaseClient(client, invalidateClient, topologyAwareRead);
   }
 
-  private void releaseClient(XceiverClientSpi client, boolean invalidateClient,
-      boolean read) {
+  @Override
+  public void releaseClient(XceiverClientSpi client, boolean invalidateClient,
+      boolean topologyAware) {
     Preconditions.checkNotNull(client);
     synchronized (clientCache) {
       client.decrementReference();
       if (invalidateClient) {
         Pipeline pipeline = client.getPipeline();
-        String key = getPipelineCacheKey(pipeline, read);
+        String key = getPipelineCacheKey(pipeline, topologyAware);
         XceiverClientSpi cachedClient = clientCache.getIfPresent(key);
         if (cachedClient == client) {
           clientCache.invalidate(key);
@@ -216,13 +228,13 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     }
   }
 
-  private XceiverClientSpi getClient(Pipeline pipeline, boolean forRead)
+  private XceiverClientSpi getClient(Pipeline pipeline, boolean topologyAware)
       throws IOException {
     HddsProtos.ReplicationType type = pipeline.getType();
     try {
-      // create different client for read different pipeline node based on
+      // create different client different pipeline node based on
       // network topology
-      String key = getPipelineCacheKey(pipeline, forRead);
+      String key = getPipelineCacheKey(pipeline, topologyAware);
       // Append user short name to key to prevent a different user
       // from using same instance of xceiverClient.
       key = isSecurityEnabled ?
@@ -234,13 +246,13 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             switch (type) {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  caCerts);
+                  trustManager);
               break;
             case STAND_ALONE:
-              client = new XceiverClientGrpc(pipeline, conf, caCerts);
+              client = new XceiverClientGrpc(pipeline, conf, trustManager);
               break;
             case EC:
-              client = new ECXceiverClientGrpc(pipeline, conf, caCerts);
+              client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
               break;
             case CHAINED:
             default:
@@ -256,18 +268,30 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     }
   }
 
-  private String getPipelineCacheKey(Pipeline pipeline, boolean forRead) {
+  private String getPipelineCacheKey(Pipeline pipeline,
+                                     boolean topologyAware) {
     String key = pipeline.getId().getId().toString() + pipeline.getType();
-    boolean isEC = pipeline.getReplicationConfig()
-        .getReplicationType() == HddsProtos.ReplicationType.EC;
-    if (topologyAwareRead && forRead || isEC) {
+    boolean isEC = pipeline.getType() == HddsProtos.ReplicationType.EC;
+    if (topologyAware || isEC) {
       try {
-        key += pipeline.getClosestNode().getHostName();
-        if (isEC) {
-          // Currently EC uses standalone client.
-          key += pipeline.getClosestNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE);
-        }
+        DatanodeDetails closestNode = pipeline.getClosestNode();
+        // Pipeline cache key uses host:port suffix to handle
+        // both EC, Ratis, and Standalone client.
+        //
+        // For EC client, the host:port cache key is needed
+        // so that there is a different cache key for each node in
+        // a block group.
+        //
+        // For Ratis and Standalone client, the host:port cache key is needed
+        // to handle the possibility of two datanodes sharing the same machine.
+        // While normally one machine only hosts one datanode service,
+        // this situation might arise in tests.
+        //
+        // Standalone port is chosen since all datanodes should have a
+        // standalone port regardless of version and this port should not
+        // have any collisions.
+        key += closestNode.getHostName() + closestNode.getPort(
+            DatanodeDetails.Port.Name.STANDALONE);
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());

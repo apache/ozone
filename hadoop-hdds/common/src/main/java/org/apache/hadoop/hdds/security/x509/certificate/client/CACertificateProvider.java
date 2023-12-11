@@ -7,40 +7,25 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
+package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-package org.apache.hadoop.util;
-
-import java.security.SecureRandom;
+import java.io.IOException;
+import java.security.cert.X509Certificate;
+import java.util.List;
 
 /**
- * Helper methods to deal with random UUIDs.
+ * An interface that defines a trust anchor provider API this class relies on.
  */
-public final class UUIDUtil {
-
-  private UUIDUtil() {
-
-  }
-
-  private static final ThreadLocal<SecureRandom> GENERATOR =
-      ThreadLocal.withInitial(SecureRandom::new);
-
-  public static byte[] randomUUIDBytes() {
-    final byte[] bytes = new byte[16];
-    GENERATOR.get().nextBytes(bytes);
-    // See RFC 4122 section 4.4
-    bytes[6]  &= 0x0f;
-    bytes[6]  |= 0x40;
-    bytes[8]  &= 0x3f;
-    bytes[8]  |= 0x80;
-    return bytes;
-  }
-
+@FunctionalInterface
+public interface CACertificateProvider {
+  List<X509Certificate> provideCACerts() throws IOException;
 }
