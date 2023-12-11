@@ -233,11 +233,11 @@ public class TestNodeDecommissionMetrics {
   }
 
   /**
-   * Test for collecting metric for unhealthy containers
+   * Test for collecting metric for unclosed containers
    * from nodes in decommissioning and maintenance workflow.
    */
   @Test
-  public void testDecommMonitorCollectUnhealthyContainers()
+  public void testDecommMonitorCollectUnclosedContainers()
       throws ContainerNotFoundException, NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.createDatanodeDetails(
         "datanode_host1",
@@ -249,7 +249,7 @@ public class TestNodeDecommissionMetrics {
     containers.add(ContainerID.valueOf(1));
 
     // set OPEN container with 1 replica CLOSED replica state,
-    // in-service node, generates monitored  unhealthy container replica
+    // in-service node, generates monitored  unclosed container replica
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
@@ -259,12 +259,12 @@ public class TestNodeDecommissionMetrics {
 
     monitor.run();
     Assertions.assertEquals(1,
-        metrics.getContainersUnhealthyTotal());
+        metrics.getContainersUnClosedTotal());
 
     // should have host specific metric collected
     // for datanode_host1
     Assertions.assertEquals(1,
-        metrics.getUnhealthyContainersByHost(
+        metrics.getUnClosedContainersByHost(
             "datanode_host1"));
   }
 

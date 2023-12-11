@@ -85,7 +85,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long sufficientlyReplicatedContainers = 0;
   private long trackedDecomMaintenance = 0;
   private long trackedRecommission = 0;
-  private long unhealthyContainers = 0;
+  private long unClosedContainers = 0;
   private long underReplicatedContainers = 0;
 
   private Map<String, ContainerStateInWorkflow> containerStateByHost;
@@ -197,7 +197,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   synchronized void setMetricsToGauge() {
     synchronized (metrics) {
-      metrics.setContainersUnhealthyTotal(unhealthyContainers);
+      metrics.setContainersUnClosedTotal(unClosedContainers);
       metrics.setRecommissionNodesTotal(trackedRecommission);
       metrics.setDecommissioningMaintenanceNodesTotal(
           trackedDecomMaintenance);
@@ -213,7 +213,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   void resetContainerMetrics() {
     pipelinesWaitingToClose = 0;
     sufficientlyReplicatedContainers = 0;
-    unhealthyContainers = 0;
+    unClosedContainers = 0;
     underReplicatedContainers = 0;
   }
 
@@ -342,9 +342,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     int sufficientlyReplicated = 0;
     int deleting = 0;
     int underReplicated = 0;
-    int unhealthy = 0;
+    int unclosed = 0;
     List<ContainerID> underReplicatedIDs = new ArrayList<>();
-    List<ContainerID> unhealthyIDs = new ArrayList<>();
+    List<ContainerID> unClosedIDs = new ArrayList<>();
     Set<ContainerID> containers =
         nodeManager.getContainers(dn);
     for (ContainerID cid : containers) {
@@ -377,14 +377,13 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         }
         if (!isHealthy) {
           if (LOG.isDebugEnabled()) {
-            unhealthyIDs.add(cid);
+            unClosedIDs.add(cid);
           }
-          if (unhealthy < containerDetailsLoggingLimit
+          if (unclosed < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
-            LOG.info("Unhealthy Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
+            LOG.info("Unclosed Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
-          unhealthy++;
+          unclosed++;
           continue;
         }
 
@@ -417,27 +416,27 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       }
     }
     LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
-            "underReplicated and {} unhealthy containers",
-        dn, sufficientlyReplicated, deleting, underReplicated, unhealthy);
+            "underReplicated and {} unclosed containers",
+        dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
     containerStateByHost.put(dn.getHostName(),
         new ContainerStateInWorkflow(dn.getHostName(),
             sufficientlyReplicated,
             underReplicated,
-            unhealthy,
+            unclosed,
             0L));
     sufficientlyReplicatedContainers += sufficientlyReplicated;
     underReplicatedContainers += underReplicated;
-    unhealthyContainers += unhealthy;
+    unClosedContainers += unclosed;
     if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
-        unhealthyIDs.size() < 10000) {
-      LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
+        unClosedIDs.size() < 10000) {
+      LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
               "containers", dn, underReplicated,
           underReplicatedIDs.stream().map(
               Object::toString).collect(Collectors.joining(", ")),
-          unhealthy, unhealthyIDs.stream().map(
+          unclosed, unClosedIDs.stream().map(
               Object::toString).collect(Collectors.joining(", ")));
     }
-    return underReplicated == 0 && unhealthy == 0;
+    return underReplicated == 0 && unclosed == 0;
   }
 
   private String replicaDetails(Collection<ContainerReplica> replicas) {
