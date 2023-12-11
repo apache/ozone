@@ -268,6 +268,18 @@ public class TestListKeysWithFSO {
   }
 
   @Test
+  public void testListKeysWithAndWithoutTrailingSlashInPrefix()
+      throws Exception {
+    List<String> expectedKeys = new ArrayList<>();
+    expectedKeys.add("a1/b2/d2/d21.tx");
+    // With trailing slash
+    checkKeyList("a1/b2/d2/d21.tx/", "", expectedKeys, fsoOzoneBucket);
+
+    //Without trailing slash
+    checkKeyList("a1/b2/d2/d21.tx", "", expectedKeys, fsoOzoneBucket);
+  }
+
+  @Test
   public void testListKeysWithNonExistentStartKey() throws Exception {
     // case-1: StartKey LeafNode is lexographically ahead than prefixKey.
     // So, will return EmptyList

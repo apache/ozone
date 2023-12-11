@@ -836,7 +836,7 @@
   </property>
   <property>
     <name>ozone.chunk.read.buffer.default.size</name>
-    <value>64KB</value>
+    <value>1MB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read buffer size during read chunk operations when checksum
@@ -845,6 +845,14 @@
       For chunk data with checksum, the read buffer size will be the
       same as the number of bytes per checksum
       (ozone.client.bytes.per.checksum) corresponding to the chunk.
+    </description>
+  </property>
+  <property>
+    <name>ozone.chunk.read.mapped.buffer.threshold</name>
+    <value>32KB</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default read threshold to use memory mapped buffers.
     </description>
   </property>
   <property>
@@ -4261,6 +4269,14 @@
     <tag>OZONE, DATANODE</tag>
     <description>
       Specify if zero-copy should be enabled for EC GRPC protocol.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.max.buckets</name>
+    <value>100000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      maximum number of buckets across all volumes.
     </description>
   </property>
 </configuration>
