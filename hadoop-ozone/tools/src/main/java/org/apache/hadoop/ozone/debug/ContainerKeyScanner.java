@@ -89,7 +89,7 @@ public class ContainerKeyScanner implements Callable<Void>,
       paramLabel = "containerIDs",
       required = true,
       description = "Set of container IDs to be used for getting all " +
-          "their keys. Example-usage: 1,11,2 (Separated by ',')")
+          "their keys. Example-usage: 1,11,2 (Separated by ',').")
   private Set<Long> containerIds;
 
   private static Map<String, OmDirectoryInfo> directoryTable;
