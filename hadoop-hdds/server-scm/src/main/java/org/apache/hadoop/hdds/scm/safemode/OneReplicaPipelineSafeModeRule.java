@@ -57,6 +57,7 @@ public class OneReplicaPipelineSafeModeRule extends
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
   private final double pipelinePercent;
+  private static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
 
 
   public OneReplicaPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
@@ -142,12 +143,20 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return String
-        .format(
-            "reported Ratis/THREE pipelines with at least one datanode (=%d) "
-                + ">= threshold (=%d)",
-            getCurrentReportedPipelineCount(),
-            getThresholdCount());
+    String status = String.format(
+        "reported Ratis/THREE pipelines with at least one datanode (=%d) "
+            + ">= threshold (=%d)", getCurrentReportedPipelineCount(),
+        getThresholdCount());
+    Set<PipelineID> samplePipelines = oldPipelineIDSet.stream()
+        .filter(element -> !reportedPipelineIDSet.contains(element))
+        .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
+        .collect(Collectors.toSet());
+    if (!samplePipelines.isEmpty()) {
+      String samplePipelineText =
+          "Sample pipelines not satisfying the criteria : " + samplePipelines;
+      status = status.concat("/n").concat(samplePipelineText);
+    }
+    return status;
   }
 
   @Override

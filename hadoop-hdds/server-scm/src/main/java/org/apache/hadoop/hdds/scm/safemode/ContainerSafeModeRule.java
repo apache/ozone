@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +55,7 @@ public class ContainerSafeModeRule extends
 
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
   private final ContainerManager containerManager;
+  private static final int SAMPLE_CONTAINER_DISPLAY_LIMIT = 5;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
              ConfigurationSource conf,
@@ -139,11 +141,28 @@ public class ContainerSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return String
-        .format(
-            "%% of containers with at least one reported replica (=%1.2f) >= "
-                + "safeModeCutoff (=%1.2f)",
-            getCurrentContainerThreshold(), this.safeModeCutoff);
+    List<Long> sampleContainers = new ArrayList<>();
+    if (!containerMap.isEmpty()) {
+      int count = 0;
+      for (long cId : containerMap.keySet()) {
+        if (count < SAMPLE_CONTAINER_DISPLAY_LIMIT) {
+          sampleContainers.add(cId);
+          count++;
+        }
+      }
+    }
+
+    String status = String.format("%% of containers with at least one reported"
+            + " replica (=%1.2f) >= safeModeCutoff (=%1.2f)",
+        getCurrentContainerThreshold(), this.safeModeCutoff);
+
+    if (!sampleContainers.isEmpty()) {
+      String sampleContainerText =
+          "Sample containers not satisfying the criteria : " + sampleContainers;
+      status = status.concat("\n").concat(sampleContainerText);
+    }
+
+    return status;
   }
 
 

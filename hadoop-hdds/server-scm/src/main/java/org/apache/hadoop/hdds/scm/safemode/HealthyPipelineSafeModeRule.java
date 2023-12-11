@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -56,6 +57,8 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final PipelineManager pipelineManager;
   private final int minHealthyPipelines;
   private final SCMContext scmContext;
+  private Set<PipelineID> pipelineIDSet;
+  private static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
@@ -154,9 +157,13 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   }
 
   private synchronized void initializeRule(boolean refresh) {
-    int pipelineCount = pipelineManager.getPipelines(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        Pipeline.PipelineState.OPEN).size();
+    pipelineIDSet = pipelineManager.getPipelines(RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN).stream()
+        .map(Pipeline::getId)
+        .collect(Collectors.toSet());
+
+    int pipelineCount = pipelineIDSet.size();
 
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
         (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
@@ -193,9 +200,20 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   public String getStatusText() {
-    return String.format("healthy Ratis/THREE pipelines (=%d) >= "
-            + "healthyPipelineThresholdCount (=%d)",
-        getCurrentHealthyPipelineCount(),
+    String status = String.format(
+        "healthy Ratis/THREE pipelines (=%d) >= healthyPipelineThresholdCount" +
+            " (=%d)", getCurrentHealthyPipelineCount(),
         getHealthyPipelineThresholdCount());
+    Set<PipelineID> samplePipelines = pipelineIDSet.stream()
+        .filter(element -> !processedPipelineIDs.contains(element))
+        .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
+        .collect(Collectors.toSet());
+
+    if (!samplePipelines.isEmpty()) {
+      String samplePipelineText =
+          "Sample pipelines not satisfying the criteria : " + samplePipelines;
+      status = status.concat("/n").concat(samplePipelineText);
+    }
+    return status;
   }
 }
