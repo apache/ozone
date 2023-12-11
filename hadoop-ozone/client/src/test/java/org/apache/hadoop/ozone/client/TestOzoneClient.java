@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.jetbrains.annotations.NotNull;
@@ -41,10 +42,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -83,15 +82,14 @@ public class TestOzoneClient {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(String omServiceId)
-          throws IOException {
+      protected OmTransport createOmTransport(String omServiceId) {
         return new MockOmTransport(blkAllocator);
       }
 
       @NotNull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates) throws IOException {
+          ServiceInfoEx serviceInfo) {
         return new MockXceiverClientFactory();
       }
     });
