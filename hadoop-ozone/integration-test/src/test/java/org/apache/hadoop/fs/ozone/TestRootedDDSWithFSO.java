@@ -59,6 +59,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -212,13 +213,9 @@ public class TestRootedDDSWithFSO {
   }
 
   private void checkPath(Path path) {
-    try {
-      fs.getFileStatus(path);
-      fail("testRecursiveDelete failed");
-    } catch (IOException ex) {
-      assertTrue(ex instanceof FileNotFoundException);
-      assertTrue(ex.getMessage().contains("File not found"));
-    }
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
+        fs.getFileStatus(path), "testRecursiveDelete failed");
+    assertTrue(ex.getMessage().contains("File not found"));
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)

@@ -259,7 +259,7 @@ public class TestOzoneFsHAURLs {
                     + " be omitted when ozone.om.service.ids is defined."));
       }
       // Check return value, should be -1 (failure)
-      assertEquals(res, -1);
+      assertEquals(-1, res);
 
       // Test case 4: ozone fs -ls o3fs://bucket.volume.om1/
       // Expectation: Success. The client should use the port number
@@ -303,7 +303,7 @@ public class TestOzoneFsHAURLs {
                 "does not use port information"));
       }
       // Check return value, should be -1 (failure)
-      assertEquals(res, -1);
+      assertEquals(-1, res);
     } finally {
       shell.close();
     }
@@ -329,7 +329,7 @@ public class TestOzoneFsHAURLs {
       // Test case: ozone fs -ls o3fs:///
       // Expectation: Fail. fs.defaultFS is not a qualified o3fs URI.
       int res = ToolRunner.run(shell, new String[] {"-ls", "o3fs:///"});
-      assertEquals(res, -1);
+      assertEquals(-1, res);
     } finally {
       shell.close();
     }

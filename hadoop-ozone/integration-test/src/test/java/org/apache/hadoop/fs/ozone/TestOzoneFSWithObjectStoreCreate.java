@@ -63,6 +63,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -459,13 +460,9 @@ public class TestOzoneFSWithObjectStoreCreate {
   }
 
   private void checkPath(Path path) {
-    try {
-      o3fs.getFileStatus(path);
-      fail("testObjectStoreCreateWithO3fs failed for Path" + path);
-    } catch (IOException ex) {
-      assertTrue(ex instanceof FileNotFoundException);
-      assertTrue(ex.getMessage().contains("No such file or directory"));
-    }
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
+        o3fs.getFileStatus(path), "testObjectStoreCreateWithO3fs failed for Path" + path);
+    assertTrue(ex.getMessage().contains("No such file or directory"));
   }
 
   private void checkAncestors(Path p) throws Exception {
