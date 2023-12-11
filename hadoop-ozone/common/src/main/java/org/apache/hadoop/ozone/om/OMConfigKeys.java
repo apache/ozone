@@ -36,8 +36,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
       "ozone.om.snapshot.load.native.lib";
-  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT
-      = true;
+  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
   public static final String
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
       "ozone.om.snapshot.sst_dumptool.buffer.size";
