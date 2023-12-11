@@ -114,7 +114,7 @@ public class TestReplicationManagerScenarios {
 
   private static List<URI> getTestFiles() throws URISyntaxException {
     File[] fileList = (new File(TestReplicationManagerScenarios.class
-        .getClass().getResource(TEST_RESOURCE_PATH)
+        .getResource(TEST_RESOURCE_PATH)
         .toURI())).listFiles();
     if (fileList == null) {
       Assertions.fail("No test file resources found");
@@ -154,8 +154,7 @@ public class TestReplicationManagerScenarios {
       Set<String> names = new HashSet<>();
       for (Scenario scenario : scenarios) {
         if (!names.add(scenario.getDescription())) {
-          Assertions.fail("Duplicate test name: " + scenario.getDescription() +
-              " in file: " + file);
+          Assertions.fail("Duplicate test name: " + scenario.getDescription() + " in file: " + file);
         }
         scenario.setResourceName(file.toString());
       }
@@ -172,10 +171,8 @@ public class TestReplicationManagerScenarios {
     scmContext = Mockito.mock(SCMContext.class);
     nodeManager = Mockito.mock(NodeManager.class);
 
-    ratisPlacementPolicy = ReplicationTestUtil
-        .getSimpleTestPlacementPolicy(nodeManager, configuration);
-    ecPlacementPolicy = ReplicationTestUtil
-        .getSimpleTestPlacementPolicy(nodeManager, configuration);
+    ratisPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
+    ecPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
 
     commandsSent = new HashSet<>();
     eventPublisher = Mockito.mock(EventPublisher.class);
@@ -187,15 +184,13 @@ public class TestReplicationManagerScenarios {
 
     legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
 
-    Mockito.when(containerManager
-        .getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
-            invocation -> {
-              ContainerID cid = invocation.getArgument(0);
-              return containerReplicaMap.get(cid);
-            });
+    Mockito.when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
+        invocation -> {
+          ContainerID cid = invocation.getArgument(0);
+          return containerReplicaMap.get(cid);
+        });
 
     Mockito.when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
@@ -203,8 +198,7 @@ public class TestReplicationManagerScenarios {
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
-          return NODE_STATUS_MAP.getOrDefault(dn,
-              NodeStatus.inServiceHealthy());
+          return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
         });
 
     final HashMap<SCMCommandProto.Type, Integer> countMap = new HashMap<>();
@@ -258,12 +252,10 @@ public class TestReplicationManagerScenarios {
   private void loadPendingOps(ContainerInfo container, Scenario scenario) {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
-        containerReplicaPendingOps.scheduleAddReplica(
-            container.containerID(), r.getDatanodeDetails(),
+        containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
             r.getReplicaIndex(), Long.MAX_VALUE);
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        containerReplicaPendingOps.scheduleDeleteReplica(
-            container.containerID(), r.getDatanodeDetails(),
+        containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
             r.getReplicaIndex(), Long.MAX_VALUE);
       }
     }
@@ -274,8 +266,7 @@ public class TestReplicationManagerScenarios {
   public void testAllScenarios(Scenario scenario) throws IOException {
     ReplicationManager.ReplicationManagerConfiguration conf =
         new ReplicationManager.ReplicationManagerConfiguration();
-    conf.setMaintenanceRemainingRedundancy(
-        scenario.getEcMaintenanceRedundancy());
+    conf.setMaintenanceRemainingRedundancy(scenario.getEcMaintenanceRedundancy());
     conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
     configuration.setFromObject(conf);
     replicationManager = createReplicationManager();
@@ -298,12 +289,10 @@ public class TestReplicationManagerScenarios {
     // Check the results in the report and queue against the expected results.
     assertExpectations(scenario, repReport);
     Expectation expectation = scenario.getExpectation();
-    Assertions.assertEquals(expectation.getUnderReplicatedQueue(),
-        repQueue.underReplicatedQueueSize(), "Test: "
-            + scenario + ": Unexpected count for underReplicatedQueue");
-    Assertions.assertEquals(expectation.getOverReplicatedQueue(),
-        repQueue.overReplicatedQueueSize(), "Test: "
-            + scenario + ": Unexpected count for overReplicatedQueue");
+    Assertions.assertEquals(expectation.getUnderReplicatedQueue(), repQueue.underReplicatedQueueSize(),
+        "Test: " + scenario + ": Unexpected count for underReplicatedQueue");
+    Assertions.assertEquals(expectation.getOverReplicatedQueue(), repQueue.overReplicatedQueueSize(),
+        "Test: " + scenario + ": Unexpected count for overReplicatedQueue");
 
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
@@ -316,11 +305,9 @@ public class TestReplicationManagerScenarios {
     // Now run the replication manager execute phase, where we expect commands
     // to be sent to fix the under and over replicated containers.
     if (repQueue.underReplicatedQueueSize() > 0) {
-      replicationManager.processUnderReplicatedContainer(
-          repQueue.dequeueUnderReplicatedContainer());
+      replicationManager.processUnderReplicatedContainer(repQueue.dequeueUnderReplicatedContainer());
     } else if (repQueue.overReplicatedQueueSize() > 0) {
-      replicationManager.processOverReplicatedContainer(
-          repQueue.dequeueOverReplicatedContainer());
+      replicationManager.processOverReplicatedContainer(repQueue.dequeueOverReplicatedContainer());
     }
     assertExpectedCommands(scenario, scenario.getCommands());
   }
@@ -330,9 +317,8 @@ public class TestReplicationManagerScenarios {
     Expectation expectation = scenario.getExpectation();
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(expectation.getExpected(state),
-          report.getStat(state), "Test: "
-              + scenario + ": Unexpected count for " + state);
+      Assertions.assertEquals(expectation.getExpected(state), report.getStat(state),
+          "Test: " + scenario + ": Unexpected count for " + state);
     }
   }
 
@@ -351,10 +337,8 @@ public class TestReplicationManagerScenarios {
           DatanodeDetails targetDatanode = expectedCommand.getTargetDatanode();
           if (targetDatanode != null) {
             // We need to assert against the command the datanode is sent to
-            DatanodeDetails commandDatanode =
-                findDatanodeFromUUID(command.getKey());
-            if (commandDatanode != null && commandDatanode.equals(
-                targetDatanode)) {
+            DatanodeDetails commandDatanode = findDatanodeFromUUID(command.getKey());
+            if (commandDatanode != null && commandDatanode.equals(targetDatanode)) {
               found = true;
               commandsSent.remove(command);
               break;
@@ -367,8 +351,7 @@ public class TestReplicationManagerScenarios {
           }
         }
       }
-      Assertions.assertTrue(found, "Test: " + scenario
-          + ": Expected command not sent: " + expectedCommand.getType());
+      Assertions.assertTrue(found, "Test: " + scenario + ": Expected command not sent: " + expectedCommand.getType());
     }
   }
 
@@ -386,15 +369,13 @@ public class TestReplicationManagerScenarios {
    * created by deserializing JSON files.
    */
   public static class TestReplica {
-    private ContainerReplicaProto.State state
-        = ContainerReplicaProto.State.CLOSED;
+    private ContainerReplicaProto.State state = ContainerReplicaProto.State.CLOSED;
     private long containerId = 1;
     // This is a string identifier for a datanode that can be referenced in
     // test expectations and commands. The real datanode will be generated.
     private String datanode;
     private DatanodeDetails datanodeDetails;
-    private HddsProtos.NodeOperationalState operationalState
-        = HddsProtos.NodeOperationalState.IN_SERVICE;
+    private HddsProtos.NodeOperationalState operationalState = HddsProtos.NodeOperationalState.IN_SERVICE;
     private HddsProtos.NodeState healthState = HddsProtos.NodeState.HEALTHY;
 
     private int index = 0;
@@ -447,8 +428,7 @@ public class TestReplicationManagerScenarios {
     }
 
     public void setOperationalState(String operationalState) {
-      this.operationalState = HddsProtos.NodeOperationalState.valueOf(
-          operationalState.toUpperCase());
+      this.operationalState = HddsProtos.NodeOperationalState.valueOf(operationalState.toUpperCase());
     }
 
     public String getOrigin() {
@@ -469,12 +449,10 @@ public class TestReplicationManagerScenarios {
     public ContainerReplica buildContainerReplica() {
       createDatanodeDetails();
       createOrigin();
-      NODE_STATUS_MAP.put(datanodeDetails,
-          new NodeStatus(operationalState, healthState));
+      NODE_STATUS_MAP.put(datanodeDetails, new NodeStatus(operationalState, healthState));
       datanodeDetails.setPersistedOpState(operationalState);
 
-      ContainerReplica.ContainerReplicaBuilder builder =
-          new ContainerReplica.ContainerReplicaBuilder();
+      ContainerReplica.ContainerReplicaBuilder builder = new ContainerReplica.ContainerReplicaBuilder();
       return builder.setReplicaIndex(index)
           .setContainerID(new ContainerID(containerId))
           .setContainerState(state)
@@ -516,49 +494,40 @@ public class TestReplicationManagerScenarios {
    */
   public static class Expectation {
 
-    private Map<ReplicationManagerReport.HealthState, Integer> stateCounts
-        = new HashMap<>();
+    private Map<ReplicationManagerReport.HealthState, Integer> stateCounts = new HashMap<>();
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
     private void setUnderReplicated(int underReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          underReplicated);
+      stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED, underReplicated);
     }
 
     private void setOverReplicated(int overReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED,
-          overReplicated);
+      stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED, overReplicated);
     }
 
     private void setMisReplicated(int misReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED,
-          misReplicated);
+      stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED, misReplicated);
     }
 
     private void setUnhealthy(int unhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY,
-          unhealthy);
+      stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY, unhealthy);
     }
 
     private void setMissing(int missing) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MISSING,
-          missing);
+      stateCounts.put(ReplicationManagerReport.HealthState.MISSING, missing);
     }
 
     private void setEmpty(int empty) {
-      stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,
-          empty);
+      stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,  empty);
     }
 
     private void setQuasiClosedStuck(int quasiClosedStuck) {
-      stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK,
-          quasiClosedStuck);
+      stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
     }
 
     private void setOpenUnhealthy(int openUnhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
-          openUnhealthy);
+      stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
     public int getExpected(ReplicationManagerReport.HealthState state) {
@@ -601,8 +570,7 @@ public class TestReplicationManagerScenarios {
       }
       DatanodeDetails datanodeDetails = DATANODE_ALIASES.get(this.datanode);
       if (datanodeDetails == null) {
-        Assertions.fail("Unable to find a datanode for the alias: " + datanode
-            + " in the expected commands.");
+        Assertions.fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
       }
       return datanodeDetails;
     }
@@ -658,8 +626,7 @@ public class TestReplicationManagerScenarios {
     private String resourceName;
     private int ecMaintenanceRedundancy;
     private int ratisMaintenanceMinimum;
-    private HddsProtos.LifeCycleState containerState =
-        HddsProtos.LifeCycleState.CLOSED;
+    private HddsProtos.LifeCycleState containerState = HddsProtos.LifeCycleState.CLOSED;
     private long used = 10;
     private long keys = 10;
     private long id = 1;
@@ -778,20 +745,17 @@ public class TestReplicationManagerScenarios {
       String[] parts = replicationConfig.split(":");
       if (parts.length != 2) {
         throw new IllegalArgumentException(
-            "Replication config should be in the format of \"type:factor\". " +
-            " Eg RATIS:THREE");
+            "Replication config should be in the format of \"type:factor\". Eg RATIS:THREE");
       }
       switch (parts[0].toUpperCase()) {
       case "RATIS":
-        this.replicationConfig = RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.valueOf(parts[1]));
+        this.replicationConfig = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.valueOf(parts[1]));
         break;
       case "EC":
         this.replicationConfig = new ECReplicationConfig(parts[1]);
         break;
       default:
-        throw new IllegalArgumentException(
-            "Unknown replication type: " + parts[0]);
+        throw new IllegalArgumentException("Unknown replication type: " + parts[0]);
       }
     }
 
