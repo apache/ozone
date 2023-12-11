@@ -175,7 +175,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public abstract class TestOzoneRpcClientAbstract {
 
   private static MiniOzoneCluster cluster = null;
-  protected static OzoneClient ozClient = null;
+  private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
   private static OzoneManager ozoneManager;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
@@ -268,6 +268,13 @@ public abstract class TestOzoneRpcClientAbstract {
     TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
+  public static OzoneClient getClient() {
+    return TestOzoneRpcClientAbstract.ozClient;
+  }
+
+  public static MiniOzoneCluster getCluster() {
+    return TestOzoneRpcClientAbstract.cluster;
+  }
   /**
    * Test OM Proxy Provider.
    */

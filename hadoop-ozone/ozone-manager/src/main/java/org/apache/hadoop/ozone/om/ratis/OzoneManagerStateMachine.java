@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
@@ -113,6 +114,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   // conf/metadata entries which are received through notifyIndexUpdate.
   private ConcurrentMap<Long, Long> ratisTransactionMap =
       new ConcurrentSkipListMap<>();
+  private OzoneManagerStateMachineMetrics metrics;
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
@@ -139,6 +141,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.metrics = OzoneManagerStateMachineMetrics.create();
   }
 
   /**
@@ -364,6 +367,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       CompletableFuture<Message> ratisFuture =
           new CompletableFuture<>();
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
+      metrics.incrApplyTransactionMapSize();
 
       //if there are too many pending requests, wait for doubleBuffer flushing
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
@@ -650,17 +654,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         if (flushedTrans.contains(i)) {
           appliedIndex = i;
           final Long removed = applyTransactionMap.remove(i);
+          metrics.decrApplyTransactionMapSize();
           appliedTerm = removed;
           flushedTrans.remove(i);
         } else if (ratisTransactionMap.containsKey(i)) {
           final Long removed = ratisTransactionMap.remove(i);
           appliedTerm = removed;
           appliedIndex = i;
+          metrics.decrRatisTransactionMapSize();
         } else {
           // Add remaining which are left in flushedEpochs to
           // ratisTransactionMap to be considered further.
           for (long epoch : flushedTrans) {
             ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
+            metrics.decrApplyTransactionMapSize();
+            metrics.incrRatisTransactionMapSize();
           }
           if (LOG.isDebugEnabled()) {
             if (!flushedTrans.isEmpty()) {
@@ -687,6 +695,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         }
       } else {
         ratisTransactionMap.put(lastFlushedIndex, currentTerm);
+        metrics.incrRatisTransactionMapSize();
         if (LOG.isDebugEnabled()) {
           LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex " +
               "added to map. Passed Term {} index {}, where as lastApplied " +
@@ -738,8 +747,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
+  public OzoneManagerRequestHandler getHandler() {
+    return (OzoneManagerRequestHandler) this.handler;
+  }
+
+  @VisibleForTesting
   public void setRaftGroupId(RaftGroupId raftGroupId) {
     this.raftGroupId = raftGroupId;
+  }
+
+  @VisibleForTesting
+  public OzoneManagerStateMachineMetrics getMetrics() {
+    return this.metrics;
   }
 
   public void stop() {
@@ -758,11 +777,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           ratisTransactionMap.keySet().stream().map(Object::toString)
             .collect(Collectors.joining(",")));
     }
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @VisibleForTesting
   void addApplyTransactionTermIndex(long term, long index) {
     applyTransactionMap.put(index, term);
+    metrics.incrApplyTransactionMapSize();
   }
 
   /**

@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -171,6 +172,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private FaultInjector injector;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -387,22 +389,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return responseBuilder.build();
   }
 
-  @VisibleForTesting
-  public static int handle_write_sleep = 0;
-
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) throws IOException {
-    
-    if (handle_write_sleep > 0) {
-      // Only for test purpose
-      try {
-        Thread.sleep(handle_write_sleep);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-
+    injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
@@ -423,6 +413,27 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public void updateDoubleBuffer(OzoneManagerDoubleBuffer omDoubleBuffer) {
     this.ozoneManagerDoubleBuffer = omDoubleBuffer;
+  }
+
+  @VisibleForTesting
+  public void setInjector(FaultInjector injector) {
+    this.injector = injector;
+  }
+
+  @VisibleForTesting
+  public FaultInjector getInjector() {
+    return injector;
+  }
+
+  /**
+   * Inject pause for test only.
+   *
+   * @throws IOException
+   */
+  private void injectPause() throws IOException {
+    if (injector != null) {
+      injector.pause();
+    }
   }
 
   private DBUpdatesResponse getOMDBUpdates(
