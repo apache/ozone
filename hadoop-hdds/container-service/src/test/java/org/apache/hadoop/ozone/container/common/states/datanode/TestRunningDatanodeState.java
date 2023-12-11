@@ -57,7 +57,7 @@ public class TestRunningDatanodeState {
     state.setExecutorCompletionService(ecs);
 
     for (int i = 0; i < threadPoolSize; i++) {
-      stateMachines.add(new EndpointStateMachine(null, null, null));
+      stateMachines.add(new EndpointStateMachine(null, null, null, ""));
     }
 
     CompletableFuture<EndpointStateMachine.EndPointStates> futureOne =

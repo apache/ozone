@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.ratis.helpers.DoubleBufferEntry;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
@@ -59,6 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
@@ -109,6 +111,8 @@ public final class OzoneManagerDoubleBuffer {
   private final Semaphore unFlushedTransactions;
   private final FlushNotifier flushNotifier;
   private final String threadPrefix;
+  private final S3SecretManager s3SecretManager;
+
   /**
    * function which will get term associated with the transaction index.
    */
@@ -125,6 +129,7 @@ public final class OzoneManagerDoubleBuffer {
     private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
+    private S3SecretManager s3SecretManager;
     private String threadPrefix = "";
 
 
@@ -169,6 +174,11 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
+    public Builder setS3SecretManager(S3SecretManager s3SecretManager) {
+      this.s3SecretManager = s3SecretManager;
+      return this;
+    }
+
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
         Preconditions.checkNotNull(rs, "When ratis is enabled, " +
@@ -185,7 +195,7 @@ public final class OzoneManagerDoubleBuffer {
 
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
           isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount,
-          flushNotifier, threadPrefix);
+          flushNotifier, s3SecretManager, threadPrefix);
     }
   }
 
@@ -194,7 +204,8 @@ public final class OzoneManagerDoubleBuffer {
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
       Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
-      FlushNotifier flushNotifier, String threadPrefix) {
+      FlushNotifier flushNotifier, S3SecretManager s3SecretManager,
+      String threadPrefix) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
@@ -216,6 +227,7 @@ public final class OzoneManagerDoubleBuffer {
     daemon = new Daemon(this::flushTransactions);
     daemon.setName(threadPrefix + "OMDoubleBufferFlushThread");
     daemon.start();
+    this.s3SecretManager = s3SecretManager;
   }
 
   /**
@@ -516,6 +528,10 @@ public final class OzoneManagerDoubleBuffer {
     cleanupEpochs.forEach((tableName, epochs) -> {
       Collections.sort(epochs);
       omMetadataManager.getTable(tableName).cleanupCache(epochs);
+      // Check if the table is S3SecretTable, if yes, then clear the cache.
+      if (tableName.equals(S3_SECRET_TABLE.getName())) {
+        s3SecretManager.clearS3Cache(epochs);
+      }
     });
   }
 

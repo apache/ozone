@@ -37,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
@@ -137,10 +138,11 @@ public class NSSummaryTask implements ReconOmTask {
         .reprocessWithOBS(reconOMMetadataManager));
 
     List<Future<Boolean>> results;
-    ExecutorService executorService = Executors
-        .newFixedThreadPool(3,
-            new ThreadFactoryBuilder().setNameFormat("NSSummaryTask - %d")
-                .build());
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat("Recon-NSSummaryTask-%d")
+        .build();
+    ExecutorService executorService = Executors.newFixedThreadPool(2,
+        threadFactory);
     try {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {

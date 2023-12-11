@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.Assume;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -250,7 +250,7 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
 
-    Assume.assumeTrue(healthyNodes.size() == 8);
+    Assumptions.assumeTrue(healthyNodes.size() == 8);
 
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
 

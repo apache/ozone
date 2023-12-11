@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Interface to manager s3 secret.
@@ -61,6 +62,11 @@ public interface S3SecretManager {
   void revokeSecret(String kerberosId) throws IOException;
 
   /**
+   * Clear s3 secret cache when double buffer is flushed to the DB.
+   */
+  void clearS3Cache(List<Long> epochs);
+
+  /**
    * Apply provided action under write lock.
    * @param lockId lock identifier.
    * @param action custom action.
@@ -96,6 +102,7 @@ public interface S3SecretManager {
   default void updateCache(String accessId, S3SecretValue secret) {
     S3SecretCache cache = cache();
     if (cache != null) {
+      LOG.info("Updating cache for accessId/user: {}.", accessId);
       cache.put(accessId, secret);
     }
   }
@@ -106,4 +113,12 @@ public interface S3SecretManager {
       cache.invalidate(id);
     }
   }
+
+  default void clearCache(List<Long> flushedTransactionIds) {
+    S3SecretCache cache = cache();
+    if (cache != null) {
+      cache.clearCache(flushedTransactionIds);
+    }
+  }
+
 }

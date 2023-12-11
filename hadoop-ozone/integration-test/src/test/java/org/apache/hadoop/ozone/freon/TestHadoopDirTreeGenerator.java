@@ -21,6 +21,8 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -111,25 +113,25 @@ public class TestHadoopDirTreeGenerator {
       out.close();
 
       verifyDirTree("vol1", "bucket1", 1,
-              1, 1, 0);
+              1, 1, "0");
       verifyDirTree("vol2", "bucket1", 1,
-              5, 1, 5);
+              5, 1, "5B");
       verifyDirTree("vol3", "bucket1", 2,
-              5, 3, 1);
+              5, 3, "1B");
       verifyDirTree("vol4", "bucket1", 3,
-              2, 4, 2);
+              2, 4, "2B");
       verifyDirTree("vol5", "bucket1", 5,
-              4, 1, 0);
+              4, 1, "0");
       // default page size is Constants.LISTING_PAGE_SIZE = 1024
       verifyDirTree("vol6", "bucket1", 2,
-              1, 1100, 0);
+              1, 1100, "0");
     } finally {
       shutdown();
     }
   }
 
   private void verifyDirTree(String volumeName, String bucketName, int depth,
-                             int span, int fileCount, int perFileSizeInBytes)
+                             int span, int fileCount, String perFileSize)
           throws IOException {
 
     store.createVolume(volumeName);
@@ -140,7 +142,7 @@ public class TestHadoopDirTreeGenerator {
     new Freon().execute(
         new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
             fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
-                     "-g", perFileSizeInBytes + ""});
+            "-g", perFileSize});
     // verify the directory structure
     LOG.info("Started verifying the directory structure...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
@@ -152,8 +154,9 @@ public class TestHadoopDirTreeGenerator {
       // verify the num of peer directories, expected span count is 1
       // as it has only one dir at root.
       verifyActualSpan(1, fileStatuses);
-      int actualDepth = traverseToLeaf(fileSystem, fileStatus.getPath(),
-              1, depth, span, fileCount, perFileSizeInBytes);
+      int actualDepth =
+          traverseToLeaf(fileSystem, fileStatus.getPath(), 1, depth, span,
+              fileCount, StorageSize.parse(perFileSize, StorageUnit.BYTES));
       Assert.assertEquals("Mismatch depth in a path",
               depth, actualDepth);
     }
@@ -161,7 +164,7 @@ public class TestHadoopDirTreeGenerator {
 
   private int traverseToLeaf(FileSystem fs, Path dirPath, int depth,
                              int expectedDepth, int expectedSpanCnt,
-                             int expectedFileCnt, int perFileSizeInBytes)
+                             int expectedFileCnt, StorageSize perFileSize)
           throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(dirPath);
     // check the num of peer directories except root and leaf as both
@@ -175,10 +178,10 @@ public class TestHadoopDirTreeGenerator {
       if (fileStatus.isDirectory()) {
         ++depth;
         return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
-                expectedSpanCnt, expectedFileCnt, perFileSizeInBytes);
+                expectedSpanCnt, expectedFileCnt, perFileSize);
       } else {
-        Assert.assertEquals("Mismatches file len",
-                perFileSizeInBytes, fileStatus.getLen());
+        Assert.assertEquals("Mismatches file len", perFileSize.toBytes(),
+            fileStatus.getLen());
         String fName = fileStatus.getPath().getName();
         Assert.assertFalse("actualNumFiles:" + actualNumFiles +
                         ", fName:" + fName + ", expectedFileCnt:" +

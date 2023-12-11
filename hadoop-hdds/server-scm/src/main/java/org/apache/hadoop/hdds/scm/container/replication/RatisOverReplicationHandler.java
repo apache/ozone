@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -34,11 +33,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -165,13 +161,6 @@ public class RatisOverReplicationHandler
         sortReplicas(replicaCount.getReplicas(),
             replicaCount.getHealthyReplicaCount() == 0);
 
-    // retain one replica per unique origin datanode if the container is not
-    // closed
-    if (replicaCount.getContainer().getState() !=
-        HddsProtos.LifeCycleState.CLOSED) {
-      saveReplicasWithUniqueOrigins(eligibleReplicas);
-    }
-
     Set<DatanodeDetails> pendingDeletion = new HashSet<>();
     // collect the DNs that are going to have their container replica deleted
     for (ContainerReplicaOp op : pendingOps) {
@@ -187,6 +176,14 @@ public class RatisOverReplicationHandler
             HddsProtos.NodeOperationalState.IN_SERVICE ||
             pendingDeletion.contains(replica.getDatanodeDetails()));
 
+    // retain one replica per unique origin datanode if the container is not
+    // closed
+    if (replicaCount.getContainer().getState() !=
+        HddsProtos.LifeCycleState.CLOSED) {
+      saveReplicasWithUniqueOrigins(replicaCount.getContainer(),
+          eligibleReplicas);
+    }
+
     return eligibleReplicas;
   }
 
@@ -199,29 +196,26 @@ public class RatisOverReplicationHandler
    * @param eligibleReplicas List of replicas that are eligible to be deleted
    * and from which replicas with unique origin node ID need to be saved
    */
-  private void saveReplicasWithUniqueOrigins(
+  private void saveReplicasWithUniqueOrigins(ContainerInfo container,
       List<ContainerReplica> eligibleReplicas) {
-    final Map<UUID, ContainerReplica> uniqueOrigins = new LinkedHashMap<>();
-    eligibleReplicas.stream()
-        // get unique origin nodes of healthy replicas
-        .filter(r -> r.getState() != ContainerReplicaProto.State.UNHEALTHY)
-        .forEach(r -> uniqueOrigins.putIfAbsent(r.getOriginDatanodeId(), r));
-
-    /*
-     Now that we've checked healthy replicas, see if some unhealthy replicas
-     need to be saved. For example, in the case of {QUASI_CLOSED,
-     QUASI_CLOSED, QUASI_CLOSED, UNHEALTHY}, if both the first and last
-     replicas have the same origin node ID (and no other replicas have it), we
-     prefer saving the QUASI_CLOSED replica and deleting the UNHEALTHY one.
-     */
-    for (ContainerReplica replica : eligibleReplicas) {
-      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        uniqueOrigins.putIfAbsent(replica.getOriginDatanodeId(), replica);
-      }
-    }
+    List<ContainerReplica> nonUniqueDeleteCandidates =
+        ReplicationManagerUtil.findNonUniqueDeleteCandidates(
+            new HashSet<>(eligibleReplicas),
+            eligibleReplicas, (dnd) -> {
+              try {
+                return replicationManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                LOG.warn(
+                    "Exception while finding excess unhealthy replicas to " +
+                        "delete for container {} with eligible replicas {}.",
+                    container, eligibleReplicas, e);
+                return null;
+              }
+            });
 
     // note that this preserves order of the List
-    eligibleReplicas.removeAll(uniqueOrigins.values());
+    eligibleReplicas.removeIf(
+        replica -> !nonUniqueDeleteCandidates.contains(replica));
   }
 
   /**
@@ -237,7 +231,7 @@ public class RatisOverReplicationHandler
       // prefer deleting replicas with lower sequence IDs
       return replicas.stream()
           .sorted(Comparator.comparingLong(ContainerReplica::getSequenceId)
-              .reversed())
+              .thenComparing(ContainerReplica::hashCode))
           .collect(Collectors.toList());
     }
 

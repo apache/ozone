@@ -45,7 +45,7 @@ import org.apache.ratis.util.ExitUtils;
 /**
  * Interface used for MiniOzoneClusters.
  */
-public interface MiniOzoneCluster {
+public interface MiniOzoneCluster extends AutoCloseable {
 
   /**
    * Returns the Builder to construct MiniOzoneCluster.
@@ -259,6 +259,10 @@ public interface MiniOzoneCluster {
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
    */
   void shutdown();
+
+  default void close() {
+    shutdown();
+  }
 
   /**
    * Stop the MiniOzoneCluster without any cleanup.

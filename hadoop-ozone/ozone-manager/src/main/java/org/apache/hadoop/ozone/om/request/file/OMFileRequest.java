@@ -58,6 +58,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -621,7 +622,7 @@ public final class OMFileRequest {
   }
 
   /**
-   * Gets OmKeyInfo if exists for the given key name in the DB.
+   * Gets OmKeyInfo if exists and validate bucket and volume.
    *
    * @param omMetadataMgr metadata manager
    * @param volumeName    volume name
@@ -637,8 +638,34 @@ public final class OMFileRequest {
       String volumeName, String bucketName, String keyName,
       long scmBlockSize, ReplicationConfig defaultReplication
   ) throws IOException {
+    return getOMKeyInfoIfExists(omMetadataMgr, volumeName, bucketName, keyName,
+        scmBlockSize, defaultReplication, true);
+  }
 
-    OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
+
+  /**
+   * Gets OmKeyInfo if exists for the given key name in the DB.
+   *
+   * @param omMetadataMgr metadata manager
+   * @param volumeName    volume name
+   * @param bucketName    bucket name
+   * @param keyName       key name
+   * @param scmBlockSize  scm block size
+   * @param validateBucketAndVolume true if the volume/bucket needs validating.
+   * @return OzoneFileStatus
+   * @throws IOException DB failure
+   */
+  @Nullable
+  public static OzoneFileStatus getOMKeyInfoIfExists(
+      OMMetadataManager omMetadataMgr,
+      String volumeName, String bucketName, String keyName,
+      long scmBlockSize, ReplicationConfig defaultReplication,
+      boolean validateBucketAndVolume
+  ) throws IOException {
+
+    if (validateBucketAndVolume) {
+      OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
+    }
 
     Path keyPath = Paths.get(keyName);
     Iterator<Path> elements = keyPath.iterator();
@@ -664,7 +691,10 @@ public final class OMFileRequest {
 
       if (omDirInfo != null) {
         lastKnownParentId = omDirInfo.getObjectID();
-      } else if (!elements.hasNext()) {
+      } else if (!elements.hasNext() && 
+          (!keyName.endsWith(PATH_SEPARATOR_STR))) {
+        // If the requested keyName contains "/" at the end then we need to
+        // just check the directory table.
         // reached last path component. Check file exists for the given path.
         OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataMgr, dbNodeName, keyName);

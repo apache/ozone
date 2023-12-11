@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -39,11 +42,16 @@ public class ContainerHealthStatus {
   private int replicaDelta;
   private Set<ContainerReplica> healthyReplicas;
   private ContainerPlacementStatus placementStatus;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private int numReplicas;
+  private long numKeys;
 
   ContainerHealthStatus(ContainerInfo container,
                         Set<ContainerReplica> healthyReplicas,
-                        PlacementPolicy placementPolicy) {
+                        PlacementPolicy placementPolicy,
+                        ReconContainerMetadataManager
+                            reconContainerMetadataManager) {
+    this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
     this.healthyReplicas = healthyReplicas
@@ -54,6 +62,7 @@ public class ContainerHealthStatus {
     this.replicaDelta = repFactor - this.healthyReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
     this.numReplicas = healthyReplicas.size();
+    this.numKeys = getContainerKeyCount(container.getContainerID());
   }
 
   public long getContainerID() {
@@ -117,11 +126,28 @@ public class ContainerHealthStatus {
     return numReplicas == 0;
   }
 
+  public boolean isEmpty() {
+    return numKeys == 0;
+  }
+
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
     List<DatanodeDetails> dns = healthyReplicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
     return policy.validateContainerPlacement(dns, repFactor);
+  }
+
+  private long getContainerKeyCount(long containerID) {
+    try {
+      return reconContainerMetadataManager.getKeyCountForContainer(
+          containerID);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public long getNumKeys() {
+    return numKeys;
   }
 }

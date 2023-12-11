@@ -58,13 +58,14 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private int maxQueueSize;
 
   public DeleteContainerCommandHandler(
-      int threadPoolSize, Clock clock, int queueSize) {
+      int threadPoolSize, Clock clock, int queueSize, String threadNamePrefix) {
     this(clock, new ThreadPoolExecutor(
-        threadPoolSize, threadPoolSize,
-        0L, TimeUnit.MILLISECONDS,
-        new LinkedBlockingQueue<>(queueSize),
-        new ThreadFactoryBuilder()
-            .setNameFormat("DeleteContainerThread-%d").build()),
+            threadPoolSize, threadPoolSize,
+            0L, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(queueSize),
+            new ThreadFactoryBuilder()
+                .setNameFormat(threadNamePrefix + "DeleteContainerThread-%d")
+                .build()),
         queueSize);
   }
 

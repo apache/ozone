@@ -179,8 +179,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   @Override
   public void connect() throws Exception {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Connecting to pipeline:{} datanode:{}", getPipeline().getId(),
-          RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
+      LOG.debug("Connecting to pipeline:{} leaderDatanode:{}, " +
+          "primaryDatanode:{}", getPipeline().getId(),
+          RatisHelper.toRaftPeerId(pipeline.getLeaderNode()),
+          RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
     if (!client.compareAndSet(null,
@@ -286,9 +288,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       Preconditions.checkState(updated >= index);
       return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);
     } catch (Exception e) {
-      Throwable t = HddsClientUtils.checkForException(e);
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
-      if (t instanceof GroupMismatchException) {
+      Throwable t =
+          HddsClientUtils.containsException(e, GroupMismatchException.class);
+      if (t != null) {
         throw e;
       }
       final RaftClientReply reply = getClient().async()

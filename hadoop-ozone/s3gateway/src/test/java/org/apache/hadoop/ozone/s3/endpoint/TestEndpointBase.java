@@ -24,16 +24,19 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.Assert;
-import org.junit.Test;
 
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test methods of the EndpointBase.
@@ -64,13 +67,13 @@ public class TestEndpointBase {
 
     Map<String, String> filteredCustomMetadata =
             endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
-    Assert.assertTrue(filteredCustomMetadata.containsKey("custom-key1"));
-    Assert.assertEquals(
+    assertTrue(filteredCustomMetadata.containsKey("custom-key1"));
+    assertEquals(
             "custom-value1", filteredCustomMetadata.get("custom-key1"));
-    Assert.assertTrue(filteredCustomMetadata.containsKey("custom-key2"));
-    Assert.assertEquals(
+    assertTrue(filteredCustomMetadata.containsKey("custom-key2"));
+    assertEquals(
             "custom-value2", filteredCustomMetadata.get("custom-key2"));
-    Assert.assertFalse(
+    assertFalse(
             filteredCustomMetadata.containsKey(OzoneConsts.GDPR_FLAG));
   }
 
@@ -94,13 +97,11 @@ public class TestEndpointBase {
       public void init() { }
     };
 
-    try {
-      endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
-      Assert.fail("getCustomMetadataFromHeaders should fail. " +
-          "Expected OS3Exception not thrown");
-    } catch (OS3Exception ex) {
-      Assert.assertTrue(ex.getCode().contains("MetadataTooLarge"));
-    }
+    OS3Exception e = assertThrows(OS3Exception.class, () -> endpointBase
+        .getCustomMetadataFromHeaders(s3requestHeaders),
+        "getCustomMetadataFromHeaders should fail." +
+            " Expected OS3Exception not thrown");
+    assertTrue(e.getCode().contains("MetadataTooLarge"));
   }
 
 }

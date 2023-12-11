@@ -28,8 +28,8 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -74,7 +74,7 @@ public class TestKeyInputStreamEC {
         null, true,  null, mockStreamFactory)) {
       byte[] buf = new byte[100];
       int readBytes = kis.read(buf, 0, 100);
-      Assert.assertEquals(100, readBytes);
+      Assertions.assertEquals(100, readBytes);
     }
   }
 

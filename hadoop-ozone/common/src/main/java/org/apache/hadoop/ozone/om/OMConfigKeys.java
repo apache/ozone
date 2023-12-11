@@ -160,7 +160,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK =
       "ozone.om.open.mpu.parts.cleanup.limit.per.task";
   public static final int OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK_DEFAULT =
-      0;
+      1000;
 
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
@@ -586,4 +586,8 @@ public final class OMConfigKeys {
 
   public static final boolean OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT
       = true;
+
+  public static final String OZONE_OM_MAX_BUCKET =
+      "ozone.om.max.buckets";
+  public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
 }

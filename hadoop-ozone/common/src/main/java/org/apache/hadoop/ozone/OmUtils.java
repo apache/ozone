@@ -248,6 +248,7 @@ public final class OmUtils {
     case GetFileStatus:
     case LookupFile:
     case ListStatus:
+    case ListStatusLight:
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:
@@ -271,6 +272,7 @@ public final class OmUtils {
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
+    case GetSnapshotInfo:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -811,39 +813,29 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-
-  public static String format(List<ServiceInfo> nodes, int port,
-                              String leaderId) {
-    StringBuilder sb = new StringBuilder();
+  
+  public static List<List<String>> format(
+          List<ServiceInfo> nodes, int port, String leaderId) {
+    List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
         .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
-    int count = 0;
     for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role =
-            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
-                "FOLLOWER";
-        sb.append(
-            String.format(
-                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
-                info.getHostname(),
-                info.getOmRoleInfo().getNodeId(),
-                port,
-                role
-            ));
-        count++;
+        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
+                      ? "LEADER" : "FOLLOWER";
+        List<String> omInfo = new ArrayList<>();
+        omInfo.add(info.getHostname());
+        omInfo.add(info.getOmRoleInfo().getNodeId());
+        omInfo.add(String.valueOf(port));
+        omInfo.add(role);
+        omInfoList.add(omInfo);
       }
     }
-    // Print Stand-alone if only one OM exists
-    if (count == 1) {
-      return "STANDALONE";
-    } else {
-      return sb.toString();
-    }
+    return omInfoList;
   }
 
   /**

@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -107,6 +108,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
@@ -378,7 +380,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     setStore(loadDB(conf, dir, name, true,
         java.util.Optional.of(Boolean.TRUE), Optional.empty()));
-    initializeOmTables(false);
+    initializeOmTables(CacheType.PARTIAL_CACHE, false);
   }
 
 
@@ -411,7 +413,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE),
           Optional.of(maxOpenFiles), false, false));
-      initializeOmTables(false);
+      initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
       throw e;
@@ -555,7 +557,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       this.store = loadDB(configuration, metaDir);
 
-      initializeOmTables(true);
+      initializeOmTables(CacheType.FULL_CACHE, true);
     }
 
     snapshotChainManager = new SnapshotChainManager(this);
@@ -632,7 +634,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
         .addCodec(OmBucketInfo.class, OmBucketInfo.getCodec())
         .addCodec(OmVolumeArgs.class, OmVolumeArgs.getCodec())
-        .addProto2Codec(PersistedUserVolumeInfo.class)
+        .addProto2Codec(PersistedUserVolumeInfo.getDefaultInstance())
         .addCodec(OmMultipartKeyInfo.class, OmMultipartKeyInfo.getCodec())
         .addCodec(S3SecretValue.class, S3SecretValue.getCodec())
         .addCodec(OmPrefixInfo.class, OmPrefixInfo.getCodec())
@@ -650,14 +652,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    *
    * @throws IOException
    */
-  protected void initializeOmTables(boolean addCacheMetrics)
+  protected void initializeOmTables(CacheType cacheType,
+                                    boolean addCacheMetrics)
       throws IOException {
     userTable =
         this.store.getTable(USER_TABLE, String.class,
             PersistedUserVolumeInfo.class);
     checkTableStatus(userTable, USER_TABLE, addCacheMetrics);
-
-    CacheType cacheType = CacheType.FULL_CACHE;
 
     volumeTable =
         this.store.getTable(VOLUME_TABLE, String.class, OmVolumeArgs.class,
@@ -1306,6 +1307,25 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
     return deletedKeys;
+  }
+
+  @Override
+  public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
+                                      String snapshotName) throws IOException {
+    if (Strings.isNullOrEmpty(volumeName)) {
+      throw new OMException("Volume name is required.", VOLUME_NOT_FOUND);
+    }
+
+    if (Strings.isNullOrEmpty(bucketName)) {
+      throw new OMException("Bucket name is required.", BUCKET_NOT_FOUND);
+    }
+
+    if (Strings.isNullOrEmpty(snapshotName)) {
+      throw new OMException("Snapshot name is required.", FILE_NOT_FOUND);
+    }
+
+    return SnapshotUtils.getSnapshotInfo(ozoneManager, volumeName, bucketName,
+        snapshotName);
   }
 
   @Override
@@ -2168,5 +2188,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
     return result;
+  }
+
+  @Override
+  public boolean containsIncompleteMPUs(String volume, String bucket)
+      throws IOException {
+    String keyPrefix =
+        OmMultipartUpload.getDbKey(volume, bucket, "");
+
+    // First check in table cache
+    if (isKeyPresentInTableCache(keyPrefix, multipartInfoTable)) {
+      return true;
+    }
+
+    // Check in table
+    if (isKeyPresentInTable(keyPrefix, multipartInfoTable)) {
+      return true;
+    }
+
+    return false;
   }
 }

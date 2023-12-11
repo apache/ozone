@@ -221,8 +221,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   @Override
   public void restartOzoneManager() throws IOException {
-    for (OzoneManager ozoneManager : this.omhaService.getServices()) {
-      ozoneManager.stop();
+    for (OzoneManager ozoneManager : omhaService.getActiveServices()) {
+      stopOM(ozoneManager);
+    }
+    omhaService.inactiveServices().forEachRemaining(omhaService::activate);
+    for (OzoneManager ozoneManager : omhaService.getServices()) {
       ozoneManager.restart();
     }
   }
@@ -301,8 +304,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     for (OzoneManager ozoneManager : this.omhaService.getServices()) {
       if (ozoneManager != null) {
         LOG.info("Stopping the OzoneManager {}", ozoneManager.getOMNodeId());
-        ozoneManager.stop();
-        ozoneManager.join();
+        stopOM(ozoneManager);
       }
     }
 
@@ -317,17 +319,16 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   public void stopOzoneManager(int index) {
-    OzoneManager om = omhaService.getServices().get(index);
-    om.stop();
-    om.join();
+    stopAndDeactivate(omhaService.getServices().get(index));
+  }
+
+  private void stopAndDeactivate(OzoneManager om) {
+    stopOM(om);
     omhaService.deactivate(om);
   }
 
   public void stopOzoneManager(String omNodeId) {
-    OzoneManager om = omhaService.getServiceById(omNodeId);
-    om.stop();
-    om.join();
-    omhaService.deactivate(om);
+    stopAndDeactivate(omhaService.getServiceById(omNodeId));
   }
 
   private static void configureOMPorts(ConfigurationTarget conf,
@@ -514,8 +515,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           break;
         } catch (BindException e) {
           for (OzoneManager om : omList) {
-            om.stop();
-            om.join();
+            stopOM(om);
             LOG.info("Stopping OzoneManager server at {}",
                 om.getOmRpcServerAddr());
           }

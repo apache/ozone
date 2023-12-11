@@ -40,7 +40,6 @@ import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.utils.ThrowableFunction;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -66,6 +65,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -97,6 +97,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
@@ -478,8 +479,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = getOzonePathKeyWithVolumeBucketNames(
-        omMetadataManager, volumeName, bucketName);
+    final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
+        volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
@@ -492,32 +493,6 @@ public final class OmSnapshotManager implements AutoCloseable {
             return null;
           });
     }
-  }
-
-  /**
-   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
-   * volume name and bucket name as a prefix in FSO deletedDirectoryTable.
-   * Follows:
-   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
-   * <p>
-   * Note: Currently, this is only intended to be a special use case in
-   * {@link OmSnapshotManager}. If this is used elsewhere, consider moving this
-   * to {@link OMMetadataManager}.
-   *
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @return /volumeId/bucketId/
-   *    e.g. /-9223372036854772480/-9223372036854771968/
-   */
-  @VisibleForTesting
-  public static String getOzonePathKeyWithVolumeBucketNames(
-      OMMetadataManager omMetadataManager,
-      String volumeName,
-      String bucketName) throws IOException {
-
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
-    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
   @VisibleForTesting
@@ -537,7 +512,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static void performOperationOnKeys(
       TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
-      ThrowableFunction<Table.KeyValue<String, ?>,
+      CheckedFunction<Table.KeyValue<String, ?>,
       Void, IOException> operationFunction) throws IOException {
     // Continue only when there are entries of snapshot (bucket) scope
     // in deletedTable in the first place

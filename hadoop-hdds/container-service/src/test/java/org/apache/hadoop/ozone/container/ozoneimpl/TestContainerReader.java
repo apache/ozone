@@ -61,6 +61,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -240,8 +241,10 @@ public class TestContainerReader {
     thread.start();
     thread.join();
 
-    //recovering container should be deleted, so the count should be 2
-    Assert.assertEquals(2, containerSet.containerCount());
+    //recovering container should be marked unhealthy, so the count should be 3
+    Assert.assertEquals(UNHEALTHY, containerSet.getContainer(
+        recoveringContainerData.getContainerID()).getContainerState());
+    Assert.assertEquals(3, containerSet.containerCount());
 
     for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);

@@ -28,6 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS Common</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -107,15 +111,22 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>slf4j-reload4j</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>io.dropwizard.metrics</groupId>
-          <artifactId>metrics-core</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.bouncycastle</groupId>
           <artifactId>bcprov-jdk15on</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
+    <dependency>
+      <artifactId>ratis-metrics-dropwizard3</artifactId>
+      <groupId>org.apache.ratis</groupId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.dropwizard.metrics</groupId>
+          <artifactId>metrics-core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
     <dependency>
       <artifactId>ratis-netty</artifactId>
       <groupId>org.apache.ratis</groupId>
@@ -224,19 +235,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <!-- Needed for mocking RaftServerImpl -->
     </dependency>
     <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-api</artifactId>
       <version>${io.grpc.version}</version>
       <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.uuid</groupId>
-      <artifactId>java-uuid-generator</artifactId>
     </dependency>
   </dependencies>
 

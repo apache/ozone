@@ -55,7 +55,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
+      Proto2Codec.get(
+          OzoneManagerProtocolProtos.SnapshotInfo.getDefaultInstance()),
       SnapshotInfo::getFromProtobuf,
       SnapshotInfo::getProtobuf);
 
@@ -64,13 +65,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   }
 
   /**
-   * SnapshotStatus enum composed of
-   * active, deleted and reclaimed statues.
+   * SnapshotStatus enum composed of active and deleted statuses.
    */
   public enum SnapshotStatus {
     SNAPSHOT_ACTIVE,
-    SNAPSHOT_DELETED,
-    SNAPSHOT_RECLAIMED;
+    SNAPSHOT_DELETED;
 
     public static final SnapshotStatus DEFAULT = SNAPSHOT_ACTIVE;
 
@@ -80,8 +79,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         return SnapshotStatusProto.SNAPSHOT_ACTIVE;
       case SNAPSHOT_DELETED:
         return SnapshotStatusProto.SNAPSHOT_DELETED;
-      case SNAPSHOT_RECLAIMED:
-        return SnapshotStatusProto.SNAPSHOT_RECLAIMED;
       default:
         throw new IllegalStateException(
             "BUG: missing valid SnapshotStatus, found status=" + this);
@@ -94,8 +91,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         return SNAPSHOT_ACTIVE;
       case SNAPSHOT_DELETED:
         return SNAPSHOT_DELETED;
-      case SNAPSHOT_RECLAIMED:
-        return SNAPSHOT_RECLAIMED;
       default:
         throw new IllegalStateException(
             "BUG: missing valid SnapshotStatus, found status=" + status);
@@ -135,8 +130,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    * @param name - snapshot name.
    * @param volumeName - volume name.
    * @param bucketName - bucket name.
-   * @param snapshotStatus - status: SNAPSHOT_ACTIVE, SNAPSHOT_DELETED,
-   *                      SNAPSHOT_RECLAIMED
+   * @param snapshotStatus - status: SNAPSHOT_ACTIVE, SNAPSHOT_DELETED
    * @param creationTime - Snapshot creation time.
    * @param deletionTime - Snapshot deletion time.
    * @param pathPreviousSnapshotId - Snapshot path previous snapshot id.

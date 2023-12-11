@@ -91,7 +91,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final XceiverClientMetrics metrics;
   private final Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
-  private final long timeout;
+  private long timeout;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private final List<X509Certificate> caCerts;
@@ -114,9 +114,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
-    timeout = config.getTimeDuration(OzoneConfigKeys.
+    setTimeout(config.getTimeDuration(OzoneConfigKeys.
         OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
-        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
+        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -292,23 +292,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
-    try {
-      for (Map.Entry<DatanodeDetails,
+    for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
               entry : futureHashMap.entrySet()) {
+      try {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
-      }
-    } catch (InterruptedException e) {
-      LOG.error("Command execution was interrupted.");
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      String message = "Failed to execute command {}.";
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(message, processForDebug(request), e);
-      } else {
-        LOG.error(message + " Exception Class: {}, Exception Message: {}",
-                request.getCmdType(), e.getClass().getName(), e.getMessage());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        String message =
+            "Failed to execute command {} on datanode " + entry.getKey()
+                .getHostName();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(message, processForDebug(request), e);
+        } else {
+          LOG.error(message + " Exception Class: {}, Exception Message: {}",
+              request.getCmdType(), e.getClass().getName(), e.getMessage());
+        }
       }
     }
     return responseProtoHashMap;
@@ -614,5 +616,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @VisibleForTesting
   public static Logger getLogger() {
     return LOG;
+  }
+
+  public void setTimeout(long timeout) {
+    this.timeout = timeout;
   }
 }

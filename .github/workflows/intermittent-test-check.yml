@@ -46,7 +46,7 @@ env:
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]', inputs.test-class, inputs.test-name, inputs.ref) || '' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
 jobs:
   prepare-job:
     runs-on: ubuntu-20.04
@@ -135,9 +135,10 @@ jobs:
         continue-on-error: true
         env:
           CHECK: ${{ needs.prepare-job.outputs.test_type }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ needs.prepare-job.outputs.test_type }}/summary.txt
-        if: always()
+        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -150,3 +151,21 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/hdds*
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
+  count-failures:
+    if: ${{ always() }}
+    needs: run-test
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Download build results
+        uses: actions/download-artifact@v3
+      - name: Count failures
+        run: |
+          failures=$(find . -name 'summary.txt' | grep -v 'iteration' | xargs grep -v 'exit code: 0' | wc -l)
+          echo "Total failures: $failures"
+          if [[ $failures -gt 0 ]]; then
+            echo ""
+            echo "Failed runs:"
+            grep 'exit code: 1' */summary.txt | grep -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
+            echo ""
+            exit 1
+          fi

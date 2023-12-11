@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,15 +142,17 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  bucket/key/volume or not and also with out any authorization checks.
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
-
+      UserInfo userInfo = getUserInfo();
       List<OmKeyLocationInfo> omKeyLocationInfoList =
           allocateBlock(ozoneManager.getScmClient(),
               ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId(),
-              ozoneManager.getMetrics());
+              ozoneManager.getOMServiceId(),
+              ozoneManager.getMetrics(),
+              keyArgs.getSortDatanodes(),
+              userInfo);
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
@@ -204,7 +208,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
     Result result = null;
     List<OmKeyInfo> missingParentInfos = null;
     int numMissingParents = 0;
@@ -217,8 +221,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquireLock = ozoneLockStrategy.acquireWriteLock(omMetadataManager,
-          volumeName, bucketName, keyName);
+      mergeOmLockDetails(
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
+              bucketName, keyName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -331,7 +337,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omMetrics.incNumKeyAllocateFails();
@@ -342,8 +348,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        ozoneLockStrategy.releaseWriteLock(omMetadataManager, volumeName,
-            bucketName, keyName);
+        mergeOmLockDetails(ozoneLockStrategy
+            .releaseWriteLock(omMetadataManager, volumeName,
+                bucketName, keyName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -359,7 +369,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   }
 
   protected void logResult(CreateKeyRequest createKeyRequest,
-      OMMetrics omMetrics, IOException exception, Result result,
+      OMMetrics omMetrics, Exception exception, Result result,
        int numMissingParents) {
     switch (result) {
     case SUCCESS:
