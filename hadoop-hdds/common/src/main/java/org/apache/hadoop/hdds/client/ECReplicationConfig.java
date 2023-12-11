@@ -212,4 +212,14 @@ public class ECReplicationConfig implements ReplicationConfig {
   private String chunkKB() {
     return ecChunkSize / 1024 + "k";
   }
+
+  /**
+   * Get the number of parity checksum bytes per stripe.
+   * For Example, EC chunk size 2MB and repConfig rs-3-2-2048k
+   * (chunkSize / bytesPerCrc) * bytesPerChecksum * numParity =
+   * (2MB / 1MB) * 4L * 2 = 16 Bytes
+   */
+  public int getParityBytes(long chunkSize, long bytesPerCrc) {
+    return (int) (Math.ceil((double) chunkSize / bytesPerCrc) * 4L * parity);
+  }
 }

@@ -20,17 +20,17 @@ package org.apache.hadoop.ozone.protocolPB;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
-import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.HadoopCompatibility;
+import org.apache.hadoop.ozone.client.checksum.CompositeCrc;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
@@ -47,8 +47,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.CrcUtil;
-import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +176,12 @@ public final class OMPBHelper {
       throw new IOException("The field md5Crc is not set.");
     case COMPOSITE_CRC:
       if (proto.hasCompositeCrc()) {
-        return convertCompositeCrcChecksum(proto.getCompositeCrc());
+        if (HadoopCompatibility.isCompositeCrcAvailable()) {
+          return CompositeCrc.fromProto(proto.getCompositeCrc());
+        } else {
+          LOG.warn("{} is not supported with this version of Hadoop",
+              proto.getChecksumType());
+        }
       }
       throw new IOException("The field CompositeCrc is not set.");
     default:
@@ -202,23 +205,6 @@ public final class OMPBHelper {
     case CHECKSUM_CRC32C:
       return new MD5MD5CRC32CastagnoliFileChecksum(bytesPerCRC, crcPerBlock,
           md5Hash);
-    default:
-      throw new IOException("Unexpected checksum type " + checksumTypeProto);
-    }
-  }
-
-  public static CompositeCrcFileChecksum convertCompositeCrcChecksum(
-      CompositeCrcFileChecksumProto proto) throws IOException {
-    ChecksumTypeProto checksumTypeProto = proto.getChecksumType();
-    int bytesPerCRC = proto.getBytesPerCrc();
-    int crc = proto.getCrc();
-    switch (checksumTypeProto) {
-    case CHECKSUM_CRC32:
-      return new CompositeCrcFileChecksum(
-          crc, DataChecksum.Type.CRC32, bytesPerCRC);
-    case CHECKSUM_CRC32C:
-      return new CompositeCrcFileChecksum(
-          crc, DataChecksum.Type.CRC32C, bytesPerCRC);
     default:
       throw new IOException("Unexpected checksum type " + checksumTypeProto);
     }
@@ -260,29 +246,6 @@ public final class OMPBHelper {
         .build();
   }
 
-  public static CompositeCrcFileChecksumProto convert(
-      CompositeCrcFileChecksum checksum)
-      throws IOException {
-    ChecksumTypeProto type;
-    Options.ChecksumOpt opt = checksum.getChecksumOpt();
-    switch (opt.getChecksumType()) {
-    case CRC32:
-      type = ChecksumTypeProto.CHECKSUM_CRC32;
-      break;
-    case CRC32C:
-      type = ChecksumTypeProto.CHECKSUM_CRC32C;
-      break;
-    default:
-      type = ChecksumTypeProto.CHECKSUM_NULL;
-    }
-    int crc = CrcUtil.readInt(checksum.getBytes(), 0);
-    return CompositeCrcFileChecksumProto.newBuilder()
-        .setChecksumType(type)
-        .setBytesPerCrc(opt.getBytesPerChecksum())
-        .setCrc(crc)
-        .build();
-  }
-
   public static FileChecksumProto convert(FileChecksum checksum) {
     if (checksum == null) {
       return null;
@@ -290,30 +253,32 @@ public final class OMPBHelper {
 
     try {
       if (checksum instanceof MD5MD5CRC32FileChecksum) {
-        MD5MD5Crc32FileChecksumProto c1 =
+        MD5MD5Crc32FileChecksumProto proto =
             convert((MD5MD5CRC32FileChecksum) checksum);
 
         return FileChecksumProto.newBuilder()
             .setChecksumType(FileChecksumTypeProto.MD5CRC)
-            .setMd5Crc(c1)
+            .setMd5Crc(proto)
             .build();
-      } else if (checksum instanceof CompositeCrcFileChecksum) {
-        CompositeCrcFileChecksumProto c2 =
-            convert((CompositeCrcFileChecksum) checksum);
-
-        return FileChecksumProto.newBuilder()
-            .setChecksumType(FileChecksumTypeProto.COMPOSITE_CRC)
-            .setCompositeCrc(c2)
-            .build();
-      } else {
-        LOG.warn("Unsupported file checksum runtime type " +
-            checksum.getClass().getName());
       }
+
+      if (HadoopCompatibility.isCompositeCrcAvailable()) {
+        CompositeCrcFileChecksumProto proto = CompositeCrc.toProto(checksum);
+        if (proto != null) {
+          return FileChecksumProto.newBuilder()
+              .setChecksumType(FileChecksumTypeProto.COMPOSITE_CRC)
+              .setCompositeCrc(proto)
+              .build();
+        }
+      }
+
+      LOG.warn("Unsupported file checksum runtime type {}",
+          checksum.getClass().getName());
     } catch (IOException ioe) {
-      LOG.warn(
-          "Failed to convert a FileChecksum {} to its protobuf representation",
+      LOG.warn("Failed to convert {} to its protobuf representation",
           checksum, ioe);
     }
+
     return null;
   }
 

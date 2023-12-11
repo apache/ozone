@@ -17,13 +17,9 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.util.CrcComposer;
-import org.apache.hadoop.util.CrcUtil;
-import org.apache.hadoop.util.DataChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +27,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+
+import static org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper.fallbackIfUnavailable;
 
 /**
  * The implementation of AbstractBlockChecksumComputer for replicated blocks.
@@ -41,7 +39,7 @@ public class ReplicatedBlockChecksumComputer extends
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicatedBlockChecksumComputer.class);
 
-  private List<ContainerProtos.ChunkInfo> chunkInfoList;
+  private final List<ContainerProtos.ChunkInfo> chunkInfoList;
 
   public ReplicatedBlockChecksumComputer(
       List<ContainerProtos.ChunkInfo> chunkInfoList) {
@@ -49,17 +47,17 @@ public class ReplicatedBlockChecksumComputer extends
   }
 
   @Override
-  public void compute(OzoneClientConfig.ChecksumCombineMode combineMode)
-      throws IOException {
-    switch (combineMode) {
+  public void compute(ChecksumCombineMode combineMode) throws IOException {
+    ChecksumCombineMode mode = fallbackIfUnavailable(combineMode);
+    switch (mode) {
     case MD5MD5CRC:
       computeMd5Crc();
       return;
     case COMPOSITE_CRC:
-      computeCompositeCrc();
+      setOutBytes(CompositeCrc.computeReplicatedBlockChecksum(chunkInfoList));
       return;
     default:
-      throw new IllegalArgumentException("unsupported combine mode");
+      throw new IllegalArgumentException("Unsupported combine mode: " + mode);
     }
   }
 
@@ -84,63 +82,4 @@ public class ReplicatedBlockChecksumComputer extends
         chunkInfoList.size(), fileMD5);
   }
 
-  // compute the block checksum of CompositeCrc,
-  // which is the incremental computation of chunk checksums
-  private void computeCompositeCrc() throws IOException {
-    DataChecksum.Type dataChecksumType;
-    long bytesPerCrc;
-    long chunkSize;
-    Preconditions.checkArgument(chunkInfoList.size() > 0);
-
-    final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
-    switch (firstChunkInfo.getChecksumData().getType()) {
-    case CRC32C:
-      dataChecksumType = DataChecksum.Type.CRC32C;
-      break;
-    case CRC32:
-      dataChecksumType = DataChecksum.Type.CRC32;
-      break;
-    default:
-      throw new IllegalArgumentException("unsupported checksum type: " +
-          firstChunkInfo.getChecksumData().getType());
-    }
-    chunkSize = firstChunkInfo.getLen();
-    bytesPerCrc = firstChunkInfo.getChecksumData().getBytesPerChecksum();
-
-
-    CrcComposer blockCrcComposer =
-        CrcComposer.newCrcComposer(dataChecksumType, chunkSize);
-
-    for (ContainerProtos.ChunkInfo chunkInfo : chunkInfoList) {
-      ContainerProtos.ChecksumData checksumData =
-          chunkInfo.getChecksumData();
-      List<ByteString> checksums = checksumData.getChecksumsList();
-      CrcComposer chunkCrcComposer =
-          CrcComposer.newCrcComposer(dataChecksumType, bytesPerCrc);
-      //compute the composite-crc checksum of the whole chunk by iterating
-      //all the checksum data one by one
-      long remainingChunkSize = chunkInfo.getLen();
-      Preconditions.checkArgument(remainingChunkSize <=
-          checksums.size() * chunkSize);
-      for (ByteString checksum : checksums) {
-        int checksumDataCrc = CrcUtil.readInt(checksum.toByteArray(), 0);
-        chunkCrcComposer.update(checksumDataCrc,
-            Math.min(bytesPerCrc, remainingChunkSize));
-        remainingChunkSize -= bytesPerCrc;
-      }
-      //get the composite-crc checksum of the whole chunk
-      int chunkChecksumCrc = CrcUtil.readInt(chunkCrcComposer.digest(), 0);
-
-      //update block checksum using chunk checksum
-      blockCrcComposer.update(chunkChecksumCrc, chunkInfo.getLen());
-    }
-
-    //compute the composite-crc checksum of the whole block
-    byte[] compositeCrcChunkChecksum = blockCrcComposer.digest();
-    setOutBytes(compositeCrcChunkChecksum);
-
-    LOG.debug("number of chunks = {}, chunk checksum type is {}, " +
-            "composite checksum = {}", chunkInfoList.size(), dataChecksumType,
-        compositeCrcChunkChecksum);
-  }
 }

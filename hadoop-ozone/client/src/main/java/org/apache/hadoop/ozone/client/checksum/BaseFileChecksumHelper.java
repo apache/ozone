@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.HadoopCompatibility;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -34,9 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.util.CrcComposer;
-import org.apache.hadoop.util.CrcUtil;
-import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +46,7 @@ import java.util.List;
 public abstract class BaseFileChecksumHelper {
   static final Logger LOG =
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
+
   private OmKeyInfo keyInfo;
 
   private OzoneVolume volume;
@@ -57,7 +55,7 @@ public abstract class BaseFileChecksumHelper {
   private final long length;
 
   private ClientProtocol rpcClient;
-  private OzoneClientConfig.ChecksumCombineMode combineMode;
+  private final ChecksumCombineMode combineMode;
   private ContainerProtos.ChecksumType checksumType;
 
   private final DataOutputBuffer blockChecksumBuf = new DataOutputBuffer();
@@ -71,15 +69,14 @@ public abstract class BaseFileChecksumHelper {
   // initialization
   BaseFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName,
-      long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      long length, ChecksumCombineMode combineMode,
       ClientProtocol rpcClient) throws IOException {
 
     this.volume = volume;
     this.bucket = bucket;
     this.keyName = keyName;
     this.length = length;
-    this.combineMode = checksumCombineMode;
+    this.combineMode = fallbackIfUnavailable(combineMode);
     this.rpcClient = rpcClient;
     this.xceiverClientFactory =
         ((RpcClient)rpcClient).getXceiverClientManager();
@@ -90,10 +87,21 @@ public abstract class BaseFileChecksumHelper {
 
   public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
       String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
+      ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
     this(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
     this.keyInfo = keyInfo;
+  }
+
+  static ChecksumCombineMode fallbackIfUnavailable(ChecksumCombineMode mode) {
+    if (ChecksumCombineMode.COMPOSITE_CRC == mode && !HadoopCompatibility.isCompositeCrcAvailable()) {
+      final ChecksumCombineMode fallback = ChecksumCombineMode.MD5MD5CRC;
+      LOG.info("{} is not available with this version of Hadoop, falling back to {}",
+          mode, fallback);
+      return fallback;
+    }
+
+    return mode;
   }
 
   protected String getSrc() {
@@ -109,7 +117,7 @@ public abstract class BaseFileChecksumHelper {
     return rpcClient;
   }
 
-  protected OzoneClientConfig.ChecksumCombineMode getCombineMode() {
+  protected ChecksumCombineMode getCombineMode() {
     return combineMode;
   }
 
@@ -235,14 +243,15 @@ public abstract class BaseFileChecksumHelper {
    * checksums collected into getBlockChecksumBuf().
    */
   private FileChecksum makeFinalResult() throws IOException {
-    switch (getCombineMode()) {
+    switch (combineMode) {
     case MD5MD5CRC:
       return makeMd5CrcResult();
     case COMPOSITE_CRC:
-      return makeCompositeCrcResult();
+      return CompositeCrc.computeFileChecksum(
+          getKeyLocationInfoList(), getBlockChecksumBuf(),
+          getChecksumType(), getBytesPerCRC());
     default:
-      throw new IOException("Unknown ChecksumCombineMode: " +
-          getCombineMode());
+      throw new IOException("Unknown ChecksumCombineMode: " + combineMode);
     }
   }
 
@@ -263,44 +272,6 @@ public abstract class BaseFileChecksumHelper {
           + getChecksumType());
     }
 
-  }
-
-  DataChecksum.Type toHadoopChecksumType() {
-    switch (checksumType) {
-    case CRC32:
-      return DataChecksum.Type.CRC32;
-    case CRC32C:
-      return DataChecksum.Type.CRC32C;
-    default:
-      throw new IllegalArgumentException("unsupported checksum type");
-    }
-  }
-
-  FileChecksum makeCompositeCrcResult() throws IOException {
-    long blockSizeHint = 0;
-    if (keyLocationInfos.size() > 0) {
-      blockSizeHint = keyLocationInfos.get(0).getLength();
-    }
-    CrcComposer crcComposer =
-        CrcComposer.newCrcComposer(toHadoopChecksumType(), blockSizeHint);
-    byte[] blockChecksumBytes = blockChecksumBuf.getData();
-
-    for (int i = 0; i < keyLocationInfos.size(); ++i) {
-      OmKeyLocationInfo block = keyLocationInfos.get(i);
-      // For every LocatedBlock, we expect getBlockSize()
-      // to accurately reflect the number of file bytes digested in the block
-      // checksum.
-      int blockCrc = CrcUtil.readInt(blockChecksumBytes, i * 4);
-
-      crcComposer.update(blockCrc, block.getLength());
-      LOG.debug(
-          "Added blockCrc 0x{} for block index {} of size {}",
-          Integer.toString(blockCrc, 16), i, block.getLength());
-    }
-
-    int compositeCrc = CrcUtil.readInt(crcComposer.digest(), 0);
-    return new CompositeCrcFileChecksum(
-        compositeCrc, toHadoopChecksumType(), bytesPerCRC);
   }
 
   public FileChecksum getFileChecksum() {
