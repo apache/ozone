@@ -67,8 +67,6 @@ public class TestSnapshotDirectoryCleaningService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSnapshotDirectoryCleaningService.class);
 
-  private static boolean omRatisEnabled = true;
-
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
   private static String volumeName;
@@ -81,7 +79,6 @@ public class TestSnapshotDirectoryCleaningService {
     conf.setInt(OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL, 2500);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 2500,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -150,17 +147,17 @@ public class TestSnapshotDirectoryCleaningService {
     /v/b/snapDir
     /v/b/snapDir/appRoot0-2/
     /v/b/snapDir/appRoot0-2/parentDir0-2/
-          KeyTable
+          FileTable
     /v/b/snapDir/testKey0 - testKey4  = 5 keys
     /v/b/snapDir/appRoot0-2/parentDir0-2/childFile = 9 keys
     /v/b/snapDir/appRoot0/parentDir0-2/childFile0-4 = 15 keys
      */
 
     Path root = new Path("/snapDir");
-    // Create  parent dir from root.
+    // Create parent dir from root.
     fs.mkdirs(root);
 
-    // Added 5 sub files inside root dir
+    // Add 5 files inside root dir
     // Creates /v/b/snapDir/testKey0 - testKey4
     for (int i = 0; i < 5; i++) {
       Path path = new Path(root, "testKey" + i);

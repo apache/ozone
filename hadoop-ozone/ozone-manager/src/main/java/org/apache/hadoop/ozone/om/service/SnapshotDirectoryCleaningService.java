@@ -311,10 +311,12 @@ public class SnapshotDirectoryCleaningService
                   stackTop.getDirValue().getObjectID(), "");
           directoryIterator.seek(seekDirInDB);
         } else {
-          // When a leaf node is processed, we need come back in
+          // When a leaf node is processed, we need to come back in
           // the call stack and process the next directories.
           seekDirInDB = stackTop.getSubDirSeek();
           directoryIterator.seek(seekDirInDB);
+          // We need skip to the next sub-directory because we already
+          // processed the current sub-directory in the previous run.
           if (directoryIterator.hasNext()) {
             directoryIterator.next();
           } else {
