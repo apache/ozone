@@ -2223,7 +2223,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       if (omRatisServer != null) {
         omRatisServer.stop();
-        omRatisServer = null;
         OMHAMetrics.unRegister();
       }
       isOmRpcServerRunning = false;
@@ -2260,6 +2259,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omhaMetrics != null) {
         OMHAMetrics.unRegister();
       }
+      omRatisServer = null;
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -3034,6 +3034,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     int port = omNodeDetails.getRatisPort();
     RaftPeer leaderId;
     if (isRatisEnabled) {
+      if (null == omRatisServer) {
+        return "Server is shutting down";
+      }
       try {
         leaderId = omRatisServer.getLeader();
         if (leaderId == null) {
