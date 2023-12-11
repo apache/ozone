@@ -3035,7 +3035,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RaftPeer leaderId;
     if (isRatisEnabled) {
       if (null == omRatisServer) {
-        return "Server is shutting down";
+        messageException.add("Server is shutting down");
+        resultList.add(messageException);
+        return resultList;
       }
       try {
         leaderId = omRatisServer.getLeader();
