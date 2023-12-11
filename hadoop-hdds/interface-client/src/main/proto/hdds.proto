@@ -188,6 +188,7 @@ message DatanodeUsageInfoProto {
     optional DatanodeDetailsProto node = 4;
     optional int64 containerCount = 5;
     optional int64 committed = 6;
+    optional int64 freeSpaceToSpare = 7;
 }
 
 /**

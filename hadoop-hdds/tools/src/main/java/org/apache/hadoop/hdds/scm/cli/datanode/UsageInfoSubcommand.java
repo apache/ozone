@@ -160,6 +160,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     System.out.printf("%-13s: %s (%s) %n", "Remaining Allocatable",
         (info.getRemaining() - info.getCommitted()) + " B",
         StringUtils.byteDesc((info.getRemaining() - info.getCommitted())));
+    System.out.printf("%-13s: %s (%s) %n", "Free Space To Spare",
+        info.getFreeSpaceToSpare() + " B",
+        StringUtils.byteDesc(info.getFreeSpaceToSpare()));
     System.out.printf("%-13s: %d %n%n", "Container(s)",
             info.getContainerCount());
   }
@@ -187,6 +190,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     private long used = 0;
     private long remaining = 0;
     private long committed = 0;
+    private long freeSpaceToSpare = 0;
     private long containerCount = 0;
 
     DatanodeUsage(HddsProtos.DatanodeUsageInfoProto proto) {
@@ -207,6 +211,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       }
       if (proto.hasContainerCount()) {
         containerCount = proto.getContainerCount();
+      }
+      if (proto.hasFreeSpaceToSpare()) {
+        freeSpaceToSpare = proto.getFreeSpaceToSpare();
       }
     }
 
@@ -231,6 +238,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     }
     public long getCommitted() {
       return committed;
+    }
+    public long getFreeSpaceToSpare() {
+      return freeSpaceToSpare;
     }
 
     public long getContainerCount() {

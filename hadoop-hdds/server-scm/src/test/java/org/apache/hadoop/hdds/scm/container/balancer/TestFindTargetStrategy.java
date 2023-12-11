@@ -56,11 +56,11 @@ public class TestFindTargetStrategy {
 
     //create three datanodes with different usageinfo
     DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 40, 0));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 40, 0, 30));
     DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 60, 0));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 60, 0, 30));
     DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 80, 0));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 80, 0, 30));
 
     //insert in ascending order
     overUtilizedDatanodes.add(dui1);
@@ -98,11 +98,11 @@ public class TestFindTargetStrategy {
   public void testResetPotentialTargets() {
     // create three datanodes with different usage infos
     DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70, 0));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70, 0, 50));
     DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80, 0));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80, 0, 60));
     DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90, 0));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90, 0, 70));
 
     List<DatanodeUsageInfo> potentialTargets = new ArrayList<>();
     potentialTargets.add(dui1);
@@ -179,18 +179,18 @@ public class TestFindTargetStrategy {
     List<DatanodeUsageInfo> overUtilizedDatanodes = new ArrayList<>();
     //set the farthest target with the lowest usage info
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target5, new SCMNodeStat(100, 0, 90, 0)));
+        new DatanodeUsageInfo(target5, new SCMNodeStat(100, 0, 90, 0, 80)));
     //set the tree targets, which have the same network topology distance
     //to source , with different usage info
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target2, new SCMNodeStat(100, 0, 20, 0)));
+        new DatanodeUsageInfo(target2, new SCMNodeStat(100, 0, 20, 0, 10)));
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target3, new SCMNodeStat(100, 0, 40, 0)));
+        new DatanodeUsageInfo(target3, new SCMNodeStat(100, 0, 40, 0, 30)));
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target4, new SCMNodeStat(100, 0, 60, 0)));
+        new DatanodeUsageInfo(target4, new SCMNodeStat(100, 0, 60, 0, 50)));
     //set the nearest target with the highest usage info
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target1, new SCMNodeStat(100, 0, 10, 0)));
+        new DatanodeUsageInfo(target1, new SCMNodeStat(100, 0, 10, 0, 5)));
 
 
     FindTargetGreedyByNetworkTopology findTargetGreedyByNetworkTopology =

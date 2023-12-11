@@ -1207,7 +1207,8 @@ public class TestContainerBalancerTask {
         datanodeCapacity = (long) (datanodeUsedSpace / nodeUtilizations.get(i));
       }
       SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
-          datanodeCapacity - datanodeUsedSpace, 0);
+          datanodeCapacity - datanodeUsedSpace, 0,
+          datanodeCapacity - datanodeUsedSpace - 1);
       nodesInCluster.get(i).setScmNodeStat(stat);
       clusterUsedSpace += datanodeUsedSpace;
       clusterCapacity += datanodeCapacity;

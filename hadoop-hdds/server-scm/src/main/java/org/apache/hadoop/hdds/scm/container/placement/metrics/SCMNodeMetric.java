@@ -46,9 +46,9 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
    */
   @VisibleForTesting
   public SCMNodeMetric(long capacity, long used, long remaining,
-                       long committed) {
+                       long committed, long freeSpaceToSpare) {
     this.stat = new SCMNodeStat();
-    this.stat.set(capacity, used, remaining, committed);
+    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare);
   }
 
   /**
@@ -159,7 +159,8 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public void set(SCMNodeStat value) {
     stat.set(value.getCapacity().get(), value.getScmUsed().get(),
-        value.getRemaining().get(), value.getCommitted().get());
+        value.getRemaining().get(), value.getCommitted().get(),
+        value.getFreeSpaceToSpare().get());
   }
 
   /**
