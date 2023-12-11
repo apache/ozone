@@ -338,6 +338,12 @@
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
       <version>${jooq.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.xml.bind</groupId>
+          <artifactId>jaxb-api</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.jooq</groupId>
@@ -373,8 +379,8 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>javax.activation</groupId>
-      <artifactId>activation</artifactId>
+      <groupId>jakarta.activation</groupId>
+      <artifactId>jakarta.activation-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.javassist</groupId>
