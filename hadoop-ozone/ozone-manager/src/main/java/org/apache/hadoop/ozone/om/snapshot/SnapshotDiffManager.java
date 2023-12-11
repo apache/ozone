@@ -289,8 +289,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
-    if (conf.getBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_NATIVE_LIB_ENABLED_DIFF,
-        OMConfigKeys.OZONE_OM_SNAPSHOT_NATIVE_LIB_ENABLED_DIFF_DEFAULT)) {
+    if (conf.getBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
+        OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
       try {
         int threadPoolSize = conf.getInt(
                 OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
