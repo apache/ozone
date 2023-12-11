@@ -461,7 +461,8 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private void checkPath(Path path) {
     FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
-        o3fs.getFileStatus(path), "testObjectStoreCreateWithO3fs failed for Path" + path);
+        o3fs.getFileStatus(path),
+        "testObjectStoreCreateWithO3fs failed for Path" + path);
     assertTrue(ex.getMessage().contains("No such file or directory"));
   }
 
