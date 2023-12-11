@@ -65,7 +65,7 @@ public class ContainerKeyInfo {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof ContainerKeyInfo)) {
       return false;
     }
     ContainerKeyInfo that = (ContainerKeyInfo) o;
