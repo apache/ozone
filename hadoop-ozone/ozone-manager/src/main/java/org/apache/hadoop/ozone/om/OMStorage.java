@@ -53,7 +53,12 @@ public class OMStorage extends Storage {
   static final String ERROR_OM_IS_ALREADY_INITIALIZED =
       "OM is already initialized.";
   static final String ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE =
-      "OM NodeId: %s does not match existing nodeId from VERSION file: %s";
+      "OM NodeId: %s does not match existing nodeId from VERSION file: %s.%n " +
+          "One of the possible reasons can be, OM maybe running on this host " +
+          "previously and either the OM or Ozone as a service was deleted " +
+          "but their metadata wasn't removed. Please remove the metadata and " +
+          "restart the OM. You may remove the metadata using %n " +
+          "rm -rf ${OZONE_OM_DB_DIRS}";
   static final String ERROR_STORAGE_NOT_INITIALIZED =
       "OM Storage is not initialized yet.";
 
