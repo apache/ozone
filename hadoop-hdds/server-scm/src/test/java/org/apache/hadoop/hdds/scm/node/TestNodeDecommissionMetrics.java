@@ -175,6 +175,7 @@ public class TestNodeDecommissionMetrics {
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
+            true,
             HddsProtos.LifeCycleState.CLOSED,
             DECOMMISSIONED,
             IN_SERVICE,
@@ -214,6 +215,7 @@ public class TestNodeDecommissionMetrics {
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
+            false,
             HddsProtos.LifeCycleState.CLOSED,
             IN_SERVICE,
             IN_SERVICE,
@@ -253,6 +255,7 @@ public class TestNodeDecommissionMetrics {
     nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
+            true,
             HddsProtos.LifeCycleState.OPEN,
             IN_SERVICE);
     monitor.startMonitoring(dn1);
@@ -299,6 +302,7 @@ public class TestNodeDecommissionMetrics {
     nodeManager.setContainers(dn2, containersDn2);
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
+            true,
             HddsProtos.LifeCycleState.CLOSED,
             DECOMMISSIONED,
             IN_SERVICE,
