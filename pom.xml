@@ -225,8 +225,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <powermock2.version>2.0.4</powermock2.version>
     <jmockit.version>1.24</jmockit.version>
     <junit4.version>4.13.1</junit4.version>
-    <junit.jupiter.version>5.10.1</junit.jupiter.version>
-    <junit.platform.version>1.10.1</junit.platform.version>
+    <junit5.version>5.10.1</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
@@ -1184,7 +1183,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
-        <version>${junit.jupiter.version}</version>
+        <version>${junit5.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
