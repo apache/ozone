@@ -357,11 +357,10 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
           ReplicationType.RATIS, ONE, new HashMap<>());
     }
 
-    shutdownCluster();
     Assert.assertTrue(
         omSMLog.getOutput().contains("Failed to write, Exception occurred"));
-    Assert.assertTrue(
-        omSMLog.getOutput().contains("applyTransactionMap size 0"));
+    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() == 0,
+        100, 5000);
   }
 
   private static class OMRequestHandlerPauseInjector extends FaultInjector {
