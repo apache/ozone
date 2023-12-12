@@ -341,6 +341,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
+  public OmMetadataManagerImpl(OzoneConfiguration conf,
+                               OzoneManager ozoneManager, OMPerformanceMetrics perfMetrics) throws IOException {
+    this.ozoneManager = ozoneManager;
+    this.lock = new OzoneManagerLock(conf);
+    isRatisEnabled = conf.getBoolean(
+            OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
+            OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
+    this.perfMetrics = perfMetrics;
+    // For test purpose only
+    ignorePipelineinKey = conf.getBoolean(
+            "ozone.om.ignore.pipeline", Boolean.TRUE);
+    start(conf);
+  }
 
   /**
    * For subclass overriding.
@@ -1282,16 +1296,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
     long averagePagination;
-    if(isTruncated)
-    {
+    if (isTruncated) {
       averagePagination = maxKeys;
-    }
-    else
-    {
+    } else {
       averagePagination = cacheKeyMap.size();
-    }
-    perfMetrics.setListKeysAveragePagination(averagePagination);
-    long opsPerSec = averagePagination/(Time.monotonicNowNanos() - startNanos);
+    } perfMetrics.setListKeysAveragePagination(averagePagination);
+    long opsPerSec = averagePagination / (Time.monotonicNowNanos() - startNanos);
     perfMetrics.setListKeysOpsPerSec(opsPerSec);
 
     // Finally DB entries and cache entries are merged, then return the count

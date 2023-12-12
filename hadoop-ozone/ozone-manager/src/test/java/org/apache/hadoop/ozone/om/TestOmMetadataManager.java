@@ -90,7 +90,7 @@ public class TestOmMetadataManager {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
         folder.getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null, new OMPerformanceMetrics());
   }
 
   @Test
