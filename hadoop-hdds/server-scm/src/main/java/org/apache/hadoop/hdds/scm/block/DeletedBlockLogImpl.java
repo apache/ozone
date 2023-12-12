@@ -496,7 +496,7 @@ public class DeletedBlockLogImpl
   public void onMessage(
       DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
     if (!scmContext.isLeader()) {
-      LOG.warn("Skip commit transactions since current SCM is not leader.");
+      LOG.info("Skip commit transactions since current SCM is not leader.");
       return;
     }
 
