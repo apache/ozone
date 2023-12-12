@@ -336,15 +336,13 @@ class TestSCMHAConfiguration {
     assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testRatisEnabledDefaultConflictConfigWithInitializedSCM(
-      boolean isRatisEnabled) {
+  @Test
+  public void testRatisEnabledDefaultConflictConfigWithInitializedSCM() {
     SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
-    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(isRatisEnabled);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled);
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(true);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     assertThrows(ConfigurationException.class,
             () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));
   }

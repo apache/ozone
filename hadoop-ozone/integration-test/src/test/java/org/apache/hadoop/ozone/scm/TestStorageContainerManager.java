@@ -637,13 +637,14 @@ public class TestStorageContainerManager {
     MiniOzoneCluster cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
+    cluster.getStorageContainerManager().stop();
     try {
       final UUID clusterId = UUID.randomUUID();
       // This will initialize SCM
       StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       Assert.assertNotEquals(clusterId.toString(), scmStore.getClusterID());
-      Assert.assertFalse(scmStore.isSCMHAEnabled());
+      Assert.assertTrue(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }
