@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
