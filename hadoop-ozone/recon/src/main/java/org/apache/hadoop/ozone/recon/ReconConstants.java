@@ -58,6 +58,9 @@ public final class ReconConstants {
   public static final String RECON_ENTITY_PATH = "path";
   public static final String RECON_ENTITY_TYPE = "entityType";
   public static final String RECON_ACCESS_METADATA_START_DATE = "startDate";
+  public static final String CONTAINER_COUNT = "CONTAINER_COUNT";
+  public static final String TOTAL_KEYS = "TOTAL_KEYS";
+  public static final String TOTAL_USED_BYTES = "TOTAL_USED_BYTES";
 
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;

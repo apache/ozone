@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.Assertions;
@@ -63,6 +64,21 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("volume1", "b1"));
     assertEquals("Invalid bucket name: b1", omException.getMessage());
+  }
+
+  @Test
+  public void preExecuteBucketCrossesMaxLimit() throws Exception {
+    ozoneManager.getConfiguration().setInt(
+        OMConfigKeys.OZONE_OM_MAX_BUCKET, 1);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
+        bucketName);
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
+    OMException omException = assertThrows(OMException.class,
+        () -> doPreExecute("volume2", "test2"));
+    assertEquals("Cannot create more than 1 buckets", omException.getMessage());
   }
 
   @Test

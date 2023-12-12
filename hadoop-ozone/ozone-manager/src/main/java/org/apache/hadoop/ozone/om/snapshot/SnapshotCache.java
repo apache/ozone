@@ -104,16 +104,18 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * @param key DB snapshot table key
    */
   public void invalidate(String key) throws IOException {
-    dbMap.computeIfPresent(key, (k, v) -> {
-      pendingEvictionList.remove(v);
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        rcOmSnapshot = dbMap.get(key);
+    if (rcOmSnapshot != null) {
+      pendingEvictionList.remove(rcOmSnapshot);
       try {
-        ((OmSnapshot) v.get()).close();
+        ((OmSnapshot) rcOmSnapshot.get()).close();
       } catch (IOException e) {
         throw new IllegalStateException("Failed to close snapshot: " + key, e);
       }
-      // Remove the entry from map by returning null
-      return null;
-    });
+      // Remove the entry from map
+      dbMap.remove(key);
+    }
   }
 
   /**
@@ -184,10 +186,6 @@ public class SnapshotCache implements ReferenceCountedCallback {
               throw new IllegalStateException(ex);
             }
           }
-          if (v != null) {
-            // When RC OmSnapshot is successfully loaded
-            v.incrementRefCount();
-          }
           return v;
         });
 
@@ -197,6 +195,9 @@ public class SnapshotCache implements ReferenceCountedCallback {
       throw new OMException("Snapshot table key '" + key + "' not found, "
           + "or the snapshot is no longer active",
           OMException.ResultCodes.FILE_NOT_FOUND);
+    } else {
+      // When RC OmSnapshot is successfully loaded
+      rcOmSnapshot.incrementRefCount();
     }
 
     // If the snapshot is already loaded in cache, the check inside the loader
@@ -230,21 +231,19 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * @param key snapshot table key
    */
   public void release(String key) {
-    dbMap.compute(key, (k, v) -> {
-      if (v == null) {
-        throw new IllegalArgumentException(
-            "Key '" + key + "' does not exist in cache");
-      }
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        rcOmSnapshot = dbMap.get(key);
+    if (rcOmSnapshot == null) {
+      throw new IllegalArgumentException(
+          "Key '" + key + "' does not exist in cache");
+    }
 
-      if (v.decrementRefCount() == 0L) {
-        synchronized (pendingEvictionList) {
-          // v is eligible to be evicted and closed
-          pendingEvictionList.add(v);
-        }
+    if (rcOmSnapshot.decrementRefCount() == 0L) {
+      synchronized (pendingEvictionList) {
+        // v is eligible to be evicted and closed
+        pendingEvictionList.add(rcOmSnapshot);
       }
-
-      return v;
-    });
+    }
 
     // The cache size might have already exceed the soft limit
     // Thus triggering cleanup() to check and evict if applicable

@@ -348,6 +348,9 @@ stop_docker_env(){
       if docker-compose --ansi never down; then
         return
       fi
+      if [[ ${i} -eq 1 ]]; then
+        create_stack_dumps
+      fi
       sleep 5
     done
 
