@@ -526,7 +526,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence
-      // the SCM process should be terminated.
+      // the OM process should be terminated.
       File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
       if (markerFile.exists()) {
         LOG.error("File {} marks that OM DB is in an inconsistent state.",
