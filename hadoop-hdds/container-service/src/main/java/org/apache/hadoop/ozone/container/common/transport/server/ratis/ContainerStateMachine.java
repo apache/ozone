@@ -798,15 +798,20 @@ public class ContainerStateMachine extends BaseStateMachine {
     return CompletableFuture.allOf(
         futureList.toArray(new CompletableFuture[futureList.size()]));
   }
-  /*
-   * This api is used by the leader while appending logs to the follower
-   * This allows the leader to read the state machine data from the
-   * state machine implementation in case cached state machine data has been
-   * evicted.
+
+  /**
+   * This method is used by the Leader to read state machine date for sending appendEntries to followers.
+   * It will first get the data from {@link #stateMachineDataCache}.
+   * If the data is not in the cache, it will read from the file by dispatching a command
+   *
+   * @param trx the transaction context,
+   *           which can be null if this method is invoked after {@link #applyTransaction(TransactionContext)}.
    */
   @Override
   public CompletableFuture<ByteString> read(LogEntryProto entry, TransactionContext trx) {
-    final ByteString dataInContext = Optional.ofNullable(trx.getStateMachineLogEntry())
+    metrics.incNumReadStateMachineOps();
+    final ByteString dataInContext = Optional.ofNullable(trx)
+        .map(TransactionContext::getStateMachineLogEntry)
         .map(StateMachineLogEntryProto::getStateMachineEntry)
         .map(StateMachineEntryProto::getStateMachineData)
         .orElse(null);
@@ -814,46 +819,36 @@ public class ContainerStateMachine extends BaseStateMachine {
       return CompletableFuture.completedFuture(dataInContext);
     }
 
-    final ByteString dataInLog = entry.getStateMachineLogEntry()
-        .getStateMachineEntry().getStateMachineData();
-    if (dataInLog != null && !dataInLog.isEmpty()) {
-      return CompletableFuture.completedFuture(dataInLog);
+    final ByteString dataInCache = stateMachineDataCache.get(entry.getIndex());
+    if (dataInCache != null) {
+      Preconditions.checkArgument(!dataInCache.isEmpty());
+      metrics.incNumDataCacheHit();
+      return CompletableFuture.completedFuture(dataInCache);
+    } else {
+      metrics.incNumDataCacheMiss();
     }
 
-    metrics.incNumReadStateMachineOps();
     try {
-      final Context context = (Context) trx.getStateMachineContext();
-      Objects.requireNonNull(context, "context == null");
-      final ContainerCommandRequestProto requestProto = context.getLogProto();
-      // readStateMachineData should only be called for "write" to Ratis.
-      Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
-      if (requestProto.getCmdType() == Type.WriteChunk) {
-        final CompletableFuture<ByteString> future = new CompletableFuture<>();
-        ByteString data = stateMachineDataCache.get(entry.getIndex());
-        if (data != null) {
-          Preconditions.checkArgument(!data.isEmpty());
-          future.complete(data);
-          metrics.incNumDataCacheHit();
-          return future;
-        }
+      final Context context = (Context) Optional.ofNullable(trx)
+          .map(TransactionContext::getStateMachineContext)
+          .orElse(null);
+      final ContainerCommandRequestProto requestProto = context != null? context.getLogProto()
+          : getContainerCommandRequestProto(gid, entry.getStateMachineLogEntry().getLogData());
 
-        metrics.incNumDataCacheMiss();
-        CompletableFuture.supplyAsync(() -> {
-          try {
-            future.complete(
-                readStateMachineData(requestProto, entry.getTerm(),
-                    entry.getIndex()));
-          } catch (IOException e) {
-            metrics.incNumReadStateMachineFails();
-            future.completeExceptionally(e);
-          }
-          return future;
-        }, getChunkExecutor(requestProto.getWriteChunk()));
-        return future;
-      } else {
+      if (requestProto.getCmdType() != Type.WriteChunk) {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()
             + " cannot have state machine data");
       }
+      final CompletableFuture<ByteString> future = new CompletableFuture<>();
+      CompletableFuture.runAsync(() -> {
+        try {
+          future.complete(readStateMachineData(requestProto, entry.getTerm(), entry.getIndex()));
+        } catch (IOException e) {
+          metrics.incNumReadStateMachineFails();
+          future.completeExceptionally(e);
+        }
+      }, getChunkExecutor(requestProto.getWriteChunk()));
+      return future;
     } catch (Exception e) {
       metrics.incNumReadStateMachineFails();
       LOG.error("{} unable to read stateMachineData:", gid, e);
