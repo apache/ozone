@@ -29,10 +29,10 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,18 +71,18 @@ public class TestKeyValueContainerMarkUnhealthy {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layout;
 
-  public TestKeyValueContainerMarkUnhealthy(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  private void initTestData(ContainerLayoutVersion layoutVersion) throws Exception {
+    this.layout = layoutVersion;
+    setup();
   }
 
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> layoutVersion() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @BeforeEach
-  public void setUp() throws Exception {
+  public void setup() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
     String dataDir = Files.createDirectory(
@@ -125,8 +125,10 @@ public class TestKeyValueContainerMarkUnhealthy {
    *
    * @throws IOException
    */
-  @Test
-  public void testMarkContainerUnhealthy() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testMarkContainerUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     assertThat(keyValueContainerData.getState(), is(OPEN));
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
@@ -141,10 +143,13 @@ public class TestKeyValueContainerMarkUnhealthy {
 
   /**
    * Attempting to close an unhealthy container should fail.
+   *
    * @throws IOException
    */
-  @Test
-  public void testCloseUnhealthyContainer() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testCloseUnhealthyContainer(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     keyValueContainer.markContainerUnhealthy();
     Assertions.assertThrows(StorageContainerException.class, () ->
         keyValueContainer.markContainerForClose());
@@ -154,8 +159,10 @@ public class TestKeyValueContainerMarkUnhealthy {
   /**
    * Attempting to mark a closed container as unhealthy should succeed.
    */
-  @Test
-  public void testMarkClosedContainerAsUnhealthy() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testMarkClosedContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     // We need to create the container so the compact-on-close operation
     // does not NPE.
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -167,8 +174,10 @@ public class TestKeyValueContainerMarkUnhealthy {
   /**
    * Attempting to mark a quasi-closed container as unhealthy should succeed.
    */
-  @Test
-  public void testMarkQuasiClosedContainerAsUnhealthy() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testMarkQuasiClosedContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     // We need to create the container so the sync-on-quasi-close operation
     // does not NPE.
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -180,8 +189,10 @@ public class TestKeyValueContainerMarkUnhealthy {
   /**
    * Attempting to mark a closing container as unhealthy should succeed.
    */
-  @Test
-  public void testMarkClosingContainerAsUnhealthy() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testMarkClosingContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     keyValueContainer.markContainerForClose();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
