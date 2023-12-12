@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -47,7 +46,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -90,13 +88,6 @@ public class TestSCMContainerPlacementRackAware {
 
   private static IntStream numDatanodes() {
     return IntStream.rangeClosed(3, 15);
-  }
-
-  private static Stream<Arguments> decommissionNodeStates() {
-    return Stream.of(
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING),
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED)
-    );
   }
 
   private void setup(int datanodeCount) {
@@ -575,7 +566,7 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @ParameterizedTest
-  @MethodSource("decommissionNodeStates")
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
   public void testReplicaOnNodeInDecommission(
       HddsProtos.NodeOperationalState state) {
     setup(6);

@@ -43,7 +43,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -96,13 +95,6 @@ public class TestSCMContainerPlacementRackScatter {
   private static IntStream numDatanodes() {
     return IntStream.concat(IntStream.rangeClosed(3, 15),
         IntStream.of(20, 25, 30));
-  }
-
-  private static Stream<Arguments> decommissionNodeStates() {
-    return Stream.of(
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING),
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED)
-    );
   }
 
   private void updateStorageInDatanode(int dnIndex, long used, long remaining) {
@@ -580,7 +572,7 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @ParameterizedTest
-  @MethodSource("decommissionNodeStates")
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
   public void testReplicaOnOutNodeInDecommission(
       HddsProtos.NodeOperationalState state) {
     setup(6, 2);
