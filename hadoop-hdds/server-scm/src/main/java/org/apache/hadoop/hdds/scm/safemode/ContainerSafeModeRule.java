@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -141,16 +141,10 @@ public class ContainerSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    List<Long> sampleContainers = new ArrayList<>();
-    if (!containerMap.isEmpty()) {
-      int count = 0;
-      for (long cId : containerMap.keySet()) {
-        if (count < SAMPLE_CONTAINER_DISPLAY_LIMIT) {
-          sampleContainers.add(cId);
-          count++;
-        }
-      }
-    }
+    List<Long> sampleContainers = containerMap.keySet()
+        .stream()
+        .limit(SAMPLE_CONTAINER_DISPLAY_LIMIT)
+        .collect(Collectors.toList());
 
     String status = String.format("%% of containers with at least one reported"
             + " replica (=%1.2f) >= safeModeCutoff (=%1.2f)",
