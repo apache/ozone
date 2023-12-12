@@ -105,8 +105,7 @@ import org.slf4j.LoggerFactory;
  * which is responsible for handling different types of container requests.
  * <p>
  * The container requests can be divided into readonly request, WriteChunk request and other write requests.
- * - Read only requests (see {@link org.apache.hadoop.hdds.HddsUtils#isReadOnly})
- *   are handled by {@link #query(Message)}.
+ * - Read only requests (see {@link HddsUtils#isReadOnly}) are handled by {@link #query(Message)}.
  * - WriteChunk request contains user data
  * - Other write request does not contain user data.
  * <p>
@@ -832,7 +831,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       final Context context = (Context) Optional.ofNullable(trx)
           .map(TransactionContext::getStateMachineContext)
           .orElse(null);
-      final ContainerCommandRequestProto requestProto = context != null? context.getLogProto()
+      final ContainerCommandRequestProto requestProto = context != null ? context.getLogProto()
           : getContainerCommandRequestProto(gid, entry.getStateMachineLogEntry().getLogData());
 
       if (requestProto.getCmdType() != Type.WriteChunk) {
