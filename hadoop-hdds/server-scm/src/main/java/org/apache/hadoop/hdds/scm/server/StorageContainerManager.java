@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -1333,14 +1334,33 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // Initialize security if security is enabled later.
       initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
-      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
+      if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
             conf);
         scmStorageConfig.setSCMHAFlag(true);
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.forceInitialize();
-        LOG.debug("Enabled SCM HA");
+
+        /*
+         * Since Ratis is initialized on an existing cluster, we have to
+         * trigger Ratis snapshot so that this SCM can send the latest scm.db
+         * to the bootstrapping SCMs later.
+         */
+
+        try {
+          DefaultConfigManager.forceUpdateConfigValue(
+              ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+          StorageContainerManager scm = createSCM(conf);
+          scm.start();
+          scm.getScmHAManager().getRatisServer().triggerSnapshot();
+          scm.stop();
+          scm.join();
+        } catch (AuthenticationException e) {
+          throw new IOException(e);
+        }
+        LOG.info("Enabled SCM HA");
       }
 
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"

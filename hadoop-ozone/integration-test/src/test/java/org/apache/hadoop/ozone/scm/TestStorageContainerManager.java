@@ -1080,6 +1080,37 @@ public class TestStorageContainerManager {
     containerReportExecutors.close();
   }
 
+  @Test
+  public void testNonRatisToRatis()
+      throws IOException, AuthenticationException, InterruptedException,
+      TimeoutException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    final String clusterID = UUID.randomUUID().toString();
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setClusterId(clusterID)
+        .setScmId(UUID.randomUUID().toString())
+        .setNumDatanodes(3)
+        .build()) {
+      final StorageContainerManager nonRatisSCM = cluster
+          .getStorageContainerManager();
+      Assert.assertNull(nonRatisSCM.getScmHAManager().getRatisServer());
+      Assert.assertFalse(nonRatisSCM.getScmStorageConfig().isSCMHAEnabled());
+      nonRatisSCM.stop();
+      nonRatisSCM.join();
+
+      DefaultConfigManager.clearDefaultConfigs();
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+      StorageContainerManager.scmInit(conf, clusterID);
+      cluster.restartStorageContainerManager(false);
+
+      final StorageContainerManager ratisSCM = cluster
+          .getStorageContainerManager();
+      Assert.assertNotNull(ratisSCM.getScmHAManager().getRatisServer());
+      Assert.assertTrue(ratisSCM.getScmStorageConfig().isSCMHAEnabled());
+
+    }
+  }
+
   private void addTransactions(StorageContainerManager scm,
       DeletedBlockLog delLog,
       Map<Long, List<Long>> containerBlocksMap)
