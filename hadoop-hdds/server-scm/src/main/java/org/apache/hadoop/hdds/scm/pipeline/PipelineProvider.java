@@ -100,7 +100,7 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
               "data in healthy node set. Nodes required: %d Found: %d",
           metadataSizeRequired, dataSizeRequired, nodesRequired,
           healthyDNsWithSpace.size());
-      LOG.error(msg);
+      LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
