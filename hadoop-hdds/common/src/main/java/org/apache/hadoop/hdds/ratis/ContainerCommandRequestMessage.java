@@ -72,8 +72,8 @@ public final class ContainerCommandRequestMessage implements Message {
       if (header.hasPipelineID()) {
         final String pid = header.getPipelineID();
         if (!gidString.equals(pid)) {
-          throw new InvalidProtocolBufferException("ID mismatched: PipelineID "
-              + pid + " does not match the groupId " + gidString);
+          throw new InvalidProtocolBufferException("ID mismatched: PipelineID " + pid
+              + " does not match the groupId " + gidString);
         }
       } else {
         b.setPipelineID(groupId.getUuid().toString());
