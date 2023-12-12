@@ -47,6 +47,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +64,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test client-side URI handling with Ozone Manager HA.
  */
-@org.junit.jupiter.api.Timeout(300)
+@Timeout(300)
 public class TestOzoneFsHAURLs {
 
   /**
