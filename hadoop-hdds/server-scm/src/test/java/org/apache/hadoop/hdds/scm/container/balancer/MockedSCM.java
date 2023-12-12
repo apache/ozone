@@ -65,7 +65,7 @@ import static org.mockito.Mockito.when;
  * mocked instances
  */
 public final class MockedSCM {
-  static final long STORAGE_UNIT = OzoneConsts.GB;
+  public static final long STORAGE_UNIT = OzoneConsts.GB;
   private final StorageContainerManager scm;
   private final TestableCluster cluster;
   private final ContainerBalancerConfiguration balancerCfg;

@@ -102,7 +102,7 @@ public final class TestableCluster {
     return cidToInfoMap;
   }
 
-  int getNodeCount() {
+  public int getNodeCount() {
     return nodeCount;
   }
 

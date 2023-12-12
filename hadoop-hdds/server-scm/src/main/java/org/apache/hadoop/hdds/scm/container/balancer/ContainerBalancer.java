@@ -225,8 +225,7 @@ public class ContainerBalancer extends StatefulService {
    * @throws IOException                                    on failure to persist {@link ContainerBalancerConfiguration}
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
-      throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, IOException {
+      throws IllegalContainerBalancerStateException, InvalidContainerBalancerConfigurationException, IOException {
     lock.lock();
     try {
       // validates state, config, and then saves config
@@ -338,11 +337,8 @@ public class ContainerBalancer extends StatefulService {
     blockTillTaskStop(balancingThread);
   }
 
-  public void saveConfiguration(
-      @Nonnull ContainerBalancerConfiguration configuration,
-      boolean shouldRun,
-      int index
-  ) throws IOException {
+  public void saveConfiguration(@Nonnull ContainerBalancerConfiguration configuration, boolean shouldRun, int index)
+      throws IOException {
     config = configuration;
     saveConfiguration(configuration
         .toProtobufBuilder()
@@ -381,8 +377,7 @@ public class ContainerBalancer extends StatefulService {
     }
 
     // "move.replication.timeout" should be lesser than "move.timeout"
-    if (conf.getMoveReplicationTimeout().toMillis() >=
-        conf.getMoveTimeout().toMillis()) {
+    if (conf.getMoveReplicationTimeout().toMillis() >= conf.getMoveTimeout().toMillis()) {
       LOG.warn("hdds.container.balancer.move.replication.timeout {} should be less than " +
               "hdds.container.balancer.move.timeout {}.",
           conf.getMoveReplicationTimeout().toMinutes(),

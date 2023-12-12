@@ -23,8 +23,11 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.balancer.iteration.ContainerBalanceIteration;
+import org.apache.hadoop.hdds.scm.container.balancer.iteration.IterationResult;
+import org.apache.hadoop.hdds.scm.container.balancer.iteration.IterationMetrics;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.util.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,8 +45,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 
 /**
- * Container balancer task performs move of containers between over- and
- * under-utilized datanodes.
+ * Container balancer task performs move of containers between over- and under-utilized datanodes.
  */
 public class ContainerBalancerTask {
 
@@ -54,6 +56,7 @@ public class ContainerBalancerTask {
   private final ContainerBalancerConfiguration config;
   private volatile Status taskStatus = Status.RUNNING;
   private ContainerBalanceIteration it;
+  private IterationResult iterationResult = IterationResult.ITERATION_COMPLETED;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -107,13 +110,9 @@ public class ContainerBalancerTask {
   }
 
   private void balance(int nextIterationIndex, int iterationCount) {
-    // nextIterationIndex is the iteration that balancer should start from on leader change or restart
+    ContainerBalancerMetrics metrics = containerBalancer.getMetrics();
+    // NextIterationIndex is the iteration that balancer should start from on leader change or restart.
     for (int i = nextIterationIndex; i < iterationCount && isBalancerRunning(); ++i) {
-      // reset some variables and metrics for this iteration
-      if (it != null) {
-        it.resetState();
-      }
-
       if (!balancerIsOk()) {
         return;
       }
@@ -123,17 +122,19 @@ public class ContainerBalancerTask {
         return;
       }
 
-      it = new ContainerBalanceIteration(containerBalancer.getMetrics(), config, scm, datanodeUsageInfos);
+      it = new ContainerBalanceIteration(config, scm, datanodeUsageInfos);
 
-      // initialize this iteration. stop balancing on initialization failure
+      // Initialize this iteration. stop balancing on initialization failure.
       if (!it.findUnBalancedNodes(this::isBalancerRunning, datanodeUsageInfos)) {
-        // Try to stop balancer
+        // Try to stop balancer.
         tryStopWithSaveConfiguration("Could not initialize ContainerBalancer's iteration number " + i);
         return;
       }
 
-      IterationResult iterationResult = it.doIteration(this::isBalancerRunning, config);
+      iterationResult = it.doIteration(this::isBalancerRunning, config);
       LOG.info("Result of this iteration of Container Balancer: {}", iterationResult);
+      metrics.incrementNumIterations(1);
+      collectMetrics(metrics, it.getMetrics());
 
       // if no new move option is generated, it means the cluster cannot be balanced anymore; so just stop balancer
       if (iterationResult == IterationResult.CAN_NOT_BALANCE_ANY_MORE) {
@@ -169,6 +170,21 @@ public class ContainerBalancerTask {
     }
 
     tryStopWithSaveConfiguration("Completed all iterations.");
+  }
+
+  private static void collectMetrics(@Nonnull ContainerBalancerMetrics metrics, @Nonnull IterationMetrics itMetrics) {
+    metrics.incrementNumContainerMovesScheduled(itMetrics.getScheduledContainerMovesCount());
+    metrics.incrementNumContainerMovesCompleted(itMetrics.getCompletedContainerMovesCount());
+    metrics.incrementNumContainerMovesTimeout(itMetrics.getTimeoutContainerMovesCount());
+    metrics.incrementDataSizeMovedBytes(itMetrics.getMovedBytesCount());
+    metrics.incrementNumContainerMovesFailed(itMetrics.getFailedContainerMovesCount());
+    LOG.info("Iteration Summary. Number of Datanodes involved: {}." +
+            " Size moved: {} ({} Bytes)." +
+            " Number of Container moves completed: {}.",
+        itMetrics.getInvolvedDatanodeCount(),
+        StringUtils.byteDesc(itMetrics.getMovedBytesCount()),
+        itMetrics.getMovedBytesCount(),
+        itMetrics.getCompletedContainerMovesCount());
   }
 
   private @Nullable List<DatanodeUsageInfo> getDatanodeUsageInfos() {
@@ -232,11 +248,8 @@ public class ContainerBalancerTask {
     }
   }
 
-  private void saveConfiguration(
-      @Nonnull ContainerBalancerConfiguration configuration,
-      boolean shouldRun,
-      int index
-  ) throws IOException, TimeoutException {
+  private void saveConfiguration(@Nonnull ContainerBalancerConfiguration configuration, boolean shouldRun, int index)
+      throws IOException, TimeoutException {
     if (!scmStateIsValid()) {
       LOG.warn("Save configuration is not allowed as not in valid State.");
       return;
@@ -333,31 +346,17 @@ public class ContainerBalancerTask {
   }
 
   @VisibleForTesting
-  int getCountDatanodesInvolvedPerIteration() {
-    return it.getDatanodeCountUsedIteration();
-  }
-
-  @VisibleForTesting
-  public long getSizeScheduledForMoveInLatestIteration() {
-    return it.getSizeScheduledForMoveInLatestIteration();
-  }
-
-  @VisibleForTesting
-  public ContainerBalancerMetrics getMetrics() {
+  public IterationMetrics getIterationMetrics() {
     return it.getMetrics();
   }
 
   @VisibleForTesting
-  IterationResult getIterationResult() {
-    return it.getIterationResult();
+  public IterationResult getIterationResult() {
+    return iterationResult;
   }
 
   public boolean isBalancerRunning() {
     return taskStatus == Status.RUNNING;
-  }
-
-  public boolean isStopped() {
-    return taskStatus == Status.STOPPED;
   }
 
   public Status getBalancerStatus() {
@@ -370,15 +369,6 @@ public class ContainerBalancerTask {
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
-  }
-
-  /**
-   * The result of {@link ContainerBalancerTask#doIteration}.
-   */
-  public enum IterationResult {
-    ITERATION_COMPLETED,
-    ITERATION_INTERRUPTED,
-    CAN_NOT_BALANCE_ANY_MORE
   }
 
   /**
