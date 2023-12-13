@@ -332,12 +332,12 @@ public class TestReconAndAdminContainerCLI {
 
     // Both threads are running every 1 second.
     // Wait until all values are equal.
-    GenericTestUtils.waitFor(() ->
-                                 rmMissingCounter == reconResponse.getMissingCount() &&
-                                 rmUnderReplCounter == reconResponse.getUnderReplicatedCount() &&
-                                 rmOverReplCounter == reconResponse.getOverReplicatedCount() &&
-                                 rmMisReplCounter == reconResponse.getMisReplicatedCount(),
-        1000, 40000);
+    GenericTestUtils.waitFor(
+            () -> rmMissingCounter == reconResponse.getMissingCount() &&
+                    rmUnderReplCounter == reconResponse.getUnderReplicatedCount() &&
+                    rmOverReplCounter == reconResponse.getOverReplicatedCount() &&
+                    rmMisReplCounter == reconResponse.getMisReplicatedCount(),
+            1000, 40000);
 
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
