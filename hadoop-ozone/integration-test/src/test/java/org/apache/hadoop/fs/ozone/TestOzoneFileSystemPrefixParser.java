@@ -31,14 +31,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.debug.PrefixParser;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.net.URI;
@@ -46,10 +43,8 @@ import java.net.URI;
 /**
  * Test Ozone Prefix Parser.
  */
+@Timeout(120)
 public class TestOzoneFileSystemPrefixParser {
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   private static MiniOzoneCluster cluster = null;
 
@@ -64,7 +59,7 @@ public class TestOzoneFileSystemPrefixParser {
   private static Path dir;
   private static Path file;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -94,7 +89,7 @@ public class TestOzoneFileSystemPrefixParser {
     os.close();
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
@@ -120,17 +115,17 @@ public class TestOzoneFileSystemPrefixParser {
   private void assertPrefixStats(PrefixParser parser, int volumeCount,
       int bucketCount, int intermediateDirCount, int nonExistentDirCount,
       int fileCount, int dirCount) {
-    Assert.assertEquals(volumeCount,
+    Assertions.assertEquals(volumeCount,
         parser.getParserStats(PrefixParser.Types.VOLUME));
-    Assert.assertEquals(bucketCount,
+    Assertions.assertEquals(bucketCount,
         parser.getParserStats(PrefixParser.Types.BUCKET));
-    Assert.assertEquals(intermediateDirCount,
+    Assertions.assertEquals(intermediateDirCount,
         parser.getParserStats(PrefixParser.Types.INTERMEDIATE_DIRECTORY));
-    Assert.assertEquals(nonExistentDirCount,
+    Assertions.assertEquals(nonExistentDirCount,
         parser.getParserStats(PrefixParser.Types.NON_EXISTENT_DIRECTORY));
-    Assert.assertEquals(fileCount,
+    Assertions.assertEquals(fileCount,
         parser.getParserStats(PrefixParser.Types.FILE));
-    Assert.assertEquals(dirCount,
+    Assertions.assertEquals(dirCount,
         parser.getParserStats(PrefixParser.Types.DIRECTORY));
   }
 

@@ -136,11 +136,6 @@ public class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public void connect(String encodedToken) {
-
-    }
-
-    @Override
     public void close() {
 
     }

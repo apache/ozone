@@ -267,6 +267,8 @@ public class OMException extends IOException {
 
     S3_SECRET_ALREADY_EXISTS,
     
-    INVALID_PATH
+    INVALID_PATH,
+
+    TOO_MANY_BUCKETS
   }
 }

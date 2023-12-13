@@ -31,14 +31,10 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -52,11 +48,13 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test covers listKeys(keyPrefix, startKey) combinations
  * in a FSO bucket layout type.
  */
+@Timeout(1200)
 public class TestListKeysWithFSO {
 
   private static MiniOzoneCluster cluster = null;
@@ -71,16 +69,13 @@ public class TestListKeysWithFSO {
   private static OzoneBucket fsoOzoneBucket2;
   private static OzoneClient client;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
-
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -129,7 +124,7 @@ public class TestListKeysWithFSO {
     initFSNameSpace();
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardownClass() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -270,6 +265,18 @@ public class TestListKeysWithFSO {
     expectedKeys =
         getExpectedKeyList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
     checkKeyList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
+  }
+
+  @Test
+  public void testListKeysWithAndWithoutTrailingSlashInPrefix()
+      throws Exception {
+    List<String> expectedKeys = new ArrayList<>();
+    expectedKeys.add("a1/b2/d2/d21.tx");
+    // With trailing slash
+    checkKeyList("a1/b2/d2/d21.tx/", "", expectedKeys, fsoOzoneBucket);
+
+    //Without trailing slash
+    checkKeyList("a1/b2/d2/d21.tx", "", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -587,7 +594,7 @@ public class TestListKeysWithFSO {
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
-      Assert.assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
+      assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
       keyLists.add(ozoneKey.getName());
     }
     LinkedList outputKeysList = new LinkedList(keyLists);
@@ -598,7 +605,7 @@ public class TestListKeysWithFSO {
     }
     System.out.println("END:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
-    Assert.assertEquals(keys, outputKeysList);
+    assertEquals(keys, outputKeysList);
   }
 
   private void checkKeyList(String keyPrefix, String startKey,
@@ -637,7 +644,7 @@ public class TestListKeysWithFSO {
     ozoneInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    Assert.assertEquals(new String(input, StandardCharsets.UTF_8),
+    assertEquals(new String(input, StandardCharsets.UTF_8),
         new String(read, StandardCharsets.UTF_8));
   }
 }

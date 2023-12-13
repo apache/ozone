@@ -188,4 +188,9 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   public CacheStats getStats() {
     return statsRecorder.snapshot();
   }
+
+  @Override
+  public CacheType getCacheType() {
+    return CacheType.PARTIAL_CACHE;
+  }
 }
