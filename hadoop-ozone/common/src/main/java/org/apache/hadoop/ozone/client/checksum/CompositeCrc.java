@@ -65,7 +65,7 @@ public final class CompositeCrc {
   }
 
   public static void checkAvailability() {
-    LOG.info("{} is available", CompositeCrcFileChecksum.class.getSimpleName());
+    LOG.debug("{} is available", CompositeCrcFileChecksum.class.getSimpleName());
   }
 
   static FileChecksum computeFileChecksum(
@@ -92,7 +92,7 @@ public final class CompositeCrc {
       int blockCrc = CrcUtil.readInt(blockChecksumBytes, i * 4);
 
       crcComposer.update(blockCrc, block.getLength());
-      LOG.debug("Added blockCrc 0x{} for block index {} of size {}",
+      LOG.trace("Added blockCrc 0x{} for block index {} of size {}",
           Integer.toString(blockCrc, 16), i, block.getLength());
     }
 
