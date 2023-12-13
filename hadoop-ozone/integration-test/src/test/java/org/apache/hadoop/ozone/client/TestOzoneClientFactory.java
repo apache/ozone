@@ -20,8 +20,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
@@ -66,7 +66,7 @@ public class TestOzoneClientFactory {
           return null;
         }
       });
-      Assert.fail("Should throw exception here");
+      Assertions.fail("Should throw exception here");
     } catch (IOException | InterruptedException e) {
       assert e instanceof AccessControlException;
     }

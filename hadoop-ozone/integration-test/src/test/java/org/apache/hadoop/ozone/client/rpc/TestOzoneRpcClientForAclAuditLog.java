@@ -39,13 +39,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.FixMethodOrder;
-import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import org.junit.runners.MethodSorters;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.MethodOrderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +64,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.assertTrue;
 
 /**
  * This class is to test audit logs for xxxACL APIs of Ozone Client.
@@ -75,7 +74,7 @@ import static org.junit.Assert.assertTrue;
  * all assertion based test in this class.
  */
 @NotThreadSafe
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@TestMethodOrder(MethodOrderer.MethodName.class)
 @Category(UnhealthyTest.class)
 @Unhealthy("Fix this after adding audit support for HA Acl code. This will " +
     "be fixed by HDDS-2038")
@@ -106,7 +105,7 @@ public class TestOzoneRpcClientForAclAuditLog {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
     ugi = UserGroupInformation.getCurrentUser();
@@ -141,7 +140,7 @@ public class TestOzoneRpcClientForAclAuditLog {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void teardown() throws IOException {
     shutdownCluster();
     deleteAuditLog();
@@ -195,7 +194,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     OzoneVolume retVolumeinfo = store.getVolume(volumeName);
     verifyLog(OMAction.READ_VOLUME.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assert.assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
+    Assertions.assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
 
     OzoneObj volObj = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -207,7 +206,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     List<OzoneAcl> acls = store.getAcl(volObj);
     verifyLog(OMAction.GET_ACL.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assert.assertTrue(acls.size() > 0);
+    Assertions.assertTrue(acls.size() > 0);
 
     //Testing addAcl
     store.addAcl(volObj, USER_ACL);
@@ -287,9 +286,9 @@ public class TestOzoneRpcClientForAclAuditLog {
     try {
       // When log entry is expected, the log file will contain one line and
       // that must be equal to the expected string
-      assertTrue(lines.size() != 0);
+      Assertions.assertTrue(lines.size() != 0);
       for (String exp: expected) {
-        assertTrue(lines.get(0).contains(exp));
+        Assertions.assertTrue(lines.get(0).contains(exp));
       }
     } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);
