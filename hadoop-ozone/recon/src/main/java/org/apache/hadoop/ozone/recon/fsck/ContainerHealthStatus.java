@@ -121,7 +121,7 @@ public class ContainerHealthStatus {
   }
 
   public boolean isUnderReplicated() {
-    return !isMissing() && containerReplicaCount.isUnderReplicated();
+    return !isMissing() && !containerReplicaCount.isSufficientlyReplicated();
   }
 
   public int replicaDelta() {
