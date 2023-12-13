@@ -342,7 +342,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     start(conf);
   }
   public OmMetadataManagerImpl(OzoneConfiguration conf,
-                               OzoneManager ozoneManager, OMPerformanceMetrics perfMetrics) throws IOException {
+      OzoneManager ozoneManager, OMPerformanceMetrics perfMetrics)
+          throws IOException {
     this.ozoneManager = ozoneManager;
     this.lock = new OzoneManagerLock(conf);
     isRatisEnabled = conf.getBoolean(
@@ -1300,8 +1301,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       averagePagination = maxKeys;
     } else {
       averagePagination = cacheKeyMap.size();
-    } perfMetrics.setListKeysAveragePagination(averagePagination);
-    long opsPerSec = averagePagination / (Time.monotonicNowNanos() - startNanos);
+    }
+    perfMetrics.setListKeysAveragePagination(averagePagination);
+    long opsPerSec =
+        averagePagination / (Time.monotonicNowNanos() - startNanos);
     perfMetrics.setListKeysOpsPerSec(opsPerSec);
 
     // Finally DB entries and cache entries are merged, then return the count

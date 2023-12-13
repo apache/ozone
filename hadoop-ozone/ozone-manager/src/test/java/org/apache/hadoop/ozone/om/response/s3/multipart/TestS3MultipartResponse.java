@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -77,7 +78,8 @@ public class TestS3MultipartResponse {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
+                        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

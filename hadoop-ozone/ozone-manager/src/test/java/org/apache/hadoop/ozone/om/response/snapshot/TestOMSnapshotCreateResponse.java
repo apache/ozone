@@ -29,6 +29,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -73,7 +74,8 @@ public class TestOMSnapshotCreateResponse {
     String fsPath = folder.getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
+                        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

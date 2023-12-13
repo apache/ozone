@@ -51,7 +51,8 @@ public class TestSnapshotInfo {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(conf, null);
+    omMetadataManager = new OmMetadataManagerImpl(conf, null,
+                        new OMPerformanceMetrics());
   }
 
   private SnapshotInfo createSnapshotInfo() {

@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,8 @@ public class TestOMBucketSetPropertyResponse {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
+                        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

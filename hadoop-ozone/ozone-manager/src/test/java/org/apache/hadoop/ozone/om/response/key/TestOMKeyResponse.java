@@ -26,6 +26,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -72,7 +73,8 @@ public class TestOMKeyResponse {
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
+                        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();

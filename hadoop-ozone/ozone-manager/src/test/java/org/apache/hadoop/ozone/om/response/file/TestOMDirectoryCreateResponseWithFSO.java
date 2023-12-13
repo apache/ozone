@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -62,7 +63,8 @@ public class TestOMDirectoryCreateResponseWithFSO {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
+                        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

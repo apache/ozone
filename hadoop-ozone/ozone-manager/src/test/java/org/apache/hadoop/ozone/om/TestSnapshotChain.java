@@ -69,7 +69,8 @@ public class TestSnapshotChain {
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS, folder.toString());
-    omMetadataManager = new OmMetadataManagerImpl(conf, null);
+    omMetadataManager = new OmMetadataManagerImpl(conf, null,
+                        new OMPerformanceMetrics());
     snapshotIdToSnapshotInfoMap = new HashMap<>();
     chainManager = new SnapshotChainManager(omMetadataManager);
   }

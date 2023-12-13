@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -74,8 +75,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS,
         folder.toAbsolutePath().toString());
-    omMetadataManager =
-        new OmMetadataManagerImpl(configuration, null);
+    omMetadataManager = new OmMetadataManagerImpl(configuration, null,
+                        new OMPerformanceMetrics());
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
