@@ -418,7 +418,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       try {
         return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
       } catch (Throwable t) {
-        prefixBuffer.release();
+        if (prefixBuffer != null) {
+          prefixBuffer.release();
+        }
         throw t;
       }
     } else {

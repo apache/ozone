@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
@@ -306,8 +307,10 @@ public class TestReplicationSupervisor {
     Mockito.when(volumeSet.getVolumesList())
         .thenReturn(singletonList(
             new HddsVolume.Builder(testDir).conf(conf).build()));
+    ContainerController mockedCC =
+        Mockito.mock(ContainerController.class);
     ContainerImporter importer =
-        new ContainerImporter(conf, set, null, volumeSet);
+        new ContainerImporter(conf, set, mockedCC, volumeSet);
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(conf, set, importer, moc);
 

@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.util.DataChecksum;
@@ -59,7 +60,6 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -97,16 +97,14 @@ public class TestReplicatedFileChecksumHelper {
 
       @Override
       protected OmTransport createOmTransport(
-          String omServiceId)
-          throws IOException {
+          String omServiceId) {
         return new MockOmTransport();
       }
 
       @NotNull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates)
-          throws IOException {
+          ServiceInfoEx serviceInfo) {
         return new MockXceiverClientFactory();
       }
     };

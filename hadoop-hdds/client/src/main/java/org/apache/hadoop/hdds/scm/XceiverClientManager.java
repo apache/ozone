@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -31,6 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -68,10 +67,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
-  private final ScmClientConfig clientConfig;
   private final Cache<String, XceiverClientSpi> clientCache;
   private final CacheMetrics cacheMetrics;
-  private List<X509Certificate> caCerts;
+  private ClientTrustManager trustManager;
 
   private static XceiverClientMetrics metrics;
   private boolean isSecurityEnabled;
@@ -89,16 +87,15 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
 
   public XceiverClientManager(ConfigurationSource conf,
       ScmClientConfig clientConf,
-      List<X509Certificate> caCerts) throws IOException {
+      ClientTrustManager trustManager) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
-    this.clientConfig = clientConf;
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (isSecurityEnabled) {
-      Preconditions.checkNotNull(caCerts);
-      this.caCerts = caCerts;
+      Preconditions.checkNotNull(trustManager);
+      this.trustManager = trustManager;
     }
 
     this.clientCache = CacheBuilder.newBuilder()
@@ -249,13 +246,13 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             switch (type) {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  caCerts);
+                  trustManager);
               break;
             case STAND_ALONE:
-              client = new XceiverClientGrpc(pipeline, conf, caCerts);
+              client = new XceiverClientGrpc(pipeline, conf, trustManager);
               break;
             case EC:
-              client = new ECXceiverClientGrpc(pipeline, conf, caCerts);
+              client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
               break;
             case CHAINED:
             default:
