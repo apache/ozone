@@ -76,7 +76,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     configuration.set(OZONE_METADATA_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(configuration, null,
-                        new OMPerformanceMetrics());
+        new OMPerformanceMetrics());
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
@@ -176,14 +176,14 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     private final OmBucketInfo omBucketInfo;
 
     OMDummyCreateBucketResponse(OmBucketInfo omBucketInfo,
-        OMResponse omResponse) {
+                                OMResponse omResponse) {
       super(omResponse);
       this.omBucketInfo = omBucketInfo;
     }
 
     @Override
     public void addToDBBatch(OMMetadataManager omMetadataManager,
-        BatchOperation batchOperation) throws IOException {
+                             BatchOperation batchOperation) throws IOException {
       String dbBucketKey =
           omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
               omBucketInfo.getBucketName());

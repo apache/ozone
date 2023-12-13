@@ -341,9 +341,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
+
   public OmMetadataManagerImpl(OzoneConfiguration conf,
-      OzoneManager ozoneManager, OMPerformanceMetrics perfMetrics)
-          throws IOException {
+                               OzoneManager ozoneManager,
+                               OMPerformanceMetrics perfMetrics)
+      throws IOException {
     this.ozoneManager = ozoneManager;
     this.lock = new OzoneManagerLock(conf);
     isRatisEnabled = conf.getBoolean(

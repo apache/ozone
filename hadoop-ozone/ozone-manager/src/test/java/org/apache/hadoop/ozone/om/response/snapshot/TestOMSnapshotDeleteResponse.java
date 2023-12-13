@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
@@ -53,7 +54,7 @@ public class TestOMSnapshotDeleteResponse {
   @TempDir
   private Path folder;
   
-  private OMMetadataManager omMetadataManager;
+  private OmMetadataManagerImpl omMetadataManager;
   private BatchOperation batchOperation;
   private OzoneConfiguration ozoneConfiguration;
 
@@ -64,7 +65,7 @@ public class TestOMSnapshotDeleteResponse {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
-                        new OMPerformanceMetrics());
+        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

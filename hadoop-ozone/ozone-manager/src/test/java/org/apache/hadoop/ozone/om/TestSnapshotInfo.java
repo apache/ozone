@@ -52,7 +52,7 @@ public class TestSnapshotInfo {
     conf.set(OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(conf, null,
-                        new OMPerformanceMetrics());
+        new OMPerformanceMetrics());
   }
 
   private SnapshotInfo createSnapshotInfo() {

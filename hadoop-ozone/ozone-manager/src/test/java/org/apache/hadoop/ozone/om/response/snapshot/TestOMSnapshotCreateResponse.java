@@ -75,7 +75,7 @@ public class TestOMSnapshotCreateResponse {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
-                        new OMPerformanceMetrics());
+        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

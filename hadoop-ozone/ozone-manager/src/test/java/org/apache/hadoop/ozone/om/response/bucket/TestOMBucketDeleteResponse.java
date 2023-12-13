@@ -62,7 +62,7 @@ public class TestOMBucketDeleteResponse {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null,
-                        new OMPerformanceMetrics());
+        new OMPerformanceMetrics());
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
@@ -102,7 +102,7 @@ public class TestOMBucketDeleteResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     Assertions.assertNull(omMetadataManager.getBucketTable().get(
-            omMetadataManager.getBucketKey(volumeName, bucketName)));
+        omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
 
 }
