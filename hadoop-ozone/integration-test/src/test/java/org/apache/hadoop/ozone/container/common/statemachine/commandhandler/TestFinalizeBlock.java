@@ -70,15 +70,15 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
  */
 public class TestFinalizeBlock {
 
-  private static OzoneClient client;
+  private OzoneClient client;
   /**
     * Set a timeout for each test.
     */
   @Rule
   public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static ObjectStore objectStore;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private ObjectStore objectStore;
   private static String volumeName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
 
