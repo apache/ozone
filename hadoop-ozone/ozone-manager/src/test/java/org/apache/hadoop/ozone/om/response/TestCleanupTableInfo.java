@@ -29,8 +29,10 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -273,7 +275,8 @@ public class TestCleanupTableInfo {
    * @throws IOException if I/O error occurs in setting up data store for the
    *                     metadata manager.
    */
-  private OmMetadataManagerImpl createOMMetadataManagerSpy() throws IOException {
+  private OmMetadataManagerImpl createOMMetadataManagerSpy()
+      throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
