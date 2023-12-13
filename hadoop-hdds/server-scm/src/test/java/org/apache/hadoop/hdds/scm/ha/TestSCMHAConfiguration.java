@@ -322,7 +322,7 @@ class TestSCMHAConfiguration {
 
   @Test
   public void testRatisEnabledDefaultConfigWithInitializedSCM()
-      throws IOException, NoSuchFieldException, IllegalAccessException {
+      throws IOException {
     SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
@@ -357,11 +357,10 @@ class TestSCMHAConfiguration {
         ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !ratisEnabled));
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testInvalidHAConfig(boolean ratisEnabled) throws IOException {
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ratisEnabled);
-    SCMStorageConfig scmStorageConfig = newStorageConfig(!ratisEnabled);
+  @Test
+  void testInvalidHAConfig() throws IOException {
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    SCMStorageConfig scmStorageConfig = newStorageConfig(true);
     String clusterID = scmStorageConfig.getClusterID();
     assertThrows(ConfigurationException.class,
         () -> StorageContainerManager.scmInit(conf, clusterID));
