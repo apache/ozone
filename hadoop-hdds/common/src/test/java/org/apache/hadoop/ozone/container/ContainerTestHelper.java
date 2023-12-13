@@ -626,7 +626,8 @@ public final class ContainerTestHelper {
       break;
     case FinalizeBlock:
       builder
-          .setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto.newBuilder()
+          .setFinalizeBlock(ContainerProtos
+            .FinalizeBlockRequestProto.newBuilder()
             .setBlockID(fakeBlockId).build());
       break;
 

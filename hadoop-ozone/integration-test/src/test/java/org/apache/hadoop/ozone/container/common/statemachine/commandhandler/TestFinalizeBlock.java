@@ -149,28 +149,36 @@ public class TestFinalizeBlock {
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.FinalizeBlock)
             .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString());
+            .setDatanodeUuid(cluster.getHddsDatanodes()
+            .get(0).getDatanodeDetails().getUuidString());
 
     final ContainerProtos.DatanodeBlockID blockId =
         ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(container.getContainerID()).setLocalID(
-                omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID())
+             omKeyLocationInfoGroupList.get(0)
+            .getLocationList().get(0).getLocalID())
             .setBlockCommitSequenceId(0).build();
 
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto.newBuilder().setBlockID(blockId).build());
+    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
+        .newBuilder().setBlockID(blockId).build());
 
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi xceiverClient = xceiverClientManager.acquireClient(pipeline);
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
 
     ContainerProtos.ContainerCommandRequestProto request = builder.build();
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
-    Assert.assertTrue(response.getFinalizeBlock().getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
+    Assert.assertTrue(response.getFinalizeBlock()
+        .getBlockData().getBlockID().getLocalID()
+        == omKeyLocationInfoGroupList.get(0)
+        .getLocationList().get(0).getLocalID());
 
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 1);
+    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
+        cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 1);
   }
 
   @Test
@@ -198,27 +206,35 @@ public class TestFinalizeBlock {
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.FinalizeBlock)
             .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString());
+            .setDatanodeUuid(cluster.getHddsDatanodes()
+             .get(0).getDatanodeDetails().getUuidString());
 
     final ContainerProtos.DatanodeBlockID blockId =
         ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(container.getContainerID()).setLocalID(
-                omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID())
+            omKeyLocationInfoGroupList.get(0)
+            .getLocationList().get(0).getLocalID())
             .setBlockCommitSequenceId(0).build();
 
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto.newBuilder().setBlockID(blockId).build());
+    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
+        .newBuilder().setBlockID(blockId).build());
 
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi xceiverClient = xceiverClientManager.acquireClient(pipeline);
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
 
     ContainerProtos.ContainerCommandRequestProto request = builder.build();
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
-    Assert.assertTrue(response.getFinalizeBlock().getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 1);
+    Assert.assertTrue(response.getFinalizeBlock()
+        .getBlockData().getBlockID().getLocalID()
+        == omKeyLocationInfoGroupList.get(0)
+        .getLocationList().get(0).getLocalID());
+    Assert.assertTrue(((KeyValueContainerData)
+        getContainerfromDN(cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 1);
 
     try {
       cluster.restartHddsDatanode(0, false);
@@ -226,8 +242,10 @@ public class TestFinalizeBlock {
     }
 
     // After restart DN, finalizeBlock should be loaded into memory
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 1);
+    Assert.assertTrue(((KeyValueContainerData)
+        getContainerfromDN(cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 1);
   }
 
   @Test
@@ -257,36 +275,47 @@ public class TestFinalizeBlock {
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.FinalizeBlock)
             .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString());
+            .setDatanodeUuid(cluster.getHddsDatanodes()
+            .get(0).getDatanodeDetails().getUuidString());
 
     final ContainerProtos.DatanodeBlockID blockId =
         ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(container.getContainerID()).setLocalID(
-                omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID())
+                omKeyLocationInfoGroupList.get(0)
+            .getLocationList().get(0).getLocalID())
             .setBlockCommitSequenceId(0).build();
 
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto.newBuilder().setBlockID(blockId).build());
+    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
+        .newBuilder().setBlockID(blockId).build());
 
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi xceiverClient = xceiverClientManager.acquireClient(pipeline);
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
     ContainerProtos.ContainerCommandRequestProto request = builder.build();
 
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
-    Assert.assertTrue(response.getFinalizeBlock().getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0).getLocationList().get(0).getLocalID());
+    Assert.assertTrue(response.getFinalizeBlock()
+        .getBlockData().getBlockID().getLocalID()
+        == omKeyLocationInfoGroupList.get(0)
+        .getLocationList().get(0).getLocalID());
 
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 1);
+    Assert.assertTrue(((KeyValueContainerData)
+        getContainerfromDN(cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 1);
 
-    OzoneTestUtils.closeAllContainers(cluster.getStorageContainerManager().getEventQueue(),
+    OzoneTestUtils.closeAllContainers(cluster
+            .getStorageContainerManager().getEventQueue(),
         cluster.getStorageContainerManager());
 
     try {
       // Finalize Block should be cleared from container data.
       GenericTestUtils.waitFor(() ->
-              ((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-              containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 0,
+              ((KeyValueContainerData)
+                  getContainerfromDN(cluster.getHddsDatanodes().get(0),
+              containerId.getId()).getContainerData())
+                  .getFinalizedBlockSet().size() == 0,
           500, 5 * 1000);
 
       // Restart DataNode
@@ -295,8 +324,10 @@ public class TestFinalizeBlock {
     }
 
     // After DN restart also there should not be any finalizeBlock
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 0);
+    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
+        cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 0);
   }
 
   /**
