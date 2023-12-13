@@ -35,6 +35,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +51,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration test to ensure a container can be closed and its replicas
@@ -144,6 +146,24 @@ public class TestCloseContainer {
     return assertDoesNotThrow(() -> cluster.getStorageContainerManager()
         .getContainerManager().getContainerReplicas(c.containerID()),
         "Unexpected exception while retrieving container replicas");
+  }
+
+  @Test
+  public void testCloseClosedContainer()
+      throws Exception {
+    // Create some keys to write data into the open containers
+    for (int i = 0; i < 10; i++) {
+      TestDataUtil.createKey(bucket, "key" + i, ReplicationFactor.THREE,
+          ReplicationType.RATIS, "this is the content");
+    }
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    // Pick any container on the cluster and close it via client
+    ContainerInfo container = scm.getContainerManager().getContainers().get(0);
+    OzoneTestUtils.closeContainer(scm, container);
+    assertThrows(IOException.class,
+        () -> cluster.getStorageContainerLocationClient()
+            .closeContainer(container.getContainerID()),
+        "Container " + container.getContainerID() + " already closed");
   }
 
 }
