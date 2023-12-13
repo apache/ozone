@@ -39,6 +39,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -49,6 +51,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
@@ -64,6 +67,8 @@ import org.apache.hadoop.http.FilterInitializer;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1757,5 +1762,33 @@ public final class HttpServer2 implements FilterContainer {
   @VisibleForTesting
   protected List<ServerConnector> getListeners() {
     return listeners;
+  }
+
+  /**
+   * Utility method to initialize config key ozone.http.basedir and create a
+   * temporary directory under the current working directory if not set.
+   *
+   * @param ozoneConfiguration current configuration.
+   * @throws IOException if unable to create a temp directory.
+   */
+  public static void setHttpBaseDir(OzoneConfiguration ozoneConfiguration)
+          throws IOException {
+    if (org.apache.commons.lang3.StringUtils.isEmpty(ozoneConfiguration.get(
+            OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
+      // Setting ozone.http.basedir to cwd if not set so that server setup
+      // doesn't fail.
+      File tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+              "ozone_http_tmp_base_dir").toFile();
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          FileUtils.deleteDirectory(tmpMetaDir);
+        } catch (IOException e) {
+          LOG.error("Failed to cleanup temporary metadata directory {}",
+                  tmpMetaDir.getAbsolutePath(), e);
+        }
+      }, 0);
+      ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+              tmpMetaDir.getAbsolutePath());
+    }
   }
 }

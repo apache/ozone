@@ -47,10 +47,6 @@ public final class CommandDispatcher {
   private final CommandHandlerMetrics commandHandlerMetrics;
 
   /**
-   * Constructs a command Dispatcher.
-   * @param context - Context.
-   */
-  /**
    * Constructs a command dispatcher.
    *
    * @param container - Ozone Container

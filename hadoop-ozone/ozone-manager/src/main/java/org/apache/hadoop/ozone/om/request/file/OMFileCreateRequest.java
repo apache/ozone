@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,11 +104,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
 
+    UserInfo userInfo = getUserInfo();
     if (keyArgs.getKeyName().length() == 0) {
       // Check if this is the root of the filesystem.
       // Not throwing exception here, as need to throw exception after
       // checking volume/bucket exists.
-      return getOmRequest().toBuilder().setUserInfo(getUserInfo()).build();
+      return getOmRequest().toBuilder().setUserInfo(userInfo).build();
     }
 
     long scmBlockSize = ozoneManager.getScmBlockSize();
@@ -140,7 +142,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
               ozoneManager.getOMServiceId(),
-              ozoneManager.getMetrics());
+              ozoneManager.getMetrics(),
+              keyArgs.getSortDatanodes(),
+              userInfo);
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)
@@ -156,7 +160,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
             .setClientID(UniqueId.next());
 
     return getOmRequest().toBuilder()
-        .setCreateFileRequest(newCreateFileRequest).setUserInfo(getUserInfo())
+        .setCreateFileRequest(newCreateFileRequest).setUserInfo(userInfo)
         .build();
   }
 

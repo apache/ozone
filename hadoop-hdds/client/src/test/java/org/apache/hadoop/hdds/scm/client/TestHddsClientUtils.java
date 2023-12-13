@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.client;
+package org.apache.hadoop.hdds.scm.client;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -30,13 +30,10 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -128,39 +125,13 @@ public class TestHddsClientUtils {
 
   }
 
-  private void checkAddr(OzoneConfiguration conf, String address,
-      int port) {
+  private void checkAddr(OzoneConfiguration conf, String address, int port) {
     Iterator<InetSocketAddress> scmAddrIterator =
         HddsUtils.getScmAddressForClients(conf).iterator();
     assertTrue(scmAddrIterator.hasNext());
     InetSocketAddress scmAddr = scmAddrIterator.next();
     assertThat(scmAddr.getHostString(), is(address));
     assertThat(scmAddr.getPort(), is(port));
-  }
-
-  @Test
-  public void testgetOmSocketAddress() {
-    final OzoneConfiguration conf = new OzoneConfiguration();
-
-    // First try a client address with just a host name. Verify it falls
-    // back to the default port.
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4");
-    InetSocketAddress addr = OmUtils.getOmAddress(conf);
-    assertThat(addr.getHostString(), is("1.2.3.4"));
-    assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
-
-    // Next try a client address with just a host name and port. Verify the port
-    // is ignored and the default OM port is used.
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4:100");
-    addr = OmUtils.getOmAddress(conf);
-    assertThat(addr.getHostString(), is("1.2.3.4"));
-    assertThat(addr.getPort(), is(100));
-
-    // Assert the we are able to use default configs if no value is specified.
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
-    addr = OmUtils.getOmAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
-    assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
   }
 
   @Test
