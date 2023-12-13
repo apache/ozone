@@ -112,11 +112,16 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test Container servers when security is enabled.
  */
 public class TestSecureContainerServer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestSecureContainerServer.class);
   private static final String TEST_DIR
       = GenericTestUtils.getTestDir("dfs").getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
@@ -247,7 +252,8 @@ public class TestSecureContainerServer {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       final XceiverServerSpi s = createServer.apply(dn, CONF);
       servers.add(s);
-      s.start();
+      startServerWithRetry(s, 5,
+          1000); // maxRetries = 5, retryDelayMillis = 1000 ms
       initServer.accept(dn, pipeline);
     }
 
@@ -340,4 +346,38 @@ public class TestSecureContainerServer {
         containerTokenSecretManager.createIdentifier(username, containerID)
     ).encodeToUrlString();
   }
+
+  private static void startServerWithRetry(XceiverServerSpi server,
+                                           int maxRetries,
+                                           long retryDelayMillis)
+      throws IOException {
+    boolean serverStarted = false;
+    for (int retry = 0; retry < maxRetries && !serverStarted; retry++) {
+      try {
+        // start the server
+        server.start();
+        serverStarted = true;
+      } catch (IOException e) {
+        if (e.getMessage().contains("Failed to bind")) {
+          LOG.warn("Failed to start server on attempt " + (retry + 1) +
+              ", retrying after delay", e);
+          try {
+            Thread.sleep(retryDelayMillis);
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IOException(
+                "Interrupted while waiting to retry server start", ie);
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    if (!serverStarted) {
+      throw new IOException(
+          "Failed to start server after " + maxRetries + " attempts");
+    }
+  }
+
 }
