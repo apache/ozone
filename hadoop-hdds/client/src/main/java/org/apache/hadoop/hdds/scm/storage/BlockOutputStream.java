@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.client.io.BlockOutPutStreamResourceProvider;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -134,6 +135,7 @@ public class BlockOutputStream extends OutputStream {
    * @param pipeline             pipeline where block will be written
    * @param bufferPool           pool of buffers
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockOutputStream(
       BlockID blockID,
       XceiverClientFactory xceiverClientManager,
@@ -141,7 +143,7 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -174,8 +176,7 @@ public class BlockOutputStream extends OutputStream {
             (long) flushPeriod * config.getStreamBufferSize() == config
                 .getStreamBufferFlushSize());
 
-    // A single thread executor handle the responses of async requests
-    responseExecutor = Executors.newSingleThreadExecutor();
+    this.responseExecutor = blockOutPutStreamResourceProvider.getThreadFactory();
     bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
@@ -183,7 +184,7 @@ public class BlockOutputStream extends OutputStream {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
-    this.clientMetrics = clientMetrics;
+    this.clientMetrics = blockOutPutStreamResourceProvider.getClientMetrics();
     this.pipeline = pipeline;
   }
 
@@ -244,7 +245,7 @@ public class BlockOutputStream extends OutputStream {
     return this.token;
   }
 
-  ExecutorService getResponseExecutor() {
+  Executor getResponseExecutor() {
     return this.responseExecutor;
   }
 
@@ -656,7 +657,6 @@ public class BlockOutputStream extends OutputStream {
       bufferList.clear();
     }
     bufferList = null;
-    responseExecutor.shutdown();
   }
 
   /**

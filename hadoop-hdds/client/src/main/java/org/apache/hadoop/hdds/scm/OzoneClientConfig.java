@@ -200,6 +200,21 @@ public class OzoneClientConfig {
   // 3 concurrent stripe read should be enough.
   private int ecReconstructStripeReadPoolLimit = 10 * 3;
 
+  @Config(key = "ec.reconstruct.stripe.write.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for parallelly write" +
+          " available ec chunks to reconstruct the whole stripe.",
+      tags = ConfigTag.CLIENT)
+  private int ecReconstructStripeWritePoolLimit = 10 * 3;
+
+  @Config(key = "ec.client.write.pool.limit",
+      defaultValue = "200",
+      description = "Maximum number of threads in the pool for handling client-side" +
+          " write operations in erasure coding. This setting controls the concurrency " +
+          "level for writing data blocks, ensuring efficient data processing and" +
+          " throughput while managing resource utilization.",
+      tags = ConfigTag.CLIENT)
+  private int ecClientWritePoolLimit = 200;
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -380,6 +395,22 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeReadPoolLimit() {
     return ecReconstructStripeReadPoolLimit;
+  }
+
+  public void setEcReconstructStripeWritePoolLimit(int poolLimit) {
+    this.ecReconstructStripeWritePoolLimit = poolLimit;
+  }
+
+  public int getEcReconstructStripeWritePoolLimit() {
+    return ecReconstructStripeWritePoolLimit;
+  }
+
+  public void setEcClientWritePoolLimit(int poolLimit) {
+    this.ecClientWritePoolLimit = poolLimit;
+  }
+
+  public int getEcClientWritePoolLimit() {
+    return ecClientWritePoolLimit;
   }
 
   public void setFsDefaultBucketLayout(String bucketLayout) {

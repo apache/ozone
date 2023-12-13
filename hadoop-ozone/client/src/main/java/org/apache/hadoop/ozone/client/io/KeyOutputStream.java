@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -104,7 +103,7 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
-      ContainerClientMetrics clientMetrics) {
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
     this.replication = replicationConfig;
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
@@ -113,7 +112,8 @@ public class KeyOutputStream extends OutputStream
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics);
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(
+        blockOutPutStreamResourceProvider);
   }
 
   @VisibleForTesting
@@ -150,9 +150,8 @@ public class KeyOutputStream extends OutputStream
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
-      ContainerClientMetrics clientMetrics,
-      boolean atomicKeyCreation
-  ) {
+      boolean atomicKeyCreation,
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
     this.config = config;
     this.replication = replicationConfig;
     blockOutputStreamEntryPool =
@@ -165,7 +164,7 @@ public class KeyOutputStream extends OutputStream
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId(),
-            clientMetrics);
+            blockOutPutStreamResourceProvider);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -606,7 +605,7 @@ public class KeyOutputStream extends OutputStream
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
-    private ContainerClientMetrics clientMetrics;
+    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
     private boolean atomicKeyCreation = false;
 
     public String getMultipartUploadID() {
@@ -699,13 +698,14 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
-    public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
-      this.clientMetrics = clientMetrics;
+    public Builder setBlockOutPutStreamResourceProvider(
+        BlockOutPutStreamResourceProvider provider) {
+      this.blockOutPutStreamResourceProvider = provider;
       return this;
     }
 
-    public ContainerClientMetrics getClientMetrics() {
-      return clientMetrics;
+    public BlockOutPutStreamResourceProvider getBlockOutPutStreamResourceProvider() {
+      return blockOutPutStreamResourceProvider;
     }
 
     public boolean getAtomicKeyCreation() {
@@ -724,8 +724,8 @@ public class KeyOutputStream extends OutputStream
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion,
-          clientMetrics,
-          atomicKeyCreation);
+          atomicKeyCreation,
+          blockOutPutStreamResourceProvider);
     }
 
   }

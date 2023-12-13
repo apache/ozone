@@ -22,12 +22,14 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.io.BlockOutPutStreamResourceProvider;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.concurrent.Executors;
 
 /**
  * OzoneOutputStream stub for testing.
@@ -75,7 +77,8 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
   @Override
   public KeyOutputStream getKeyOutputStream() {
     return new KeyOutputStream(
-        ReplicationConfig.getDefault(new OzoneConfiguration()), null) {
+        ReplicationConfig.getDefault(new OzoneConfiguration()),
+        BlockOutPutStreamResourceProvider.create(Executors::newSingleThreadExecutor, null)) {
       @Override
       public synchronized OmMultipartCommitUploadPartInfo
           getCommitUploadPartInfo() {
