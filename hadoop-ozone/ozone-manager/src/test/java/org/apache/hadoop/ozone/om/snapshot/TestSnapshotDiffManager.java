@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -640,7 +639,7 @@ public class TestSnapshotDiffManager {
       "true," + OmMetadataManagerImpl.KEY_TABLE})
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
-      throws NativeLibraryNotLoadedException, IOException, RocksDBException {
+      throws IOException, RocksDBException {
     Set<String> keysIncludingTombstones = IntStream.range(0, 100)
         .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
     // Mocking SST file with keys in SST file excluding tombstones

@@ -1060,40 +1060,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
           tablesToLookUp));
     }
-
-    try {
-      addToObjectIdMap(fsTable,
-          tsTable,
-          deltaFiles,
-          !skipNativeDiff && sstDumpTool.isPresent(),
-          oldObjIdToKeyMap,
-          newObjIdToKeyMap,
-          objectIdToIsDirMap,
-          oldParentIds,
-          newParentIds,
-          tablePrefixes);
-    } catch (NativeLibraryNotLoadedException e) {
-      LOG.warn("SSTDumpTool load failure, retrying without it.", e);
-      try {
-        // Workaround to handle deletes if use of native rockDB for reading
-        // tombstone fails.
-        // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
-        deltaFiles.addAll(getSSTFileListForSnapshot(
-            fromSnapshot, tablesToLookUp));
-        addToObjectIdMap(fsTable,
-            tsTable,
-            deltaFiles,
-            false,
-            oldObjIdToKeyMap,
-            newObjIdToKeyMap,
-            objectIdToIsDirMap,
-            oldParentIds,
-            newParentIds,
-            tablePrefixes);
-      } catch (NativeLibraryNotLoadedException ex) {
-        throw new IllegalStateException(ex);
-      }
-    }
+    addToObjectIdMap(fsTable, tsTable, deltaFiles,
+        !skipNativeDiff && sstDumpTool.isPresent(),
+        oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
+        newParentIds, tablePrefixes);
   }
 
   @VisibleForTesting
@@ -1106,8 +1076,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
-      Map<String, String> tablePrefixes) throws IOException,
-      NativeLibraryNotLoadedException, RocksDBException {
+      Map<String, String> tablePrefixes) throws IOException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }

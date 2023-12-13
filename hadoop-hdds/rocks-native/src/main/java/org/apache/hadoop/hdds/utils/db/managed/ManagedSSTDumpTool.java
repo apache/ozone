@@ -49,16 +49,14 @@ public class ManagedSSTDumpTool {
     this.executorService = executorService;
   }
 
-  public SSTDumpToolTask run(String[] args, ManagedOptions options)
-      throws NativeLibraryNotLoadedException {
+  public SSTDumpToolTask run(String[] args, ManagedOptions options) {
     PipeInputStream pipeInputStream = new PipeInputStream(bufferCapacity);
     return new SSTDumpToolTask(this.executorService.submit(() ->
         this.runInternal(args, options.getNativeHandle(),
             pipeInputStream.getNativeHandle())), pipeInputStream);
   }
 
-  public SSTDumpToolTask run(Map<String, String> args, ManagedOptions options)
-      throws NativeLibraryNotLoadedException {
+  public SSTDumpToolTask run(Map<String, String> args, ManagedOptions options) {
     return this.run(args.entrySet().stream().map(e -> "--"
         + (e.getValue() == null || e.getValue().isEmpty() ? e.getKey() :
         e.getKey() + "=" + e.getValue())).toArray(String[]::new), options);

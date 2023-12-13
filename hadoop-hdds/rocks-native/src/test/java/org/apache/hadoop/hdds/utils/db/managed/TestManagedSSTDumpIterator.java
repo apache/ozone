@@ -22,7 +22,6 @@ import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.apache.ozone.test.tag.Unhealthy;
@@ -248,7 +247,7 @@ class TestManagedSSTDumpIterator {
   @ParameterizedTest
   @MethodSource("invalidPipeInputStreamBytes")
   public void testInvalidSSTDumpIteratorWithKeyFormat(byte[] inputBytes)
-      throws NativeLibraryNotLoadedException, ExecutionException,
+      throws ExecutionException,
       InterruptedException, IOException {
     ByteArrayInputStream byteArrayInputStream =
         new ByteArrayInputStream(inputBytes);
