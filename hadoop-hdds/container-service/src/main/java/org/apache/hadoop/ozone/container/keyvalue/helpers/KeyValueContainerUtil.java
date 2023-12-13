@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
@@ -244,6 +245,7 @@ public final class KeyValueContainerUtil {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
         populateContainerMetadata(kvContainerData,
             db.getStore(), bCheckChunksFilePath);
+        populateContainerFinalizeBlock(kvContainerData, db.getStore());
       }
       return;
     }
@@ -363,6 +365,20 @@ public final class KeyValueContainerUtil {
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
     ContainerInspectorUtil.process(kvContainerData, store);
+  }
+
+  private static void populateContainerFinalizeBlock(
+      KeyValueContainerData kvContainerData, DatanodeStore store)
+      throws IOException {
+    Table<String, FinalizeBlockList> finalizeBlocksTable =
+        store.getFinalizeBlocksTable();
+
+    FinalizeBlockList finalizeBlockList =
+        finalizeBlocksTable.get(kvContainerData.getFinalizeBlockKey());
+
+    if (finalizeBlockList != null) {
+      kvContainerData.addAllToFinalizedBlockSet(finalizeBlockList.asList());
+    }
   }
 
   /**

@@ -102,6 +102,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getFinalizeBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
@@ -274,6 +275,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleGetSmallFile(request, kvContainer);
     case GetCommittedBlockLength:
       return handler.handleGetCommittedBlockLength(request, kvContainer);
+    case FinalizeBlock:
+      return handler.handleFinalizeBlock(request, kvContainer);
     default:
       return null;
     }
@@ -560,6 +563,48 @@ public class KeyValueHandler extends Handler {
     }
 
     return putBlockResponseSuccess(request, blockDataProto);
+  }
+
+  ContainerCommandResponseProto handleFinalizeBlock(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+
+    if (!request.hasFinalizeBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Finalize block request. trace ID: {}",
+            request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+    ContainerProtos.BlockData responseData;
+
+    try {
+      checkContainerOpen(kvContainer);
+      BlockID blockID = BlockID.getFromProtobuf(
+          request.getFinalizeBlock().getBlockID());
+      Preconditions.checkNotNull(blockID);
+
+      LOG.info("Finalized Block request received {} ", blockID);
+
+      responseData = blockManager.getBlock(kvContainer, blockID)
+          .getProtoBufMessage();
+
+      BlockData blockData = BlockData.getFromProtoBuf(responseData);
+
+      chunkManager.finalizeWriteChunk(kvContainer, blockData);
+      kvContainer.getContainerData()
+          .addToFinalizedBlockSet(blockData.getLocalID());
+      blockManager.finalizeBlock(kvContainer, blockData);
+
+      LOG.info("Block has been finalized {} ", blockID);
+
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(
+              "Finalize Block failed", ex, IO_EXCEPTION), request);
+    }
+    return getFinalizeBlockResponse(request, responseData);
   }
 
   /**
@@ -1160,6 +1205,15 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.close();
+
+      KeyValueContainerData containerData =
+          (KeyValueContainerData)container.getContainerData();
+      if (!containerData.getFinalizedBlockSet().isEmpty()) {
+        // delete from db and clear memory
+        containerData.clearFinalizedBlock();
+        blockManager.clearFinalizeBlock(container);
+      }
+
       ContainerLogger.logClosed(container.getContainerData());
       sendICR(container);
     } finally {
@@ -1231,6 +1285,16 @@ public class KeyValueHandler extends Handler {
       LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
           containerID);
     }
+  }
+
+  public void addFinalizedBlock(Container container, long localID) {
+    KeyValueContainer keyValueContainer = (KeyValueContainer)container;
+    keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
+  }
+
+  public boolean isFinalizedBlockExist(Container container, long localID) {
+    KeyValueContainer keyValueContainer = (KeyValueContainer)container;
+    return keyValueContainer.getContainerData().isFinalizedBlockExist(localID);
   }
 
   private String[] getFilesWithPrefix(String prefix, File chunkDir) {

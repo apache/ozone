@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 
 import java.util.List;
 import java.util.Map;
@@ -110,5 +111,11 @@ public class DatanodeSchemaOneDBDefinition
   @Override
   public Iterable<DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
     return () -> CollectionUtils.newIterator(COLUMN_FAMILIES.values());
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, FinalizeBlockList>
+      getFinalizeBlocksColumnFamily() {
+    return null;
   }
 }

@@ -91,6 +91,12 @@ public interface BlockManager {
   long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException;
 
+  void finalizeBlock(Container container, BlockData data)
+      throws IOException;
+
+  void clearFinalizeBlock(Container container)
+      throws IOException;
+
   int getDefaultReadBufferCapacity();
 
   /**

@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -211,6 +212,60 @@ public class BlockManagerImpl implements BlockManager {
                 + bcsId + " chunk size " + data.getChunks().size());
       }
       return data.getSize();
+    }
+  }
+
+  @Override
+  public void finalizeBlock(Container container, BlockData data)
+      throws IOException {
+    Preconditions.checkNotNull(data, "BlockData cannot " +
+        "be null for finalizeBlock operation.");
+    Preconditions.checkState(data.getContainerID() >= 0,
+        "Container Id cannot be negative");
+
+    KeyValueContainer kvContainer = (KeyValueContainer)container;
+    long localID = data.getLocalID();
+
+    kvContainer.removeFromPendingPutBlockCache(localID);
+
+    try (DBHandle db = BlockUtils.getDB(kvContainer.getContainerData(),
+        config)) {
+      // Should never fail.
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+
+      // persist finalizeBlock
+      try (BatchOperation batch = db.getStore().getBatchHandler()
+          .initBatchOperation()) {
+
+        FinalizeBlockList finalBlockList = new FinalizeBlockList(
+            new ArrayList<>(
+                kvContainer.getContainerData().getFinalizedBlockSet()));
+        db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
+            kvContainer.getContainerData().getFinalizeBlockKey(),
+            finalBlockList);
+
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+    }
+  }
+
+  @Override
+  public void clearFinalizeBlock(Container container)
+      throws IOException {
+    KeyValueContainer kvContainer = (KeyValueContainer)container;
+    try (DBHandle db = BlockUtils.getDB(
+        kvContainer.getContainerData(), config)) {
+      // Should never fail.
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+
+      // delete finalizeBlock
+      try (BatchOperation batch = db.getStore().getBatchHandler()
+          .initBatchOperation()) {
+
+        db.getStore().getFinalizeBlocksTable().deleteWithBatch(batch,
+            kvContainer.getContainerData().getFinalizeBlockKey());
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
     }
   }
 

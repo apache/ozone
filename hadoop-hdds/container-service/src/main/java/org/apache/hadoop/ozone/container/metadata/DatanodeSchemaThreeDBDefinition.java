@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 
@@ -92,6 +93,15 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.class));
 
+  public static final DBColumnFamilyDefinition<String, FinalizeBlockList>
+      FINALIZE_BLOCKS =
+      new DBColumnFamilyDefinition<>(
+          "finalize_blocks",
+          String.class,
+          FixedLengthStringCodec.get(),
+          FinalizeBlockList.class,
+          FinalizeBlockList.getCodec());
+
   private static String separator = "";
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
@@ -99,7 +109,9 @@ public class DatanodeSchemaThreeDBDefinition
          BLOCK_DATA,
          METADATA,
          DELETED_BLOCKS,
-         DELETE_TRANSACTION);
+         DELETE_TRANSACTION,
+         FINALIZE_BLOCKS);
+
 
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
@@ -122,6 +134,7 @@ public class DatanodeSchemaThreeDBDefinition
     METADATA.setCfOptions(cfOptions);
     DELETED_BLOCKS.setCfOptions(cfOptions);
     DELETE_TRANSACTION.setCfOptions(cfOptions);
+    FINALIZE_BLOCKS.setCfOptions(cfOptions);
   }
 
   @Override
@@ -149,6 +162,12 @@ public class DatanodeSchemaThreeDBDefinition
   public DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       getDeleteTransactionsColumnFamily() {
     return DELETE_TRANSACTION;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, FinalizeBlockList>
+      getFinalizeBlocksColumnFamily() {
+    return FINALIZE_BLOCKS;
   }
 
   public static int getContainerKeyPrefixLength() {

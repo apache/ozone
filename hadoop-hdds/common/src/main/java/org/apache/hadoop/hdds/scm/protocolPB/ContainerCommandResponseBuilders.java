@@ -318,6 +318,18 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
+  public static ContainerCommandResponseProto getFinalizeBlockResponse(
+      ContainerCommandRequestProto msg, BlockData data) {
+
+    ContainerProtos.FinalizeBlockResponseProto.Builder blockData =
+        ContainerProtos.FinalizeBlockResponseProto.newBuilder()
+        .setBlockData(data);
+
+    return getSuccessResponseBuilder(msg)
+        .setFinalizeBlock(blockData)
+        .build();
+  }
+
   private ContainerCommandResponseBuilders() {
     throw new UnsupportedOperationException("no instances");
   }

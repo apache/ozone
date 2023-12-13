@@ -94,6 +94,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.JavaUtils;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -376,8 +377,20 @@ public class ContainerStateMachine extends BaseStateMachine {
       ctxt.setException(ioe);
       return ctxt;
     }
-    if (proto.getCmdType() == Type.WriteChunk) {
+    if (proto.getCmdType() == Type.PutBlock) {
+      TransactionContext ctxt = discardRequest(request,
+          proto.getContainerID(), proto.getPutBlock().getBlockData()
+          .getBlockID().getLocalID());
+      if (ctxt != null) {
+        return ctxt;
+      }
+    } else if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
+      TransactionContext ctxt = discardRequest(request,
+          proto.getContainerID(), write.getBlockID().getLocalID());
+      if (ctxt != null) {
+        return ctxt;
+      }
       // create the log entry proto
       final WriteChunkRequestProto commitWriteChunkProto =
           WriteChunkRequestProto.newBuilder()
@@ -403,16 +416,32 @@ public class ContainerStateMachine extends BaseStateMachine {
           .setStateMachineData(write.getData())
           .setLogData(commitContainerCommandProto.toByteString())
           .build();
-    } else {
-      return TransactionContext.newBuilder()
+    } else if (proto.getCmdType() == Type.FinalizeBlock) {
+      containerController.addFinalizedBlock(proto.getContainerID(),
+          proto.getFinalizeBlock().getBlockID().getLocalID());
+    }
+    return TransactionContext.newBuilder()
+        .setClientRequest(request)
+        .setStateMachine(this)
+        .setServerRole(RaftPeerRole.LEADER)
+        .setStateMachineContext(startTime)
+        .setLogData(proto.toByteString())
+        .build();
+  }
+
+  @Nullable
+  private TransactionContext discardRequest(RaftClientRequest request,
+              long containerId, long localId) {
+    if (containerController.isFinalizedBlockExist(containerId, localId)) {
+      TransactionContext ctxt = TransactionContext.newBuilder()
           .setClientRequest(request)
           .setStateMachine(this)
           .setServerRole(RaftPeerRole.LEADER)
-          .setStateMachineContext(startTime)
-          .setLogData(proto.toByteString())
           .build();
+      ctxt.setException(new IOException("Block already finalized"));
+      return ctxt;
     }
-
+    return null;
   }
 
   private ByteString getStateMachineData(StateMachineLogEntryProto entryProto) {
