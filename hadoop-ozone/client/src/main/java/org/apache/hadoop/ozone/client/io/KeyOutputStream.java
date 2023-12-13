@@ -104,8 +104,9 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
-      ContainerClientMetrics clientMetrics) {
+      ContainerClientMetrics clientMetrics, OzoneClientConfig clientConfig) {
     this.replication = replicationConfig;
+    this.config = clientConfig;
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -113,7 +114,7 @@ public class KeyOutputStream extends OutputStream
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics);
+    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics, clientConfig);
   }
 
   @VisibleForTesting

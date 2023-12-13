@@ -27,7 +27,6 @@ import java.util.ListIterator;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -124,16 +123,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         Clock.system(ZoneOffset.UTC));
   }
 
-  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics,
+      OzoneClientConfig clientConfig) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
     xceiverClientFactory = null;
-    config =
-        new OzoneConfiguration().getObject(OzoneClientConfig.class);
-    config.setStreamBufferSize(0);
-    config.setStreamBufferMaxSize(0);
-    config.setStreamBufferFlushSize(0);
+    config = clientConfig;
     config.setStreamBufferFlushDelay(false);
     requestID = null;
     int chunkSize = 0;
