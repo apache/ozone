@@ -63,12 +63,4 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public Class<?> getParentType() {
     return OzoneAdmin.class;
   }
-
-  public static void checkContainerExists(ScmClient scmClient, long containerId)
-      throws IOException {
-    ContainerInfo container = scmClient.getContainer(containerId);
-    if (container == null) {
-      throw new IllegalArgumentException("No such container " + containerId);
-    }
-  }
 }
