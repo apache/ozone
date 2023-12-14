@@ -179,6 +179,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
                     repManager,
+                    true,
                     HddsProtos.LifeCycleState.CLOSED,
                     DECOMMISSIONED,
                     IN_SERVICE,
@@ -205,6 +206,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
                     repManager,
+                    false,
                     HddsProtos.LifeCycleState.CLOSED,
                     IN_SERVICE,
                     IN_SERVICE,
@@ -376,6 +378,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(
             repManager,
+            true,
             HddsProtos.LifeCycleState.DELETING,
             DECOMMISSIONED,
             IN_SERVICE);
@@ -404,6 +407,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCountForEC(
             repManager,
+            true,
             HddsProtos.LifeCycleState.CLOSED,
             new ECReplicationConfig(3, 2),
             Triple.of(DECOMMISSIONING, dn1, 1),
@@ -432,6 +436,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCountForEC(
             repManager,
+            false,
             HddsProtos.LifeCycleState.CLOSED,
             new ECReplicationConfig(3, 2),
             Triple.of(DECOMMISSIONING, dn1, 1),
@@ -459,6 +464,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
                     repManager,
+                    true,
                     HddsProtos.LifeCycleState.CLOSED,
                     DECOMMISSIONED,
                     IN_SERVICE,
@@ -496,6 +502,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
                     repManager,
+                    true,
                     HddsProtos.LifeCycleState.CLOSED,
                     DECOMMISSIONED,
                     IN_SERVICE,
@@ -590,12 +597,13 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
             .mockGetContainerReplicaCount(
                     repManager,
+                    true,
                     HddsProtos.LifeCycleState.CLOSED,
                     IN_MAINTENANCE,
                     ENTERING_MAINTENANCE,
                     IN_MAINTENANCE);
 
-    // Add the node to the monitor, it should transiting to
+    // Add the node to the monitor, it should transition to
     // REPLICATE_CONTAINERS as the containers are under-replicated for
     // maintenance.
     monitor.startMonitoring(dn1);
