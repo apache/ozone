@@ -17,15 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;

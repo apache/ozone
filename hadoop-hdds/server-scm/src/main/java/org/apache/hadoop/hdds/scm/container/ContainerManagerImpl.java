@@ -288,7 +288,7 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager
         .getContainerReplicas(id))
-        .orElseThrow(() -> new ContainerNotFoundException("Container with ID " +
+        .orElseThrow(() -> new ContainerNotFoundException("Container with id " +
             id + " not found."));
   }
 
