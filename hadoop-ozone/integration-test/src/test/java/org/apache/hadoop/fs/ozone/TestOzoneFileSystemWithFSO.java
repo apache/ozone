@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -296,7 +295,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     final Path sourceRoot = new Path(getFs().getUri().toString() + root);
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     //  rename should fail and return false
-    Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+    assertFalse(getFs().rename(sourceRoot, subDir1));
   }
 
   /**
@@ -316,13 +315,13 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
             + root + "/b/c");
 
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, destinPath));
+    assertFalse(getFs().rename(dir2SourcePath, destinPath));
     // (b) parent of dst is a file. /root_dir/file1/c
     Path filePath = new Path(getFs().getUri().toString() + root + "/file1");
     ContractTestUtils.touch(getFs(), filePath);
     Path newDestinPath = new Path(filePath, "c");
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
+    assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
   @Test
@@ -432,7 +431,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     // reset metrics
     long numKeys = getCluster().getOzoneManager().getMetrics().getNumKeys();
     getCluster().getOzoneManager().getMetrics().decNumKeys(numKeys);
-    Assert.assertEquals(0,
+    assertEquals(0,
         getCluster().getOzoneManager().getMetrics().getNumKeys());
 
     // Op 1. create dir -> /d1/d2/d3/d4/
@@ -445,7 +444,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         getCluster().getOzoneManager().getMetadataManager();
     OmBucketInfo omBucketInfo = omMgr.getBucketTable()
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
-    Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
+    assertNotNull("Failed to find bucketInfo", omBucketInfo);
 
     final long volumeId = omMgr.getVolumeId(getVolumeName());
     final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
@@ -463,7 +462,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         verifyDirKey(volumeId, bucketId, d3ObjectID,
                 "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
 
-    Assert.assertEquals("Wrong OM numKeys metrics", 4,
+    assertEquals("Wrong OM numKeys metrics", 4,
         getCluster().getOzoneManager().getMetrics().getNumKeys());
 
     // create sub-dirs under same parent
@@ -477,11 +476,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     long d6ObjectID =
         verifyDirKey(volumeId, bucketId, d4ObjectID,
                 "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
-    Assert.assertTrue(
+    assertTrue(
         "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
             + "/d6] of same parent!", d5ObjectID != d6ObjectID);
 
-    Assert.assertEquals("Wrong OM numKeys metrics", 6,
+    assertEquals("Wrong OM numKeys metrics", 6,
         getCluster().getOzoneManager().getMetrics().getNumKeys());
   }
 
@@ -497,7 +496,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         getCluster().getOzoneManager().getMetadataManager();
     OmBucketInfo omBucketInfo = omMgr.getBucketTable()
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
-    Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
+    assertNotNull("Failed to find bucketInfo", omBucketInfo);
 
     ArrayList<String> dirKeys = new ArrayList<>();
 
@@ -517,7 +516,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     outputStream.close();
 
     OmKeyInfo omKeyInfo = omMgr.getKeyTable(getBucketLayout()).get(openFileKey);
-    Assert.assertNotNull("Invalid Key!", omKeyInfo);
+    assertNotNull("Invalid Key!", omKeyInfo);
     verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
 
     // wait for DB updates
@@ -526,7 +525,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         return omMgr.getOpenKeyTable(getBucketLayout()).isEmpty();
       } catch (IOException e) {
         LOG.error("DB failure!", e);
-        Assert.fail("DB failure!");
+        fail("DB failure!");
         return false;
       }
     }, 1000, 120000);
@@ -572,11 +571,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
       long parentID) {
-    Assert.assertEquals("Wrong keyName", fileName, omKeyInfo.getKeyName());
-    Assert.assertEquals("Wrong parentID", parentID,
+    assertEquals("Wrong keyName", fileName, omKeyInfo.getKeyName());
+    assertEquals("Wrong parentID", parentID,
         omKeyInfo.getParentObjectID());
     String dbKey = parentID + OzoneConsts.OM_KEY_PREFIX + fileName;
-    Assert.assertEquals("Wrong path format", dbKey, omKeyInfo.getPath());
+    assertEquals("Wrong path format", dbKey, omKeyInfo.getPath());
   }
 
   long verifyDirKey(long volumeId, long bucketId, long parentId,
@@ -587,15 +586,15 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
             parentId + "/" + dirKey;
     dirKeys.add(dbKey);
     OmDirectoryInfo dirInfo = omMgr.getDirectoryTable().get(dbKey);
-    Assert.assertNotNull("Failed to find " + absolutePath +
+    assertNotNull("Failed to find " + absolutePath +
         " using dbKey: " + dbKey, dirInfo);
-    Assert.assertEquals("Parent Id mismatches", parentId,
+    assertEquals("Parent Id mismatches", parentId,
         dirInfo.getParentObjectID());
-    Assert.assertEquals("Mismatches directory name", dirKey,
+    assertEquals("Mismatches directory name", dirKey,
         dirInfo.getName());
-    Assert.assertTrue("Mismatches directory creation time param",
+    assertTrue("Mismatches directory creation time param",
         dirInfo.getCreationTime() > 0);
-    Assert.assertEquals("Mismatches directory modification time param",
+    assertEquals("Mismatches directory modification time param",
         dirInfo.getCreationTime(), dirInfo.getModificationTime());
     return dirInfo.getObjectID();
   }
