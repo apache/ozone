@@ -87,6 +87,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long unhealthyContainers = 0;
   private long underReplicatedContainers = 0;
 
+  /**
+   * Inner class for snapshot of Datanode ContainerState in
+   * Decommissioning and Maintenance mode workflow.
+   */
   public static final class TrackedNode {
 
     private DatanodeDetails datanodeDetails;
@@ -102,13 +106,23 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       return datanodeDetails.hashCode();
     }
 
+    @Override
+    public boolean equals(Object obj) {
+      return obj instanceof TrackedNode &&
+          datanodeDetails.equals(((TrackedNode) obj).datanodeDetails);
+    }
+
     public DatanodeDetails getDatanodeDetails() {
       return datanodeDetails;
     }
 
-    public long getStartTime() { return startTime; }
+    public long getStartTime() {
+      return startTime;
+    }
 
-    public void setStartTime(long startTime) { this.startTime = startTime; }
+    public void setStartTime(long startTime) {
+      this.startTime = startTime;
+    }
   }
 
   private Map<String, ContainerStateInWorkflow> containerStateByHost;

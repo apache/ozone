@@ -679,6 +679,7 @@ public class TestDatanodeAdminMonitor {
   private DatanodeDetails getFirstTrackedNode() {
     return
         monitor.getTrackedNodes().toArray(
-            new DatanodeAdminMonitorImpl.TrackedNode[0])[0].getDatanodeDetails();
+            new DatanodeAdminMonitorImpl.TrackedNode[0])[0]
+            .getDatanodeDetails();
   }
 }
