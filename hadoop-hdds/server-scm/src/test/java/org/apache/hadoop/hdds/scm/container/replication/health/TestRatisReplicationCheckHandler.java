@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -500,6 +501,43 @@ public class TestRatisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
+  @Test
+  public void shouldQueueForOverReplicationOnlyWhenSafe() {
+    ContainerInfo container =
+        createContainerInfo(repConfig, 1L, HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica mismatchedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED);
+    replicas.add(mismatchedReplica);
+    replicas.add(unhealthyReplica);
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+
+    ContainerHealthResult.OverReplicatedHealthResult
+        result = (ContainerHealthResult.OverReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+
+    assertEquals(ContainerHealthResult.HealthState.OVER_REPLICATED,
+        result.getHealthState());
+    assertEquals(1, result.getExcessRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+
+    // not safe for over replication because we don't have 3 matching replicas
+    assertFalse(result.isSafelyOverReplicated());
+
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
   /**
    * Scenario: CLOSED container with 2 CLOSED, 1 CLOSING and 3 UNHEALTHY
    * replicas.
@@ -538,6 +576,44 @@ public class TestRatisReplicationCheckHandler {
     // it should not be queued for over replication because there's a mis
     // matched replica
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * There is a CLOSED container with 3 CLOSED replicas and 1 QUASI_CLOSED
+   * replica with incorrect sequence ID. This container is over replicated
+   * because of the QUASI_CLOSED replica and should be queued for over
+   * replication.
+   */
+  @Test
+  public void testExcessQuasiClosedWithIncorrectSequenceID() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0);
+    ContainerReplica quasiClosed =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, container.getSequenceId() - 1);
+    replicas.add(quasiClosed);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    ContainerHealthResult result =
+        healthCheck.checkHealth(requestBuilder.build());
+
+    // there's an excess QUASI_CLOSED replica with incorrect sequence ID, so
+    // it's over replicated
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    OverReplicatedHealthResult overRepResult =
+        (OverReplicatedHealthResult) result;
+    assertEquals(1, overRepResult.getExcessRedundancy());
+    assertFalse(overRepResult.hasMismatchedReplicas());
+    assertFalse(overRepResult.isReplicatedOkAfterPending());
+
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     assertEquals(0, report.getStat(

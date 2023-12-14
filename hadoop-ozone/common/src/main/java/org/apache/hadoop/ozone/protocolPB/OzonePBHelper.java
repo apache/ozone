@@ -82,7 +82,7 @@ public final class OzonePBHelper {
             setIdentifier(getByteString(tok.getIdentifier())).
             setPassword(getByteString(tok.getPassword())).
             setKindBytes(getFixedByteString(tok.getKind())).
-            setServiceBytes(getFixedByteString(tok.getService()));
+            setServiceBytes(getByteString(tok.getService().getBytes()));
     return builder.build();
   }
 }

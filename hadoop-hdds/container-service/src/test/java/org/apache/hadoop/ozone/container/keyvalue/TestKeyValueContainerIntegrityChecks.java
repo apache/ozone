@@ -35,9 +35,7 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,13 +44,14 @@ import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Base class for tests identifying issues with key value container contents.
@@ -62,7 +61,7 @@ public class TestKeyValueContainerIntegrityChecks {
   static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
-  private final ContainerLayoutTestInfo containerLayoutTestInfo;
+  private ContainerLayoutTestInfo containerLayoutTestInfo;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
@@ -73,10 +72,9 @@ public class TestKeyValueContainerIntegrityChecks {
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  public TestKeyValueContainerIntegrityChecks(
-      ContainerTestVersionInfo versionInfo) {
-    LOG.info("new {} for {}", getClass().getSimpleName(), versionInfo);
-    this.conf = new OzoneConfiguration();
+  private void initialize(ContainerTestVersionInfo versionInfo) {
+    LOG.info("new TestKeyValueContainerIntegrityChecks for {}", versionInfo);
+    conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(
         versionInfo.getSchemaVersion(), conf);
     if (versionInfo.getLayout()
@@ -87,11 +85,12 @@ public class TestKeyValueContainerIntegrityChecks {
     }
   }
 
-  @Parameterized.Parameters public static Iterable<Object[]> data() {
-    return ContainerTestVersionInfo.versionParameters();
+  private static Stream<Object> data() {
+    return ContainerTestVersionInfo.versionParametersStream();
   }
 
-  @Before public void setUp() throws Exception {
+  public void setUp(ContainerTestVersionInfo versionInfo) throws Exception {
+    initialize(versionInfo);
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
@@ -103,7 +102,8 @@ public class TestKeyValueContainerIntegrityChecks {
     chunkManager = containerLayoutTestInfo.createChunkManager(true, null);
   }
 
-  @After public void teardown() {
+  @AfterEach
+  public void teardown() {
     BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);

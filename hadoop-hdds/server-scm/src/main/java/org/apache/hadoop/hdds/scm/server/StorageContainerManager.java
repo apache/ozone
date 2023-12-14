@@ -412,6 +412,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
               scmHAManager.getRatisServer());
+      if (!ratisEnabled) {
+        secretKeyManagerService.getSecretKeyManager().checkAndInitialize();
+      }
       serviceManager.register(secretKeyManagerService);
     } else {
       secretKeyManagerService = null;
@@ -806,7 +809,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
-      scmBlockManager = new BlockManagerImpl(conf, this);
+      scmBlockManager = new BlockManagerImpl(conf, scmConfig, this);
     }
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();

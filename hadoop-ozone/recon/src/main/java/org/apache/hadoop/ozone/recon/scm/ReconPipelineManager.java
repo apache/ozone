@@ -150,7 +150,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
         }
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-          closePipeline(p, false);
+          closePipeline(p.getId());
+          deletePipeline(p.getId());
         } catch (IOException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }

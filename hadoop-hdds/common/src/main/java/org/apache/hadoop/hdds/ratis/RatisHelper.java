@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -68,6 +67,8 @@ import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.TrustManager;
 
 /**
  * Ratis helper methods.
@@ -203,12 +204,23 @@ public final class RatisHelper {
         toRaftPeers(pipeline));
   }
 
+  /**
+   * Create a Raft client used primarily for Ozone client communications with
+   * the Ratis pipeline.
+   * @param rpcType rpc type
+   * @param pipeline pipeline
+   * @param retryPolicy retry policy
+   * @param tlsConfig tls config
+   * @param ozoneConfiguration configuration
+   * @return Raft client
+   * @throws IOException IOException
+   */
   public static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
-        toRaftPeer(pipeline.getFirstNode()),
+        toRaftPeer(pipeline.getClosestNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
@@ -395,11 +407,10 @@ public final class RatisHelper {
   // For External gRPC client to server with gRPC TLS.
   // No mTLS for external client as SCM CA does not issued certificates for them
   public static GrpcTlsConfig createTlsClientConfig(SecurityConfig conf,
-      List<X509Certificate> caCerts) {
+      TrustManager trustManager) {
     GrpcTlsConfig tlsConfig = null;
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      tlsConfig = new GrpcTlsConfig(null, null,
-          caCerts, false);
+      tlsConfig = new GrpcTlsConfig(null, trustManager, false);
     }
     return tlsConfig;
   }
@@ -447,14 +458,14 @@ public final class RatisHelper {
     RaftPeerId primaryId = null;
     List<RaftPeerId> raftPeers = new ArrayList<>();
 
-    for (DatanodeDetails dn : pipeline.getNodes()) {
+    for (DatanodeDetails dn : pipeline.getNodesInOrder()) {
       final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
       try {
-        if (dn == pipeline.getFirstNode()) {
+        if (dn == pipeline.getClosestNode()) {
           primaryId = raftPeerId;
         }
       } catch (IOException e) {
-        LOG.error("Can not get FirstNode from the pipeline: {} with " +
+        LOG.error("Can not get primary node from the pipeline: {} with " +
             "exception: {}", pipeline, e.getLocalizedMessage());
         return null;
       }

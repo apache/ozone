@@ -2223,7 +2223,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       if (omRatisServer != null) {
         omRatisServer.stop();
-        omRatisServer = null;
         OMHAMetrics.unRegister();
       }
       isOmRpcServerRunning = false;
@@ -2260,6 +2259,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omhaMetrics != null) {
         OMHAMetrics.unRegister();
       }
+      omRatisServer = null;
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -3027,25 +3027,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getRatisRoles() {
+  public List<List<String>> getRatisRoles() {
     List<ServiceInfo> serviceList;
+    List<List<String>> resultList = new ArrayList<>();
+    List<String> messageException = new ArrayList<>();
     int port = omNodeDetails.getRatisPort();
     RaftPeer leaderId;
     if (isRatisEnabled) {
+      if (null == omRatisServer) {
+        messageException.add("Server is shutting down");
+        resultList.add(messageException);
+        return resultList;
+      }
       try {
         leaderId = omRatisServer.getLeader();
         if (leaderId == null) {
           LOG.error("No leader found");
-          return "Exception: Not a leader";
+          messageException.add("Exception: Not a Leader");
+          resultList.add(messageException);
+          return resultList;
         }
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
-        return "Exception: " + e;
+        messageException.add("IO-Exception Occurred, " + e.getMessage());
+        resultList.add(messageException);
+        return resultList;
       }
       return OmUtils.format(serviceList, port, leaderId.getId().toString());
     } else {
-      return "Ratis-Disabled";
+      messageException.add("Ratis Disabled");
+      resultList.add(messageException);
+      return resultList;
     }
   }
 

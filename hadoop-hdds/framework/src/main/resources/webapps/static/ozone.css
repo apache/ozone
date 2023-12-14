@@ -87,3 +87,7 @@ body {
     word-wrap: break-word;
     table-layout: fixed;
 }
+
+.om-roles-background {
+    background-color: #dcfbcd!important;
+}

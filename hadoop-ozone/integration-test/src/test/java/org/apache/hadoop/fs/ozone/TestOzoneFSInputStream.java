@@ -48,27 +48,20 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Assertions;
 
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 
 /**
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
+@Timeout(300)
 public class TestOzoneFSInputStream {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static FileSystem fs;
@@ -84,7 +77,7 @@ public class TestOzoneFSInputStream {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -135,7 +128,7 @@ public class TestOzoneFSInputStream {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     IOUtils.cleanupWithLogger(null, client);
     fs.close();
@@ -154,11 +147,11 @@ public class TestOzoneFSInputStream {
           break;
         }
         value[i] = (byte) val;
-        Assert.assertEquals("value mismatch at:" + i, value[i], data[i]);
+        Assertions.assertEquals(value[i], data[i], "value mismatch at:" + i);
         i++;
       }
-      Assert.assertEquals(i, data.length);
-      Assert.assertArrayEquals(value, data);
+      Assertions.assertEquals(i, data.length);
+      Assertions.assertArrayEquals(value, data);
     }
   }
 
@@ -176,8 +169,8 @@ public class TestOzoneFSInputStream {
         System.arraycopy(tmp, 0, value, i * tmp.length, tmp.length);
         i++;
       }
-      Assert.assertEquals((long) i * tmp.length, data.length);
-      Assert.assertArrayEquals(value, data);
+      Assertions.assertEquals((long) i * tmp.length, data.length);
+      Assertions.assertArrayEquals(value, data);
     }
   }
 
@@ -188,12 +181,12 @@ public class TestOzoneFSInputStream {
       ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
       int byteRead = inputStream.read(buffer);
 
-      Assert.assertEquals(byteRead, 1024 * 1024);
+      Assertions.assertEquals(byteRead, 1024 * 1024);
 
       byte[] value = new byte[1024 * 1024];
       System.arraycopy(data, 0, value, 0, value.length);
 
-      Assert.assertArrayEquals(value, buffer.array());
+      Assertions.assertArrayEquals(value, buffer.array());
     }
   }
 
@@ -215,7 +208,7 @@ public class TestOzoneFSInputStream {
     in.sync(0);
     blockStart = in.getPosition();
     // The behavior should be consistent with HDFS
-    Assert.assertEquals(srcfile.length(), blockStart);
+    Assertions.assertEquals(srcfile.length(), blockStart);
     in.close();
   }
 
@@ -237,7 +230,7 @@ public class TestOzoneFSInputStream {
     in.sync(0);
     blockStart = in.getPosition();
     // The behavior should be consistent with HDFS
-    Assert.assertEquals(srcfile.length(), blockStart);
+    Assertions.assertEquals(srcfile.length(), blockStart);
     in.close();
   }
 }
