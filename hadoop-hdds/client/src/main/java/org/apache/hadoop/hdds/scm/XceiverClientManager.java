@@ -235,10 +235,6 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       // create different client different pipeline node based on
       // network topology
       String key = getPipelineCacheKey(pipeline, topologyAware);
-      // Append user short name to key to prevent a different user
-      // from using same instance of xceiverClient.
-      key = isSecurityEnabled ?
-          key + UserGroupInformation.getCurrentUser().getShortUserName() : key;
       return clientCache.get(key, new Callable<XceiverClientSpi>() {
         @Override
           public XceiverClientSpi call() throws Exception {
@@ -294,6 +290,17 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             DatanodeDetails.Port.Name.STANDALONE);
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
+            e.getMessage());
+      }
+    }
+
+    if (isSecurityEnabled) {
+      // Append user short name to key to prevent a different user
+      // from using same instance of xceiverClient.
+      try {
+        key += UserGroupInformation.getCurrentUser().getShortUserName();
+      } catch (IOException e) {
+        LOG.error("Failed to get current user to create pipeline cache key:" +
             e.getMessage());
       }
     }
