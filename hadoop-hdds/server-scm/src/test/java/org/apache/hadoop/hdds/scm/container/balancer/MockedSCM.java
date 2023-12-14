@@ -71,26 +71,22 @@ public final class MockedSCM {
   private final ContainerBalancerConfiguration balancerCfg;
   private final OzoneConfiguration ozoneCfg;
   private final MockNodeManager mockNodeManager;
+  private ContainerBalancer containerBalancer;
   private MockedReplicationManager mockedReplicaManager;
   private MoveManager moveManager;
   private ContainerManager containerManager;
 
   private MockedPlacementPolicies mockedPlacementPolicies;
 
-  private MockedSCM(@Nonnull TestableCluster testableCluster) {
+  private MockedSCM(@Nonnull TestableCluster testableCluster,
+                    @Nonnull OzoneConfiguration ozoneConfig,
+                    @Nonnull ContainerBalancerConfiguration balancerConfig
+  ) {
     scm = mock(StorageContainerManager.class);
-    ozoneCfg = new OzoneConfiguration();
     cluster = testableCluster;
     mockNodeManager = new MockNodeManager(cluster.getDatanodeToContainersMap());
-
-    // these configs will usually be specified in each test
-    balancerCfg = ozoneCfg.getObject(ContainerBalancerConfiguration.class);
-    balancerCfg.setThreshold(10);
-    balancerCfg.setIterations(1);
-    balancerCfg.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerCfg.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
-    balancerCfg.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
-    ozoneCfg.setFromObject(balancerCfg);
+    ozoneCfg = ozoneConfig;
+    balancerCfg = balancerConfig;
   }
 
   /**
@@ -119,15 +115,42 @@ public final class MockedSCM {
     when(scm.getStatefulServiceStateManager()).thenReturn(stateManager);
   }
 
+  private static @Nonnull ContainerBalancerConfiguration createBalancerCfg(@Nonnull OzoneConfiguration ozoneCfg) {
+    ContainerBalancerConfiguration balancerCfg = ozoneCfg.getObject(ContainerBalancerConfiguration.class);
+    balancerCfg.setThreshold(10);
+    balancerCfg.setIterations(1);
+    balancerCfg.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerCfg.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerCfg.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+    ozoneCfg.setFromObject(balancerCfg);
+    return balancerCfg;
+  }
+
   public static @Nonnull MockedSCM getMockedSCM(int datanodeCount) {
+    OzoneConfiguration ozoneCfg = new OzoneConfiguration();
+    ContainerBalancerConfiguration balancerCfg = createBalancerCfg(ozoneCfg);
+    return getMockedSCM(datanodeCount, ozoneCfg, balancerCfg);
+  }
+
+  public static @Nonnull MockedSCM getMockedSCM(
+      int datanodeCount,
+      @Nonnull OzoneConfiguration ozoneCfg,
+      @Nonnull ContainerBalancerConfiguration balancerCfg
+  ) {
     TestableCluster cluster = new TestableCluster(datanodeCount, STORAGE_UNIT);
-    MockedSCM mockedSCM = new MockedSCM(cluster);
+    MockedSCM mockedSCM = new MockedSCM(cluster, ozoneCfg, balancerCfg);
     try {
       mockedSCM.doMock();
+      mockedSCM.initContainerBalancer();
+
     } catch (IOException | NodeNotFoundException | TimeoutException e) {
       throw new RuntimeException("Can't initialize TestOzoneHDDS: ", e);
     }
     return mockedSCM;
+  }
+
+  private void initContainerBalancer() {
+    containerBalancer = new ContainerBalancer(scm);
   }
 
   @Override
@@ -140,7 +163,7 @@ public final class MockedSCM {
   }
 
   public @Nonnull ContainerBalancerTask startBalancerTask(
-      @Nonnull ContainerBalancer containerBalancer,
+      @Nonnull ContainerBalancer balancer,
       @Nonnull ContainerBalancerConfiguration config
   ) {
     ContainerBalancerTask task = new ContainerBalancerTask(scm, balancer, config);
@@ -190,6 +213,10 @@ public final class MockedSCM {
 
   public @Nonnull TestableCluster getCluster() {
     return cluster;
+  }
+
+  public @Nonnull ContainerBalancer getContainerBalancer() {
+    return containerBalancer;
   }
 
   public @Nonnull ContainerManager getContainerManager() {

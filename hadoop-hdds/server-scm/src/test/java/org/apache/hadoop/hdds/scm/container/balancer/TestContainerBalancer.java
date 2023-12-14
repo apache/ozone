@@ -18,35 +18,25 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import com.google.protobuf.ByteString;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
-import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
-import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link ContainerBalancer}.
@@ -55,73 +45,51 @@ import static org.mockito.Mockito.when;
 public class TestContainerBalancer {
   private static final Logger LOG = LoggerFactory.getLogger(TestContainerBalancer.class);
 
-  private ContainerBalancer containerBalancer;
-  private StorageContainerManager scm;
-  private ContainerBalancerConfiguration balancerConfiguration;
-  private final Map<String, ByteString> serviceToConfigMap = new HashMap<>();
-  private OzoneConfiguration conf;
+  private MockedSCM mockedScm;
 
+  @BeforeAll
+  public static void setupAll() {
+    GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
+  }
   /**
    * Sets up configuration values and creates a mock cluster.
    */
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException, TimeoutException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, 5, TimeUnit.SECONDS);
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 2, TimeUnit.SECONDS);
-    scm = Mockito.mock(StorageContainerManager.class);
-    StatefulServiceStateManager serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
-    balancerConfiguration = conf.getObject(ContainerBalancerConfiguration.class);
+
+    ContainerBalancerConfiguration balancerConfiguration = conf.getObject(ContainerBalancerConfiguration.class);
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(10);
-    // Note: this will make container balancer task to wait for running
-    // for 6 sec as default and ensure below test case have sufficient
-    // time to verify, and interrupt when stop.
+    // Note: this will make container balancer task to wait for running for 6 sec as default and
+    // ensure below test case have sufficient time to verify, and interrupt when stop.
     balancerConfiguration.setTriggerDuEnable(true);
     conf.setFromObject(balancerConfiguration);
-    GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
 
-    when(scm.getScmNodeManager()).thenReturn(mock(NodeManager.class));
-    when(scm.getScmContext()).thenReturn(SCMContext.emptyContext());
-    when(scm.getConfiguration()).thenReturn(conf);
-    when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
-    when(scm.getSCMServiceManager()).thenReturn(mock(SCMServiceManager.class));
-    when(scm.getMoveManager()).thenReturn(Mockito.mock(MoveManager.class));
-
-    // When StatefulServiceStateManager#saveConfiguration is called, save to in-memory serviceToConfigMap
-    // and read from same.
-    Mockito
-        .doAnswer(i -> {
-          serviceToConfigMap.put(i.getArgument(0, String.class), i.getArgument(1, ByteString.class));
-          return null;
-        })
-        .when(serviceStateManager)
-        .saveConfiguration(Mockito.any(String.class), Mockito.any(ByteString.class));
-
-    Mockito
-        .when(serviceStateManager.readConfiguration(Mockito.anyString()))
-        .thenAnswer(i -> serviceToConfigMap.get(i.getArgument(0, String.class)));
-
-    containerBalancer = new ContainerBalancer(scm);
+    mockedScm = MockedSCM.getMockedSCM(10, conf, balancerConfiguration);
   }
 
   @Test
   public void testShouldRun() throws Exception {
+    ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
     boolean doRun = containerBalancer.shouldRun();
     Assertions.assertFalse(doRun);
-    containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
+    containerBalancer.saveConfiguration(mockedScm.getBalancerConfig(), true, 0);
     doRun = containerBalancer.shouldRun();
     Assertions.assertTrue(doRun);
-    containerBalancer.saveConfiguration(balancerConfiguration, false, 0);
+    containerBalancer.saveConfiguration(mockedScm.getBalancerConfig(), false, 0);
     doRun = containerBalancer.shouldRun();
     Assertions.assertFalse(doRun);
   }
 
   @Test
   public void testStartBalancerStop() throws Exception {
-    startBalancer(balancerConfiguration);
+    ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
+    containerBalancer.startBalancer(mockedScm.getBalancerConfig());
     try {
-      containerBalancer.startBalancer(balancerConfiguration);
+      containerBalancer.startBalancer(mockedScm.getBalancerConfig());
       Assertions.fail("Exception should be thrown when startBalancer again");
     } catch (IllegalContainerBalancerStateException e) {
       // start failed again, valid case
@@ -149,7 +117,8 @@ public class TestContainerBalancer {
 
   @Test
   public void testStartStopSCMCalls() throws Exception {
-    containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
+    ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
+    containerBalancer.saveConfiguration(mockedScm.getBalancerConfig(), true, 0);
     containerBalancer.start();
     Assertions.assertSame(containerBalancer.getBalancerStatus(), ContainerBalancerTask.Status.RUNNING);
     containerBalancer.notifyStatusChanged();
@@ -164,13 +133,15 @@ public class TestContainerBalancer {
 
     containerBalancer.stop();
     Assertions.assertSame(containerBalancer.getBalancerStatus(), ContainerBalancerTask.Status.STOPPED);
-    containerBalancer.saveConfiguration(balancerConfiguration, false, 0);
+    containerBalancer.saveConfiguration(mockedScm.getBalancerConfig(), false, 0);
   }
 
   @Test
   public void testNotifyStateChangeStopStart() throws Exception {
-    containerBalancer.startBalancer(balancerConfiguration);
+    ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
+    containerBalancer.startBalancer(mockedScm.getBalancerConfig());
 
+    StorageContainerManager scm = mockedScm.getStorageContainerManager();
     scm.getScmContext().updateLeaderAndTerm(false, 1);
     Assertions.assertSame(containerBalancer.getBalancerStatus(), ContainerBalancerTask.Status.RUNNING);
     containerBalancer.notifyStatusChanged();
@@ -190,12 +161,12 @@ public class TestContainerBalancer {
    */
   @Test
   public void testValidationOfConfigurations() {
-    conf = new OzoneConfiguration();
-
+    OzoneConfiguration conf = mockedScm.getOzoneConfig();
     conf.setTimeDuration("hdds.container.balancer.move.replication.timeout", 60, TimeUnit.MINUTES);
     conf.setTimeDuration("hdds.container.balancer.move.timeout", 59, TimeUnit.MINUTES);
 
-    balancerConfiguration = conf.getObject(ContainerBalancerConfiguration.class);
+    ContainerBalancerConfiguration balancerConfiguration = mockedScm.getBalancerConfigByOzoneConfig(conf);
+    ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
     Assertions.assertThrowsExactly(
         InvalidContainerBalancerConfigurationException.class,
         () -> containerBalancer.startBalancer(balancerConfiguration),
@@ -210,14 +181,17 @@ public class TestContainerBalancer {
   public void testDelayedStartOnSCMStatusChange()
       throws IllegalContainerBalancerStateException, IOException, InvalidContainerBalancerConfigurationException,
       TimeoutException, InterruptedException {
-    long delayDuration = conf.getTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, 10, TimeUnit.SECONDS);
-    balancerConfiguration = conf.getObject(ContainerBalancerConfiguration.class);
+    OzoneConfiguration ozoneCfg = mockedScm.getOzoneConfig();
+    long delayDuration = ozoneCfg.getTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, 10, TimeUnit.SECONDS);
+    ContainerBalancerConfiguration balancerConfiguration = mockedScm.getBalancerConfigByOzoneConfig(ozoneCfg);
 
+    ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
     // Start the ContainerBalancer service.
     containerBalancer.startBalancer(balancerConfiguration);
     GenericTestUtils.waitFor(() -> containerBalancer.isBalancerRunning(), 1, 20);
     Assertions.assertTrue(containerBalancer.isBalancerRunning());
 
+    StorageContainerManager scm = mockedScm.getStorageContainerManager();
     // Balancer should stop the current balancing thread when it receives a status change notification
     scm.getScmContext().updateLeaderAndTerm(false, 1);
     containerBalancer.notifyStatusChanged();
@@ -238,13 +212,9 @@ public class TestContainerBalancer {
     stopBalancer();
   }
 
-  private void startBalancer(ContainerBalancerConfiguration config)
-      throws IllegalContainerBalancerStateException, IOException, InvalidContainerBalancerConfigurationException {
-    containerBalancer.startBalancer(config);
-  }
-
   private void stopBalancer() {
     try {
+      ContainerBalancer containerBalancer = mockedScm.getContainerBalancer();
       if (containerBalancer.isBalancerRunning()) {
         containerBalancer.stopBalancer();
       }
