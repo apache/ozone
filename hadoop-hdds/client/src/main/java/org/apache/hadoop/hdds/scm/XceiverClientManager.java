@@ -293,14 +293,16 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
             e.getMessage());
       }
     }
-    // Append user short name to key to prevent a different user
-    // from using same instance of xceiverClient.
-    try {
-      key = isSecurityEnabled ?
-          key + UserGroupInformation.getCurrentUser().getShortUserName() : key;
-    } catch (IOException e) {
-      LOG.error("Failed to get current user to create pipeline cache key:" +
-          e.getMessage());
+
+    if (isSecurityEnabled) {
+      // Append user short name to key to prevent a different user
+      // from using same instance of xceiverClient.
+      try {
+        key += UserGroupInformation.getCurrentUser().getShortUserName();
+      } catch (IOException e) {
+        LOG.error("Failed to get current user to create pipeline cache key:" +
+            e.getMessage());
+      }
     }
     return key;
   }
