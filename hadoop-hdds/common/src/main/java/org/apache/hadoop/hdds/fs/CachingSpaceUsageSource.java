@@ -81,7 +81,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   @Override
   public long getAvailable() {
-    return source.getAvailable();
+    return getCapacity() - getUsedSpace();
   }
 
   @Override

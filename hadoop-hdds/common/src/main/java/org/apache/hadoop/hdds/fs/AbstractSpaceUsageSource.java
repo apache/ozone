@@ -32,6 +32,7 @@ public abstract class AbstractSpaceUsageSource implements SpaceUsageSource {
 
   private final File file;
   private final String path;
+  private final long capacity;
 
   /**
    * @param file the path to check disk usage in
@@ -43,6 +44,7 @@ public abstract class AbstractSpaceUsageSource implements SpaceUsageSource {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+    capacity = file.getTotalSpace();
   }
 
   /**
@@ -87,6 +89,6 @@ public abstract class AbstractSpaceUsageSource implements SpaceUsageSource {
 
   @Override
   public long getCapacity() {
-    return file.getTotalSpace();
+    return capacity;
   }
 }
