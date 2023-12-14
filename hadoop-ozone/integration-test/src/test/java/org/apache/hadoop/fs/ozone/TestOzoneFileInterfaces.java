@@ -65,12 +65,12 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
 import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 
 import org.junit.Before;
@@ -466,7 +466,7 @@ public class TestOzoneFileInterfaces {
         cluster.getOzoneManager().getMetrics().getNumGetFileStatus();
     FileStatus status = fs.getFileStatus(path);
 
-    Assert.assertEquals(numFileStatus + 1,
+    assertEquals(numFileStatus + 1,
         cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
     assertTrue(status.isDirectory());
     assertEquals(FsPermission.getDirDefault(), status.getPermission());
@@ -481,7 +481,7 @@ public class TestOzoneFileInterfaces {
     OzoneFileStatus omStatus =
         cluster.getOzoneManager().getFileStatus(keyArgs);
     //Another get file status here, incremented the counter.
-    Assert.assertEquals(numFileStatus + 2,
+    assertEquals(numFileStatus + 2,
         cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
 
     assertTrue("The created path is not directory.", omStatus.isDirectory());
@@ -586,10 +586,10 @@ public class TestOzoneFileInterfaces {
 
       try {
         fs = FileSystem.get(fs.getConf());
-        Assert.fail("Should throw Exception due incompatible bucket layout");
+        fail("Should throw Exception due incompatible bucket layout");
       } catch (IllegalArgumentException iae) {
         // Expected exception
-        Assert.assertTrue(iae.getMessage().contains(
+        assertTrue(iae.getMessage().contains(
             "OBJECT_STORE, which does not support file system semantics"));
       }
     }
