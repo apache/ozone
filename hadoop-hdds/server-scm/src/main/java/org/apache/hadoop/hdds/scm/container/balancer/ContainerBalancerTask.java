@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
@@ -54,7 +55,7 @@ public class ContainerBalancerTask {
   private final ContainerBalancer containerBalancer;
   private final StorageContainerManager scm;
   private final ContainerBalancerConfiguration config;
-  private volatile Status taskStatus = Status.RUNNING;
+  private final AtomicReference<Status> taskStatus = new AtomicReference<>(Status.RUNNING);
   private ContainerBalanceIteration it;
   private IterationResult iterationResult = IterationResult.ITERATION_COMPLETED;
 
@@ -92,9 +93,7 @@ public class ContainerBalancerTask {
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
     } finally {
-      synchronized (this) {
-        taskStatus = Status.STOPPED;
-      }
+      taskStatus.set(Status.STOPPED);
     }
   }
 
@@ -102,11 +101,7 @@ public class ContainerBalancerTask {
    * Changes the status from RUNNING to STOPPING.
    */
   public void stop() {
-    synchronized (this) {
-      if (taskStatus == Status.RUNNING) {
-        taskStatus = Status.STOPPING;
-      }
-    }
+    taskStatus.compareAndSet(Status.RUNNING, Status.STOPPING);
   }
 
   private void balance(int nextIterationIndex, int iterationCount) {
@@ -237,14 +232,12 @@ public class ContainerBalancerTask {
    * @param stopReason a string specifying the reason for stop
    */
   private void tryStopWithSaveConfiguration(@Nonnull String stopReason) {
-    synchronized (this) {
-      try {
-        LOG.info("Save Configuration for stopping. Reason: {}", stopReason);
-        saveConfiguration(config, false, 0);
-        stop();
-      } catch (IOException | TimeoutException e) {
-        LOG.warn("Save configuration failed. Reason for stopping: {}", stopReason, e);
-      }
+    try {
+      LOG.info("Save Configuration for stopping. Reason: {}", stopReason);
+      saveConfiguration(config, false, 0);
+      stop();
+    } catch (IOException | TimeoutException e) {
+      LOG.warn("Save configuration failed. Reason for stopping: {}", stopReason, e);
     }
   }
 
@@ -355,12 +348,12 @@ public class ContainerBalancerTask {
     return iterationResult;
   }
 
-  public boolean isBalancerRunning() {
-    return taskStatus == Status.RUNNING;
+  private boolean isBalancerRunning() {
+    return taskStatus.get() == Status.RUNNING;
   }
 
   public Status getBalancerStatus() {
-    return taskStatus;
+    return taskStatus.get();
   }
 
   @Override
@@ -374,7 +367,7 @@ public class ContainerBalancerTask {
   /**
    * The status of {@link ContainerBalancerTask}.
    */
-  enum Status {
+  public enum Status {
     RUNNING,
     STOPPING,
     STOPPED
