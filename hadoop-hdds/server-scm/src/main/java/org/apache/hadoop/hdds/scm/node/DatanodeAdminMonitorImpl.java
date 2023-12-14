@@ -91,6 +91,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     private DatanodeDetails datanodeDetails;
 
+    private long startTime = 0L;
+
     public TrackedNode(DatanodeDetails datanodeDetails) {
       this.datanodeDetails = datanodeDetails;
     }
@@ -103,6 +105,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     public DatanodeDetails getDatanodeDetails() {
       return datanodeDetails;
     }
+
+    public long getStartTime() { return startTime; }
+
+    public void setStartTime(long startTime) { this.startTime = startTime; }
   }
 
   private Map<String, ContainerStateInWorkflow> containerStateByHost;
@@ -238,7 +244,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     while (!cancelledNodes.isEmpty()) {
       DatanodeDetails dn = cancelledNodes.poll();
       try {
-        stopTrackingNode(new TrackedNode(dn));
+        stopTrackingNode(dn);
         putNodeBackInService(dn);
         LOG.info("Recommissioned node {}", dn);
       } catch (NodeNotFoundException e) {
@@ -480,11 +486,13 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void startTrackingNode(DatanodeDetails dn) {
     eventQueue.fireEvent(SCMEvents.START_ADMIN_ON_NODE, dn);
-    trackedNodes.add(new TrackedNode(dn));
+    TrackedNode trackedNode = new TrackedNode(dn);
+    trackedNode.setStartTime(System.currentTimeMillis());
+    trackedNodes.add(trackedNode);
   }
 
-  private void stopTrackingNode(TrackedNode dn) {
-    trackedNodes.remove(dn);
+  private void stopTrackingNode(DatanodeDetails dn) {
+    trackedNodes.remove(new TrackedNode(dn));
   }
 
   /**
