@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.SchemaOneDeletedBlocksTable;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -69,6 +70,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTA
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -133,6 +135,11 @@ public class TestSchemaOneBackwardsCompatibility {
         metadataDir.getAbsolutePath());
   }
 
+  @AfterEach
+  public void cleanup() {
+    BlockUtils.shutdownCache(conf);
+  }
+
   /**
    * Because all tables in schema version one map back to the default table,
    * directly iterating any of the table instances should be forbidden.
@@ -156,13 +163,7 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   private void assertTableIteratorUnsupported(Table<?, ?> table) {
-    try {
-      table.iterator();
-      fail("Table iterator should have thrown " +
-          "UnsupportedOperationException.");
-    } catch (IOException | UnsupportedOperationException ex) {
-      // Exception thrown as expected.
-    }
+    assertThrows(UnsupportedOperationException.class, table::iterator);
   }
 
   /**
