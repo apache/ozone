@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -157,96 +158,102 @@ public class SnapshotDirectoryCleaningService
             continue;
           }
 
-          long volumeId = metadataManager
-              .getVolumeId(currSnapInfo.getVolumeName());
-          // Get bucketInfo for the snapshot bucket to get bucket layout.
-          String dbBucketKey = metadataManager
-              .getBucketKey(currSnapInfo.getVolumeName(),
-                  currSnapInfo.getBucketName());
-          OmBucketInfo bucketInfo = metadataManager
-              .getBucketTable().get(dbBucketKey);
-
-          if (bucketInfo == null) {
-            throw new IllegalStateException("Bucket " + "/" +
-                currSnapInfo.getVolumeName() + "/" + currSnapInfo
-                .getBucketName() + " is not found. BucketInfo should not be " +
-                "null for snapshotted bucket. The OM is in unexpected state.");
-          }
-
-          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
-              currSnapInfo, snapChainManager, omSnapshotManager);
-          SnapshotInfo previousToPrevSnapshot = null;
-
-          Table<String, OmKeyInfo> previousKeyTable = null;
-          Table<String, String> prevRenamedTable = null;
           ReferenceCounted<IOmMetadataReader, SnapshotCache>
               rcPrevOmSnapshot = null;
-
-          if (previousSnapshot != null) {
-            rcPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
-                previousSnapshot.getVolumeName(),
-                previousSnapshot.getBucketName(),
-                getSnapshotPrefix(previousSnapshot.getName()), false);
-            OmSnapshot omPreviousSnapshot = (OmSnapshot)
-                rcPrevOmSnapshot.get();
-
-            previousKeyTable = omPreviousSnapshot.getMetadataManager()
-                .getKeyTable(bucketInfo.getBucketLayout());
-            prevRenamedTable = omPreviousSnapshot
-                .getMetadataManager().getSnapshotRenamedTable();
-            previousToPrevSnapshot = getPreviousActiveSnapshot(
-                previousSnapshot, snapChainManager, omSnapshotManager);
-          }
-
-          Table<String, OmKeyInfo> previousToPrevKeyTable = null;
           ReferenceCounted<IOmMetadataReader, SnapshotCache>
               rcPrevToPrevOmSnapshot = null;
-          if (previousToPrevSnapshot != null) {
-            rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
-                previousToPrevSnapshot.getVolumeName(),
-                previousToPrevSnapshot.getBucketName(),
-                getSnapshotPrefix(previousToPrevSnapshot.getName()), false);
-            OmSnapshot omPreviousToPrevSnapshot = (OmSnapshot)
-                rcPrevToPrevOmSnapshot.get();
+          try {
+            long volumeId = metadataManager
+                .getVolumeId(currSnapInfo.getVolumeName());
+            // Get bucketInfo for the snapshot bucket to get bucket layout.
+            String dbBucketKey = metadataManager
+                .getBucketKey(currSnapInfo.getVolumeName(),
+                    currSnapInfo.getBucketName());
+            OmBucketInfo bucketInfo = metadataManager
+                .getBucketTable().get(dbBucketKey);
 
-            previousToPrevKeyTable = omPreviousToPrevSnapshot
-                .getMetadataManager()
-                .getKeyTable(bucketInfo.getBucketLayout());
-          }
+            if (bucketInfo == null) {
+              throw new IllegalStateException("Bucket " + "/" +
+                  currSnapInfo.getVolumeName() + "/" + currSnapInfo
+                  .getBucketName() +
+                  " is not found. BucketInfo should not be " +
+                  "null for snapshotted bucket. The OM is in " +
+                  "unexpected state.");
+            }
 
-          String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
-              currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                   rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
-              currSnapInfo.getVolumeName(),
-              currSnapInfo.getBucketName(),
-              getSnapshotPrefix(currSnapInfo.getName()),
-              false)) {
+            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
+                currSnapInfo, snapChainManager, omSnapshotManager);
+            SnapshotInfo previousToPrevSnapshot = null;
 
-            OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
-            Table<String, OmKeyInfo> snapDeletedDirTable =
-                currOmSnapshot.getMetadataManager().getDeletedDirTable();
+            Table<String, OmKeyInfo> previousKeyTable = null;
+            Table<String, String> prevRenamedTable = null;
 
-            try (TableIterator<String, ? extends Table.KeyValue<String,
-                OmKeyInfo>> deletedDirIterator = snapDeletedDirTable
-                .iterator(dbBucketKeyForDir)) {
+            if (previousSnapshot != null) {
+              rcPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
+                  previousSnapshot.getVolumeName(),
+                  previousSnapshot.getBucketName(),
+                  getSnapshotPrefix(previousSnapshot.getName()), false);
+              OmSnapshot omPreviousSnapshot = (OmSnapshot)
+                  rcPrevOmSnapshot.get();
 
-              while (deletedDirIterator.hasNext()) {
-                Table.KeyValue<String, OmKeyInfo> deletedDirInfo =
-                    deletedDirIterator.next();
+              previousKeyTable = omPreviousSnapshot.getMetadataManager()
+                  .getKeyTable(bucketInfo.getBucketLayout());
+              prevRenamedTable = omPreviousSnapshot
+                  .getMetadataManager().getSnapshotRenamedTable();
+              previousToPrevSnapshot = getPreviousActiveSnapshot(
+                  previousSnapshot, snapChainManager, omSnapshotManager);
+            }
 
-                // For each deleted directory we do an in-memory DFS and
-                // do a deep clean and exclusive size calculation.
-                iterateDirectoryTree(deletedDirInfo, volumeId, bucketInfo,
-                    previousSnapshot, previousToPrevSnapshot,
-                    currOmSnapshot, previousKeyTable, prevRenamedTable,
-                    previousToPrevKeyTable, dbBucketKeyForDir);
-              }
-              updateDeepCleanSnapshotDir(currSnapInfo.getTableKey());
-              if (previousSnapshot != null) {
-                updateExclusiveSize(previousSnapshot.getTableKey());
+            Table<String, OmKeyInfo> previousToPrevKeyTable = null;
+            if (previousToPrevSnapshot != null) {
+              rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
+                  previousToPrevSnapshot.getVolumeName(),
+                  previousToPrevSnapshot.getBucketName(),
+                  getSnapshotPrefix(previousToPrevSnapshot.getName()), false);
+              OmSnapshot omPreviousToPrevSnapshot = (OmSnapshot)
+                  rcPrevToPrevOmSnapshot.get();
+
+              previousToPrevKeyTable = omPreviousToPrevSnapshot
+                  .getMetadataManager()
+                  .getKeyTable(bucketInfo.getBucketLayout());
+            }
+
+            String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
+                currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
+            try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                     rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
+                currSnapInfo.getVolumeName(),
+                currSnapInfo.getBucketName(),
+                getSnapshotPrefix(currSnapInfo.getName()),
+                false)) {
+
+              OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
+              Table<String, OmKeyInfo> snapDeletedDirTable =
+                  currOmSnapshot.getMetadataManager().getDeletedDirTable();
+
+              try (TableIterator<String, ? extends Table.KeyValue<String,
+                  OmKeyInfo>> deletedDirIterator = snapDeletedDirTable
+                  .iterator(dbBucketKeyForDir)) {
+
+                while (deletedDirIterator.hasNext()) {
+                  Table.KeyValue<String, OmKeyInfo> deletedDirInfo =
+                      deletedDirIterator.next();
+
+                  // For each deleted directory we do an in-memory DFS and
+                  // do a deep clean and exclusive size calculation.
+                  iterateDirectoryTree(deletedDirInfo, volumeId, bucketInfo,
+                      previousSnapshot, previousToPrevSnapshot,
+                      currOmSnapshot, previousKeyTable, prevRenamedTable,
+                      previousToPrevKeyTable, dbBucketKeyForDir);
+                }
+                updateDeepCleanSnapshotDir(currSnapInfo.getTableKey());
+                if (previousSnapshot != null) {
+                  updateExclusiveSize(previousSnapshot.getTableKey());
+                }
               }
             }
+          } finally {
+            IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);
           }
         }
       } catch (IOException ex) {
@@ -273,8 +280,8 @@ public class SnapshotDirectoryCleaningService
         currOmSnapshot.getMetadataManager().getDirectoryTable();
     Table<String, String> snapRenamedTable =
         currOmSnapshot.getMetadataManager().getSnapshotRenamedTable();
-    Stack<StackNode> stackNodes =
-        new Stack<>();
+
+    Stack<StackNode> stackNodes = new Stack<>();
     OmDirectoryInfo omDeletedDirectoryInfo =
         getDirectoryInfo(deletedDirInfo.getValue());
     String dirPathDbKey = currOmSnapshot.getMetadataManager()
@@ -284,7 +291,7 @@ public class SnapshotDirectoryCleaningService
     StackNode topLevelDir = new StackNode();
     topLevelDir.setDirKey(dirPathDbKey);
     topLevelDir.setDirValue(omDeletedDirectoryInfo);
-    stackNodes.add(topLevelDir);
+    stackNodes.push(topLevelDir);
 
     try (
         TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
@@ -306,6 +313,7 @@ public class SnapshotDirectoryCleaningService
               previousKeyTable,
               prevRenamedTable,
               previousToPrevKeyTable);
+          // Format : /volId/bucketId/parentId/
           seekDirInDB = currOmSnapshot.getMetadataManager()
               .getOzonePathKey(volumeId, bucketInfo.getObjectID(),
                   stackTop.getDirValue().getObjectID(), "");
@@ -315,7 +323,7 @@ public class SnapshotDirectoryCleaningService
           // the call stack and process the next directories.
           seekDirInDB = stackTop.getSubDirSeek();
           directoryIterator.seek(seekDirInDB);
-          // We need skip to the next sub-directory because we already
+          // We need to skip to the next sub-directory because we already
           // processed the current sub-directory in the previous run.
           if (directoryIterator.hasNext()) {
             directoryIterator.next();
@@ -329,6 +337,8 @@ public class SnapshotDirectoryCleaningService
               directoryIterator.next();
           String deletedSubDirKey = deletedSubDirInfo.getKey();
 
+          // Convert /volId/bucketId/parentId/fileName to
+          // /volId/bucketId/parentId/
           String prefixCheck = currOmSnapshot.getMetadataManager()
               .getOzoneDeletePathDirKey(seekDirInDB);
           // Exit if it is out of the sub dir prefix scope.

@@ -556,9 +556,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keyInfo.getObjectID());
 
     String renamedKey = snapRenamedTable.getIfExist(dbRenameKey);
-    dbKeyPrevSnap = renamedKey != null ? renamedKey : dbKeyPrevSnap;
+    OmKeyInfo prevKeyInfo = renamedKey != null ?
+        previousKeyTable.get(renamedKey) :
+        previousKeyTable.get(dbKeyPrevSnap);
 
-    return previousKeyTable.get(dbKeyPrevSnap);
+    if (prevKeyInfo == null ||
+        prevKeyInfo.getObjectID() != keyInfo.getObjectID()) {
+      return null;
+    }
+
+    return isBlockLocationInfoSame(prevKeyInfo, keyInfo) ?
+        prevKeyInfo : null;
   }
 
   protected boolean isBufferLimitCrossed(

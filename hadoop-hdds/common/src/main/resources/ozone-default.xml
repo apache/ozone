@@ -3519,7 +3519,7 @@
     <value>300s</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
-      Timeout value for SnapshotDirectoryService.
+      Timeout value for SnapshotDirectoryCleaningService.
     </description>
   </property>
 
@@ -3528,7 +3528,7 @@
     <value>24h</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
-      The time interval between successive SnapshotDirectoryService
+      The time interval between successive SnapshotDirectoryCleaningService
       thread run.
     </description>
   </property>
