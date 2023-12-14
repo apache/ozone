@@ -147,15 +147,19 @@ public class OneReplicaPipelineSafeModeRule extends
         "reported Ratis/THREE pipelines with at least one datanode (=%d) "
             + ">= threshold (=%d)", getCurrentReportedPipelineCount(),
         getThresholdCount());
-    synchronized (reportedPipelineIDSet) {
-      Set<PipelineID> samplePipelines = oldPipelineIDSet.stream()
-          .filter(element -> !reportedPipelineIDSet.contains(element))
-          .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT).collect(Collectors.toSet());
-      if (!samplePipelines.isEmpty()) {
-        String samplePipelineText =
-            "Sample pipelines not satisfying the criteria : " + samplePipelines;
-        status = status.concat("\n").concat(samplePipelineText);
-      }
+    status = updateStatusTextWithSamplePipelines(status);
+    return status;
+  }
+
+  private synchronized String updateStatusTextWithSamplePipelines(
+      String status) {
+    Set<PipelineID> samplePipelines = oldPipelineIDSet.stream()
+        .filter(element -> !reportedPipelineIDSet.contains(element))
+        .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT).collect(Collectors.toSet());
+    if (!samplePipelines.isEmpty()) {
+      String samplePipelineText =
+          "Sample pipelines not satisfying the criteria : " + samplePipelines;
+      status = status.concat("\n").concat(samplePipelineText);
     }
     return status;
   }

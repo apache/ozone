@@ -206,16 +206,20 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         "healthy Ratis/THREE pipelines (=%d) >= healthyPipelineThresholdCount" +
             " (=%d)", getCurrentHealthyPipelineCount(),
         getHealthyPipelineThresholdCount());
-    synchronized (unProcessedPipelineSet) {
-      Set<PipelineID> samplePipelines =
-          unProcessedPipelineSet.stream().limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
-              .collect(Collectors.toSet());
+    status = updateStatusTextWithSamplePipelines(status);
+    return status;
+  }
 
-      if (!samplePipelines.isEmpty()) {
-        String samplePipelineText =
-            "Sample pipelines not satisfying the criteria : " + samplePipelines;
-        status = status.concat("\n").concat(samplePipelineText);
-      }
+  private synchronized String updateStatusTextWithSamplePipelines(
+      String status) {
+    Set<PipelineID> samplePipelines =
+        unProcessedPipelineSet.stream().limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
+            .collect(Collectors.toSet());
+
+    if (!samplePipelines.isEmpty()) {
+      String samplePipelineText =
+          "Sample pipelines not satisfying the criteria : " + samplePipelines;
+      status = status.concat("\n").concat(samplePipelineText);
     }
     return status;
   }
