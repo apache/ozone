@@ -36,9 +36,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GET_CONTAINER_MAX_RETRY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GET_CONTAINER_MAX_RETRY_DEFAULT;
-
 /**
  * Class to obtain a writable container for Ratis and Standalone pipelines.
  */
@@ -52,7 +49,7 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
-  private int maxRetryGetContainer;
+  private static final int MAX_RETRY_GET_CONTAINER = 4096;
 
 
   public WritableRatisContainerProvider(ConfigurationSource conf,
@@ -63,8 +60,6 @@ public class WritableRatisContainerProvider
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
-    this.maxRetryGetContainer = conf.getInt(OZONE_SCM_GET_CONTAINER_MAX_RETRY,
-        OZONE_SCM_GET_CONTAINER_MAX_RETRY_DEFAULT);
   }
 
 
@@ -93,7 +88,7 @@ public class WritableRatisContainerProvider
     //in downstream managers.
 
     int currentCount = 0;
-    while (currentCount < maxRetryGetContainer) {
+    while (currentCount < MAX_RETRY_GET_CONTAINER) {
       List<Pipeline> availablePipelines;
       Pipeline pipeline;
       // Acquire pipeline manager lock, to avoid any updates to pipeline
@@ -112,7 +107,7 @@ public class WritableRatisContainerProvider
         if (containerInfo != null) {
           // if containerID == -1, means Container allocation
           // failed on selected pipeline
-          if (containerInfo.getContainerID() != -1) {
+          if (containerInfo.getContainerID() != 0) {
             return containerInfo;
           } else {
             excludeList.addPipeline(containerInfo.getPipelineID());
@@ -177,7 +172,7 @@ public class WritableRatisContainerProvider
           containerInfo = selectContainer(availablePipelines, size, owner,
               excludeList);
           if (containerInfo != null) {
-            if (containerInfo.getContainerID() != -1) {
+            if (containerInfo.getContainerID() != 0) {
               return containerInfo;
             } else {
               excludeList.addPipeline(containerInfo.getPipelineID());

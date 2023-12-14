@@ -341,7 +341,7 @@ public class ContainerManagerImpl implements ContainerManager {
     } catch (Exception e) {
       LOG.warn("Container allocation failed on pipeline={}", pipeline, e);
       return new ContainerInfo.Builder()
-          .setContainerID(-1)
+          .setContainerID(0)
           .setPipelineID(pipeline.getId())
           .build();
     }

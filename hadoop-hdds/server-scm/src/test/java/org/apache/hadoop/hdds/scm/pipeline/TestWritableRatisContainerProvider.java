@@ -38,7 +38,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_GET_CONTAINER_MAX_RETRY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -93,8 +92,6 @@ public class TestWritableRatisContainerProvider {
   void setup(PipelineChoosePolicy policy) {
     conf = new OzoneConfiguration();
     testSCMGetContainerMaxRetry = 3;
-    conf.setInt(OZONE_SCM_GET_CONTAINER_MAX_RETRY,
-        testSCMGetContainerMaxRetry);
 
     repConfig = mock(ReplicationConfig.class);
     pipelineManager = mock(PipelineManager.class);
