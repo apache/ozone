@@ -362,19 +362,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        boolean isHealthy;
-        /*
-        If LegacyReplicationManager is enabled, then use the
-        isHealthyEnoughForOffline API. ReplicationManager doesn't support this
-        API yet.
-         */
-        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
-            ".legacy", false);
-        if (legacyEnabled) {
-          isHealthy = replicaSet.isHealthyEnoughForOffline();
-        } else {
-          isHealthy = replicaSet.isHealthy();
-        }
+        boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
         if (!isHealthy) {
           if (LOG.isDebugEnabled()) {
             unClosedIDs.add(cid);
@@ -391,6 +379,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         // state, except for any which are unhealthy. As the container is closed, we can check
         // if it is sufficiently replicated using replicationManager, but this only works if the
         // legacy RM is not enabled.
+        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
+            ".legacy", false);
         boolean replicatedOK;
         if (legacyEnabled) {
           replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager);
