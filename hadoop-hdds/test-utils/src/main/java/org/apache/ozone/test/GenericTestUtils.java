@@ -488,7 +488,7 @@ public abstract class GenericTestUtils {
     }
 
     public static String localhostWithFreePort() {
-      return HOST_ADDRESS + getFreePort();
+      return HOST_ADDRESS + ":" + getFreePort();
     }
 
     public static String anyHostWithFreePort() {
