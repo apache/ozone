@@ -1819,9 +1819,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <includeTestCode>true</includeTestCode>
                     <reason>Use JUnit5</reason>
                     <bannedImports>
-                      <bannedImport>org.junit.*</bannedImport>
-                      <bannedImport>static org.junit.*.*</bannedImport>
+                      <bannedImport>org.junit.**</bannedImport>
                     </bannedImports>
+                    <allowedImports>
+                      <allowedImport>org.junit.jupiter.**</allowedImport>
+                    </allowedImports>
                   </restrictImports>
                 </rules>
               </configuration>
