@@ -47,6 +47,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   private final ScheduledExecutorService executor;
   private final AtomicLong cachedValue = new AtomicLong();
+  private final AtomicLong cachedAvailable = new AtomicLong();
   private final Duration refresh;
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
@@ -81,7 +82,8 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   @Override
   public long getAvailable() {
-    return getCapacity() - getUsedSpace();
+    //return source.getAvailable();
+    return cachedAvailable.get();
   }
 
   @Override
@@ -91,10 +93,12 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
   public void incrementUsedSpace(long usedSpace) {
     cachedValue.addAndGet(usedSpace);
+    cachedAvailable.addAndGet(-1 * usedSpace);
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
     cachedValue.addAndGet(-1 * reclaimedSpace);
+    cachedAvailable.addAndGet(reclaimedSpace);
   }
 
   public void start() {
@@ -138,6 +142,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     if (isRefreshRunning.compareAndSet(false, true)) {
       try {
         cachedValue.set(source.getUsedSpace());
+        cachedAvailable.set(source.getAvailable());
       } catch (RuntimeException e) {
         LOG.warn("Error refreshing space usage for {}", source, e);
       } finally {
