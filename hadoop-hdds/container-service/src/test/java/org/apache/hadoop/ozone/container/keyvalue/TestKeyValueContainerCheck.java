@@ -50,10 +50,10 @@ public class TestKeyValueContainerCheck
    * Sanity test, when there are no corruptions induced.
    */
   @ParameterizedTest
-  @MethodSource("data")
+  @MethodSource("versionInfo")
   public void testKeyValueContainerCheckNoCorruption(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
@@ -86,10 +86,10 @@ public class TestKeyValueContainerCheck
    * Sanity test, when there are corruptions induced.
    */
   @ParameterizedTest
-  @MethodSource("data")
+  @MethodSource("versionInfo")
   public void testKeyValueContainerCheckCorruption(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
