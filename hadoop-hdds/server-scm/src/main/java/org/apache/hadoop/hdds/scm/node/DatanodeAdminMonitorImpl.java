@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,7 +43,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -78,7 +78,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private ReplicationManager replicationManager;
   private Queue<DatanodeDetails> pendingNodes = new ArrayDeque();
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
-  private Set<TrackedNode> trackedNodes = new HashSet<>();
+  private Map<String, TrackedNode> trackedNodes = new HashMap<>();
   private NodeDecommissionMetrics metrics;
   private long pipelinesWaitingToClose = 0;
   private long sufficientlyReplicatedContainers = 0;
@@ -180,11 +180,24 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   /**
    * Get the set of nodes which are currently tracked in the decommissioned
    * and maintenance workflow.
+   *
    * @return An unmodifiable set of the tracked nodes.
    */
   @Override
   public synchronized Set<TrackedNode> getTrackedNodes() {
-    return Collections.unmodifiableSet(trackedNodes);
+    return Collections.unmodifiableSet(new HashSet<>(trackedNodes
+        .values()));
+  }
+
+  /**
+   * Get a node which is currently tracked in the decommissioned
+   * or maintenance workflow.
+   *
+   * @return An unmodifiable set of the tracked nodes.
+   */
+  @VisibleForTesting
+  public synchronized TrackedNode getSingleTrackedNode(String host) {
+    return trackedNodes.get(host);
   }
 
   /**
@@ -275,23 +288,21 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void processTransitioningNodes() {
     resetContainerMetrics();
-    Iterator<TrackedNode> iterator = trackedNodes.iterator();
-
-    while (iterator.hasNext()) {
-      DatanodeDetails dn = iterator.next().getDatanodeDetails();
+    for (Map.Entry<String, TrackedNode> entry : trackedNodes.entrySet()) {
+      DatanodeDetails dn = entry.getValue().getDatanodeDetails();
       try {
         NodeStatus status = getNodeStatus(dn);
 
         if (!shouldContinueWorkflow(dn, status)) {
           abortWorkflow(dn);
-          iterator.remove();
+          trackedNodes.remove(dn.getHostName());
           continue;
         }
 
         if (status.isMaintenance()) {
           if (status.operationalStateExpired()) {
             completeMaintenance(dn);
-            iterator.remove();
+            trackedNodes.remove(dn.getHostName());
             continue;
           }
         }
@@ -312,10 +323,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
                   "continue. The node will be put back to IN_SERVICE and " +
                   "handled as a dead node", dn);
               putNodeBackInService(dn);
-              iterator.remove();
+              trackedNodes.remove(dn.getHostName());
             } else if (status.isDecommissioning()) {
               completeDecommission(dn);
-              iterator.remove();
+              trackedNodes.remove(dn.getHostName());
             } else if (status.isEnteringMaintenance()) {
               putIntoMaintenance(dn);
             }
@@ -326,7 +337,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         LOG.error("An unexpected error occurred processing datanode {}. " +
             "Aborting the admin workflow", dn, e);
         abortWorkflow(dn);
-        iterator.remove();
+        trackedNodes.remove(dn.getHostName());
       }
     }
   }
@@ -502,11 +513,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     eventQueue.fireEvent(SCMEvents.START_ADMIN_ON_NODE, dn);
     TrackedNode trackedNode = new TrackedNode(dn);
     trackedNode.setStartTime(System.currentTimeMillis());
-    trackedNodes.add(trackedNode);
+    trackedNodes.put(dn.getHostName(), trackedNode);
   }
 
   private void stopTrackingNode(DatanodeDetails dn) {
-    trackedNodes.remove(new TrackedNode(dn));
+    trackedNodes.remove(dn.getHostName());
   }
 
   /**

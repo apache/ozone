@@ -135,13 +135,10 @@ public final class NodeDecommissionMetrics implements MetricsSource {
 
   private Map<String, ContainerStateInWorkflow> metricsByHost;
 
-  private Map<String, Long> startTimeByHost;
-
   /** Private constructor. */
   private NodeDecommissionMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     metricsByHost = new HashMap<>();
-    startTimeByHost = new HashMap<>();
   }
 
   /**
@@ -189,20 +186,6 @@ public final class NodeDecommissionMetrics implements MetricsSource {
               e.getValue().getUnhealthyContainers());
     }
     recordBuilder.endRecord();
-
-    MetricsRecordBuilder secondRecordBuilder = recordBuilder;
-    for (Map.Entry<String, Long> e :
-        startTimeByHost.entrySet()) {
-      secondRecordBuilder = secondRecordBuilder.endRecord()
-          .addRecord(METRICS_SOURCE_NAME)
-          .add(new MetricsTag(Interns.info("datanode",
-              "datanode host in decommission maintenance workflow"),
-              e.getKey()))
-          .addGauge(Interns.info("DecommissionStartTimeDN",
-                  "Time at which decommission was started"),
-              e.getValue());
-    }
-    secondRecordBuilder.endRecord();
   }
 
   /**
@@ -269,15 +252,6 @@ public final class NodeDecommissionMetrics implements MetricsSource {
 
   public synchronized long getContainersSufficientlyReplicatedTotal() {
     return containersSufficientlyReplicatedTotal.value();
-  }
-
-  public synchronized void setDecommissionStartTimeByHost(
-      String host, long startTime) {
-    startTimeByHost.put(host, startTime);
-  }
-
-  public Long getStartTimeByHost(String host) {
-    return (startTimeByHost.get(host) == null ? 0L : startTimeByHost.get(host));
   }
 
   public synchronized void metricRecordOfContainerStateByHost(

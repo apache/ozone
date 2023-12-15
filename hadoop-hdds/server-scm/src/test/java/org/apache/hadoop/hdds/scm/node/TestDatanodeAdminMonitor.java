@@ -518,6 +518,34 @@ public class TestDatanodeAdminMonitor {
   }
 
   @Test
+  public void testStartTimeMetricWhenNodesDecommissioned()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+    nodeManager.setContainers(dn1, generateContainers(3));
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCount(
+            repManager,
+            HddsProtos.LifeCycleState.CLOSED,
+            DECOMMISSIONED,
+            IN_SERVICE,
+            IN_SERVICE);
+
+    long beforeTime = System.currentTimeMillis();
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    long afterTime = System.currentTimeMillis();
+
+    assertEquals(1, monitor.getTrackedNodeCount());
+    long monitoredTime = monitor.getSingleTrackedNode(dn1.getHostName())
+        .getStartTime();
+    assertTrue(monitoredTime >= beforeTime);
+    assertTrue(monitoredTime <= afterTime);
+  }
+
+  @Test
   public void testMaintenanceWaitsForMaintenanceToComplete()
       throws NodeNotFoundException {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();

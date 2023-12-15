@@ -368,8 +368,6 @@ public class NodeDecommissionManager {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
       monitor.startMonitoring(dn);
-      metrics.setDecommissionStartTimeByHost(dn.getHostName(),
-          System.currentTimeMillis());
     } else if (nodeStatus.isDecommission()) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to " +
           "do.", dn, opState);
@@ -496,10 +494,5 @@ public class NodeDecommissionManager {
             e);
       }
     });
-  }
-
-  @VisibleForTesting
-  public NodeDecommissionMetrics getNodeDecommissionMetrics() {
-    return this.metrics;
   }
 }
