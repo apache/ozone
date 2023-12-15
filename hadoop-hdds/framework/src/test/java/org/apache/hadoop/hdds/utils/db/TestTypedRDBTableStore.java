@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -240,6 +241,17 @@ public class TestTypedRDBTableStore {
         Assertions.assertEquals(iterCount, count);
 
       }
+    }
+  }
+
+  @Test
+  public void testIteratorOnException() throws Exception {
+    RDBTable rdbTable = Mockito.mock(RDBTable.class);
+    Mockito.when(rdbTable.iterator((CodecBuffer) null))
+        .thenThrow(new IOException());
+    try (Table<String, String> testTable = new TypedTable<>(rdbTable,
+        codecRegistry, String.class, String.class)) {
+      Assertions.assertThrows(IOException.class, testTable::iterator);
     }
   }
 

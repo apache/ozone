@@ -289,28 +289,31 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
-    try {
-      int threadPoolSize = conf.getInt(
-              OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
-              OMConfigKeys
-                  .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
-      int bufferSize = (int) conf.getStorageSize(
-          OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
-          OMConfigKeys
-              .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
-              StorageUnit.BYTES);
-      this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
-              threadPoolSize, 60, TimeUnit.SECONDS,
-              new SynchronousQueue<>(), new ThreadFactoryBuilder()
-          .setNameFormat(ozoneManager.getThreadNamePrefix() +
-              "snapshot-diff-manager-sst-dump-tool-TID-%d")
-              .build(),
-              new ThreadPoolExecutor.DiscardPolicy()));
-      return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecService.get(),
-          bufferSize));
-    } catch (NativeLibraryNotLoadedException e) {
-      this.sstDumpToolExecService.ifPresent(exec ->
-          closeExecutorService(exec, "SstDumpToolExecutor"));
+    if (conf.getBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
+        OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)) {
+      try {
+        int threadPoolSize = conf.getInt(
+                OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
+                OMConfigKeys
+                    .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
+        int bufferSize = (int) conf.getStorageSize(
+            OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
+            OMConfigKeys
+                .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
+                StorageUnit.BYTES);
+        this.sstDumpToolExecService = Optional.of(new ThreadPoolExecutor(0,
+                threadPoolSize, 60, TimeUnit.SECONDS,
+                new SynchronousQueue<>(), new ThreadFactoryBuilder()
+            .setNameFormat(ozoneManager.getThreadNamePrefix() +
+                "snapshot-diff-manager-sst-dump-tool-TID-%d")
+                .build(),
+                new ThreadPoolExecutor.DiscardPolicy()));
+        return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecService.get(),
+            bufferSize));
+      } catch (NativeLibraryNotLoadedException e) {
+        this.sstDumpToolExecService.ifPresent(exec ->
+            closeExecutorService(exec, "SstDumpToolExecutor"));
+      }
     }
     return Optional.empty();
   }
@@ -1057,40 +1060,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
           tablesToLookUp));
     }
-
-    try {
-      addToObjectIdMap(fsTable,
-          tsTable,
-          deltaFiles,
-          !skipNativeDiff && sstDumpTool.isPresent(),
-          oldObjIdToKeyMap,
-          newObjIdToKeyMap,
-          objectIdToIsDirMap,
-          oldParentIds,
-          newParentIds,
-          tablePrefixes);
-    } catch (NativeLibraryNotLoadedException e) {
-      LOG.warn("SSTDumpTool load failure, retrying without it.", e);
-      try {
-        // Workaround to handle deletes if use of native rockDB for reading
-        // tombstone fails.
-        // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
-        deltaFiles.addAll(getSSTFileListForSnapshot(
-            fromSnapshot, tablesToLookUp));
-        addToObjectIdMap(fsTable,
-            tsTable,
-            deltaFiles,
-            false,
-            oldObjIdToKeyMap,
-            newObjIdToKeyMap,
-            objectIdToIsDirMap,
-            oldParentIds,
-            newParentIds,
-            tablePrefixes);
-      } catch (NativeLibraryNotLoadedException ex) {
-        throw new IllegalStateException(ex);
-      }
-    }
+    addToObjectIdMap(fsTable, tsTable, deltaFiles,
+        !skipNativeDiff && sstDumpTool.isPresent(),
+        oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
+        newParentIds, tablePrefixes);
   }
 
   @VisibleForTesting
@@ -1103,8 +1076,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
-      Map<String, String> tablePrefixes) throws IOException,
-      NativeLibraryNotLoadedException, RocksDBException {
+      Map<String, String> tablePrefixes) throws IOException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }

@@ -142,6 +142,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * @param num               - number of blocks.
    * @param replicationConfig - replication configuration of the blocks.
    * @param excludeList       - exclude list while allocating blocks.
+   * @param clientMachine     - client address, depends, can be hostname or
+   *                            ipaddress.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */

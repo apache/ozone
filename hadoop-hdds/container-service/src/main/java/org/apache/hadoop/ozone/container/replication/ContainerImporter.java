@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +64,10 @@ public class ContainerImporter {
   private final Set<Long> importContainerProgress
       = Collections.synchronizedSet(new HashSet<>());
 
-  public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
-      ContainerController controller,
-      MutableVolumeSet volumeSet) {
+  public ContainerImporter(@NotNull ConfigurationSource conf,
+                           @NotNull ContainerSet containerSet,
+                           @NotNull ContainerController controller,
+                           @NotNull MutableVolumeSet volumeSet) {
     this.containerSet = containerSet;
     this.controller = controller;
     this.volumeSet = volumeSet;
