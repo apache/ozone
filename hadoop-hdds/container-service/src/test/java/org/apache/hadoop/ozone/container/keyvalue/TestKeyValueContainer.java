@@ -62,8 +62,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.Assume;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -133,10 +131,6 @@ public class TestKeyValueContainer {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, CONF);
   }
 
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void init(ContainerTestVersionInfo versionInfo) throws Exception {
     setVersionInfo(versionInfo);
     CodecBuffer.enableLeakDetection();
@@ -182,8 +176,7 @@ public class TestKeyValueContainer {
     CodecBuffer.assertNoLeaks();
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCreateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -209,8 +202,7 @@ public class TestKeyValueContainer {
   /**
    * Tests repair of containers affected by the bug reported in HDDS-6235.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testMissingChunksDirCreated(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -229,8 +221,7 @@ public class TestKeyValueContainer {
     Assertions.assertTrue(chunksDir.exists());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testNextVolumeTriedOnWriteFailure(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -268,8 +259,7 @@ public class TestKeyValueContainer {
     assertEquals(2, callCount.get());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testEmptyContainerImportExport(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -303,8 +293,7 @@ public class TestKeyValueContainer {
     checkContainerFilesPresent(data, 0);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testUnhealthyContainerImportExport(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -343,8 +332,7 @@ public class TestKeyValueContainer {
     assertEquals(numberOfKeysToWrite, keyValueContainerData.getBlockCount());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerImportExport(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -518,8 +506,7 @@ public class TestKeyValueContainer {
         ContainerProtos.ContainerDataProto.State.CLOSED);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void concurrentExport(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -552,8 +539,7 @@ public class TestKeyValueContainer {
     assertNull(failed.get());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDuplicateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -570,8 +556,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDiskFullExceptionCreateContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -588,8 +573,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -619,8 +603,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCloseContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -642,8 +625,7 @@ public class TestKeyValueContainer {
         keyValueContainerData.getState());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testReportOfUnhealthyContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -659,8 +641,7 @@ public class TestKeyValueContainer {
   }
 
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -684,8 +665,7 @@ public class TestKeyValueContainer {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainerUnsupportedRequest(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -706,8 +686,7 @@ public class TestKeyValueContainer {
   }
 
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerRocksDB(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -763,8 +742,7 @@ public class TestKeyValueContainer {
         ssdProfile.getColumnFamilyOptions(conf));
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDBProfileAffectsDBOptions(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -812,8 +790,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testKeyValueDataProtoBufMsg(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
@@ -842,8 +819,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -948,8 +924,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIsEmptyContainerStateWhileImport(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -998,8 +973,7 @@ public class TestKeyValueContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIsEmptyContainerStateWhileImportWithoutBlock(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -1051,8 +1025,7 @@ public class TestKeyValueContainer {
   /**
    * Test import schema V2 replica to V3 enabled HddsVolume.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testImportV2ReplicaToV3HddsVolume(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -1069,8 +1042,7 @@ public class TestKeyValueContainer {
   /**
    * Test import schema V3 replica to V3 disabled HddsVolume.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testImportV3ReplicaToV2HddsVolume(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);

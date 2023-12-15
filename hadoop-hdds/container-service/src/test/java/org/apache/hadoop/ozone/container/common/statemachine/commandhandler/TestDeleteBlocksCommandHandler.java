@@ -33,8 +33,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -90,10 +88,6 @@ public class TestDeleteBlocksCommandHandler {
     setup();
   }
 
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void setup() throws Exception {
     conf = new OzoneConfiguration();
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -136,8 +130,7 @@ public class TestDeleteBlocksCommandHandler {
     BlockDeletingServiceMetrics.unRegister();
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteBlocksCommandHandler(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
@@ -163,8 +156,7 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteBlocksCommandHandlerWithTimeoutFailed(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
@@ -212,8 +204,7 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteBlocksCommandHandlerSuccessfulAfterFirstTimeout(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
@@ -263,8 +254,7 @@ public class TestDeleteBlocksCommandHandler {
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteCmdWorkerInterval(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
