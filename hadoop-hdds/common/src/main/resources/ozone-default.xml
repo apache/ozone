@@ -4189,6 +4189,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.load.native.lib</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Load native library for performing optimized snapshot diff.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.sst_dumptool.buffer.size</name>
     <value>8KB</value>
     <tag>OZONE, OM</tag>
