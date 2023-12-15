@@ -136,6 +136,7 @@ public class SCMNodeManager implements NodeManager {
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
   private final String opeState = "OPSTATE";
   private final String comState = "COMSTATE";
+  private final String lastHeartbeat = "LASTHEARTBEAT";
   /**
    * Constructs SCM machine Manager.
    */
@@ -1061,13 +1062,16 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
       String opstate = "";
       String healthState = "";
+      String heartbeatTimeDiff = "";
       if (dni.getNodeStatus() != null) {
         opstate = dni.getNodeStatus().getOperationalState().toString();
         healthState = dni.getNodeStatus().getHealth().toString();
+        heartbeatTimeDiff = getLastHeartbeatTimeDiff(dni.getLastHeartbeatTime());
       }
       Map<String, String> map = new HashMap<>();
       map.put(opeState, opstate);
       map.put(comState, healthState);
+      map.put(lastHeartbeat, heartbeatTimeDiff);
       if (httpPort != null) {
         map.put(httpPort.getName().toString(), httpPort.getValue().toString());
       }
@@ -1078,6 +1082,48 @@ public class SCMNodeManager implements NodeManager {
       nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Based on the current time and the last heartbeat, calculate the time difference
+   * and get a string of the relative value. E.g. "2s ago", "1m 2s ago", etc.
+   *
+   * @return string with the relative value of the time diff.
+   */
+  public String getLastHeartbeatTimeDiff(long lastHeartbeatTime) {
+    long currentTime = Time.monotonicNow();
+    long timeDiff = currentTime - lastHeartbeatTime;
+
+    // Time is in ms. Calculate total time in seconds.
+    long seconds = timeDiff / 1000;
+    // Calculate days and subtract them from seconds.
+    long days = seconds / (24 * 60 * 60);
+    seconds -= days * 24 * 60 * 60;
+    // Calculate hours and subtract them from seconds.
+    long hours = seconds / (60 * 60);
+    seconds -= hours * 60 * 60;
+    // Calculate minutes and subtract them from seconds.
+    long minutes = seconds / 60;
+    seconds -= minutes * 60;
+
+    StringBuilder stringBuilder = new StringBuilder();
+    if (days > 0) {
+      stringBuilder.append(days).append("d ");
+    }
+    if (hours > 0) {
+      stringBuilder.append(hours).append("h ");
+    }
+    if (minutes > 0) {
+      stringBuilder.append(minutes).append("m ");
+    }
+    if (seconds > 0) {
+      stringBuilder.append(seconds).append("s ");
+    }
+    String str = stringBuilder.length() == 0 ? "Just now" : "ago";
+
+    stringBuilder.append(str);
+
+    return stringBuilder.toString();
   }
 
   private enum UsageMetrics {
