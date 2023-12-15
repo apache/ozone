@@ -111,7 +111,7 @@ public class TestWritableRatisContainerProvider {
         any(Pipeline.PipelineState.class), anyCollection(),
         anyCollection())).thenReturn(pipelines);
     ContainerInfo containerInfo = mock(ContainerInfo.class);
-    when(containerInfo.getContainerID()).thenReturn(-1L);
+    when(containerInfo.getContainerID()).thenReturn(0L);
     when(containerManager.getMatchingContainer(anyLong(), anyString(),
         any(Pipeline.class), anySet())).thenReturn(containerInfo);
 
@@ -150,7 +150,7 @@ public class TestWritableRatisContainerProvider {
         .thenReturn(pipeline1);
 
     ContainerInfo containerInfo = mock(ContainerInfo.class);
-    when(containerInfo.getContainerID()).thenReturn(-1L);
+    when(containerInfo.getContainerID()).thenReturn(0L);
 
     PipelineID pipelineID2 = PipelineID.valueOf(UUID.randomUUID());
 
