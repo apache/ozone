@@ -82,16 +82,4 @@ public final class ReconConfigKeys {
 
   public static final String OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD
       = "ozone.recon.task.safemode.wait.threshold";
-
-  public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
-      "ozone.recon.scmclient.rpc.timeout";
-
-  public static final long OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT =
-      1 * 60 * 1000L;
-
-  public static final String OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY =
-      "ozone.recon.scmclient.failover.max.retry";
-
-  public static final int
-      OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
 }

@@ -101,15 +101,17 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
@@ -188,15 +190,21 @@ public class ReconStorageContainerManagerFacade
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
-    long scmClientRPCTimeOut = ozoneConfiguration.getLong(
+    long scmClientRPCTimeOut = ozoneConfiguration.getTimeDuration(
         OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY,
-        OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT);
+        OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    long scmClientMaxRetryTimeOut = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY,
+        OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
     int scmClientFailOverMaxRetryCount = ozoneConfiguration.getInt(
         OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY,
         OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT);
     SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     scmClientConfig.setRpcTimeOut(scmClientRPCTimeOut);
     scmClientConfig.setRetryCount(scmClientFailOverMaxRetryCount);
+    scmClientConfig.setMaxRetryTimeout(scmClientMaxRetryTimeOut);
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
