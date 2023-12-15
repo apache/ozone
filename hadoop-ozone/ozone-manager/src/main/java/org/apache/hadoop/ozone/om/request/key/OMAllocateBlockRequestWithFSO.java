@@ -218,8 +218,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
           .setBucketName(bucketName)
           .setKeyName(keyName)
           .setOmMetadataManager(omMetadataManager)
-          .setClientID(clientID)
-          .build().getOpenFileName();
+          .build().getOpenFileName(clientID);
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,

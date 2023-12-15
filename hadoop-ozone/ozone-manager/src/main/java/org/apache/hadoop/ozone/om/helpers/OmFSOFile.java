@@ -35,7 +35,6 @@ public final class OmFSOFile {
   private String bucketName;
   private String keyName;
   private OMMetadataManager omMetadataManager;
-  private long clientID;
 
   private String fileName;
   private Iterator<Path> pathComponents;
@@ -46,14 +45,13 @@ public final class OmFSOFile {
 
   @SuppressWarnings("checkstyle:parameternumber")
   private OmFSOFile(String volumeName, String bucketName, String keyName, 
-      OMMetadataManager omMetadataManager, long clientID,
+      OMMetadataManager omMetadataManager,
       String fileName, Iterator<Path> pathComponents, long volumeId,
       long bucketId, long parentID) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.omMetadataManager = omMetadataManager;
-    this.clientID = clientID;
 
     this.fileName = fileName;
     this.pathComponents = pathComponents;
@@ -70,7 +68,6 @@ public final class OmFSOFile {
     private String bucketName;
     private String keyName;
     private OMMetadataManager omMetadataManager;
-    private long clientID;
     private String errMsg;
 
     public Builder() {
@@ -97,11 +94,6 @@ public final class OmFSOFile {
       return this;
     }
 
-    public Builder setClientID(long clientID) {
-      this.clientID = clientID;
-      return this;
-    }
-
     public Builder setErrMsg(String errMsg) {
       this.errMsg = errMsg;
       return this;
@@ -118,7 +110,7 @@ public final class OmFSOFile {
           this.omMetadataManager, this.errMsg);
 
       return new OmFSOFile(volumeName, bucketName, keyName, 
-          omMetadataManager, clientID, fileName, pathComponents, 
+          omMetadataManager, fileName, pathComponents, 
           volumeId, bucketId, parentID);
     }
   }
@@ -137,10 +129,6 @@ public final class OmFSOFile {
 
   public OMMetadataManager getOmMetadataManager() {
     return this.omMetadataManager;
-  }
-
-  public long getClientID() {
-    return this.clientID;
   }
 
   public String getFileName() {
@@ -163,9 +151,9 @@ public final class OmFSOFile {
     return this.pathComponents;
   }
 
-  public String getOpenFileName() {
+  public String getOpenFileName(long clientID) {
     return omMetadataManager.getOpenFileName(this.volumeId, this.bucketId,
-        this.parentID, this.fileName, this.clientID);
+        this.parentID, this.fileName, clientID);
   }
 
   public String getOzonePathKey() {

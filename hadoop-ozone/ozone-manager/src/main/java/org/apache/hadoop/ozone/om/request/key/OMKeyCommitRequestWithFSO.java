@@ -143,14 +143,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           .setBucketName(bucketName)
           .setKeyName(keyName)
           .setOmMetadataManager(omMetadataManager)
-          .setClientID(commitKeyRequest.getClientID())
           .setErrMsg(errMsg)
           .build();
 
       String fileName = getKey.getFileName();
       long volumeId = getKey.getVolumeId();
       String dbFileKey = getKey.getOzonePathKey();
-      dbOpenFileKey = getKey.getOpenFileName();
+      dbOpenFileKey = getKey.getOpenFileName(commitKeyRequest.getClientID());
 
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);

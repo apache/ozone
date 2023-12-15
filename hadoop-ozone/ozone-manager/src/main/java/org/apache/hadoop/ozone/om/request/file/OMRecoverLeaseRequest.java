@@ -211,7 +211,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       LOG.warn("Key:" + keyName + " is already closed");
       return null;
     }
-    String openFileDBKey = getKey.getOpenFileName();
+    String openFileDBKey = getKey.getOpenFileName(Long.parseLong(clientId));
     if (openFileDBKey != null) {
       commitKey(dbFileKey, keyInfo, fileName, ozoneManager,
           transactionLogIndex);
