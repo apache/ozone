@@ -99,10 +99,12 @@ public class RatisUnderReplicationHandler
         new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
             minHealthyForMaintenance, false);
 
-    ContainerHealthResult.UnderReplicatedHealthResult underReplicatedResult =
-        (ContainerHealthResult.UnderReplicatedHealthResult) result;
-    if (underReplicatedResult.hasVulnerableUnhealthy()) {
-      return handleVulnerableUnhealthyReplicas(withUnhealthy, pendingOps);
+    if (result.getHealthState() == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+      ContainerHealthResult.UnderReplicatedHealthResult
+          underReplicatedResult = (ContainerHealthResult.UnderReplicatedHealthResult) result;
+      if (underReplicatedResult.hasVulnerableUnhealthy()) {
+        return handleVulnerableUnhealthyReplicas(withUnhealthy, pendingOps);
+      }
     }
 
     // verify that this container is still under replicated and we don't have
