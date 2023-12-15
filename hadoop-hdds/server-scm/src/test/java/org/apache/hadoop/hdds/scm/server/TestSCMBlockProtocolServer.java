@@ -53,7 +53,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.platform.commons.util.Preconditions;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -71,6 +70,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -93,7 +93,7 @@ public class TestSCMBlockProtocolServer {
     private final List<DatanodeDetails> datanodes;
 
     BlockManagerStub(List<DatanodeDetails> datanodes) {
-      Preconditions.notNull(datanodes, "Datanodes cannot be null");
+      assertNotNull(datanodes, "Datanodes cannot be null");
       this.datanodes = datanodes;
     }
 
