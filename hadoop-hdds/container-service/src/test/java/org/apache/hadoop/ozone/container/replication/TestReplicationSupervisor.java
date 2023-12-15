@@ -63,12 +63,11 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
@@ -88,7 +87,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 /**
  * Test the replication supervisor.
  */
-@RunWith(Parameterized.class)
 public class TestReplicationSupervisor {
 
   private static final long CURRENT_TERM = 1;
@@ -108,22 +106,17 @@ public class TestReplicationSupervisor {
 
   private ContainerSet set;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
 
   private StateContext context;
   private TestClock clock;
   private DatanodeDetails datanode;
 
-  public TestReplicationSupervisor(ContainerLayoutVersion layout) {
-    this.layout = layout;
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> layoutVersion() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
@@ -138,13 +131,15 @@ public class TestReplicationSupervisor {
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     replicatorRef.set(null);
   }
 
-  @Test
-  public void normal() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void normal(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     // GIVEN
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
@@ -157,24 +152,26 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(2L));
       supervisor.addTask(createTask(5L));
 
-      Assert.assertEquals(3, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(3, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(3, set.containerCount());
+      Assertions.assertEquals(3, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(3, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(3, set.containerCount());
 
       MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
       metrics.getMetrics(metricsCollector, true);
-      Assert.assertEquals(1, metricsCollector.getRecords().size());
+      Assertions.assertEquals(1, metricsCollector.getRecords().size());
     } finally {
       metrics.unRegister();
       supervisor.stop();
     }
   }
 
-  @Test
-  public void duplicateMessage() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void duplicateMessage(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWithReplicator(
         FakeReplicator::new);
@@ -187,20 +184,22 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(6L));
 
       //THEN
-      Assert.assertEquals(4, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(3, supervisor.getReplicationSkippedCount());
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(1, set.containerCount());
+      Assertions.assertEquals(4, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(1, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(3, supervisor.getReplicationSkippedCount());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(1, set.containerCount());
     } finally {
       supervisor.stop();
     }
   }
 
-  @Test
-  public void failureHandling() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void failureHandling(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(
         __ -> throwingReplicator, newDirectExecutorService());
@@ -211,19 +210,20 @@ public class TestReplicationSupervisor {
       supervisor.addTask(task);
 
       //THEN
-      Assert.assertEquals(1, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(1, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(0, set.containerCount());
-      Assert.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
+      Assertions.assertEquals(1, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(1, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(0, set.containerCount());
+      Assertions.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
     } finally {
       supervisor.stop();
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void stalledDownload() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(__ -> noopReplicator,
@@ -238,22 +238,23 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createECTask(5L));
 
       //THEN
-      Assert.assertEquals(0, supervisor.getReplicationRequestCount());
-      Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
-      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-      Assert.assertEquals(5, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(3, supervisor.getInFlightReplications(
+      Assertions.assertEquals(0, supervisor.getReplicationRequestCount());
+      Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
+      Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assertions.assertEquals(5, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(3, supervisor.getInFlightReplications(
           ReplicationTask.class));
-      Assert.assertEquals(2, supervisor.getInFlightReplications(
+      Assertions.assertEquals(2, supervisor.getInFlightReplications(
           ECReconstructionCoordinatorTask.class));
-      Assert.assertEquals(0, supervisor.getQueueSize());
-      Assert.assertEquals(0, set.containerCount());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(0, set.containerCount());
     } finally {
       supervisor.stop();
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void slowDownload() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(__ -> slowReplicator,
@@ -267,21 +268,22 @@ public class TestReplicationSupervisor {
       supervisor.addTask(createTask(3L));
 
       //THEN
-      Assert.assertEquals(3, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(2, supervisor.getQueueSize());
+      Assertions.assertEquals(3, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(2, supervisor.getQueueSize());
       // Sleep 4s, wait all tasks processed
       try {
         Thread.sleep(4000);
       } catch (InterruptedException e) {
       }
-      Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-      Assert.assertEquals(0, supervisor.getQueueSize());
+      Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(0, supervisor.getQueueSize());
     } finally {
       supervisor.stop();
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -320,14 +322,16 @@ public class TestReplicationSupervisor {
         .captureLogs(DownloadAndImportReplicator.LOG);
 
     supervisor.addTask(createTask(1L));
-    Assert.assertEquals(1, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
-    Assert.assertTrue(logCapturer.getOutput()
+    Assertions.assertEquals(1, supervisor.getReplicationFailureCount());
+    Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
+    Assertions.assertTrue(logCapturer.getOutput()
         .contains("Container 1 replication was unsuccessful."));
   }
 
-  @Test
-  public void testTaskBeyondDeadline() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testTaskBeyondDeadline(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
 
@@ -348,18 +352,20 @@ public class TestReplicationSupervisor {
     supervisor.addTask(task2);
     supervisor.addTask(task3);
 
-    Assert.assertEquals(3, supervisor.getReplicationRequestCount());
-    Assert.assertEquals(2, supervisor.getReplicationSuccessCount());
-    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-    Assert.assertEquals(0, supervisor.getQueueSize());
-    Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
-    Assert.assertEquals(2, set.containerCount());
+    Assertions.assertEquals(3, supervisor.getReplicationRequestCount());
+    Assertions.assertEquals(2, supervisor.getReplicationSuccessCount());
+    Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+    Assertions.assertEquals(0, supervisor.getQueueSize());
+    Assertions.assertEquals(1, supervisor.getReplicationTimeoutCount());
+    Assertions.assertEquals(2, set.containerCount());
 
   }
 
-  @Test
-  public void testDatanodeOutOfService() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testDatanodeOutOfService(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
     datanode.setPersistedOpState(
@@ -373,17 +379,19 @@ public class TestReplicationSupervisor {
     supervisor.addTask(new ReplicationTask(pushCmd, replicatorRef.get()));
     supervisor.addTask(new ReplicationTask(pullCmd, replicatorRef.get()));
 
-    Assert.assertEquals(2, supervisor.getReplicationRequestCount());
-    Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
-    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
-    Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
-    Assert.assertEquals(0, supervisor.getQueueSize());
-    Assert.assertEquals(0, supervisor.getReplicationTimeoutCount());
-    Assert.assertEquals(1, set.containerCount());
+    Assertions.assertEquals(2, supervisor.getReplicationRequestCount());
+    Assertions.assertEquals(1, supervisor.getReplicationSuccessCount());
+    Assertions.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assertions.assertEquals(0, supervisor.getTotalInFlightReplications());
+    Assertions.assertEquals(0, supervisor.getQueueSize());
+    Assertions.assertEquals(0, supervisor.getReplicationTimeoutCount());
+    Assertions.assertEquals(1, set.containerCount());
   }
 
-  @Test
-  public void taskWithObsoleteTermIsDropped() {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void taskWithObsoleteTermIsDropped(ContainerLayoutVersion layout) {
+    this.layoutVersion = layout;
     final long newTerm = 2;
     ReplicationSupervisor supervisor =
         supervisorWithReplicator(FakeReplicator::new);
@@ -391,12 +399,15 @@ public class TestReplicationSupervisor {
     context.setTermOfLeaderSCM(newTerm);
     supervisor.addTask(createTask(1L));
 
-    Assert.assertEquals(1, supervisor.getReplicationRequestCount());
-    Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
+    Assertions.assertEquals(1, supervisor.getReplicationRequestCount());
+    Assertions.assertEquals(0, supervisor.getReplicationSuccessCount());
   }
 
-  @Test
-  public void testPriorityOrdering() throws InterruptedException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testPriorityOrdering(ContainerLayoutVersion layout)
+      throws InterruptedException {
+    this.layoutVersion = layout;
     long deadline = clock.millis() + 1000;
     long containerId = 1;
     long term = 1;
@@ -447,19 +458,19 @@ public class TestReplicationSupervisor {
     // Before unblocking the queue, check the queue count for the OrderedTask.
     // We loaded 3 High / normal priority and 2 low. The counter should not
     // include the low counts.
-    Assert.assertEquals(3,
+    Assertions.assertEquals(3,
         supervisor.getInFlightReplications(OrderedTask.class));
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         supervisor.getInFlightReplications(BlockingTask.class));
 
     // Unblock the queue
     completeRunning.countDown();
     // Wait for all tasks to complete
     tasksCompleteLatch.await();
-    Assert.assertEquals(expectedOrder, completionOrder);
-    Assert.assertEquals(0,
+    Assertions.assertEquals(expectedOrder, completionOrder);
+    Assertions.assertEquals(0,
         supervisor.getInFlightReplications(OrderedTask.class));
-    Assert.assertEquals(0,
+    Assertions.assertEquals(0,
         supervisor.getInFlightReplications(BlockingTask.class));
   }
 
@@ -599,11 +610,11 @@ public class TestReplicationSupervisor {
       }
 
       // assumes same-thread execution
-      Assert.assertEquals(1, supervisor.getTotalInFlightReplications());
+      Assertions.assertEquals(1, supervisor.getTotalInFlightReplications());
 
       KeyValueContainerData kvcd =
           new KeyValueContainerData(task.getContainerId(),
-              layout, 100L,
+              layoutVersion, 100L,
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);
@@ -612,7 +623,7 @@ public class TestReplicationSupervisor {
         set.addContainer(kvc);
         task.setStatus(DONE);
       } catch (Exception e) {
-        Assert.fail("Unexpected error: " + e.getMessage());
+        Assertions.fail("Unexpected error: " + e.getMessage());
       }
     }
   }
@@ -654,7 +665,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void poolSizeCanBeIncreased() {
     datanode.setPersistedOpState(IN_SERVICE);
     ReplicationSupervisor subject = ReplicationSupervisor.newBuilder()
@@ -668,7 +680,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void poolSizeCanBeDecreased() {
     datanode.setPersistedOpState(IN_MAINTENANCE);
     ReplicationSupervisor subject = ReplicationSupervisor.newBuilder()
@@ -682,7 +695,8 @@ public class TestReplicationSupervisor {
     }
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
   public void testMaxQueueSize() {
     List<DatanodeDetails> datanodes = new ArrayList<>();
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -710,21 +724,22 @@ public class TestReplicationSupervisor {
 
     // in progress task will be limited by max. queue size,
     // since all tasks are discarded by the executor, none of them complete
-    Assert.assertEquals(maxQueueSize, rs.getTotalInFlightReplications());
+    Assertions.assertEquals(maxQueueSize, rs.getTotalInFlightReplications());
 
     // queue size is doubled
     rs.nodeStateUpdated(HddsProtos.NodeOperationalState.DECOMMISSIONING);
-    Assert.assertEquals(2 * maxQueueSize, rs.getMaxQueueSize());
-    Assert.assertEquals(2 * replicationMaxStreams, threadPoolSize.get());
+    Assertions.assertEquals(2 * maxQueueSize, rs.getMaxQueueSize());
+    Assertions.assertEquals(2 * replicationMaxStreams, threadPoolSize.get());
 
     // can schedule more tasks
     scheduleTasks(datanodes, rs);
-    Assert.assertEquals(2 * maxQueueSize, rs.getTotalInFlightReplications());
+    Assertions.assertEquals(
+        2 * maxQueueSize, rs.getTotalInFlightReplications());
 
     // queue size is restored
     rs.nodeStateUpdated(IN_SERVICE);
-    Assert.assertEquals(maxQueueSize, rs.getMaxQueueSize());
-    Assert.assertEquals(replicationMaxStreams, threadPoolSize.get());
+    Assertions.assertEquals(maxQueueSize, rs.getMaxQueueSize());
+    Assertions.assertEquals(replicationMaxStreams, threadPoolSize.get());
   }
 
   //schedule 10 container replication
