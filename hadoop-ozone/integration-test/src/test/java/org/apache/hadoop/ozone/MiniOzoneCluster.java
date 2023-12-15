@@ -23,7 +23,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -657,36 +656,5 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
-  }
-
-  /**
-   * Helper class to get free port avoiding randomness.
-   */
-  class PortAllocator {
-
-    private static final int MIN_PORT = 15000;
-    private static final int MAX_PORT = 32000;
-    private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
-
-    private PortAllocator() {
-      // no instances
-    }
-
-    static synchronized int getFreePort() {
-      int port = NEXT_PORT.getAndIncrement();
-      if (port > MAX_PORT) {
-        NEXT_PORT.set(MIN_PORT);
-        port = NEXT_PORT.getAndIncrement();
-      }
-      return port;
-    }
-
-    static String localhostWithFreePort() {
-      return "127.0.0.1:" + getFreePort();
-    }
-
-    static String anyHostWithFreePort() {
-      return "0.0.0.0:" + getFreePort();
-    }
   }
 }
