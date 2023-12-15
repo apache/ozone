@@ -466,7 +466,7 @@ public abstract class GenericTestUtils {
   /**
    * Helper class to get free port avoiding randomness.
    */
-  public static class PortAllocator {
+  public static final class PortAllocator {
 
     public static final String HOSTNAME = "localhost";
     public static final String HOST_ADDRESS = "127.0.0.1";
@@ -474,7 +474,7 @@ public abstract class GenericTestUtils {
     public static final int MAX_PORT = 32000;
     public static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
 
-    public PortAllocator() {
+    private PortAllocator() {
       // no instances
     }
 
