@@ -18,15 +18,10 @@
 package org.apache.hadoop.hdds.protocol;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.net.ServerSocket;
+import org.apache.ozone.test.GenericTestUtils;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 
@@ -34,13 +29,6 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORT
  * Provides {@link DatanodeDetails} factory methods for testing.
  */
 public final class MockDatanodeDetails {
-  private static final int MIN_PORT = 15000;
-  private static final int MAX_PORT = 32000;
-  private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeDetails.class);
-
 
   /**
    * Creates DatanodeDetails with random UUID and random IP address.
@@ -122,27 +110,14 @@ public final class MockDatanodeDetails {
    *
    * @return DatanodeDetails
    */
-  public static DatanodeDetails randomLocalDatanodeDetails()
-      throws IOException {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return createDatanodeDetails(UUID.randomUUID().toString(),
-          socket.getInetAddress().getHostName(),
-          socket.getInetAddress().getHostAddress(), null,
-          getFreePort());
-    }
+  public static DatanodeDetails randomLocalDatanodeDetails() {
+    return createDatanodeDetails(UUID.randomUUID().toString(),
+        GenericTestUtils.PortAllocator.HOSTNAME,
+        GenericTestUtils.PortAllocator.HOST_ADDRESS, null,
+        GenericTestUtils.PortAllocator.getFreePort());
   }
 
   private MockDatanodeDetails() {
     throw new UnsupportedOperationException("no instances");
-  }
-
-  static synchronized int getFreePort() {
-    LOG.info("### Getting free port ###");
-    int port = NEXT_PORT.getAndIncrement();
-    if (port > MAX_PORT) {
-      NEXT_PORT.set(MIN_PORT);
-      port = NEXT_PORT.getAndIncrement();
-    }
-    return port;
   }
 }

@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,9 @@ import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
  */
 public abstract class GenericTestUtils {
 
+  private static final int MIN_PORT = 15000;
+  private static final int MAX_PORT = 32000;
+  private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
   public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
   public static final String DEFAULT_TEST_DATA_DIR;
   public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
@@ -460,6 +464,39 @@ public abstract class GenericTestUtils {
     public void write(byte[] buf, int off, int len) {
       super.write(buf, off, len);
       other.write(buf, off, len);
+    }
+  }
+
+  /**
+   * Nested class for port allocation.
+   */
+  public static class PortAllocator {
+
+    public static final String HOSTNAME = "localhost";
+    public static final String HOST_ADDRESS = "127.0.0.1";
+    public static final int MIN_PORT = 15000;
+    public static final int MAX_PORT = 32000;
+    public static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    public PortAllocator() {
+      // no instances
+    }
+
+    public static synchronized int getFreePort() {
+      int port = NEXT_PORT.getAndIncrement();
+      if (port > MAX_PORT) {
+        NEXT_PORT.set(MIN_PORT);
+        port = NEXT_PORT.getAndIncrement();
+      }
+      return port;
+    }
+
+    public static String localhostWithFreePort() {
+      return HOST_ADDRESS + getFreePort();
+    }
+
+    public static String anyHostWithFreePort() {
+      return "0.0.0.0:" + getFreePort();
     }
   }
 

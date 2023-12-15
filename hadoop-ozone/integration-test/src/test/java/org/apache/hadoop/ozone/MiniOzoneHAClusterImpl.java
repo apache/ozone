@@ -57,8 +57,6 @@ import java.util.function.Function;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.getFreePort;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.localhostWithFreePort;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 
 /**
@@ -343,10 +341,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     String omRatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNodeId);
 
-    conf.set(omAddrKey, localhostWithFreePort());
-    conf.set(omHttpAddrKey, localhostWithFreePort());
-    conf.set(omHttpsAddrKey, localhostWithFreePort());
-    conf.setInt(omRatisPortKey, getFreePort());
+    conf.set(omAddrKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
+    conf.set(omHttpAddrKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
+    conf.set(omHttpsAddrKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
+    conf.setInt(omRatisPortKey, GenericTestUtils.PortAllocator.getFreePort());
   }
 
   /**
@@ -650,23 +648,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmNodeId);
 
         conf.set(scmAddrKey, "127.0.0.1");
-        conf.set(scmHttpAddrKey, localhostWithFreePort());
-        conf.set(scmHttpsAddrKey, localhostWithFreePort());
-        conf.set(scmSecurityAddrKey, localhostWithFreePort());
+        conf.set(scmHttpAddrKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
+        conf.set(scmHttpsAddrKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
+        conf.set(scmSecurityAddrKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
         conf.set("ozone.scm.update.service.port", "0");
 
-        int ratisPort = getFreePort();
+        int ratisPort = GenericTestUtils.PortAllocator.getFreePort();
         conf.setInt(scmRatisPortKey, ratisPort);
         //conf.setInt("ozone.scm.ha.ratis.bind.port", ratisPort);
 
-        int dnPort = getFreePort();
+        int dnPort = GenericTestUtils.PortAllocator.getFreePort();
         conf.set(dnPortKey, "127.0.0.1:" + dnPort);
         scmNames.append(",localhost:").append(dnPort);
 
-        conf.set(ssClientKey, localhostWithFreePort());
-        conf.setInt(scmGrpcPortKey, getFreePort());
+        conf.set(ssClientKey, GenericTestUtils.PortAllocator.localhostWithFreePort());
+        conf.setInt(scmGrpcPortKey, GenericTestUtils.PortAllocator.getFreePort());
 
-        String blockAddress = localhostWithFreePort();
+        String blockAddress = GenericTestUtils.PortAllocator.localhostWithFreePort();
         conf.set(blockClientKey, blockAddress);
         conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             blockAddress);
