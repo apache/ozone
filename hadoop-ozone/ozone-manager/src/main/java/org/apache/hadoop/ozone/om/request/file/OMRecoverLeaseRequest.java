@@ -189,7 +189,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     String errMsg = "Cannot recover file : " + keyName 
         + " as parent directory doesn't exist";
 
-    OmFSOFile getKey =  new OmFSOFile.Builder()
+    OmFSOFile fsoFile =  new OmFSOFile.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
@@ -197,8 +197,8 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         .setErrMsg(errMsg)
         .build();
   
-    String fileName = getKey.getFileName();
-    dbFileKey = getKey.getOzonePathKey();
+    String fileName = fsoFile.getFileName();
+    dbFileKey = fsoFile.getOzonePathKey();
 
     keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
@@ -211,7 +211,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       LOG.warn("Key:" + keyName + " is already closed");
       return null;
     }
-    String openFileDBKey = getKey.getOpenFileName(Long.parseLong(clientId));
+    String openFileDBKey = fsoFile.getOpenFileName(Long.parseLong(clientId));
     if (openFileDBKey != null) {
       commitKey(dbFileKey, keyInfo, fileName, ozoneManager,
           transactionLogIndex);

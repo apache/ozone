@@ -138,7 +138,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       String errMsg = "Cannot create file : " + keyName
               + " as parent directory doesn't exist";
-      OmFSOFile getKey =  new OmFSOFile.Builder()
+      OmFSOFile fsoFile =  new OmFSOFile.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(keyName)
@@ -146,10 +146,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           .setErrMsg(errMsg)
           .build();
 
-      String fileName = getKey.getFileName();
-      long volumeId = getKey.getVolumeId();
-      String dbFileKey = getKey.getOzonePathKey();
-      dbOpenFileKey = getKey.getOpenFileName(commitKeyRequest.getClientID());
+      String fileName = fsoFile.getFileName();
+      long volumeId = fsoFile.getVolumeId();
+      String dbFileKey = fsoFile.getOzonePathKey();
+      dbOpenFileKey = fsoFile.getOpenFileName(commitKeyRequest.getClientID());
 
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);
