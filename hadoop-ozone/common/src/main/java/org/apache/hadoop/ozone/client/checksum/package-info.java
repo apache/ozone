@@ -17,6 +17,7 @@
  */
 
 /**
- * Code copied from Hadoop for compatibility with older Hadoop versions.
+ * This package contains checksum calculation shared between client and
+ * server code.
  */
-package org.apache.hadoop.fs;
+package org.apache.hadoop.ozone.client.checksum;

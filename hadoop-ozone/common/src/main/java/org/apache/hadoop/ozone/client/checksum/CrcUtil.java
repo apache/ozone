@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.util;
+package org.apache.hadoop.ozone.client.checksum;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.util.DataChecksum;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -27,7 +28,7 @@ import java.util.Arrays;
 /**
  * This class provides utilities for working with CRCs.
  */
-@InterfaceAudience.LimitedPrivate({"Common", "HDFS", "MapReduce", "Yarn"})
+@InterfaceAudience.Private
 @InterfaceStability.Unstable
 public final class CrcUtil {
   public static final int MULTIPLICATIVE_IDENTITY = 0x80000000;

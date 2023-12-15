@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.util;
+package org.apache.hadoop.ozone.client.checksum;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ import java.io.IOException;
  * a large number of CRCs that correspond to underlying chunks of data all of
  * same size.
  */
-@InterfaceAudience.LimitedPrivate({"Common", "HDFS", "MapReduce", "Yarn"})
+@InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class CrcComposer {
   private static final int CRC_SIZE_BYTES = 4;
@@ -83,10 +84,10 @@ public class CrcComposer {
   public static CrcComposer newStripedCrcComposer(
       DataChecksum.Type type, long bytesPerCrcHint, long stripeLength)
       throws IOException {
-    int polynomial = CrcUtil.getCrcPolynomialForType(type);
+    int polynomial = org.apache.hadoop.ozone.client.checksum.CrcUtil.getCrcPolynomialForType(type);
     return new CrcComposer(
         polynomial,
-        CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
+        org.apache.hadoop.ozone.client.checksum.CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
         bytesPerCrcHint,
         stripeLength);
   }
@@ -131,7 +132,7 @@ public class CrcComposer {
     }
     int limit = offset + length;
     while (offset < limit) {
-      int crcB = CrcUtil.readInt(crcBuffer, offset);
+      int crcB = org.apache.hadoop.ozone.client.checksum.CrcUtil.readInt(crcBuffer, offset);
       update(crcB, bytesPerCrc);
       offset += CRC_SIZE_BYTES;
     }
@@ -168,10 +169,10 @@ public class CrcComposer {
     if (curCompositeCrc == 0) {
       curCompositeCrc = crcB;
     } else if (bytesPerCrc == bytesPerCrcHint) {
-      curCompositeCrc = CrcUtil.composeWithMonomial(
+      curCompositeCrc = org.apache.hadoop.ozone.client.checksum.CrcUtil.composeWithMonomial(
           curCompositeCrc, crcB, precomputedMonomialForHint, crcPolynomial);
     } else {
-      curCompositeCrc = CrcUtil.compose(
+      curCompositeCrc = org.apache.hadoop.ozone.client.checksum.CrcUtil.compose(
           curCompositeCrc, crcB, bytesPerCrc, crcPolynomial);
     }
 
@@ -185,7 +186,7 @@ public class CrcComposer {
     } else if (curPositionInStripe == stripeLength) {
       // Hit a stripe boundary; flush the curCompositeCrc and reset for next
       // stripe.
-      digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
+      digestOut.write(org.apache.hadoop.ozone.client.checksum.CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
       curCompositeCrc = 0;
       curPositionInStripe = 0;
     }
