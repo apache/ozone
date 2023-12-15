@@ -98,6 +98,8 @@ public class TestWritableRatisContainerProvider {
     containerManager = mock(ContainerManager.class);
     provider = spy(new WritableRatisContainerProvider(conf,
         pipelineManager, containerManager, policy));
+    when(provider.getMaxRetryGetContainer())
+        .thenReturn(testSCMGetContainerMaxRetry);
   }
 
   @ParameterizedTest

@@ -49,7 +49,8 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
-  private static final int MAX_RETRY_GET_CONTAINER = 4096;
+  // added in HDDS-8982, it shouldn't be exposed to users to configure
+  private static int MAX_RETRY_GET_CONTAINER = 4096;
 
 
   public WritableRatisContainerProvider(ConfigurationSource conf,
@@ -88,7 +89,7 @@ public class WritableRatisContainerProvider
     //in downstream managers.
 
     int currentCount = 0;
-    while (currentCount < MAX_RETRY_GET_CONTAINER) {
+    while (currentCount < getMaxRetryGetContainer()) {
       List<Pipeline> availablePipelines;
       Pipeline pipeline;
       // Acquire pipeline manager lock, to avoid any updates to pipeline
@@ -105,8 +106,8 @@ public class WritableRatisContainerProvider
               excludeList);
         }
         if (containerInfo != null) {
-          // if containerID == -1, means Container allocation
-          // failed on selected pipeline
+          // selectContainer returns containerID with 0 whenever
+          // container allocation failed on selected pipeline
           if (containerInfo.getContainerID() != 0) {
             return containerInfo;
           } else {
@@ -227,6 +228,10 @@ public class WritableRatisContainerProvider
 
     return containerInfo;
 
+  }
+
+  public int getMaxRetryGetContainer() {
+    return MAX_RETRY_GET_CONTAINER;
   }
 
 }
