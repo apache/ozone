@@ -27,9 +27,9 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 
 /**
- * This class help to get metadata keys.
+ * This class is used exclusively in FSO buckets..
  */
-public final class OmGetKey {
+public final class OmFSOFile {
 
   private String volumeName;
   private String bucketName;
@@ -45,7 +45,7 @@ public final class OmGetKey {
 
 
   @SuppressWarnings("checkstyle:parameternumber")
-  private OmGetKey(String volumeName, String bucketName, String keyName, 
+  private OmFSOFile(String volumeName, String bucketName, String keyName, 
       OMMetadataManager omMetadataManager, long clientID,
       String fileName, Iterator<Path> pathComponents, long volumeId,
       long bucketId, long parentID) {
@@ -63,7 +63,7 @@ public final class OmGetKey {
   }
 
   /**
-   * Builder class for OmGetKey.
+   * Builder class for OmFSOFile.
    */
   public static class Builder {
     private String volumeName;
@@ -107,7 +107,7 @@ public final class OmGetKey {
       return this;
     }
 
-    public OmGetKey build() throws IOException {
+    public OmFSOFile build() throws IOException {
       String fileName = OzoneFSUtils.getFileName(this.keyName);
       Iterator<Path> pathComponents = Paths.get(this.keyName).iterator();
       final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
@@ -117,7 +117,7 @@ public final class OmGetKey {
           .getParentID(volumeId, bucketId, pathComponents, this.keyName,
           this.omMetadataManager, this.errMsg);
 
-      return new OmGetKey(volumeName, bucketName, keyName, 
+      return new OmFSOFile(volumeName, bucketName, keyName, 
           omMetadataManager, clientID, fileName, pathComponents, 
           volumeId, bucketId, parentID);
     }

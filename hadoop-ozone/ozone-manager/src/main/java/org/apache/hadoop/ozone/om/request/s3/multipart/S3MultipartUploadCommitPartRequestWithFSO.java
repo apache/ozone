@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmGetKey;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponseWithFSO;
@@ -49,7 +49,7 @@ public class S3MultipartUploadCommitPartRequestWithFSO
       String keyName, OMMetadataManager omMetadataManager, long clientID)
       throws IOException {
 
-    return new OmGetKey.Builder()
+    return new OmFSOFile.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(keyName)

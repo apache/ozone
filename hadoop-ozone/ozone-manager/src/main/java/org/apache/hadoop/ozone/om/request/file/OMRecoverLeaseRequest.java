@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmGetKey;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -189,7 +189,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     String errMsg = "Cannot recover file : " + keyName 
         + " as parent directory doesn't exist";
 
-    OmGetKey getKey =  new OmGetKey.Builder()
+    OmFSOFile getKey =  new OmFSOFile.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)

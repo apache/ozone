@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmGetKey;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
@@ -138,7 +138,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       String errMsg = "Cannot create file : " + keyName
               + " as parent directory doesn't exist";
-      OmGetKey getKey =  new OmGetKey.Builder()
+      OmFSOFile getKey =  new OmFSOFile.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(keyName)

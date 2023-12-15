@@ -19,5 +19,5 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 /**
- * This package contains classes and interfaces for OM Lock Strategy Patterns.
+ * This package contains Ozone manager helper class.
  */

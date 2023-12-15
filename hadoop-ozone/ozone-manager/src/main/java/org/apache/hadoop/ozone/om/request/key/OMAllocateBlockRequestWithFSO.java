@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.helpers.OmGetKey;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -213,7 +213,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    return new OmGetKey.Builder()
+    return new OmFSOFile.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(keyName)
