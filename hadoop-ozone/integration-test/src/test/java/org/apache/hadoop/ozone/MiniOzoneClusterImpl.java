@@ -82,6 +82,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -900,13 +903,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     protected void configureSCM() {
       conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.localhostWithFreePort());
+          localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.localhostWithFreePort());
+          localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.localhostWithFreePort());
+          localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.localhostWithFreePort());
+          localhostWithFreePort());
       conf.setInt(ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numOfScmHandlers);
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
@@ -937,10 +940,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureOM() {
-      conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, GenericTestUtils.PortAllocator.localhostWithFreePort());
-      conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, GenericTestUtils.PortAllocator.localhostWithFreePort());
-      conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, GenericTestUtils.PortAllocator.localhostWithFreePort());
-      conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, GenericTestUtils.PortAllocator.getFreePort());
+      conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, localhostWithFreePort());
+      conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, localhostWithFreePort());
+      conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
+          localhostWithFreePort());
+      conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, getFreePort());
       conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
     }
 
@@ -951,17 +955,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     protected void configureDatanodePorts(ConfigurationTarget conf) {
       conf.set(ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.anyHostWithFreePort());
+          anyHostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.anyHostWithFreePort());
+          anyHostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY,
-          GenericTestUtils.PortAllocator.anyHostWithFreePort());
-      conf.setInt(DFS_CONTAINER_IPC_PORT, GenericTestUtils.PortAllocator.getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, GenericTestUtils.PortAllocator.getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT, GenericTestUtils.PortAllocator.getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, GenericTestUtils.PortAllocator.getFreePort());
-      conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, GenericTestUtils.PortAllocator.getFreePort());
-      conf.setFromObject(new ReplicationConfig().setPort(GenericTestUtils.PortAllocator.getFreePort()));
+          anyHostWithFreePort());
+      conf.setInt(DFS_CONTAINER_IPC_PORT, getFreePort());
+      conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, getFreePort());
+      conf.setInt(DFS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
+      conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
+      conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
+      conf.setFromObject(new ReplicationConfig().setPort(getFreePort()));
     }
 
     private void configureTrace() {
@@ -991,8 +995,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           + "/ozone_recon_derby.db");
       conf.setFromObject(dbConfig);
 
-      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, GenericTestUtils.PortAllocator.anyHostWithFreePort());
-      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, GenericTestUtils.PortAllocator.anyHostWithFreePort());
+      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, anyHostWithFreePort());
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, anyHostWithFreePort());
       conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "10s");
 
       ConfigurationProvider.setConfiguration(conf);

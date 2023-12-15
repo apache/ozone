@@ -53,10 +53,6 @@ import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-
-  private static final int MIN_PORT = 15000;
-  private static final int MAX_PORT = 32000;
-  private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
   public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
   public static final String DEFAULT_TEST_DATA_DIR;
   public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
