@@ -464,7 +464,7 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Nested class for port allocation.
+   * Helper class to get free port avoiding randomness.
    */
   public static class PortAllocator {
 
