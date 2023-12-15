@@ -58,7 +58,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final int minHealthyPipelines;
   private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
-  private static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,

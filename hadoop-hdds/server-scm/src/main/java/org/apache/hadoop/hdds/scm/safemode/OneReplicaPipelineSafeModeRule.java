@@ -57,7 +57,6 @@ public class OneReplicaPipelineSafeModeRule extends
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
   private final double pipelinePercent;
-  private static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
 
 
   public OneReplicaPipelineSafeModeRule(String ruleName, EventQueue eventQueue,

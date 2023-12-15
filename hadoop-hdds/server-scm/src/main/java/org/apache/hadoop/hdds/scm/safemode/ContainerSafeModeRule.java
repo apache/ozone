@@ -55,7 +55,6 @@ public class ContainerSafeModeRule extends
 
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
   private final ContainerManager containerManager;
-  private static final int SAMPLE_CONTAINER_DISPLAY_LIMIT = 5;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
              ConfigurationSource conf,
