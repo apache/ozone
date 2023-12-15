@@ -42,7 +42,7 @@ interface IDatanodeResponse {
   hostname: string;
   state: DatanodeState;
   opState: DatanodeOpState;
-  lastHeartbeat: number;
+  lastHeartbeat: string;
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
@@ -182,7 +182,7 @@ const COLUMNS = [
     isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
-      return heartbeat > 0 ? moment(heartbeat).format('ll LTS') : 'NA';
+      return heartbeat > 0 ? getTimeDiffFromTimestamp(heartbeat) : 'NA';
     }
   },
   {
@@ -302,6 +302,39 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   label: column.key,
   value: column.key
 }));
+
+const getTimeDiffFromTimestamp = (timestamp: number): string => {
+  const timestampDate = new Date(timestamp);
+  const currentDate = new Date();
+
+  const totalSecondsDiff = Math.floor((currentDate.getTime() - timestampDate.getTime()) / 1000);
+
+  const years = Math.floor(totalSecondsDiff / (3600 * 24 * 365));
+  const days = Math.floor((totalSecondsDiff % (3600 * 24 * 365)) / (3600 * 24));
+  const hours = Math.floor((totalSecondsDiff % (3600 * 24)) / 3600);
+  const minutes = Math.floor((totalSecondsDiff % 3600) / 60);
+  const seconds = totalSecondsDiff % 60;
+
+  let timeStr = "";
+
+  if (years > 0) {
+    timeStr += years + "y ";
+  }
+  if (days > 0 || years > 0) {
+    timeStr += days + "d ";
+  }
+  if (hours > 0 || days > 0 || years > 0) {
+    timeStr += hours + "h ";
+  }
+  if (minutes > 0 || hours > 0 || days > 0 || years > 0) {
+    timeStr += minutes + "m ";
+  }
+  if (seconds > 0 || minutes > 0 || hours > 0 || days > 0 || years > 0) {
+    timeStr += seconds + "s ";
+  }
+
+  return timeStr.trim().length === 0 ? "Just now" : timeStr.trim() + " ago";
+}
 
 let cancelSignal: AbortController;
 
