@@ -145,8 +145,8 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
+      StreamBufferArgs streamBufferArgs,
       BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider
-      StreamBufferArgs streamBufferArgs
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;

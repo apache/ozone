@@ -69,8 +69,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   /**
    * Creates a new BlockOutputStream.
    *
-   * @param blockID              block ID
-   * @param bufferPool           pool of buffers
+   * @param blockID    block ID
+   * @param bufferPool pool of buffers
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public RatisBlockOutputStream(
@@ -80,12 +80,13 @@ public class RatisBlockOutputStream extends BlockOutputStream
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider,
-      StreamBufferArgs streamBufferArgs
+      StreamBufferArgs streamBufferArgs,
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider
   ) throws IOException {
     super(blockID, xceiverClientManager, pipeline,
-        bufferPool, config, token, blockOutPutStreamResourceProvider,
-        streamBufferArgs);
+        bufferPool, config, token, streamBufferArgs,
+        blockOutPutStreamResourceProvider
+    );
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

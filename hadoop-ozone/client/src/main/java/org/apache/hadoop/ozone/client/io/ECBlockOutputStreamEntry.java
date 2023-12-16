@@ -78,10 +78,10 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
   ECBlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
-      OzoneClientConfig config, BlockOutPutStreamResourceProvider provider,
-      StreamBufferArgs streamBufferArgs) {
+      OzoneClientConfig config, StreamBufferArgs streamBufferArgs,
+      BlockOutPutStreamResourceProvider provider) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
-        token, config, provider, streamBufferArgs);
+        token, config, streamBufferArgs, provider);
     assertInstanceOf(
         pipeline.getReplicationConfig(), ECReplicationConfig.class);
     this.replicationConfig =
@@ -100,7 +100,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
         streams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
-                getBufferPool(), getConf(), getToken(), getBlockOutPutStreamResourceProvider(), getStreamBufferArgs());
+                getBufferPool(), getConf(), getToken(), getStreamBufferArgs(),
+                getBlockOutPutStreamResourceProvider());
       }
       blockOutputStreams = streams;
     }
@@ -441,8 +442,8 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
-    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
     private StreamBufferArgs streamBufferArgs;
+    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -506,8 +507,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
           pipeline,
           length,
           bufferPool,
-          token, config, blockOutPutStreamResourceProvider,
-          streamBufferArgs);
+          token, config, streamBufferArgs,
+          blockOutPutStreamResourceProvider
+      );
     }
   }
 }

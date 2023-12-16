@@ -215,11 +215,11 @@ public class RpcClient implements ClientProtocol {
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
   private final BlockInputStreamFactory blockInputStreamFactory;
-  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
   private volatile ExecutorService ecWriteExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
+  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
   /**
    * Creates RpcClient instance with the given configuration.

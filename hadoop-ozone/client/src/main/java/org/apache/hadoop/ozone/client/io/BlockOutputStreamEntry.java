@@ -60,8 +60,8 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final Token<OzoneBlockTokenIdentifier> token;
 
   private BufferPool bufferPool;
-  private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
   private StreamBufferArgs streamBufferArgs;
+  private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   BlockOutputStreamEntry(
@@ -72,8 +72,8 @@ public class BlockOutputStreamEntry extends OutputStream {
       BufferPool bufferPool,
       Token<OzoneBlockTokenIdentifier> token,
       OzoneClientConfig config,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider,
-      StreamBufferArgs streamBufferArgs
+      StreamBufferArgs streamBufferArgs,
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider
   ) {
     this.config = config;
     this.outputStream = null;
@@ -85,8 +85,8 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.length = length;
     this.currentPosition = 0;
     this.bufferPool = bufferPool;
-    this.blockOutPutStreamResourceProvider = blockOutPutStreamResourceProvider;
     this.streamBufferArgs = streamBufferArgs;
+    this.blockOutPutStreamResourceProvider = blockOutPutStreamResourceProvider;
   }
 
   /**
@@ -108,8 +108,9 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, blockOutPutStreamResourceProvider,
-        streamBufferArgs);
+        pipeline, bufferPool, config, token, streamBufferArgs,
+        blockOutPutStreamResourceProvider
+    );
   }
 
   BlockOutPutStreamResourceProvider getBlockOutPutStreamResourceProvider() {
@@ -360,8 +361,8 @@ public class BlockOutputStreamEntry extends OutputStream {
     private BufferPool bufferPool;
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
-    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
     private StreamBufferArgs streamBufferArgs;
+    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
     public Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -421,8 +422,9 @@ public class BlockOutputStreamEntry extends OutputStream {
           pipeline,
           length,
           bufferPool,
-          token, config, blockOutPutStreamResourceProvider,
-          streamBufferArgs);
+          token, config, streamBufferArgs,
+          blockOutPutStreamResourceProvider
+      );
     }
   }
 }

@@ -56,11 +56,11 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory,
       long openID,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider,
-      StreamBufferArgs streamBufferArgs) {
+      StreamBufferArgs streamBufferArgs,
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
     super(config, omClient, requestId, replicationConfig, uploadID, partNumber,
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
-        openID, blockOutPutStreamResourceProvider, streamBufferArgs);
+        openID, streamBufferArgs, blockOutPutStreamResourceProvider);
     assert replicationConfig instanceof ECReplicationConfig;
   }
 
@@ -82,8 +82,8 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setLength(subKeyInfo.getLength())
             .setBufferPool(getBufferPool())
             .setToken(subKeyInfo.getToken())
-            .setBlockOutPutStreamResourceProvider(getBlockOutPutStreamResourceProvider())
             .setStreamBufferArgs(getStreamBufferArgs())
+            .setBlockOutPutStreamResourceProvider(getBlockOutPutStreamResourceProvider())
             .build();
   }
 

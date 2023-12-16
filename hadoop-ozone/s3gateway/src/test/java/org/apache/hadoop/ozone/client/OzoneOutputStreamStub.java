@@ -85,7 +85,9 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
     StreamBufferArgs streamBufferArgs =
         StreamBufferArgs.getDefaultStreamBufferArgs(replicationConfig, ozoneClientConfig);
     return new KeyOutputStream(replicationConfig,
-        BlockOutPutStreamResourceProvider.create(Executors::newSingleThreadExecutor, null, ozoneClientConfig, streamBufferArgs)) {
+        streamBufferArgs, ozoneClientConfig,
+        BlockOutPutStreamResourceProvider.create(Executors::newSingleThreadExecutor, null)
+    ) {
       @Override
       public synchronized OmMultipartCommitUploadPartInfo
           getCommitUploadPartInfo() {

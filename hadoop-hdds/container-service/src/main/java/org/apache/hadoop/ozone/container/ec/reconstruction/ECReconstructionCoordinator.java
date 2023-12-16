@@ -109,11 +109,11 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private final ExecutorService ecReconstructReadExecutor;
   private final ExecutorService ecReconstructWriteExecutor;
-  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
+  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -244,8 +244,9 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), configuration,
-        blockLocationInfo.getToken(), blockOutPutStreamResourceProvider,
-        streamBufferArgs);
+        blockLocationInfo.getToken(), streamBufferArgs,
+        blockOutPutStreamResourceProvider
+    );
   }
 
   @VisibleForTesting

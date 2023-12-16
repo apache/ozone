@@ -105,8 +105,8 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider,
-      StreamBufferArgs streamBufferArgs) {
+      StreamBufferArgs streamBufferArgs, OzoneClientConfig clientConfig,
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
     this.replication = replicationConfig;
     this.config = clientConfig;
     closed = false;
@@ -117,7 +117,7 @@ public class KeyOutputStream extends OutputStream
     retryCount = 0;
     offset = 0;
     blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(
-        blockOutPutStreamResourceProvider, streamBufferArgs);
+        streamBufferArgs, clientConfig, blockOutPutStreamResourceProvider);
   }
 
   @VisibleForTesting
@@ -155,9 +155,8 @@ public class KeyOutputStream extends OutputStream
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
       boolean atomicKeyCreation,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider,
-      StreamBufferArgs streamBufferArgs
-  ) {
+      StreamBufferArgs streamBufferArgs,
+      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
     this.config = config;
     this.replication = replicationConfig;
     blockOutputStreamEntryPool =
@@ -170,8 +169,9 @@ public class KeyOutputStream extends OutputStream
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId(),
-            blockOutPutStreamResourceProvider,
-            streamBufferArgs);
+            streamBufferArgs,
+            blockOutPutStreamResourceProvider
+        );
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -613,9 +613,9 @@ public class KeyOutputStream extends OutputStream
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
-    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
+    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -743,8 +743,9 @@ public class KeyOutputStream extends OutputStream
           isMultipartKey,
           unsafeByteBufferConversion,
           atomicKeyCreation,
-          blockOutPutStreamResourceProvider,
-          streamBufferArgs);
+          streamBufferArgs,
+          blockOutPutStreamResourceProvider
+      );
     }
 
   }
