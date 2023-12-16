@@ -326,8 +326,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     case CREATE_KEY:
       keyName = getPath(counter);
       getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createKey(keyName,
-            dataSize.toBytes())) {
+        try (OutputStream stream = bucket.createStreamKey(keyName,
+            dataSize.toBytes(), replicationConfig, new HashMap<>())) {
           contentGenerator.write(stream);
         }
         return null;
