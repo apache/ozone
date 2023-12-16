@@ -181,7 +181,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       return ChunkBuffer.wrap(ByteBuffer.wrap(new byte[0]));
     }
 
-    limitReadSize(info.getLen());
+    final int len = limitReadSize(info.getLen());
 
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
@@ -190,7 +190,6 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     File chunkFile = getChunkFile(container, blockID, info);
 
-    final long len = info.getLen();
     long offset = info.getOffset();
     int bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);

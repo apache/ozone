@@ -187,7 +187,7 @@ public final class ChunkUtils {
     }
   }
 
-  public static ChunkBuffer readData(long len, int bufferCapacity,
+  public static ChunkBuffer readData(int len, int bufferCapacity,
       File file, long off, HddsVolume volume, int readMappedBufferThreshold)
       throws StorageContainerException {
     if (len > readMappedBufferThreshold) {
@@ -454,15 +454,15 @@ public final class ChunkUtils {
     }
   }
 
-  public static void limitReadSize(long len)
-      throws StorageContainerException {
-    if (len > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
-      String err = String.format(
-          "Oversize read. max: %d, actual: %d",
-          OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE, len);
-      LOG.error(err);
-      throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
+  public static int limitReadSize(long len) throws StorageContainerException {
+    final int max = OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
+    if (len <= max) {
+      return Math.toIntExact(len);
     }
+
+    final String err = String.format("Oversize read. max: %d, actual: %d", max, len);
+    LOG.error(err);
+    throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
   }
 
   public static StorageContainerException wrapInStorageContainerException(

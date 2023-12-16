@@ -72,9 +72,8 @@ public class ChunkManagerDummyImpl implements ChunkManager {
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
-    limitReadSize(info.getLen());
     // stats are handled in ChunkManagerImpl
-    return ChunkBuffer.allocate(Math.toIntExact(info.getLen()));
+    return ChunkBuffer.allocate(limitReadSize(info.getLen()));
   }
 
   @Override
