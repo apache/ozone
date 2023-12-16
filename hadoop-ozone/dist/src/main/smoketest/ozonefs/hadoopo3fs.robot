@@ -38,3 +38,5 @@ Test hadoop dfs
                        Should contain             ${result}   ${PREFIX}-${random}
     ${result} =        Execute                    hdfs dfs -cat ${dir}/${PREFIX}-${random}
                        Should contain             ${result}   This product includes software developed
+    ${result} =        Execute                    hdfs dfs -checksum ${dir}/${PREFIX}-${random}
+                       Should contain             ${result}   ${PREFIX}-${random}

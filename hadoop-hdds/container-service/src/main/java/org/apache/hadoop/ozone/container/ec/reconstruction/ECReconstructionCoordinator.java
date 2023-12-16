@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -235,13 +236,16 @@ public class ECReconstructionCoordinator implements Closeable {
       BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
       ECReplicationConfig repConfig, int replicaIndex,
       OzoneClientConfig configuration) throws IOException {
+    StreamBufferArgs streamBufferArgs =
+        StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, configuration);
     return new ECBlockOutputStream(
         blockLocationInfo.getBlockID(),
         containerOperationClient.getXceiverClientManager(),
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), configuration,
-        blockLocationInfo.getToken(), blockOutPutStreamResourceProvider);
+        blockLocationInfo.getToken(), blockOutPutStreamResourceProvider,
+        streamBufferArgs);
   }
 
   @VisibleForTesting
