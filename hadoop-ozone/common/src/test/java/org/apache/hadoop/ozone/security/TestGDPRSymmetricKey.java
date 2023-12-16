@@ -18,8 +18,8 @@ package org.apache.hadoop.ozone.security;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.security.SecureRandom;
 
@@ -32,11 +32,11 @@ public class TestGDPRSymmetricKey {
   public void testKeyGenerationWithDefaults() throws Exception {
     GDPRSymmetricKey gkey = new GDPRSymmetricKey(new SecureRandom());
 
-    Assert.assertTrue(gkey.getCipher().getAlgorithm()
+    Assertions.assertTrue(gkey.getCipher().getAlgorithm()
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> Assert.assertTrue(v.length() > 0));
+        (k, v) -> Assertions.assertTrue(v.length() > 0));
   }
 
   @Test
@@ -45,11 +45,11 @@ public class TestGDPRSymmetricKey {
         RandomStringUtils.randomAlphabetic(16),
         OzoneConsts.GDPR_ALGORITHM_NAME);
 
-    Assert.assertTrue(gkey.getCipher().getAlgorithm()
+    Assertions.assertTrue(gkey.getCipher().getAlgorithm()
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> Assert.assertTrue(v.length() > 0));
+        (k, v) -> Assertions.assertTrue(v.length() > 0));
   }
 
   @Test
@@ -57,9 +57,9 @@ public class TestGDPRSymmetricKey {
     try {
       new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5),
           OzoneConsts.GDPR_ALGORITHM_NAME);
-      Assert.fail("Expect length mismatched");
+      Assertions.fail("Expect length mismatched");
     } catch (IllegalArgumentException ex) {
-      Assert.assertTrue(ex.getMessage()
+      Assertions.assertTrue(ex.getMessage()
           .equalsIgnoreCase("Secret must be exactly 16 characters"));
     }
   }

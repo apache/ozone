@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -71,6 +72,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -141,7 +143,8 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
-    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
+    this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
+        datanodeDetails.threadNamePrefix());
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.DATA_VOLUME, volumeChecker);
@@ -211,7 +214,8 @@ public class OzoneContainer {
         secConf,
         certClient,
         new ContainerImporter(conf, containerSet, controller,
-            volumeSet));
+            volumeSet),
+        datanodeDetails.threadNamePrefix());
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
@@ -229,7 +233,9 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, blockDeletingSvcInterval.toMillis(),
             blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
-            blockDeletingServiceWorkerSize, config);
+            blockDeletingServiceWorkerSize, config,
+            datanodeDetails.threadNamePrefix(),
+            context.getParent().getReconfigurationHandler());
 
     Duration recoveringContainerScrubbingSvcInterval = conf.getObject(
         DatanodeConfiguration.class).getRecoveringContainerScrubInterval();
@@ -290,10 +296,16 @@ public class OzoneContainer {
     // system properties set. These can inspect and possibly repair
     // containers as we iterate them here.
     ContainerInspectorUtil.load();
+    String threadNamePrefix = datanodeDetails.threadNamePrefix();
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "ContainerReader-%d")
+        .build();
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
-      Thread thread = new Thread(new ContainerReader(volumeSet,
-          (HddsVolume) volume, containerSet, config, true));
+      ContainerReader containerReader = new ContainerReader(volumeSet,
+          (HddsVolume) volume, containerSet, config, true);
+      Thread thread = threadFactory.newThread(containerReader);
       thread.start();
       volumeThreads.add(thread);
     }
@@ -551,4 +563,9 @@ public class OzoneContainer {
   public ContainerMetrics getMetrics() {
     return metrics;
   }
+
+  public BlockDeletingService getBlockDeletingService() {
+    return blockDeletingService;
+  }
+
 }

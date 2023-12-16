@@ -20,14 +20,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>rocksdb-checkpoint-differ</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>RocksDB Checkpoint Differ</description>
   <name>RocksDB Checkpoint Differ</name>
   <packaging>jar</packaging>
+
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -45,11 +49,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>

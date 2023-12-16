@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -81,7 +80,6 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
-  @Flaky("HDDS-6112")
   public void testStartMultipleDatanodes() throws Exception {
     final int numberOfNodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -210,7 +208,6 @@ public class TestMiniOzoneCluster {
    * @throws Exception
    */
   @Test @Timeout(100)
-  @Flaky("HDDS-6111")
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)

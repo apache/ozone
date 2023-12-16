@@ -86,6 +86,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
@@ -124,6 +125,8 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSING;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -576,8 +579,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setTraceID(TracingUtil.exportCurrentSpan())
         .setContainerID(containerID)
         .build();
-    submitRequest(Type.CloseContainer,
-        builder -> builder.setScmCloseContainerRequest(request));
+    SCMCloseContainerResponseProto response = submitRequest(Type.CloseContainer,
+          builder -> builder.setScmCloseContainerRequest(
+            request)).getScmCloseContainerResponse();
+    if (response.hasStatus() && (response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSED) || response.getStatus()
+        .equals(CONTAINER_ALREADY_CLOSING))) {
+      String errorMessage =
+          response.getStatus().equals(CONTAINER_ALREADY_CLOSED) ?
+              String.format("Container %s already closed", containerID) :
+              String.format("Container %s is in closing state", containerID);
+      throw new IOException(errorMessage);
+    }
   }
 
   /**
@@ -932,7 +945,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   /**
    * Builds request for datanode usage information and receives response.
    *
-   * @param ipaddress Address String
+   * @param address Address String
    * @param uuid UUID String
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMUsed, and remaining space.
@@ -940,11 +953,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, int clientVersion) throws IOException {
 
     DatanodeUsageInfoRequestProto request =
         DatanodeUsageInfoRequestProto.newBuilder()
-            .setIpaddress(ipaddress)
+            .setIpaddress(address)
             .setUuid(uuid)
             .build();
 

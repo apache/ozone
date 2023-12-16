@@ -111,6 +111,7 @@ public class ContainerHealthResult {
     private boolean isMissing = false;
     private boolean hasHealthyReplicas;
     private boolean hasUnReplicatedOfflineIndexes = false;
+    private boolean offlineIndexesOkAfterPending = false;
     private int requeueCount = 0;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
@@ -229,6 +230,27 @@ public class ContainerHealthResult {
      */
     public boolean hasUnreplicatedOfflineIndexes() {
       return hasUnReplicatedOfflineIndexes;
+    }
+
+    /**
+     * Pass true if a container has some indexes which are only on nodes which
+     * are DECOMMISSIONING or ENTERING_MAINTENANCE, but the container has a
+     * pending add to correct the under replication caused by decommission, but
+     * it has not completed yet.
+     * @param val Pass True if the container has a pending add to correct the
+     *            under replication caused by decommission. False otherwise.
+     */
+    public void setOfflineIndexesOkAfterPending(boolean val) {
+      offlineIndexesOkAfterPending = val;
+    }
+
+    /**
+     * Returns true if a container has under-replication caused by offline
+     * indexes, but it is corrected by a pending add.
+     * @return
+     */
+    public boolean offlineIndexesOkAfterPending() {
+      return offlineIndexesOkAfterPending;
     }
 
     public boolean hasHealthyReplicas() {

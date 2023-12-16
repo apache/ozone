@@ -17,6 +17,7 @@
 CORE-SITE.XML_fs.ofs.impl=org.apache.hadoop.fs.ozone.RootedOzoneFileSystem
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 OZONE-SITE.XML_hdds.scm.safemode.min.datanode=3
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.om.address=om

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -105,7 +107,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-
+    UserInfo userInfo = getUserInfo();
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
@@ -116,8 +118,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
             ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId(),
-            ozoneManager.getMetrics());
+            ozoneManager.isGrpcBlockTokenEnabled(),
+            ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
+            keyArgs.getSortDatanodes(), userInfo);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -137,7 +140,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     newAllocatedBlockRequest.setKeyLocation(
         omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
-    return getOmRequest().toBuilder().setUserInfo(getUserInfo())
+    return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
   }
@@ -177,7 +180,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
 
     OmKeyInfo openKeyInfo = null;
-    IOException exception = null;
+    Exception exception = null;
     OmBucketInfo omBucketInfo = null;
     boolean acquiredLock = false;
 
@@ -208,8 +211,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedKeySize = newLocationList.size()
@@ -244,19 +248,23 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
-            "Exception:{}", volumeName, bucketName, openKeyName, exception);
+          "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+                volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

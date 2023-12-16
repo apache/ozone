@@ -62,6 +62,7 @@ public class TestRDBStoreCodecBufferIterator {
 
   @BeforeEach
   public void setup() {
+    CodecBuffer.enableLeakDetection();
     rocksIteratorMock = mock(RocksIterator.class);
     managedRocksIterator = newManagedRocksIterator();
     rdbTableMock = mock(RDBTable.class);

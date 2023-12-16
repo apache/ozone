@@ -50,7 +50,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
@@ -66,7 +68,7 @@ public class TestContainerMapper {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;

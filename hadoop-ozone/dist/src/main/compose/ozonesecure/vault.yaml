@@ -21,7 +21,7 @@ services:
       - vault.conf
     environment:
       - OZONE_OPTS=-Dcom.sun.net.ssl.checkRevocation=false
-      - OZONE_CLASSPATH=/opt/hadoop/share/ozone/lib/ozone-s3-secret-store-@project.version@.jar:/opt/hadoop/share/ozone/lib/vault-java-driver-*.jar
+      - OZONE_MANAGER_CLASSPATH=/opt/hadoop/share/ozone/lib/ozone-s3-secret-store-@project.version@.jar:/opt/hadoop/share/ozone/lib/vault-java-driver-@vault.driver.version@.jar
   vault:
     image: hashicorp/vault:1.13.2
     hostname: vault

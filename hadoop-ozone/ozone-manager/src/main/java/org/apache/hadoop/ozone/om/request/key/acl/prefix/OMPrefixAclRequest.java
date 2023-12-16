@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -60,7 +61,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -88,8 +89,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
             volume, bucket, key);
       }
 
-      lockAcquired =
-          omMetadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(PREFIX_LOCK, prefixPath));
+      lockAcquired = getOmLockDetails().isLockAcquired();
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
 
@@ -131,16 +133,19 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       omClientResponse = onSuccess(omResponse, omPrefixInfo, opResult);
       result = Result.SUCCESS;
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(PREFIX_LOCK,
-            getOzoneObj().getPath());
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(PREFIX_LOCK, getOzoneObj().getPath()));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -184,7 +189,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @return OMClientResponse
    */
   abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception);
+      Exception exception);
 
   /**
    * Completion hook for final processing before return without lock.
@@ -193,7 +198,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @param exception
    * @param omMetrics
    */
-  abstract void onComplete(boolean operationResult, IOException exception,
+  abstract void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, Result result, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
 

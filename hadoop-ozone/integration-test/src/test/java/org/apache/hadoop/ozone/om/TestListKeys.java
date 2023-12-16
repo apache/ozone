@@ -34,7 +34,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -70,7 +72,7 @@ public class TestListKeys {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = new Timeout(1200000);
+  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
 
   /**
    * Create a MiniDFSCluster for testing.

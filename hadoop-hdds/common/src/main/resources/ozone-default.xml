@@ -98,10 +98,17 @@
   </property>
   <property>
     <name>dfs.container.ratis.statemachinedata.sync.retries</name>
-    <value>-1</value>
+    <value/>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Number of times the WriteStateMachineData op will be tried
-      before failing, if this value is -1, then this retries indefinitely.
+      before failing. If the value is not configured, it will default
+      to (hdds.ratis.rpc.slowness.timeout / dfs.container.ratis.statemachinedata.sync.timeout),
+      which means that the WriteStatMachineData will be retried for every sync timeout until
+      the configured slowness timeout is hit, after which the StateMachine will close down the pipeline.
+
+      If this value is set to -1, then this retries indefinitely. This might not be desirable
+      since if due to persistent failure the WriteStateMachineData op was not able to complete
+      for a long time, this might block the Ratis write pipeline.
     </description>
   </property>
   <property>
@@ -314,18 +321,18 @@
   </property>
   <property>
     <name>dfs.container.ratis.segment.size</name>
-    <value>1MB</value>
+    <value>64MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment used by Apache Ratis on datanodes.
-      (1 MB by default)
+    <description>The size of the raft segment file used
+      by Apache Ratis on datanodes. (64 MB by default)
     </description>
   </property>
   <property>
     <name>dfs.container.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on datanodes.(16 KB by default)
+    <description>The pre-allocated file size for raft segment used
+      by Apache Ratis on datanodes. (4 MB by default)
     </description>
   </property>
   <property>
@@ -829,7 +836,7 @@
   </property>
   <property>
     <name>ozone.chunk.read.buffer.default.size</name>
-    <value>64KB</value>
+    <value>1MB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read buffer size during read chunk operations when checksum
@@ -838,6 +845,14 @@
       For chunk data with checksum, the read buffer size will be the
       same as the number of bytes per checksum
       (ozone.client.bytes.per.checksum) corresponding to the chunk.
+    </description>
+  </property>
+  <property>
+    <name>ozone.chunk.read.mapped.buffer.threshold</name>
+    <value>32KB</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default read threshold to use memory mapped buffers.
     </description>
   </property>
   <property>
@@ -1392,6 +1407,55 @@
   </property>
 
   <property>
+    <name>ozone.om.open.mpu.cleanup.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically checks inactive multipart info
+      send multipart upload abort requests for them.
+      This entry controls the interval of this
+      cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.cleanup.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A timeout value of multipart upload cleanup service. If this is set
+      greater than 0, the service will stop waiting for the multipart info abort
+      completion after this time. If timeout happens to a large proportion of
+      multipart aborts, this value needs to be increased or
+      ozone.om.open.key.cleanup.limit.per.task should be decreased.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.expire.threshold</name>
+    <value>30d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long multipart upload is considered active. Specifically, if a multipart info
+      has been ongoing longer than the value of this config entry, that multipart info is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.open.mpu.parts.cleanup.limit.per.task</name>
+    <value>1000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of parts, rounded up to the nearest
+      number of expired multipart upload. This property is used
+      to approximately throttle the number of MPU parts sent
+      to the OM.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1858,6 +1922,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Timeout for ozone grpc client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.ec.grpc.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone ec grpc client during write.
     </description>
   </property>
 
@@ -2753,7 +2826,7 @@
   </property>
   <property>
     <name>hdds.datanode.client.port</name>
-    <value>9864</value>
+    <value>19864</value>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The port number of the Ozone Datanode client service.
@@ -2810,10 +2883,10 @@
   </property>
   <property>
     <name>ozone.om.transport.class</name>
-    <value>org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory</value>
+    <value>org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory</value>
     <tag>OM, MANAGEMENT</tag>
     <description>
-      Enable Ozone Manager S3G Grpc channel.
+      Property to determine the transport protocol for the client to Ozone Manager channel.
     </description>
   </property>
   <property>
@@ -3150,6 +3223,17 @@
       nodes added to the admin workflow or removed from it. The progress
       of decommissioning and entering maintenance nodes is also checked to see
       if they have completed.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.admin.monitor.logging.limit</name>
+    <value>1000</value>
+    <tag>SCM</tag>
+    <description>
+      When a node is checked for decommission or maintenance, this setting
+      controls how many degraded containers are logged on each pass. The limit
+      is applied separately for each type of container, ie under-replicated and
+      unhealthy will each have their own limit.
     </description>
   </property>
   <property>
@@ -4105,6 +4189,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.load.native.lib</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Load native library for performing optimized snapshot diff.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.sst_dumptool.buffer.size</name>
     <value>8KB</value>
     <tag>OZONE, OM</tag>
@@ -4177,6 +4270,22 @@
       quota recalculation trigger when upgrade to the layout version QUOTA.
       while upgrade, re-calculation of quota used will block write operation
       to existing buckets till this operation is completed.
+    </description>
+  </property>
+  <property>
+    <name>ozone.ec.grpc.zerocopy.enabled</name>
+    <value>true</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Specify if zero-copy should be enabled for EC GRPC protocol.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.max.buckets</name>
+    <value>100000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      maximum number of buckets across all volumes.
     </description>
   </property>
 </configuration>

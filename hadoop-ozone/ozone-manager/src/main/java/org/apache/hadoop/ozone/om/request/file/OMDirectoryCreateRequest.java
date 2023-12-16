@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -116,6 +118,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         getOmRequest().getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
 
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(
+        createDirectoryRequest.getKeyArgs().getKeyName());
+
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Time.now());
 
@@ -151,7 +156,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = Result.FAILURE;
     List<OmKeyInfo> missingParentInfos;
@@ -173,8 +178,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
       }
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -227,7 +233,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             result);
       }
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMDirectoryCreateResponse(
           createErrorOMResponse(omResponse, exception), result);
@@ -235,8 +241,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -308,7 +317,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
       KeyArgs keyArgs, OMMetrics omMetrics, Result result,
-      IOException exception, int numMissingParents) {
+      Exception exception, int numMissingParents) {
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

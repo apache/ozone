@@ -72,7 +72,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVer
  */
 public final class SCMDatanodeHeartbeatDispatcher {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMDatanodeHeartbeatDispatcher.class);
 
   private final NodeManager nodeManager;

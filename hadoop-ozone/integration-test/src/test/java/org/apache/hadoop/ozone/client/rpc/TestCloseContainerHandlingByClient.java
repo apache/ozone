@@ -58,7 +58,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests Close Container Exception handling by Ozone Client.
@@ -69,7 +71,7 @@ public class TestCloseContainerHandlingByClient {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
@@ -102,7 +104,7 @@ public class TestCloseContainerHandlingByClient {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);

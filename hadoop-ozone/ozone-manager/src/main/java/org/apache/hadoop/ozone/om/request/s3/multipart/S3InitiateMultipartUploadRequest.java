@@ -58,6 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -130,7 +131,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     ozoneManager.getMetrics().incNumInitiateMultipartUploads();
     boolean acquiredBucketLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
     Result result = null;
@@ -148,9 +149,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquiredBucketLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -238,7 +240,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   .build(), multipartKeyInfo, omKeyInfo, getBucketLayout());
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3InitiateMultipartUploadResponse(
@@ -247,8 +249,11 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
     logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,
@@ -261,7 +266,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   protected void logResult(OzoneManager ozoneManager,
       MultipartInfoInitiateRequest multipartInfoInitiateRequest,
       Map<String, String> auditMap, String volumeName, String bucketName,
-      String keyName, IOException exception, Result result) {
+      String keyName, Exception exception, Result result) {
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,

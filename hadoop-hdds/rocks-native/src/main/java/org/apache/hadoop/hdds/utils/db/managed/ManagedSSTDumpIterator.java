@@ -19,10 +19,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.collect.Maps;
 import com.google.common.primitives.UnsignedLong;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +61,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
                                 String sstFilePath, ManagedOptions options)
-      throws NativeLibraryNotLoadedException, IOException {
+      throws IOException {
     this(sstDumpTool, sstFilePath, options, null, null);
   }
 
@@ -71,7 +69,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
                                 String sstFilePath, ManagedOptions options,
                                 ManagedSlice lowerKeyBound,
                                 ManagedSlice upperKeyBound)
-      throws IOException, NativeLibraryNotLoadedException {
+      throws IOException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
       throw new IOException(String.format("File in path : %s doesn't exist",
@@ -137,8 +135,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
                     ManagedOptions options, ManagedSlice lowerKeyBound,
-                    ManagedSlice upperKeyBound)
-      throws NativeLibraryNotLoadedException {
+                    ManagedSlice upperKeyBound) {
     Map<String, String> argMap = Maps.newHashMap();
     argMap.put("file", sstFile.getAbsolutePath());
     argMap.put("silent", null);
@@ -288,7 +285,6 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       this.value = value;
     }
 
-    @SuppressFBWarnings("EI_EXPOSE_REP")
     public byte[] getKey() {
       return key;
     }
@@ -301,7 +297,6 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       return type;
     }
 
-    @SuppressFBWarnings("EI_EXPOSE_REP")
     public byte[] getValue() {
       return value;
     }

@@ -20,13 +20,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-client</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Client</description>
   <name>Apache Ozone Client</name>
   <packaging>jar</packaging>
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -55,6 +58,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
@@ -98,7 +99,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo fromKeyValue;
     Result result;
     try {
@@ -128,8 +129,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
             IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
       }
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -222,7 +224,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
         result = Result.SUCCESS;
       }
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponseWithFSO(createErrorOMResponse(
@@ -231,8 +233,11 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

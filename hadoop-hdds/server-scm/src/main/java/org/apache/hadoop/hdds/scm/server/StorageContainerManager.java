@@ -25,10 +25,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -147,7 +149,10 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -160,6 +165,7 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
@@ -306,6 +312,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SecurityConfig securityConfig;
 
   private final SCMHANodeDetails scmHANodeDetails;
+  private final String threadNamePrefix;
 
   private final ContainerBalancer containerBalancer;
   // MoveManager is used by ContainerBalancer to schedule container moves
@@ -318,6 +325,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SecretKeyManagerService secretKeyManagerService;
 
   private Clock systemClock;
+  private DNSToSwitchMapping dnsToSwitchMapping;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -371,6 +379,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
+    threadNamePrefix = getScmNodeDetails().threadNamePrefix();
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
 
     jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
@@ -390,7 +399,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
 
-    eventQueue = new EventQueue();
+    eventQueue = new EventQueue(threadNamePrefix);
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
@@ -403,6 +412,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
               scmHAManager.getRatisServer());
+      if (!ratisEnabled) {
+        secretKeyManagerService.getSecretKeyManager().checkAndInitialize();
+      }
       serviceManager.register(secretKeyManagerService);
     } else {
       secretKeyManagerService = null;
@@ -514,7 +526,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     List<BlockingQueue<ContainerReport>> queues
         = ScmUtils.initContainerReportQueue(configuration);
     List<ThreadPoolExecutor> executors
-        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+            threadNamePrefix, queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
@@ -654,7 +667,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
           OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
               .getDuration(), TimeUnit.MILLISECONDS);
-      leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
+      leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
@@ -695,15 +708,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
+          .setThreadNamePrefix(threadNamePrefix)
           .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
           .build();
     }
+
+    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+        conf.getClass(
+            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            TableMapping.class, DNSToSwitchMapping.class);
+    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+        dnsToSwitchMappingClass, conf);
+    dnsToSwitchMapping =
+        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+            : new CachedDNSToSwitchMapping(newInstance));
 
     if (configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
-          clusterMap, scmContext, scmLayoutVersionManager);
+          clusterMap, scmContext, scmLayoutVersionManager,
+          this::resolveNodeLocation);
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();
@@ -784,7 +809,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
-      scmBlockManager = new BlockManagerImpl(conf, this);
+      scmBlockManager = new BlockManagerImpl(conf, scmConfig, this);
     }
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
@@ -857,7 +882,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final CertificateServer rootCertificateServer;
 
     // Start specific instance SCM CA server.
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime()) +
+    String subject = SCM_SUB_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {
       scmCertificateServer = configurator.getCertificateServer();
@@ -942,6 +967,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       certificateStore.storeValidScmCertificate(
           rootCACert.getSerialNumber(), rootCACert);
     }
+    // Upgrade certificate sequence ID
+    SequenceIdGenerator.upgradeToCertificateSequenceId(scmMetadataStore, true);
   }
 
   public CertificateServer getRootCertificateServer() {
@@ -987,7 +1014,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
           getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
       scmCertificateClient = new SCMCertificateClient(securityConfig,
-          scmSecurityClient, certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
+          scmSecurityClient, certSerialNumber, getScmId(),
+          SCM_ROOT_CA_COMPONENT_NAME);
     }
     return new ContainerTokenSecretManager(expiryTime,
         secretKeyManagerService.getSecretKeyManager());
@@ -1460,6 +1488,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public SCMHANodeDetails getSCMHANodeDetails() {
     return scmHANodeDetails;
+  }
+
+  public String threadNamePrefix() {
+    return threadNamePrefix;
   }
 
   @Override
@@ -2175,7 +2207,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
+  @Override
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }
+
+  public String resolveNodeLocation(String hostname) {
+    List<String> hosts = Collections.singletonList(hostname);
+    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+      String location = resolvedHosts.get(0);
+      LOG.debug("Node {} resolved to location {}", hostname, location);
+      return location;
+    } else {
+      LOG.debug("Node resolution did not yield any result for {}", hostname);
+      return null;
+    }
+  }
+
 }

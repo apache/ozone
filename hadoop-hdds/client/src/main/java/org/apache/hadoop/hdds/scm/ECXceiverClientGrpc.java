@@ -21,16 +21,17 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT;
@@ -52,10 +53,13 @@ public class ECXceiverClientGrpc extends XceiverClientGrpc {
   public ECXceiverClientGrpc(
       Pipeline pipeline,
       ConfigurationSource config,
-      List<X509Certificate> caCerts) {
-    super(pipeline, config, caCerts);
+      ClientTrustManager trustManager) {
+    super(pipeline, config, trustManager);
     this.enableRetries = config.getBoolean(OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED,
         OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT);
+    setTimeout(config.getTimeDuration(OzoneConfigKeys.
+        OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT, OzoneConfigKeys
+        .OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
   }
 
   /**

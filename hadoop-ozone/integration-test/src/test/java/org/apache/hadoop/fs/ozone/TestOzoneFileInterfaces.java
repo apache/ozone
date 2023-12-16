@@ -65,16 +65,20 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
 import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Assert;
 
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
+
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -92,7 +96,7 @@ public class TestOzoneFileInterfaces {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private String rootPath;
 
@@ -218,6 +222,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testFileSystemInit() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     if (setDefaultFs) {
       assertTrue(
           "The initialized file system is not OzoneFileSystem but " +
@@ -230,6 +236,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testOzFsReadWrite() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     long currentTime = Time.now();
     int stringLen = 20;
     OMMetadataManager metadataManager = cluster.getOzoneManager()
@@ -316,6 +324,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testReplication() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     int stringLen = 20;
     String data = RandomStringUtils.randomAlphanumeric(stringLen);
     String filePath = RandomStringUtils.randomAlphanumeric(5);
@@ -342,6 +352,8 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testDirectory() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
     String leafName = RandomStringUtils.randomAlphanumeric(5);
     OMMetadataManager metadataManager = cluster.getOzoneManager()
         .getMetadataManager();
@@ -454,7 +466,7 @@ public class TestOzoneFileInterfaces {
         cluster.getOzoneManager().getMetrics().getNumGetFileStatus();
     FileStatus status = fs.getFileStatus(path);
 
-    Assert.assertEquals(numFileStatus + 1,
+    assertEquals(numFileStatus + 1,
         cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
     assertTrue(status.isDirectory());
     assertEquals(FsPermission.getDirDefault(), status.getPermission());
@@ -469,7 +481,7 @@ public class TestOzoneFileInterfaces {
     OzoneFileStatus omStatus =
         cluster.getOzoneManager().getFileStatus(keyArgs);
     //Another get file status here, incremented the counter.
-    Assert.assertEquals(numFileStatus + 2,
+    assertEquals(numFileStatus + 2,
         cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
 
     assertTrue("The created path is not directory.", omStatus.isDirectory());
@@ -503,7 +515,6 @@ public class TestOzoneFileInterfaces {
   }
 
   @Test
-  @Ignore("HDDS-3506")
   public void testOzoneManagerLocatedFileStatusBlockOffsetsWithMultiBlockFile()
       throws Exception {
     // naive assumption: MiniOzoneCluster will not have larger than ~1GB
@@ -534,6 +545,7 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testPathToKey() throws Exception {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
 
     assertEquals("a/b/1", o3fs.pathToKey(new Path("/a/b/1")));
 
@@ -574,10 +586,10 @@ public class TestOzoneFileInterfaces {
 
       try {
         fs = FileSystem.get(fs.getConf());
-        Assert.fail("Should throw Exception due incompatible bucket layout");
+        fail("Should throw Exception due incompatible bucket layout");
       } catch (IllegalArgumentException iae) {
         // Expected exception
-        Assert.assertTrue(iae.getMessage().contains(
+        assertTrue(iae.getMessage().contains(
             "OBJECT_STORE, which does not support file system semantics"));
       }
     }

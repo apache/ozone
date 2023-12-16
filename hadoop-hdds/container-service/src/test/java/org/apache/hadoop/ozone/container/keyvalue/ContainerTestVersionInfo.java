@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
@@ -70,6 +71,15 @@ public class ContainerTestVersionInfo {
   public static Iterable<Object[]> versionParameters() {
     return layoutList.stream().map(each -> new Object[] {each})
         .collect(toList());
+  }
+
+  /**
+   * This method is created to support the parameterized data during
+   * migration to Junit5.
+   * @return Stream of ContainerTestVersionInfo objects.
+   */
+  public static Stream<Object> versionParametersStream() {
+    return layoutList.stream().map(each -> new Object[] {each});
   }
 
   @Override

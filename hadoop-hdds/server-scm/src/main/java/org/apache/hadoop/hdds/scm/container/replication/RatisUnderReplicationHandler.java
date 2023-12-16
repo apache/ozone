@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -153,6 +154,9 @@ public class RatisUnderReplicationHandler
   private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
       throws NotLeaderException {
+    LOG.info("Finding an unhealthy replica to delete for container {} with " +
+        "replicas {} to unblock under replication handling.", containerInfo,
+        replicas);
     int pendingDeletes = 0;
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
@@ -166,6 +170,9 @@ public class RatisUnderReplicationHandler
               try {
                 return replicationManager.getNodeStatus(dnd);
               } catch (NodeNotFoundException e) {
+                LOG.warn("Exception while finding an unhealthy replica to " +
+                    "delete for container {} with replicas {}.", containerInfo,
+                    replicas, e);
                 return null;
               }
             });
@@ -244,8 +251,8 @@ public class RatisUnderReplicationHandler
    * @param pendingOps List of pending ContainerReplicaOp
    * @return List of healthy datanodes that have closed/quasi-closed replicas
    * (or UNHEALTHY replicas if they're the only ones available) and are not
-   * pending replica deletion. Sorted in descending order of
-   * sequence id.
+   * pending replica deletion. If there is a maximum sequence ID, then only
+   * replicas with that sequence ID are returned.
    */
   private List<DatanodeDetails> getSources(
       RatisContainerReplicaCount replicaCount,
@@ -259,8 +266,24 @@ public class RatisUnderReplicationHandler
     }
 
     Predicate<ContainerReplica> predicate =
-        replica -> replica.getState() == State.CLOSED ||
-        replica.getState() == State.QUASI_CLOSED;
+        replica -> replica.getState() == State.CLOSED;
+
+    /*
+    If no CLOSED replicas are available, or if the container itself is
+    QUASI_CLOSED, then QUASI_CLOSED replicas are allowed to be sources.
+    */
+    boolean hasClosedReplica = false;
+    for (ContainerReplica replica : replicaCount.getReplicas()) {
+      if (replica.getState() == State.CLOSED) {
+        hasClosedReplica = true;
+        break;
+      }
+    }
+    if (!hasClosedReplica ||
+        replicaCount.getContainer().getState() == LifeCycleState.QUASI_CLOSED) {
+      predicate =
+          predicate.or(replica -> replica.getState() == State.QUASI_CLOSED);
+    }
 
     if (replicaCount.getHealthyReplicaCount() == 0) {
       predicate = predicate.or(

@@ -88,6 +88,8 @@ public class TestRDBSnapshotProvider {
 
   @BeforeEach
   public void init(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = getNewDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {

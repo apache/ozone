@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.nio.ByteBuffer;
-import java.util.function.IntFunction;
 
 import javax.annotation.Nonnull;
 
@@ -45,7 +44,7 @@ public final class ShortCodec implements Codec<Short> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull Short object,
-      IntFunction<CodecBuffer> allocator) {
+      CodecBuffer.Allocator allocator) {
     return allocator.apply(Short.BYTES).putShort(object);
   }
 

@@ -381,6 +381,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<DatanodeDetails> getNodesByAddress(String address);
 
   /**
+   * For the given node, retried the last heartbeat time.
+   * @param datanodeDetails DatanodeDetails of the node.
+   * @return The last heartbeat time in milliseconds or -1 if the node does not
+   *         existing in the nodeManager.
+   */
+  long getLastHeartbeat(DatanodeDetails datanodeDetails);
+
+  /**
    * Get cluster map as in network topology for this node manager.
    * @return cluster map
    */

@@ -25,10 +25,10 @@ import org.apache.hadoop.hdds.scm.update.client.SCMUpdateClientConfiguration;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -97,7 +97,7 @@ public class TestSCMUpdateServiceGrpcServer {
   }
 
 
-  @Disabled("HDDS-5319")
+  @Unhealthy("HDDS-5319")
   @Test
   public void testClientUpdateWithRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -140,7 +140,7 @@ public class TestSCMUpdateServiceGrpcServer {
     }
   }
 
-  @Disabled("HDDS-5319")
+  @Unhealthy("HDDS-5319")
   @Test
   public void testClientUpdateWithDelayedRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -213,7 +213,7 @@ public class TestSCMUpdateServiceGrpcServer {
     return crlId.get();
   }
 
-  @Disabled("HDDS-5319")
+  @Unhealthy("HDDS-5319")
   @Test
   public void testClientUpdateWithRestart() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();

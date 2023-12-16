@@ -24,9 +24,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -45,7 +45,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 /**
  * Tests for LeaderChoosePolicy.
  */
-@Disabled("This test was never enabled")
+@Unhealthy("This test was never enabled")
 public class TestLeaderChoosePolicy {
 
   private MiniOzoneCluster cluster;

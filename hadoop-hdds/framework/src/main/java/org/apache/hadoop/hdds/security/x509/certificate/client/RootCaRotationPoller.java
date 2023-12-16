@@ -60,19 +60,27 @@ public class RootCaRotationPoller implements Runnable, Closeable {
 
   public RootCaRotationPoller(SecurityConfig securityConfig,
       Set<X509Certificate> initiallyKnownRootCaCerts,
-      SCMSecurityProtocolClientSideTranslatorPB scmSecureClient) {
+      SCMSecurityProtocolClientSideTranslatorPB scmSecureClient,
+      String threadNamePrefix) {
     this.scmSecureClient = scmSecureClient;
     this.knownRootCerts = initiallyKnownRootCaCerts;
     poller = Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setNameFormat(
-                this.getClass().getSimpleName())
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + getClass().getSimpleName())
             .setDaemon(true).build());
     pollingInterval = securityConfig.getRootCaCertificatePollingInterval();
     rootCARotationProcessors = new ArrayList<>();
     certificateRenewalError = new AtomicBoolean(false);
   }
 
-  private void pollRootCas() {
+  /**
+   * Polls the SCM for root ca certificates and compares them to the known
+   * set of root ca certificates. If there are new root ca certificates it
+   * invokes the necessary handlers provided in rootCaRotationProcessors.
+   *
+   * @return returns true if the SCM provided a new root ca certificate.
+   */
+  void pollRootCas() {
     try {
       List<String> pemEncodedRootCaList =
           scmSecureClient.getAllRootCaCertificates();
@@ -98,8 +106,9 @@ public class RootCaRotationPoller implements Runnable, Closeable {
       allRootCAProcessorFutures.whenComplete((unused, throwable) -> {
         if (throwable == null && !certificateRenewalError.get()) {
           knownRootCerts = new HashSet<>(rootCAsFromSCM);
+          LOG.info("Certificate processing was successful.");
         } else {
-          LOG.info("Certificate consumption was unsuccesfull. " +
+          LOG.info("Certificate consumption was unsuccessful. " +
               (certificateRenewalError.get() ?
                   "There was a caught exception when trying to sign the " +
                       "certificate" :

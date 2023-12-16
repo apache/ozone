@@ -45,15 +45,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -67,6 +63,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -75,11 +72,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Test ContainerReader class which loads containers from disks.
  */
-@RunWith(Parameterized.class)
 public class TestContainerReader {
-
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private MutableVolumeSet volumeSet;
   private HddsVolume hddsVolume;
@@ -93,26 +86,17 @@ public class TestContainerReader {
   private int blockCount = 10;
   private long blockLen = 1024;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layout;
   private String schemaVersion;
 
-  public TestContainerReader(ContainerTestVersionInfo versionInfo) {
-    this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+  @TempDir
+  private Path tempDir;
+
+  private void setup(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    File volumeDir =
+        Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @Before
-  public void setup() throws Exception {
-
-    File volumeDir = tempDir.newFolder();
     volumeSet = Mockito.mock(MutableVolumeSet.class);
     containerSet = new ContainerSet(1000);
 
@@ -129,10 +113,9 @@ public class TestContainerReader {
         .thenReturn(hddsVolume);
 
     for (int i = 0; i < 2; i++) {
-      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
-          layout,
-          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-          datanodeId.toString());
+      KeyValueContainerData keyValueContainerData =
+          new KeyValueContainerData(i, layout, (long) StorageUnit.GB.toBytes(5),
+              UUID.randomUUID().toString(), datanodeId.toString());
 
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
@@ -142,7 +125,7 @@ public class TestContainerReader {
 
       List<Long> blkNames;
       if (i % 2 == 0) {
-        blkNames = addBlocks(keyValueContainer,  true);
+        blkNames = addBlocks(keyValueContainer, true);
         markBlocksForDelete(keyValueContainer, true, blkNames, i);
       } else {
         blkNames = addBlocks(keyValueContainer, false);
@@ -155,7 +138,7 @@ public class TestContainerReader {
     ContainerCache.getInstance(conf).shutdownCache();
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     BlockUtils.shutdownCache(conf);
   }
@@ -216,17 +199,21 @@ public class TestContainerReader {
 
       if (setMetaData) {
         metadataStore.getStore().getMetadataTable()
-                .put(cData.getBlockCountKey(), (long)blockCount);
+            .put(cData.getBlockCountKey(), (long) blockCount);
         metadataStore.getStore().getMetadataTable()
-                .put(cData.getBytesUsedKey(), blockCount * blockLen);
+            .put(cData.getBytesUsedKey(), blockCount * blockLen);
       }
     }
 
     return blkNames;
   }
 
-  @Test
-  public void testContainerReader() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testContainerReader(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     KeyValueContainerData recoveringContainerData = new KeyValueContainerData(
         10, layout, (long) StorageUnit.GB.toBytes(5),
         UUID.randomUUID().toString(), datanodeId.toString());
@@ -246,8 +233,10 @@ public class TestContainerReader {
     thread.start();
     thread.join();
 
-    //recovering container should be deleted, so the count should be 2
-    Assert.assertEquals(2, containerSet.containerCount());
+    //recovering container should be marked unhealthy, so the count should be 3
+    Assertions.assertEquals(UNHEALTHY, containerSet.getContainer(
+        recoveringContainerData.getContainerID()).getContainerState());
+    Assertions.assertEquals(3, containerSet.containerCount());
 
     for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);
@@ -256,23 +245,28 @@ public class TestContainerReader {
           keyValueContainer.getContainerData();
 
       // Verify block related metadata.
-      Assert.assertEquals(blockCount,
+      Assertions.assertEquals(blockCount,
           keyValueContainerData.getBlockCount());
 
-      Assert.assertEquals(blockCount * blockLen,
+      Assertions.assertEquals(blockCount * blockLen,
           keyValueContainerData.getBytesUsed());
 
-      Assert.assertEquals(i,
+      Assertions.assertEquals(i,
           keyValueContainerData.getNumPendingDeletionBlocks());
     }
   }
 
-  @Test
-  public void testContainerReaderWithLoadException() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testContainerReaderWithLoadException(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     MutableVolumeSet volumeSet1;
     HddsVolume hddsVolume1;
     ContainerSet containerSet1 = new ContainerSet(1000);
-    File volumeDir1 = tempDir.newFolder();
+    File volumeDir1 =
+        Files.createDirectory(tempDir.resolve("volumeDir" + 1)).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
 
     volumeSet1 = Mockito.mock(MutableVolumeSet.class);
@@ -302,7 +296,7 @@ public class TestContainerReader {
             keyValueContainer.getContainerData().getContainerPath();
         File containerPath = new File(containerPathStr);
         String renamePath = containerPathStr + "-aa";
-        Assert.assertTrue(containerPath.renameTo(new File(renamePath)));
+        Assertions.assertTrue(containerPath.renameTo(new File(renamePath)));
       }
     }
     ContainerCache.getInstance(conf).shutdownCache();
@@ -310,16 +304,21 @@ public class TestContainerReader {
     ContainerReader containerReader = new ContainerReader(volumeSet1,
         hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
-    Assert.assertEquals(containerCount - 1, containerSet1.containerCount());
+    Assertions.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
 
-  @Test
-  public void testMultipleContainerReader() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testMultipleContainerReader(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     final int volumeNum = 10;
     StringBuffer datanodeDirs = new StringBuffer();
     File[] volumeDirs = new File[volumeNum];
     for (int i = 0; i < volumeNum; i++) {
-      volumeDirs[i] = tempDir.newFolder();
+      volumeDirs[i] =
+          Files.createDirectory(tempDir.resolve("volumeDir" + i)).toFile();
       datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(",");
     }
 
@@ -404,9 +403,9 @@ public class TestContainerReader {
     }
     System.out.println("Open " + volumeNum + " Volume with " + containerCount +
         " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
-    Assert.assertEquals(containerCount,
+    Assertions.assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
-    Assert.assertEquals(volumeSet.getFailedVolumesList().size(), 0);
+    Assertions.assertEquals(volumeSet.getFailedVolumesList().size(), 0);
 
     // One of the conflict01 or conflict02 should have had its container path
     // removed.
@@ -419,37 +418,37 @@ public class TestContainerReader {
         exist++;
       }
     }
-    Assert.assertEquals(1, exist);
-    Assert.assertTrue(paths.contains(Paths.get(
+    Assertions.assertEquals(1, exist);
+    Assertions.assertTrue(paths.contains(Paths.get(
         containerSet.getContainer(0).getContainerData().getContainerPath())));
 
     // For conflict1, the one with the larger BCSID should win, which is
     // conflict11.
-    Assert.assertFalse(Files.exists(Paths.get(
+    Assertions.assertFalse(Files.exists(Paths.get(
         conflict12.getContainerData().getContainerPath())));
-    Assert.assertEquals(conflict11.getContainerData().getContainerPath(),
+    Assertions.assertEquals(conflict11.getContainerData().getContainerPath(),
         containerSet.getContainer(1).getContainerData().getContainerPath());
-    Assert.assertEquals(baseBCSID, containerSet.getContainer(1)
+    Assertions.assertEquals(baseBCSID, containerSet.getContainer(1)
         .getContainerData().getBlockCommitSequenceId());
 
     // For conflict2, the closed on (conflict22) should win.
-    Assert.assertFalse(Files.exists(Paths.get(
+    Assertions.assertFalse(Files.exists(Paths.get(
         conflict21.getContainerData().getContainerPath())));
-    Assert.assertEquals(conflict22.getContainerData().getContainerPath(),
+    Assertions.assertEquals(conflict22.getContainerData().getContainerPath(),
         containerSet.getContainer(2).getContainerData().getContainerPath());
-    Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+    Assertions.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
         containerSet.getContainer(2).getContainerData().getState());
 
     // For the EC conflict, both containers should be left on disk
-    Assert.assertTrue(Files.exists(Paths.get(
+    Assertions.assertTrue(Files.exists(Paths.get(
         ec1.getContainerData().getContainerPath())));
-    Assert.assertTrue(Files.exists(Paths.get(
+    Assertions.assertTrue(Files.exists(Paths.get(
         ec2.getContainerData().getContainerPath())));
-    Assert.assertNotNull(containerSet.getContainer(3));
+    Assertions.assertNotNull(containerSet.getContainer(3));
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
-    Assert.assertEquals(0, cache.size());
+    Assertions.assertEquals(0, cache.size());
   }
 
   private KeyValueContainer createContainerWithId(int id, VolumeSet volSet,
@@ -488,8 +487,12 @@ public class TestContainerReader {
     cData.updateBlockCommitSequenceId(val);
   }
 
-  @Test
-  public void testMarkedDeletedContainerCleared() throws Exception {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testMarkedDeletedContainerCleared(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
     KeyValueContainerData containerData = new KeyValueContainerData(
         101, layout, (long) StorageUnit.GB.toBytes(5),
         UUID.randomUUID().toString(), datanodeId.toString());
@@ -546,5 +549,17 @@ public class TestContainerReader {
           metadataTable.getEstimatedKeyCount());
       return baseSize;
     }
+  }
+
+  private void setLayoutAndSchemaVersion(
+      ContainerTestVersionInfo versionInfo) {
+    layout = versionInfo.getLayout();
+    schemaVersion = versionInfo.getSchemaVersion();
+    conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  private static Iterable<Object[]> versionInfo() {
+    return ContainerTestVersionInfo.versionParameters();
   }
 }

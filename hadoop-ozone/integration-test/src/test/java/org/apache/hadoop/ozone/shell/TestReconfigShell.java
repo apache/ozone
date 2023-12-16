@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.ReconfigurableBase;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
@@ -41,7 +40,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -57,7 +58,8 @@ public class TestReconfigShell {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = new Timeout(5, TimeUnit.MINUTES);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
   private static MiniOzoneCluster cluster;
   private static List<HddsDatanodeService> datanodeServices;
   private static OzoneAdmin ozoneAdmin;

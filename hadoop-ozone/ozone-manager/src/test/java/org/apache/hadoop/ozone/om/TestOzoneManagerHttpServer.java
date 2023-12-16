@@ -30,26 +30,22 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpConfig.Policy;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test http server of OM with various HTTP option.
  */
-@RunWith(value = Parameterized.class)
 public class TestOzoneManagerHttpServer {
   private static final String BASEDIR = GenericTestUtils
       .getTempPath(TestOzoneManagerHttpServer.class.getSimpleName());
@@ -58,8 +54,7 @@ public class TestOzoneManagerHttpServer {
   private static OzoneConfiguration conf;
   private static URLConnectionFactory connectionFactory;
   private static File ozoneMetadataDirectory;
-
-  @Parameters public static Collection<Object[]> policy() {
+  public static Collection<Object[]> policy() {
     Object[][] params = new Object[][] {
         {HttpConfig.Policy.HTTP_ONLY},
         {HttpConfig.Policy.HTTPS_ONLY},
@@ -67,14 +62,7 @@ public class TestOzoneManagerHttpServer {
     return Arrays.asList(params);
   }
 
-  private final HttpConfig.Policy policy;
-
-  public TestOzoneManagerHttpServer(Policy policy) {
-    super();
-    this.policy = policy;
-  }
-
-  @BeforeClass public static void setUp() throws Exception {
+  @BeforeAll public static void setUp() throws Exception {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
 
@@ -104,13 +92,15 @@ public class TestOzoneManagerHttpServer {
     conf.set(OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY, "localhost");
   }
 
-  @AfterClass public static void tearDown() throws Exception {
+  @AfterAll public static void tearDown() throws Exception {
     connectionFactory.destroy();
     FileUtil.fullyDelete(new File(BASEDIR));
     KeyStoreTestUtil.cleanupSSLConfig(keystoresDir, sslConfDir);
   }
 
-  @Test public void testHttpPolicy() throws Exception {
+  @ParameterizedTest
+  @MethodSource("policy")
+  public void testHttpPolicy(HttpConfig.Policy policy) throws Exception {
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
     OzoneManagerHttpServer server = null;
     try {
@@ -118,15 +108,15 @@ public class TestOzoneManagerHttpServer {
       DefaultMetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
 
-      Assert.assertTrue(implies(policy.isHttpEnabled(),
+      Assertions.assertTrue(implies(policy.isHttpEnabled(),
           canAccess("http", server.getHttpAddress())));
-      Assert.assertTrue(implies(policy.isHttpEnabled() &&
+      Assertions.assertTrue(implies(policy.isHttpEnabled() &&
               !policy.isHttpsEnabled(),
           !canAccess("https", server.getHttpsAddress())));
 
-      Assert.assertTrue(implies(policy.isHttpsEnabled(),
+      Assertions.assertTrue(implies(policy.isHttpsEnabled(),
           canAccess("https", server.getHttpsAddress())));
-      Assert.assertTrue(implies(policy.isHttpsEnabled(),
+      Assertions.assertTrue(implies(policy.isHttpsEnabled(),
           !canAccess("http", server.getHttpsAddress())));
     } finally {
       if (server != null) {
@@ -146,7 +136,7 @@ public class TestOzoneManagerHttpServer {
       // Checking if the /webserver directory does get created
       File webServerDir =
           new File(ozoneMetadataDirectory, BaseHttpServer.SERVER_DIR);
-      Assert.assertTrue(webServerDir.exists());
+      Assertions.assertTrue(webServerDir.exists());
       // Verify that the jetty directory is set correctly
       String expectedJettyDirLocation =
           ozoneMetadataDirectory.getAbsolutePath() + BaseHttpServer.SERVER_DIR;

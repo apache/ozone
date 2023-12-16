@@ -16,7 +16,9 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -55,9 +57,7 @@ public class BlockDeletingService extends BackgroundService {
   private final OzoneContainer ozoneContainer;
   private final ContainerDeletionChoosingPolicy containerDeletionPolicy;
   private final ConfigurationSource conf;
-
-  private final int blockLimitPerInterval;
-
+  private final DatanodeConfiguration dnConf;
   private final BlockDeletingServiceMetrics metrics;
 
   // Task priority is useful when a to-delete block has weight.
@@ -65,12 +65,23 @@ public class BlockDeletingService extends BackgroundService {
 
   private final Duration blockDeletingMaxLockHoldingTime;
 
-  public BlockDeletingService(OzoneContainer ozoneContainer,
-                              long serviceInterval, long serviceTimeout,
-                              TimeUnit timeUnit, int workerSize,
-                              ConfigurationSource conf) {
+  @VisibleForTesting
+  public BlockDeletingService(
+      OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
+      TimeUnit timeUnit, int workerSize, ConfigurationSource conf
+  ) {
+    this(ozoneContainer, serviceInterval, serviceTimeout, timeUnit, workerSize,
+        conf, "", null);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  public BlockDeletingService(
+      OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
+      TimeUnit timeUnit, int workerSize, ConfigurationSource conf,
+      String threadNamePrefix, ReconfigurationHandler reconfigurationHandler
+  ) {
     super("BlockDeletingService", serviceInterval, timeUnit,
-        workerSize, serviceTimeout);
+        workerSize, serviceTimeout, threadNamePrefix);
     this.ozoneContainer = ozoneContainer;
     try {
       containerDeletionPolicy = conf.getClass(
@@ -81,8 +92,10 @@ public class BlockDeletingService extends BackgroundService {
       throw new RuntimeException(e);
     }
     this.conf = conf;
-    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    dnConf = conf.getObject(DatanodeConfiguration.class);
+    if (reconfigurationHandler != null) {
+      reconfigurationHandler.register(dnConf);
+    }
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
     metrics = BlockDeletingServiceMetrics.create();
@@ -121,7 +134,7 @@ public class BlockDeletingService extends BackgroundService {
       // The chosen result depends on what container deletion policy is
       // configured.
       List<ContainerBlockInfo> containers =
-          chooseContainerForBlockDeletion(blockLimitPerInterval,
+          chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
               containerDeletionPolicy);
 
       BackgroundTask
@@ -256,6 +269,10 @@ public class BlockDeletingService extends BackgroundService {
 
   public Duration getBlockDeletingMaxLockHoldingTime() {
     return blockDeletingMaxLockHoldingTime;
+  }
+
+  public int getBlockLimitPerInterval() {
+    return dnConf.getBlockDeletionLimit();
   }
 
   private static class BlockDeletingTaskBuilder {

@@ -34,7 +34,6 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.IntFunction;
 
 /**
  * An abstract {@link Codec} to serialize/deserialize {@link String}
@@ -169,7 +168,7 @@ abstract class StringCodecBase implements Codec<String> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull String object,
-      IntFunction<CodecBuffer> allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws IOException {
     // allocate a larger buffer to avoid encoding twice.
     final int upperBound = getSerializedSizeUpperBound(object);
     final CodecBuffer buffer = allocator.apply(upperBound);

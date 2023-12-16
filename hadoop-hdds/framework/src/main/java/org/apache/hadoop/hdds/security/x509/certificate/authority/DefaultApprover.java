@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
-import org.apache.hadoop.util.Time;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -53,7 +52,7 @@ import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 
 /**
@@ -84,6 +83,7 @@ public class DefaultApprover extends BaseApprover {
    * @param certificationRequest - Certification Request.
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
+   * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
    * @throws OperatorCreationException - on Error.
@@ -98,7 +98,8 @@ public class DefaultApprover extends BaseApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId) throws IOException,
+      String clusterId,
+      String certSerialId) throws IOException,
       OperatorCreationException {
 
     AlgorithmIdentifier sigAlgId = new
@@ -118,6 +119,8 @@ public class DefaultApprover extends BaseApprover {
         toASN1Primitive().toString();
     String csrClusterId = x500Name.getRDNs(BCStyle.O)[0].getFirst().getValue().
         toASN1Primitive().toString();
+    String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
+        .toASN1Primitive().toString();
 
     if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&
@@ -125,15 +128,16 @@ public class DefaultApprover extends BaseApprover {
         // Special case to handle DN certificate generation as DN might not know
         // scmId and clusterId before registration. In secure mode registration
         // will succeed only after datanode has a valid certificate.
-        String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
-            .toASN1Primitive().toString();
-        x500Name = getDistinguishedName(cn, scmId, clusterId);
+        csrClusterId = clusterId;
+        csrScmId = scmId;
       } else {
         // Throw exception if scmId and clusterId doesn't match.
         throw new SCMSecurityException("ScmId and ClusterId in CSR subject" +
             " are incorrect.");
       }
     }
+    x500Name = getDistinguishedNameWithSN(cn, csrScmId, csrClusterId,
+        certSerialId);
 
     RSAKeyParameters rsa =
         (RSAKeyParameters) PublicKeyFactory.createKey(keyInfo);
@@ -144,8 +148,7 @@ public class DefaultApprover extends BaseApprover {
     X509v3CertificateBuilder certificateGenerator =
         new X509v3CertificateBuilder(
             caCertificate.getSubject(),
-            // Serial is not sequential but it is monotonically increasing.
-            BigInteger.valueOf(generateSerialId()),
+            new BigInteger(certSerialId),
             validFrom,
             validTill,
             x500Name, keyInfo);
@@ -171,12 +174,6 @@ public class DefaultApprover extends BaseApprover {
 
     return certificateGenerator.build(sigGen);
 
-  }
-
-  public long generateSerialId() {
-    // TODO: to make generation of serialId distributed.
-    // This issue will be fixed in HDDS-4999.
-    return Time.monotonicNowNanos();
   }
 
   @Override

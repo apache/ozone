@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.buildTokenAuditMap;
@@ -98,7 +99,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OzoneTokenIdentifier ozoneTokenIdentifier = null;
-    IOException exception = null;
+    Exception exception = null;
 
     try {
       ozoneTokenIdentifier =
@@ -118,11 +119,11 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
                   CancelDelegationTokenResponseProto.newBuilder().setResponse(
                       SecurityProtos.CancelDelegationTokenResponseProto
                           .newBuilder())).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in cancel DelegationToken {}", ozoneTokenIdentifier, ex);
       exception = ex;
       omClientResponse = new OMCancelDelegationTokenResponse(null,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

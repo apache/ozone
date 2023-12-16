@@ -110,6 +110,7 @@ import java.util.stream.Stream;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
@@ -266,15 +267,10 @@ public class TestContainerCommandsEC {
     scm.getPipelineManager().closePipeline(orphanPipeline, false);
 
     // Find the datanode hosting Replica index = 2
-    DatanodeDetails dn2 = null;
     HddsDatanodeService dn2Service = null;
     List<DatanodeDetails> pipelineNodes = orphanPipeline.getNodes();
-    for (DatanodeDetails node : pipelineNodes) {
-      if (orphanPipeline.getReplicaIndex(node) == 2) {
-        dn2 = node;
-        break;
-      }
-    }
+    DatanodeDetails dn2 = findDatanodeWithIndex(
+        orphanPipeline, pipelineNodes, 2);
     // Find the Cluster node corresponding to the datanode hosting index = 2
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       if (dn.getDatanodeDetails().equals(dn2)) {
@@ -363,8 +359,9 @@ public class TestContainerCommandsEC {
     }
 
     try (ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-            null, ECReconstructionMetrics.create())) {
+             new ECReconstructionCoordinator(config, certClient,
+                 secretKeyClient, null,
+                 ECReconstructionMetrics.create(), "")) {
 
       // Attempt to reconstruct the container.
       coordinator.reconstructECContainerGroup(orphanContainerID,
@@ -388,6 +385,16 @@ public class TestContainerCommandsEC {
       Assert.assertEquals(0L, count);
       Assert.assertEquals(0, response.getBlockDataList().size());
     }
+  }
+
+  private DatanodeDetails findDatanodeWithIndex(Pipeline orphanPipeline,
+      List<DatanodeDetails> pipelineNodes, int index) {
+    for (DatanodeDetails node : pipelineNodes) {
+      if (orphanPipeline.getReplicaIndex(node) == index) {
+        return node;
+      }
+    }
+    return null;
   }
 
   @Test
@@ -517,6 +524,81 @@ public class TestContainerCommandsEC {
     }
   }
 
+  @Test
+  public void testCreateRecoveryContainerAfterDNRestart() throws Exception {
+    try (XceiverClientManager xceiverClientManager =
+             new XceiverClientManager(config)) {
+      ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+      Pipeline newPipeline =
+          scm.getPipelineManager().createPipeline(replicationConfig);
+      scm.getPipelineManager().activatePipeline(newPipeline.getId());
+      final ContainerInfo container = scm.getContainerManager()
+          .allocateContainer(replicationConfig, "test");
+      Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
+          .generateToken(ANY_USER, container.containerID());
+      scm.getContainerManager().getContainerStateManager()
+          .addContainer(container.getProtobuf());
+
+      DatanodeDetails targetDN = newPipeline.getNodes().get(0);
+      XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
+          createSingleNodePipeline(newPipeline, targetDN,
+              2));
+      try {
+        // To create the actual situation, container would have been in closed
+        // state at SCM.
+        scm.getContainerManager().getContainerStateManager()
+            .updateContainerState(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.FINALIZE);
+        scm.getContainerManager().getContainerStateManager()
+            .updateContainerState(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.CLOSE);
+
+        //Create the recovering container in target DN.
+        String encodedToken = cToken.encodeToUrlString();
+        ContainerProtocolCalls.createRecoveringContainer(dnClient,
+            container.containerID().getProtobuf().getId(),
+            encodedToken, 4);
+
+        // Restart the DN.
+        cluster.restartHddsDatanode(targetDN, true);
+
+        // Recovering container state after DN restart should be UNHEALTHY.
+        Assert.assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+            cluster.getHddsDatanode(targetDN)
+                .getDatanodeStateMachine()
+                .getContainer()
+                .getContainerSet()
+                .getContainer(container.getContainerID())
+                .getContainerState());
+
+        // Writes to recovering container after DN restart should fail
+        // because the container is marked UNHEALTHY
+        // and hence does not accept any writes.
+        BlockID blockID = ContainerTestHelper
+            .getTestBlockID(container.containerID().getProtobuf().getId());
+        Token<? extends TokenIdentifier> blockToken =
+            blockTokenGenerator.generateToken(ANY_USER, blockID,
+                EnumSet.of(READ, WRITE), Long.MAX_VALUE);
+        byte[] data = "TestData".getBytes(UTF_8);
+        ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+            newWriteChunkRequestBuilder(newPipeline, blockID,
+                ChunkBuffer.wrap(ByteBuffer.wrap(data)), 0)
+                .setEncodedToken(blockToken.encodeToUrlString())
+                .build();
+        scm.getPipelineManager().activatePipeline(newPipeline.getId());
+
+        try {
+          dnClient.sendCommand(writeChunkRequest);
+        } catch (StorageContainerException e) {
+          Assert.assertEquals(CONTAINER_UNHEALTHY, e.getResult());
+        }
+
+      } finally {
+        xceiverClientManager.releaseClient(dnClient, false);
+      }
+    }
+  }
+
   private static byte[] getBytesWith(int singleDigitNumber, int total) {
     StringBuilder builder = new StringBuilder(singleDigitNumber);
     for (int i = 1; i <= total; i++) {
@@ -581,7 +663,7 @@ public class TestContainerCommandsEC {
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
             new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-                 null, ECReconstructionMetrics.create())) {
+                null, ECReconstructionMetrics.create(), "2")) {
 
       ECReconstructionMetrics metrics =
           coordinator.getECReconstructionMetrics();
@@ -776,8 +858,9 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       try (ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient,  secretKeyClient,
-              null, ECReconstructionMetrics.create())) {
+               new ECReconstructionCoordinator(config, certClient,
+                   secretKeyClient,
+                   null, ECReconstructionMetrics.create(), "")) {
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
             sourceNodeMap, targetNodeMap);

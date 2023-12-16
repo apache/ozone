@@ -32,13 +32,14 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -53,8 +54,8 @@ import static org.mockito.Mockito.mock;
  */
 public class TestHeatMapInfo {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -64,11 +65,12 @@ public class TestHeatMapInfo {
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
@@ -728,7 +730,7 @@ public class TestHeatMapInfo {
         "}";
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {

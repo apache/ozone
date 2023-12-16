@@ -45,7 +45,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -90,7 +92,7 @@ public class TestOzoneTenantShell {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static File baseDir;
   private static File testFile;

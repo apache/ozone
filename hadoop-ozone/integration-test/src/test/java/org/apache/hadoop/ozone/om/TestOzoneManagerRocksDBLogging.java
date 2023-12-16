@@ -31,7 +31,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test RocksDB logging for Ozone Manager.
@@ -42,7 +44,7 @@ public class TestOzoneManagerRocksDBLogging {
   private RocksDBConfiguration dbConf;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(100);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
 
   private static GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);

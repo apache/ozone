@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -42,7 +43,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -66,7 +69,7 @@ public class TestContainerStateMachineFlushDelay {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -109,6 +112,9 @@ public class TestContainerStateMachineFlushDelay {
     OzoneManager.setTestSecureOmFlag(true);
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
+    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
             .setBlockSize(blockSize)

@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
+
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +35,14 @@ import java.time.Duration;
 /**
  * Configuration class used for high level datanode configuration parameters.
  */
-@ConfigGroup(prefix = "hdds.datanode")
-public class DatanodeConfiguration {
+@ConfigGroup(prefix = CONFIG_PREFIX)
+public class DatanodeConfiguration extends ReconfigurableConfig {
+  public static final String CONFIG_PREFIX = "hdds.datanode";
+
+  private static final String BLOCK_DELETE_THREAD_MAX
+      = "block.delete.threads.max";
+  public static final String HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX =
+      CONFIG_PREFIX + "." + BLOCK_DELETE_THREAD_MAX;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeConfiguration.class);
@@ -80,11 +89,9 @@ public class DatanodeConfiguration {
 
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
-  static final long DISK_CHECK_MIN_GAP_DEFAULT =
-      Duration.ofMinutes(10).toMillis();
+  static final Duration DISK_CHECK_MIN_GAP_DEFAULT = Duration.ofMinutes(10);
 
-  static final long DISK_CHECK_TIMEOUT_DEFAULT =
-      Duration.ofMinutes(10).toMillis();
+  static final Duration DISK_CHECK_TIMEOUT_DEFAULT = Duration.ofMinutes(10);
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -120,6 +127,11 @@ public class DatanodeConfiguration {
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
+  public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
+      "hdds.datanode.block.delete.command.worker.interval";
+  public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT =
+      Duration.ofSeconds(2);
+
   /**
    * The maximum number of threads used to delete containers on a datanode
    * simultaneously.
@@ -153,7 +165,7 @@ public class DatanodeConfiguration {
    * missed. With max threads 5, optimistically DN can handle 1500 individual
    * container delete tx in 60s with RocksDB cache miss.
    */
-  @Config(key = "block.delete.threads.max",
+  @Config(key = BLOCK_DELETE_THREAD_MAX,
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
@@ -176,6 +188,16 @@ public class DatanodeConfiguration {
           " a datanode"
   )
   private int blockDeleteQueueLimit = 5;
+
+  @Config(key = "block.delete.command.worker.interval",
+      type = ConfigType.TIME,
+      defaultValue = "2s",
+      tags = {DATANODE},
+      description = "The interval between DeleteCmdWorker execution of " +
+          "delete commands."
+  )
+  private Duration blockDeleteCommandWorkerInterval =
+      BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 
   /**
    * The maximum number of commands in queued list.
@@ -201,7 +223,7 @@ public class DatanodeConfiguration {
                           + "deletion. Unit could be defined with "
                           + "postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+  private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
   @Config(key = "recovering.container.scrubbing.service.interval",
       defaultValue = "1m",
@@ -213,29 +235,44 @@ public class DatanodeConfiguration {
               "on Datanode periodically and deletes stale recovering " +
               "container Unit could be defined with postfix (ns,ms,s,m,h,d)."
   )
-  private long recoveringContainerScrubInterval =
-      Duration.ofMinutes(10).toMillis();
+  private Duration recoveringContainerScrubInterval = Duration.ofMinutes(10);
+
+  /**
+   * The maximum time to wait for acquiring the container lock when processing
+   * a delete block transaction.
+   * If a timeout occurs while attempting to get the lock, the delete block
+   * transaction won't be immediately discarded. Instead, it will be retried
+   * after all the current delete block transactions have been processed.
+   */
+  @Config(key = "block.delete.max.lock.wait.timeout",
+      defaultValue = "100ms",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION},
+      description = "Timeout for the thread used to process the delete" +
+          " block command to wait for the container lock."
+  )
+  private long blockDeleteMaxLockWaitTimeoutMs =
+      Duration.ofMillis(100).toMillis();
 
   public Duration getBlockDeletionInterval() {
-    return Duration.ofMillis(blockDeletionInterval);
+    return blockDeletionInterval;
   }
 
-  public void setRecoveringContainerScrubInterval(
-          Duration recoveringContainerScrubInterval) {
-    this.recoveringContainerScrubInterval =
-            recoveringContainerScrubInterval.toMillis();
+  public void setRecoveringContainerScrubInterval(Duration duration) {
+    recoveringContainerScrubInterval = duration;
   }
 
   public Duration getRecoveringContainerScrubInterval() {
-    return Duration.ofMillis(recoveringContainerScrubInterval);
+    return recoveringContainerScrubInterval;
   }
 
   public void setBlockDeletionInterval(Duration duration) {
-    this.blockDeletionInterval = duration.toMillis();
+    blockDeletionInterval = duration;
   }
 
   @Config(key = "block.deleting.limit.per.interval",
       defaultValue = "5000",
+      reconfigurable = true,
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
       description =
@@ -361,7 +398,7 @@ public class DatanodeConfiguration {
           + " Datanode volume. Unit could be defined with"
           + " postfix (ns,ms,s,m,h,d)."
   )
-  private long diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
+  private Duration diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
 
   @Config(key = "disk.check.timeout",
       defaultValue = "10m",
@@ -372,7 +409,7 @@ public class DatanodeConfiguration {
           + " then the disk is declared as failed. Unit could be defined with"
           + " postfix (ns,ms,s,m,h,d)."
   )
-  private long diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+  private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
   @Config(key = "chunk.data.validation.check",
       defaultValue = "false",
@@ -598,18 +635,27 @@ public class DatanodeConfiguration {
       }
     }
 
-    if (diskCheckMinGap < 0) {
+    if (diskCheckMinGap.isNegative()) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
           diskCheckMinGap, DISK_CHECK_MIN_GAP_DEFAULT);
       diskCheckMinGap = DISK_CHECK_MIN_GAP_DEFAULT;
     }
 
-    if (diskCheckTimeout < 0) {
+    if (diskCheckTimeout.isNegative()) {
       LOG.warn(DISK_CHECK_TIMEOUT_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
           diskCheckTimeout, DISK_CHECK_TIMEOUT_DEFAULT);
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+    }
+
+    if (blockDeleteCommandWorkerInterval.isNegative()) {
+      LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
+          " must be greater than zero and was set to {}. Defaulting to {}",
+          blockDeleteCommandWorkerInterval,
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT);
+      blockDeleteCommandWorkerInterval =
+          BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
     }
 
     if (rocksdbLogMaxFileSize < 0) {
@@ -714,19 +760,19 @@ public class DatanodeConfiguration {
   }
 
   public Duration getDiskCheckMinGap() {
-    return Duration.ofMillis(diskCheckMinGap);
+    return diskCheckMinGap;
   }
 
   public void setDiskCheckMinGap(Duration duration) {
-    this.diskCheckMinGap = duration.toMillis();
+    diskCheckMinGap = duration;
   }
 
   public Duration getDiskCheckTimeout() {
-    return Duration.ofMillis(diskCheckTimeout);
+    return diskCheckTimeout;
   }
 
   public void setDiskCheckTimeout(Duration duration) {
-    this.diskCheckTimeout = duration.toMillis();
+    diskCheckTimeout = duration;
   }
 
   public int getBlockDeleteThreads() {
@@ -741,8 +787,21 @@ public class DatanodeConfiguration {
     return blockDeleteQueueLimit;
   }
 
+  public long getBlockDeleteMaxLockWaitTimeoutMs() {
+    return blockDeleteMaxLockWaitTimeoutMs;
+  }
+
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public Duration getBlockDeleteCommandWorkerInterval() {
+    return blockDeleteCommandWorkerInterval;
+  }
+
+  public void setBlockDeleteCommandWorkerInterval(
+      Duration blockDeleteCommandWorkerInterval) {
+    this.blockDeleteCommandWorkerInterval = blockDeleteCommandWorkerInterval;
   }
 
   public int getCommandQueueLimit() {

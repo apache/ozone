@@ -922,6 +922,11 @@ public class MockNodeManager implements NodeManager {
     return numPipelinePerDatanode;
   }
 
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
+  }
+
   public void setNumPipelinePerDatanode(int value) {
     numPipelinePerDatanode = value;
   }

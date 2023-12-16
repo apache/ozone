@@ -22,8 +22,9 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,25 +65,19 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.assertj.core.util.Lists;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.Mockito;
 
 /**
  * Test for OM metrics.
  */
+@Timeout(300)
 public class TestOmMetrics {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
   private OzoneConfiguration conf;
@@ -98,7 +93,7 @@ public class TestOmMetrics {
   /**
    * Create a MiniDFSCluster for testing.
    */
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL,
@@ -118,15 +113,13 @@ public class TestOmMetrics {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
-
-
 
   @Test
   public void testVolumeOps() throws Exception {
@@ -331,8 +324,8 @@ public class TestOmMetrics {
       writeClient.commitKey(keyArgs, keySession.getId());
     } catch (Exception e) {
       //Expected Failure in preExecute due to not enough datanode
-      Assertions.assertTrue(e.getMessage()
-          .contains("No enough datanodes to choose"), e::getMessage);
+      assertTrue(e.getMessage().contains("No enough datanodes to choose"),
+          e::getMessage);
     }
 
     omMetrics = getMetrics("OMMetrics");
@@ -340,7 +333,7 @@ public class TestOmMetrics {
     assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
+    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
@@ -424,7 +417,8 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotLists", 0L, omMetrics);
     assertCounter("NumSnapshotActive", 1L, omMetrics);
     assertCounter("NumSnapshotDeleted", 0L, omMetrics);
-    assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
+    assertCounter("NumSnapshotDiffJobs", 0L, omMetrics);
+    assertCounter("NumSnapshotDiffJobFails", 0L, omMetrics);
 
     // Create second key
     OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
@@ -434,6 +428,21 @@ public class TestOmMetrics {
 
     // Create second snapshot
     writeClient.createSnapshot(volumeName, bucketName, snapshot2);
+
+    // Snapshot diff
+    while (true) {
+      SnapshotDiffResponse response =
+          writeClient.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+              null, 100, false, false);
+      if (response.getJobStatus() == SnapshotDiffResponse.JobStatus.DONE) {
+        break;
+      } else {
+        Thread.sleep(response.getWaitTimeInMs());
+      }
+    }
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotDiffJobs", 1L, omMetrics);
+    assertCounter("NumSnapshotDiffJobFails", 0L, omMetrics);
 
     // List snapshots
     writeClient.listSnapshot(

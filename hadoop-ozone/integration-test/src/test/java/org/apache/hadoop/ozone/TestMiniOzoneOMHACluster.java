@@ -27,7 +27,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -53,7 +55,7 @@ public class TestMiniOzoneOMHACluster {
   public ExpectedException exception = ExpectedException.none();
 
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   /**
    * Create a MiniOzoneHAClusterImpl for testing.

@@ -87,7 +87,8 @@ public class OzoneAdmin extends GenericCli {
   @Override
   public int execute(String[] argv) {
     TracingUtil.initTracing("shell", createOzoneConfiguration());
-    return TracingUtil.executeInNewSpan("main",
+    String spanName = "ozone admin " + String.join(" ", argv);
+    return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));
   }
 }

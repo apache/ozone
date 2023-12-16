@@ -22,14 +22,15 @@ import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,21 +44,22 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
  * Test for NSSummary manager.
  */
 public class TestReconNamespaceSummaryManagerImpl {
-  @ClassRule
-  public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
+  @TempDir()
+  private static Path temporaryFolder;
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static int[] testBucket;
   private static final Set<Long> TEST_CHILD_DIR =
           new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
-  @BeforeClass
+  @BeforeAll
   public static void setupOnce() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(TEMP_FOLDER.newFolder()),
-        TEMP_FOLDER.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
-            new ReconTestInjector.Builder(TEMP_FOLDER)
+            new ReconTestInjector.Builder(temporaryFolder.toFile())
                     .withReconSqlDb()
                     .withReconOm(reconOMMetadataManager)
                     .withContainerDB()
@@ -70,7 +72,7 @@ public class TestReconNamespaceSummaryManagerImpl {
     }
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // Clear namespace table before running each test
     reconNamespaceSummaryManager.clearNSSummaryTable();
@@ -82,30 +84,30 @@ public class TestReconNamespaceSummaryManagerImpl {
     NSSummary summary = reconNamespaceSummaryManager.getNSSummary(1L);
     NSSummary summary2 = reconNamespaceSummaryManager.getNSSummary(2L);
     NSSummary summary3 = reconNamespaceSummaryManager.getNSSummary(3L);
-    Assert.assertEquals(1, summary.getNumOfFiles());
-    Assert.assertEquals(2, summary.getSizeOfFiles());
-    Assert.assertEquals(3, summary2.getNumOfFiles());
-    Assert.assertEquals(4, summary2.getSizeOfFiles());
-    Assert.assertEquals(5, summary3.getNumOfFiles());
-    Assert.assertEquals(6, summary3.getSizeOfFiles());
+    Assertions.assertEquals(1, summary.getNumOfFiles());
+    Assertions.assertEquals(2, summary.getSizeOfFiles());
+    Assertions.assertEquals(3, summary2.getNumOfFiles());
+    Assertions.assertEquals(4, summary2.getSizeOfFiles());
+    Assertions.assertEquals(5, summary3.getNumOfFiles());
+    Assertions.assertEquals(6, summary3.getSizeOfFiles());
 
-    Assert.assertEquals("dir1", summary.getDirName());
-    Assert.assertEquals("dir2", summary2.getDirName());
-    Assert.assertEquals("dir3", summary3.getDirName());
+    Assertions.assertEquals("dir1", summary.getDirName());
+    Assertions.assertEquals("dir2", summary2.getDirName());
+    Assertions.assertEquals("dir3", summary3.getDirName());
 
     // test child dir is written
-    Assert.assertEquals(3, summary.getChildDir().size());
+    Assertions.assertEquals(3, summary.getChildDir().size());
     // non-existent key
-    Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(0L));
+    Assertions.assertNull(reconNamespaceSummaryManager.getNSSummary(0L));
   }
 
   @Test
   public void testInitNSSummaryTable() throws IOException {
     putThreeNSMetadata();
-    Assert.assertFalse(
+    Assertions.assertFalse(
             reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
     reconNamespaceSummaryManager.clearNSSummaryTable();
-    Assert.assertTrue(
+    Assertions.assertTrue(
             reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
   }
 

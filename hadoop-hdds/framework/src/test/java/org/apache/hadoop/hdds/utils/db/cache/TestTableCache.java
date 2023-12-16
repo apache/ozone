@@ -45,9 +45,9 @@ public class TestTableCache {
 
   private void createTableCache(TableCache.CacheType cacheType) {
     if (cacheType == TableCache.CacheType.FULL_CACHE) {
-      tableCache = new FullTableCache<>();
+      tableCache = new FullTableCache<>("");
     } else {
-      tableCache = new PartialTableCache<>();
+      tableCache = new PartialTableCache<>("");
     }
   }
 

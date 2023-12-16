@@ -39,7 +39,7 @@ import java.util.TreeMap;
  */
 public final class OmMultipartKeyInfo extends WithObjectID {
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(MultipartKeyInfo.class),
+      Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
       OmMultipartKeyInfo::getProto);
 

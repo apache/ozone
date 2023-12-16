@@ -36,7 +36,7 @@ public final class CodecTestUtil {
   /**
    * Force gc to check leakage.
    */
-  static void gc() throws InterruptedException {
+  public static void gc() throws InterruptedException {
     // use WeakReference to detect gc
     Object obj = new Object();
     final WeakReference<Object> weakRef = new WeakReference<>(obj);
@@ -71,7 +71,7 @@ public final class CodecTestUtil {
 
     // serialize to CodecBuffer
     final CodecBuffer codecBuffer = codec.toCodecBuffer(
-        original, CodecBuffer::allocateHeap);
+        original, CodecBuffer.Allocator.getHeap());
     Assertions.assertEquals(array.length, codecBuffer.readableBytes());
     final ByteBuffer byteBuffer = codecBuffer.asReadOnlyByteBuffer();
     Assertions.assertEquals(array.length, byteBuffer.remaining());

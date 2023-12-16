@@ -20,13 +20,14 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
@@ -38,15 +39,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -57,22 +57,21 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+
 import org.mockito.Mockito;
+
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.times;
 
@@ -80,35 +79,25 @@ import static org.mockito.Mockito.times;
 /**
  * Unit tests for {@link KeyValueHandler}.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestKeyValueHandler {
 
-  @Rule
-  public final TestRule timeout = Timeout.seconds(300);
-
-  @Rule
-  public final TemporaryFolder tempDir = new TemporaryFolder();
+  @TempDir
+  private Path tempDir;
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
-  private static final String DUMMY_PATH = "/dummy/dir/doesnt/exist";
-
-  private final ContainerLayoutVersion layout;
+  private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
 
-  public TestKeyValueHandler(ContainerLayoutVersion layout) {
-    this.layout = layout;
-  }
-
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> layoutVersion() {
     return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
     handler = Mockito.mock(KeyValueHandler.class);
@@ -146,9 +135,8 @@ public class TestKeyValueHandler {
 
     KeyValueContainer container = Mockito.mock(KeyValueContainer.class);
 
-    DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
-        .dispatchRequest(handler, createContainerRequest, container, context);
+        .dispatchRequest(handler, createContainerRequest, container, null);
     Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
@@ -156,7 +144,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto readContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadContainer);
     KeyValueHandler
-        .dispatchRequest(handler, readContainerRequest, container, context);
+        .dispatchRequest(handler, readContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleReadContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -164,7 +152,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto updateContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.UpdateContainer);
     KeyValueHandler
-        .dispatchRequest(handler, updateContainerRequest, container, context);
+        .dispatchRequest(handler, updateContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleUpdateContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -172,7 +160,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto deleteContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.DeleteContainer);
     KeyValueHandler
-        .dispatchRequest(handler, deleteContainerRequest, container, context);
+        .dispatchRequest(handler, deleteContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleDeleteContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -180,7 +168,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto listContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListContainer);
     KeyValueHandler
-        .dispatchRequest(handler, listContainerRequest, container, context);
+        .dispatchRequest(handler, listContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
@@ -188,7 +176,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto closeContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.CloseContainer);
     KeyValueHandler
-        .dispatchRequest(handler, closeContainerRequest, container, context);
+        .dispatchRequest(handler, closeContainerRequest, container, null);
     Mockito.verify(handler, times(1)).handleCloseContainer(
         any(ContainerCommandRequestProto.class), any());
 
@@ -196,7 +184,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto putBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.PutBlock);
     KeyValueHandler
-        .dispatchRequest(handler, putBlockRequest, container, context);
+        .dispatchRequest(handler, putBlockRequest, container, null);
     Mockito.verify(handler, times(1)).handlePutBlock(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -204,7 +192,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto getBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetBlock);
     KeyValueHandler
-        .dispatchRequest(handler, getBlockRequest, container, context);
+        .dispatchRequest(handler, getBlockRequest, container, null);
     Mockito.verify(handler, times(1)).handleGetBlock(
         any(ContainerCommandRequestProto.class), any());
 
@@ -214,7 +202,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto listBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
-        .dispatchRequest(handler, listBlockRequest, container, context);
+        .dispatchRequest(handler, listBlockRequest, container, null);
     Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
@@ -222,7 +210,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto readChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadChunk);
     KeyValueHandler
-        .dispatchRequest(handler, readChunkRequest, container, context);
+        .dispatchRequest(handler, readChunkRequest, container, null);
     Mockito.verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -233,7 +221,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto writeChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.WriteChunk);
     KeyValueHandler
-        .dispatchRequest(handler, writeChunkRequest, container, context);
+        .dispatchRequest(handler, writeChunkRequest, container, null);
     Mockito.verify(handler, times(1)).handleWriteChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -241,7 +229,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto listChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
-        .dispatchRequest(handler, listChunkRequest, container, context);
+        .dispatchRequest(handler, listChunkRequest, container, null);
     Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
@@ -249,7 +237,7 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto putSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.PutSmallFile);
     KeyValueHandler
-        .dispatchRequest(handler, putSmallFileRequest, container, context);
+        .dispatchRequest(handler, putSmallFileRequest, container, null);
     Mockito.verify(handler, times(1)).handlePutSmallFile(
         any(ContainerCommandRequestProto.class), any(), any());
 
@@ -257,17 +245,21 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto getSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetSmallFile);
     KeyValueHandler
-        .dispatchRequest(handler, getSmallFileRequest, container, context);
+        .dispatchRequest(handler, getSmallFileRequest, container, null);
     Mockito.verify(handler, times(1)).handleGetSmallFile(
         any(ContainerCommandRequestProto.class), any());
   }
 
   @Test
   public void testVolumeSetInKeyValueHandler() throws Exception {
-    File path = tempDir.newFolder();
+    File datanodeDir =
+        Files.createDirectory(tempDir.resolve("datanodeDir")).toFile();
+    File metadataDir =
+        Files.createDirectory(tempDir.resolve("metadataDir")).toFile();
+
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
-    conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
+    conf.set(HDDS_DATANODE_DIR_KEY, datanodeDir.getAbsolutePath());
+    conf.set(OZONE_METADATA_DIRS, metadataDir.getAbsolutePath());
     MutableVolumeSet
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -277,18 +269,14 @@ public class TestKeyValueHandler {
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
       DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails())
-          .thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(
+          datanodeDetails, conf);
       KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
           context.getParent().getDatanodeDetails().getUuidString(), cset,
           volumeSet, metrics, c -> {
       });
       assertEquals("org.apache.hadoop.ozone.container.common" +
-          ".volume.RoundRobinVolumeChoosingPolicy",
+          ".volume.CapacityVolumeChoosingPolicy",
           keyValueHandler.getVolumeChoosingPolicyForTesting()
               .getClass().getName());
 
@@ -307,7 +295,8 @@ public class TestKeyValueHandler {
       }
     } finally {
       volumeSet.shutdown();
-      FileUtil.fullyDelete(path);
+      FileUtil.fullyDelete(datanodeDir);
+      FileUtil.fullyDelete(metadataDir);
     }
   }
 
@@ -321,12 +310,14 @@ public class TestKeyValueHandler {
   }
 
 
-  @Test
-  public void testCloseInvalidContainer() throws IOException {
+  @ParameterizedTest
+  @MethodSource("layoutVersion")
+  public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
+      throws IOException {
     long containerID = 1234L;
     OzoneConfiguration conf = new OzoneConfiguration();
     KeyValueContainerData kvData = new KeyValueContainerData(containerID,
-        layout,
+        layoutVersion,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
@@ -350,14 +341,14 @@ public class TestKeyValueHandler {
     ContainerProtos.ContainerCommandResponseProto response =
         handler.handleCloseContainer(closeContainerRequest, container);
 
-    assertEquals("Close container should return Invalid container error",
-        ContainerProtos.Result.INVALID_CONTAINER_STATE, response.getResult());
+    assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
+        response.getResult(),
+        "Close container should return Invalid container error");
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testDeleteContainer() throws IOException {
-    final String testDir = tempDir.newFolder().getAbsolutePath();
+    final String testDir = tempDir.toString();
     try {
       // Case 1 : Regular container delete
       final long containerID = 1L;
@@ -396,12 +387,12 @@ public class TestKeyValueHandler {
           createContainerRequest(datanodeId, containerID);
 
       kvHandler.handleCreateContainer(createContainer, null);
-      Assert.assertEquals(1, icrReceived.get());
-      Assert.assertNotNull(containerSet.getContainer(containerID));
+      Assertions.assertEquals(1, icrReceived.get());
+      Assertions.assertNotNull(containerSet.getContainer(containerID));
 
       kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
-      Assert.assertEquals(2, icrReceived.get());
-      Assert.assertNull(containerSet.getContainer(containerID));
+      Assertions.assertEquals(2, icrReceived.get());
+      Assertions.assertNull(containerSet.getContainer(containerID));
 
       File[] deletedContainers =
           hddsVolume.getDeletedContainerDir().listFiles();
@@ -418,9 +409,9 @@ public class TestKeyValueHandler {
 
       kvHandler.handleCreateContainer(createContainer2, null);
 
-      Assert.assertEquals(3, icrReceived.get());
+      Assertions.assertEquals(3, icrReceived.get());
       Container<?> container = containerSet.getContainer(container2ID);
-      Assert.assertNotNull(container);
+      Assertions.assertNotNull(container);
       File deletedContainerDir = hddsVolume.getDeletedContainerDir();
       // to simulate failed move
       File dummyDir = new File(DUMMY_PATH);
@@ -428,7 +419,7 @@ public class TestKeyValueHandler {
       try {
         kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
-        Assert.assertTrue(
+        Assertions.assertTrue(
             sce.getMessage().contains("Failed to move container"));
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
@@ -445,7 +436,7 @@ public class TestKeyValueHandler {
       String expectedLog =
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";
-      Assert.assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
+      Assertions.assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

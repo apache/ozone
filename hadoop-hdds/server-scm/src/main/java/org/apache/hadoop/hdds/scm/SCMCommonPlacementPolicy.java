@@ -283,7 +283,7 @@ public abstract class SCMCommonPlacementPolicy implements
               "data in healthy node set. Required %d. Found %d.",
           metadataSizeRequired, dataSizeRequired, nodesRequired,
           nodesWithSpace.size());
-      LOG.error(msg);
+      LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
@@ -500,7 +500,7 @@ public abstract class SCMCommonPlacementPolicy implements
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
       return true;
     }
-    LOG.debug("Datanode {} is not chosen. Required metadata size is {} and " +
+    LOG.info("Datanode {} is not chosen. Required metadata size is {} and " +
             "required data size is {} and NodeStatus is {}",
         datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
     return false;

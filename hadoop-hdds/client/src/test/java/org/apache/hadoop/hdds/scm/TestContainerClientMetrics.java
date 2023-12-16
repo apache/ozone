@@ -21,21 +21,22 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test ContainerClientMetrics.
  */
 public class TestContainerClientMetrics {
-  @Before
+  @BeforeEach
   public void setup() {
     while (ContainerClientMetrics.referenceCount > 0) {
       ContainerClientMetrics.release();
@@ -81,27 +82,27 @@ public class TestContainerClientMetrics {
         metrics.getWriteChunksCallsByLeaders().get(leaderId2).value());
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test
   public void testReleaseWithoutUse() {
-    ContainerClientMetrics.release();
+    assertThrows(IllegalStateException.class, ContainerClientMetrics::release);
   }
 
   @Test
   public void testAcquireAndRelease() {
-    Assertions.assertNotNull(ContainerClientMetrics.acquire());
-    Assertions.assertEquals(1, ContainerClientMetrics.referenceCount);
+    assertNotNull(ContainerClientMetrics.acquire());
+    assertEquals(1, ContainerClientMetrics.referenceCount);
     ContainerClientMetrics.release();
-    Assertions.assertEquals(0, ContainerClientMetrics.referenceCount);
+    assertEquals(0, ContainerClientMetrics.referenceCount);
 
-    Assertions.assertNotNull(ContainerClientMetrics.acquire());
-    Assertions.assertNotNull(ContainerClientMetrics.acquire());
-    Assertions.assertEquals(2, ContainerClientMetrics.referenceCount);
+    assertNotNull(ContainerClientMetrics.acquire());
+    assertNotNull(ContainerClientMetrics.acquire());
+    assertEquals(2, ContainerClientMetrics.referenceCount);
     ContainerClientMetrics.release();
     ContainerClientMetrics.release();
-    Assertions.assertEquals(0, ContainerClientMetrics.referenceCount);
+    assertEquals(0, ContainerClientMetrics.referenceCount);
 
     ContainerClientMetrics.acquire();
-    Assertions.assertNotNull(ContainerClientMetrics.acquire());
+    assertNotNull(ContainerClientMetrics.acquire());
   }
 
   private Pipeline createPipeline(PipelineID piplineId, UUID leaderId) {

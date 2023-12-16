@@ -54,7 +54,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -100,7 +99,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
@@ -124,6 +126,7 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(240)
 public class TestOMDbCheckpointServlet {
+  public static final String JAVA_IO_TMPDIR = "java.io.tmpdir";
   private OzoneConfiguration conf;
   private File tempFile;
   private ServletOutputStream servletOutputStream;
@@ -280,6 +283,13 @@ public class TestOMDbCheckpointServlet {
 
     Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("getHttpMethods")
+  public void testEndpointNotRatis(String httpMethod) throws Exception {
+    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    testEndpoint(httpMethod);
   }
 
   @Test
@@ -439,7 +449,9 @@ public class TestOMDbCheckpointServlet {
 
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+    long tmpHardLinkFileCount = tmpHardLinkFileCount();
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    Assertions.assertEquals(tmpHardLinkFileCount, tmpHardLinkFileCount());
 
     // Verify that tarball request count reaches to zero once doGet completes.
     Assertions.assertEquals(0,
@@ -517,6 +529,18 @@ public class TestOMDbCheckpointServlet {
     initialFullSet.remove(unExpectedSstStr);
     Assertions.assertEquals(initialFullSet, finalFullSet,
         "expected snapshot files not found");
+  }
+
+  private static long tmpHardLinkFileCount() throws IOException {
+    Path tmpDirPath = Paths.get(System.getProperty(JAVA_IO_TMPDIR));
+    try (Stream<Path> tmpFiles = Files.list(tmpDirPath)) {
+      return tmpFiles
+          .filter(path -> {
+            String regex = DATA_PREFIX + ".*" + DATA_SUFFIX;
+            return path.getFileName().toString().matches(regex);
+          })
+          .count();
+    }
   }
 
   @Test
@@ -761,7 +785,6 @@ public class TestOMDbCheckpointServlet {
   }
 
   // Get all files below path, recursively, (skipping fabricated files).
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private Set<String> getFiles(Path path, int truncateLength,
       Set<String> fileSet) throws IOException {
     try (Stream<Path> files = Files.list(path)) {
@@ -769,7 +792,7 @@ public class TestOMDbCheckpointServlet {
         if (file.toFile().isDirectory()) {
           getFiles(file, truncateLength, fileSet);
         }
-        String filename = file.getFileName().toString();
+        String filename = String.valueOf(file.getFileName());
         if (!filename.startsWith("fabricated") &&
             !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME)) {
           fileSet.add(truncateFileName(truncateLength, file));
@@ -791,7 +814,6 @@ public class TestOMDbCheckpointServlet {
    * @param lines Text lines defining the link paths.
    * @param testDirName Name of test directory.
    */
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void checkFabricatedLines(Set<String> directories, List<String> lines,
                                     String testDirName) {
     // find the real file
@@ -820,9 +842,11 @@ public class TestOMDbCheckpointServlet {
           "fabricated entry contains correct real directory: " + line);
       Path path0 = Paths.get(files[0]);
       Path path1 = Paths.get(files[1]);
-      Assertions.assertTrue(
-          path0.getFileName().toString().equals(FABRICATED_FILE_NAME) &&
-              path1.getFileName().toString().equals(FABRICATED_FILE_NAME),
+      Assertions.assertEquals(FABRICATED_FILE_NAME,
+          String.valueOf(path0.getFileName()),
+          "fabricated entries contains correct file name: " + line);
+      Assertions.assertEquals(FABRICATED_FILE_NAME,
+          String.valueOf(path1.getFileName()),
           "fabricated entries contains correct file name: " + line);
     }
   }

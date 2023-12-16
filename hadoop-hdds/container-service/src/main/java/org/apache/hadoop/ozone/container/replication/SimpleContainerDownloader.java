@@ -71,7 +71,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     final List<DatanodeDetails> shuffledDatanodes =
         shuffleDatanodes(sourceDatanodes);
 
-    for (DatanodeDetails datanode : shuffledDatanodes) {
+    for (int i = 0; i < shuffledDatanodes.size(); i++) {
+      DatanodeDetails datanode = shuffledDatanodes.get(i);
       GrpcReplicationClient client = null;
       try {
         client = createReplicationClient(datanode, compression);
@@ -79,10 +80,10 @@ public class SimpleContainerDownloader implements ContainerDownloader {
             downloadContainer(client, containerId, downloadDir);
         return result.get();
       } catch (InterruptedException e) {
-        logError(e, containerId, datanode);
+        logError(e, containerId, datanode, i, shuffledDatanodes.size());
         Thread.currentThread().interrupt();
       } catch (Exception e) {
-        logError(e, containerId, datanode);
+        logError(e, containerId, datanode, i, shuffledDatanodes.size());
       } finally {
         IOUtils.close(LOG, client);
       }
@@ -93,8 +94,14 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   private static void logError(Exception e,
-      long containerId, DatanodeDetails datanode) {
-    LOG.error("Error on replicating container: {} from {}", containerId,
+      long containerId, DatanodeDetails datanode, int datanodeIndex,
+      int shuffledDatanodesSize) {
+    StringBuilder sb =
+        new StringBuilder("Error on replicating container: {} from {}. ");
+    if (datanodeIndex < shuffledDatanodesSize - 1) {
+      sb.append("Will try next datanode.");
+    }
+    LOG.error(sb.toString(), containerId,
         datanode, e);
   }
 

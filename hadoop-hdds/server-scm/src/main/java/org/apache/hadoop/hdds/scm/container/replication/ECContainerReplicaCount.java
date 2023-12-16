@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -497,11 +498,13 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * replica on the node going offline has a copy elsewhere on another
    * IN_SERVICE node, and if so that replica is sufficiently replicated.
    * @param datanode The datanode being checked to go offline.
+   * @param nodeManager not used in this implementation
    * @return True if the container is sufficiently replicated or if this replica
    *         on the passed node is present elsewhere on an IN_SERVICE node.
    */
   @Override
-  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode) {
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager) {
     boolean sufficientlyReplicated = isSufficientlyReplicated(false);
     if (sufficientlyReplicated) {
       return true;
@@ -531,6 +534,11 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
       return false;
     }
     return healthyIndexes.containsKey(thisReplica.getReplicaIndex());
+  }
+
+  @Override
+  public boolean isHealthyEnoughForOffline() {
+    return isHealthy();
   }
 
   @Override

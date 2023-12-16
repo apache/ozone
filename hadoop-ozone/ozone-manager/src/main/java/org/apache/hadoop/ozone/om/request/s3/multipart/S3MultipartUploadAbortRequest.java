@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -111,7 +113,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     ozoneManager.getMetrics().incNumAbortMultipartUploads();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     String multipartKey = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -128,9 +130,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -189,7 +192,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = getOmClientResponse(exception, omResponse);
@@ -197,8 +200,11 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -227,7 +233,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  protected OMClientResponse getOmClientResponse(IOException exception,
+  protected OMClientResponse getOmClientResponse(Exception exception,
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
@@ -250,10 +256,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   protected String getMultipartOpenKey(String multipartUploadID,
       String volumeName, String bucketName, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-
-    String multipartKey = omMetadataManager.getMultipartKey(
-        volumeName, bucketName, keyName, multipartUploadID);
-    return multipartKey;
+    return OMMultipartUploadUtils.getMultipartOpenKey(
+        volumeName, bucketName, keyName, multipartUploadID, omMetadataManager,
+        getBucketLayout());
   }
 
   @RequestFeatureValidator(

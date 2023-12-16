@@ -86,7 +86,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   public AbstractKeyDeletingService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient) {
-    super(serviceName, interval, unit, threadPoolSize, serviceTimeout);
+    super(serviceName, interval, unit, threadPoolSize, serviceTimeout,
+        ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.scmClient = scmClient;
     this.deletedDirsCount = new AtomicLong(0);
@@ -102,6 +103,17 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     long startTime = Time.monotonicNow();
     int delCount = 0;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Send {} key(s) to SCM: {}",
+          keyBlocksList.size(), keyBlocksList);
+    } else if (LOG.isInfoEnabled()) {
+      int logSize = 10;
+      if (keyBlocksList.size() < logSize) {
+        logSize = keyBlocksList.size();
+      }
+      LOG.info("Send {} key(s) to SCM, first {} keys: {}",
+          keyBlocksList.size(), logSize, keyBlocksList.subList(0, logSize));
+    }
     List<DeleteBlockGroupResult> blockDeletionResults =
         scmClient.deleteKeyBlocks(keyBlocksList);
     if (blockDeletionResults != null) {
@@ -297,10 +309,15 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      RaftClientRequest raftClientRequest =
-          createRaftClientRequestForPurge(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest,
-          raftClientRequest);
+      if (isRatisEnabled()) {
+        RaftClientRequest raftClientRequest =
+            createRaftClientRequestForPurge(omRequest);
+        ozoneManager.getOmRatisServer().submitRequest(omRequest,
+            raftClientRequest);
+      } else {
+        getOzoneManager().getOmServerProtocol()
+            .submitRequest(null, omRequest);
+      }
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.");
     }
@@ -394,7 +411,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
-      int remainingBufLimit) {
+      int remainingBufLimit, KeyManager keyManager) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -408,7 +425,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         PurgePathRequest request = prepareDeleteDirRequest(
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
-            getOzoneManager().getKeyManager());
+            keyManager);
         if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
             request.getSerializedSize())) {
           // ignore further add request
@@ -433,8 +450,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    // TODO: need to handle delete with non-ratis
-    if (isRatisEnabled() && !purgePathRequestList.isEmpty()) {
+    if (!purgePathRequestList.isEmpty()) {
       submitPurgePaths(purgePathRequestList, snapTableKey);
     }
 

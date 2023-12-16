@@ -32,7 +32,9 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Strings;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.IExceptionHandler2;
@@ -49,7 +51,7 @@ public class TestOzoneDatanodeShell {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneDatanodeShell.class);

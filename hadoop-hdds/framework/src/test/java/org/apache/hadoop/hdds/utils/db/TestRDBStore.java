@@ -60,7 +60,7 @@ public class TestRDBStore {
       throws IOException {
     return new RDBStore(dbFile, options, new ManagedWriteOptions(), families,
         CodecRegistry.newBuilder().build(), false, 1000, null, false,
-        maxDbUpdatesSizeThreshold, true, null);
+        maxDbUpdatesSizeThreshold, true, null, "");
   }
 
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
@@ -75,6 +75,8 @@ public class TestRDBStore {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);

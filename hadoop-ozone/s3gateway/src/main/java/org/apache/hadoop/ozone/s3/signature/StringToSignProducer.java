@@ -81,7 +81,6 @@ public final class StringToSignProducer {
     return createSignatureBase(signatureInfo,
         context.getUriInfo().getRequestUri().getScheme(),
         context.getMethod(),
-        context.getUriInfo().getRequestUri().getPath(),
         LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders()),
         fromMultiValueToSingleValueMap(
             context.getUriInfo().getQueryParameters()));
@@ -92,7 +91,6 @@ public final class StringToSignProducer {
       SignatureInfo signatureInfo,
       String scheme,
       String method,
-      String uri,
       LowerCaseKeyStringMap headers,
       Map<String, String> queryParams
   ) throws Exception {
@@ -111,6 +109,7 @@ public final class StringToSignProducer {
     String credentialScope = signatureInfo.getCredentialScope();
 
     // If the absolute path is empty, use a forward slash (/)
+    String uri = signatureInfo.getUnfilteredURI();
     uri = (uri.trim().length() > 0) ? uri : "/";
     // Encode URI and preserve forward slashes
     strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);

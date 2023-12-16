@@ -30,7 +30,7 @@ public final class TestCodecRegistry {
   static final Logger LOG = LoggerFactory.getLogger(TestCodecRegistry.class);
 
   private final CodecRegistry registry = CodecRegistry.newBuilder()
-      .addCodec(ByteString.class, ByteStringCodec.getInstance())
+      .addCodec(ByteString.class, ByteStringCodec.get())
       .build();
 
   <T> void assertGetCodec(Class<?> expectedCodecClass, T object) {

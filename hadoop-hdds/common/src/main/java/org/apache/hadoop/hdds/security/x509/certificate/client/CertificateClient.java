@@ -248,7 +248,7 @@ public interface CertificateClient extends Closeable {
    * Initialize certificate client.
    *
    * */
-  InitResponse init() throws CertificateException;
+  void initWithRecovery() throws IOException;
 
   /**
    * Represents initialization response of client.
@@ -262,7 +262,6 @@ public interface CertificateClient extends Closeable {
   enum InitResponse {
     SUCCESS,
     FAILURE,
-    GETCERT,
-    RECOVER
+    GETCERT
   }
 }

@@ -18,7 +18,7 @@
     </indentOptions>
   </codeStyleSettings>
   <codeStyleSettings language="JAVA">
-    <option name="RIGHT_MARGIN" value="80" />
+    <option name="RIGHT_MARGIN" value="120" />
     <option name="INDENT_CASE_FROM_SWITCH" value="false" />
     <option name="CALL_PARAMETERS_WRAP" value="1" />
     <option name="METHOD_PARAMETERS_WRAP" value="1" />

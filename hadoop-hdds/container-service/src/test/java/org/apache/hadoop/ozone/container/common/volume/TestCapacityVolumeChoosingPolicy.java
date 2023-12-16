@@ -38,7 +38,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -134,6 +136,23 @@ public class TestCapacityVolumeChoosingPolicy {
         msg.contains("No volumes have enough space for a new container.  " +
             "Most available space: 250 bytes"),
         msg);
+  }
+
+  @Test
+  public void testVolumeChoosingPolicyFactory()
+      throws InstantiationException, IllegalAccessException {
+    // unset HDDS_DATANODE_VOLUME_CHOOSING_POLICY
+    // should assert the default policy.
+    assertEquals(CapacityVolumeChoosingPolicy.class,
+        VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
+    CONF.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+        CapacityVolumeChoosingPolicy.class.getName());
+    assertEquals(CapacityVolumeChoosingPolicy.class,
+        VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
+    CONF.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+        RoundRobinVolumeChoosingPolicy.class.getName());
+    assertEquals(RoundRobinVolumeChoosingPolicy.class,
+        VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
   }
 
 }

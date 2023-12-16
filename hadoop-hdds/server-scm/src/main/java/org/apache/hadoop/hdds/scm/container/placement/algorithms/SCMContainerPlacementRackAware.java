@@ -561,7 +561,7 @@ public final class SCMContainerPlacementRackAware
       DatanodeDetails favoredNode = favoredNodeNum > favorIndex ?
           favoredNodes.get(favorIndex) : null;
       DatanodeDetails chosenNode;
-      if (favoredNode != null && networkTopology.isSameParent(
+      if (favoredNode != null && !networkTopology.isSameParent(
           excludedNodeList.get(excludedNodeList.size() - 1), favoredNode)) {
         chosenNode = favoredNode;
         favorIndex++;

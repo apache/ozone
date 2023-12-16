@@ -71,17 +71,16 @@ public class OzoneDelegationTokenSecretManager
   private final S3SecretManager s3SecretManager;
   private Thread tokenRemoverThread;
   private final long tokenRemoverScanInterval;
-  private String omCertificateSerialId;
-  private String omServiceId;
+  private final String omServiceId;
   private final OzoneManager ozoneManager;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
    * interrupted.
    */
-  private Object noInterruptsLock = new Object();
+  private final Object noInterruptsLock = new Object();
 
-  private boolean isRatisEnabled;
+  private final boolean isRatisEnabled;
 
   /**
    * Create a secret manager with a builder object.
@@ -187,10 +186,6 @@ public class OzoneDelegationTokenSecretManager
   /**
    * Returns {@link Token} for given identifier.
    *
-   * @param owner
-   * @param renewer
-   * @param realUser
-   * @return Token
    * @throws IOException to allow future exceptions to be added without breaking
    * compatibility
    */
@@ -221,8 +216,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Add delegation token in to in-memory map of tokens.
-   * @param token
-   * @param ozoneTokenIdentifier
    * @return renewTime - If updated successfully, return renewTime.
    */
   public long updateToken(Token<OzoneTokenIdentifier> token,
@@ -236,10 +229,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Stores given identifier in token store.
-   *
-   * @param identifier
-   * @param password
-   * @throws IOException
    */
   private void addToTokenStore(OzoneTokenIdentifier identifier,
       byte[] password, long renewTime)
@@ -393,8 +382,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Remove the expired token from in-memory map.
-   * @param ozoneTokenIdentifier
-   * @throws IOException
    */
   public void removeToken(OzoneTokenIdentifier ozoneTokenIdentifier) {
     currentTokens.remove(ozoneTokenIdentifier);
@@ -446,13 +433,10 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Validates if given hash is valid.
-   *
-   * @param identifier
-   * @param password
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
-    X509Certificate signerCert = null;
+    X509Certificate signerCert;
     try {
       signerCert = getCertClient().getCertificate(
           identifier.getOmCertSerialId());
@@ -564,10 +548,13 @@ public class OzoneDelegationTokenSecretManager
       throws IOException {
     super.start(certClient);
     tokenRemoverThread = new Daemon(new ExpiredTokenRemover());
+    tokenRemoverThread.setName(
+        ozoneManager.getThreadNamePrefix() +
+            "ExpiredTokenRemover");
     tokenRemoverThread.start();
   }
 
-  public void stopThreads() {
+  private synchronized void stopThreads() {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stopping expired delegation token remover thread");
     }
@@ -589,8 +576,6 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Stops the OzoneDelegationTokenSecretManager.
-   *
-   * @throws IOException
    */
   @Override
   public void stop() throws IOException {
@@ -606,7 +591,7 @@ public class OzoneDelegationTokenSecretManager
    */
   private void removeExpiredToken() {
     long now = Time.now();
-    synchronized (this) {
+    synchronized (noInterruptsLock) {
       Iterator<Map.Entry<OzoneTokenIdentifier,
           TokenInfo>> i = currentTokens.entrySet().iterator();
       while (i.hasNext()) {

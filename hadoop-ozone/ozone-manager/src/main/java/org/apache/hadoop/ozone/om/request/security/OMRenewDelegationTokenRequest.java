@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -149,7 +150,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
 
     try {
 
@@ -174,12 +175,12 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
               omResponse.setRenewDelegationTokenResponse(
                   updateRenewDelegationTokenRequest
                       .getRenewDelegationTokenResponse()).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in Updating Renew DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
       exception = ex;
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

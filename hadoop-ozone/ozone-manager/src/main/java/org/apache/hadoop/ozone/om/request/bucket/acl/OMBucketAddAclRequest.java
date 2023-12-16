@@ -112,7 +112,7 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
+  void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,

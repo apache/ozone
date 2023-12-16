@@ -29,16 +29,13 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,8 +47,10 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Base class for tests identifying issues with key value container contents.
@@ -61,20 +60,18 @@ public class TestKeyValueContainerIntegrityChecks {
   static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerIntegrityChecks.class);
 
-  private final ContainerLayoutTestInfo containerLayoutTestInfo;
+  private ContainerLayoutTestInfo containerLayoutTestInfo;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
   private ChunkManager chunkManager;
-  private String datanodeID = UUID.randomUUID().toString();
   private String clusterID = UUID.randomUUID().toString();
 
   protected static final int UNIT_LEN = 1024;
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  public TestKeyValueContainerIntegrityChecks(
-      ContainerTestVersionInfo versionInfo) {
+  void initTestData(ContainerTestVersionInfo versionInfo) throws Exception {
     LOG.info("new {} for {}", getClass().getSimpleName(), versionInfo);
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(
@@ -85,13 +82,14 @@ public class TestKeyValueContainerIntegrityChecks {
     } else {
       containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_CHUNK;
     }
+    setup();
   }
 
-  @Parameterized.Parameters public static Iterable<Object[]> data() {
+  static Iterable<Object[]> versionInfo() {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Before public void setUp() throws Exception {
+  private void setup() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
@@ -103,7 +101,8 @@ public class TestKeyValueContainerIntegrityChecks {
     chunkManager = containerLayoutTestInfo.createChunkManager(true, null);
   }
 
-  @After public void teardown() {
+  @AfterEach
+  public void teardown() {
     BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
@@ -133,12 +132,6 @@ public class TestKeyValueContainerIntegrityChecks {
         bytesPerChecksum);
     byte[] chunkData = RandomStringUtils.randomAscii(CHUNK_LEN).getBytes(UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
-    DispatcherContext writeStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
-        .build();
-    DispatcherContext commitStage = new DispatcherContext.Builder()
-        .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-        .build();
 
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         containerLayoutTestInfo.getLayout(),
@@ -166,9 +159,9 @@ public class TestKeyValueContainerIntegrityChecks {
           info.setChecksumData(checksumData);
           chunkList.add(info.getProtoBufMessage());
           chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), writeStage);
+              ByteBuffer.wrap(chunkData), WRITE_STAGE);
           chunkManager.writeChunk(container, blockID, info,
-              ByteBuffer.wrap(chunkData), commitStage);
+              ByteBuffer.wrap(chunkData), COMMIT_STAGE);
         }
         blockData.setChunks(chunkList);
 

@@ -53,7 +53,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests the validity BCSID of a container.
@@ -64,7 +66,7 @@ public class TestBCSID {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static MiniOzoneCluster cluster;

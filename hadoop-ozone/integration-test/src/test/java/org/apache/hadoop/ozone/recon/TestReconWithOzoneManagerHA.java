@@ -50,14 +50,16 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
 public class TestReconWithOzoneManagerHA {
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;

@@ -67,13 +67,13 @@ import org.apache.commons.io.IOUtils;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -172,7 +172,7 @@ public class TestContainerPlacement {
    * @throws InterruptedException
    */
   @Test
-  @Disabled
+  @Unhealthy
   public void testContainerPlacementCapacity() throws IOException,
       InterruptedException, TimeoutException {
     final int nodeCount = 4;

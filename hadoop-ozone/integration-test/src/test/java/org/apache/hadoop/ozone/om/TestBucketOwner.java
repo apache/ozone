@@ -31,12 +31,10 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,13 +47,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for Ozone Bucket Owner.
  */
+@Timeout(120)
 public class TestBucketOwner {
-  @Rule public Timeout timeout = Timeout.seconds(120);
 
   private static MiniOzoneCluster cluster;
   private static final Logger LOG =
@@ -69,7 +68,7 @@ public class TestBucketOwner {
   private static UserGroupInformation user3 = UserGroupInformation
       .createUserForTesting("user3", new String[] {"test3"});
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     // loginUser is the user running this test.
     UserGroupInformation.setLoginUser(adminUser);
@@ -101,7 +100,7 @@ public class TestBucketOwner {
     }
   }
 
-  @AfterClass
+  @AfterAll
   public static void stopCluster() {
     if (cluster != null) {
       cluster.shutdown();
@@ -242,7 +241,7 @@ public class TestBucketOwner {
       String aclString) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
-    Assert.assertTrue(store.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(store.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   private void createKey(OzoneBucket ozoneBucket, String key, int length,

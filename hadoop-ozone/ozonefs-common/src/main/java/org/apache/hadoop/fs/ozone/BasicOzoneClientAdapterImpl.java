@@ -357,6 +357,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       bucket.deleteDirectory(keyName, recursive);
       return true;
     } catch (OMException ome) {
+      if (OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+        LOG.warn("delete key failed {}", ome.getMessage());
+        return false;
+      }
       LOG.error("delete key failed {}", ome.getMessage());
       if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
         throw new PathIsNotEmptyDirectoryException(ome.getMessage());
@@ -703,12 +707,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
         OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
         if (takeTemporaryToSnapshot) {
-          objectStore.deleteSnapshot(snapPath.getVolumeName(),
-              snapPath.getBucketName(), toSnapshot);
+          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, snapPath);
         }
         if (takeTemporaryFromSnapshot) {
-          objectStore.deleteSnapshot(snapPath.getVolumeName(),
-              snapPath.getBucketName(), fromSnapshot);
+          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, snapPath);
         }
       }
     }

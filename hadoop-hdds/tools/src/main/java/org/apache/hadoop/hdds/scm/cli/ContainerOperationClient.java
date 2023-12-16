@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -52,7 +55,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -112,11 +114,10 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      List<X509Certificate> caCertificates =
-          HAUtils.buildCAX509List(null, conf);
+      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
-          caCertificates);
+          new ClientTrustManager(caCerts, null));
     } else {
       manager = new XceiverClientManager(conf);
     }
@@ -363,6 +364,25 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
+  public Map<DatanodeDetails, ReadContainerResponseProto>
+      readContainerFromAllNodes(long containerID, Pipeline pipeline)
+      throws IOException, InterruptedException {
+    XceiverClientManager clientManager = getXceiverClientManager();
+    String encodedToken = getEncodedContainerToken(containerID);
+    XceiverClientSpi client = null;
+    try {
+      client = clientManager.acquireClientForReadData(pipeline);
+      Map<DatanodeDetails, ReadContainerResponseProto> responses =
+          ContainerProtocolCalls.readContainerFromAllNodes(client, containerID,
+              encodedToken);
+      return responses;
+    } finally {
+      if (client != null) {
+        clientManager.releaseClient(client, false);
+      }
+    }
+  }
+
   @Override
   public ContainerDataProto readContainer(long containerID) throws IOException {
     ContainerWithPipeline info = getContainerWithPipeline(containerID);
@@ -499,8 +519,8 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String ipaddress, String uuid) throws IOException {
-    return storageContainerLocationClient.getDatanodeUsageInfo(ipaddress,
+      String address, String uuid) throws IOException {
+    return storageContainerLocationClient.getDatanodeUsageInfo(address,
         uuid, ClientVersion.CURRENT_VERSION);
   }
 

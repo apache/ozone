@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.function.IntFunction;
 
 /**
  * Codec interface to serialize/deserialize objects to/from bytes.
@@ -34,7 +33,7 @@ public interface Codec<T> {
   /**
    * Does this {@link Codec} support the {@link CodecBuffer} methods?
    * If this method returns true, this class must implement both
-   * {@link #toCodecBuffer(Object, IntFunction)} and
+   * {@link #toCodecBuffer(Object, CodecBuffer.Allocator)} and
    * {@link #fromCodecBuffer(CodecBuffer)}.
    *
    * @return ture iff this class supports the {@link CodecBuffer} methods.
@@ -59,7 +58,7 @@ public interface Codec<T> {
    * @return a buffer storing the serialized bytes.
    */
   default CodecBuffer toCodecBuffer(@Nonnull T object,
-      IntFunction<CodecBuffer> allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws IOException {
     throw new UnsupportedOperationException();
   }
 
@@ -71,7 +70,7 @@ public interface Codec<T> {
    */
   default CodecBuffer toDirectCodecBuffer(@Nonnull T object)
       throws IOException {
-    return toCodecBuffer(object, CodecBuffer::allocateDirect);
+    return toCodecBuffer(object, CodecBuffer.Allocator.getDirect());
   }
 
   /**
@@ -82,7 +81,7 @@ public interface Codec<T> {
    */
   default CodecBuffer toHeapCodecBuffer(@Nonnull T object)
       throws IOException {
-    return toCodecBuffer(object, CodecBuffer::allocateHeap);
+    return toCodecBuffer(object, CodecBuffer.Allocator.getHeap());
   }
 
   /**
