@@ -424,9 +424,12 @@ public final class HddsUtils {
    * @param proto ContainerCommand Request proto
    * @return True if its readOnly , false otherwise.
    */
-  public static boolean isReadOnly(
-      ContainerCommandRequestProtoOrBuilder proto) {
-    switch (proto.getCmdType()) {
+  public static boolean isReadOnly(ContainerCommandRequestProtoOrBuilder proto) {
+    return isReadOnly(proto.getCmdType());
+  }
+
+  public static boolean isReadOnly(ContainerProtos.Type type) {
+    switch (type) {
     case ReadContainer:
     case ReadChunk:
     case ListBlock:
