@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -94,6 +95,7 @@ public class KeyOutputStream extends OutputStream
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   private long clientID;
+  private StreamBufferArgs streamBufferArgs;
 
   /**
    * Indicates if an atomic write is required. When set to true,
@@ -104,7 +106,8 @@ public class KeyOutputStream extends OutputStream
   private boolean atomicKeyCreation;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
-      ContainerClientMetrics clientMetrics, OzoneClientConfig clientConfig) {
+      ContainerClientMetrics clientMetrics, OzoneClientConfig clientConfig,
+      StreamBufferArgs streamBufferArgs) {
     this.replication = replicationConfig;
     this.config = clientConfig;
     closed = false;
@@ -114,7 +117,8 @@ public class KeyOutputStream extends OutputStream
             e -> RetryPolicies.TRY_ONCE_THEN_FAIL));
     retryCount = 0;
     offset = 0;
-    blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(clientMetrics, clientConfig);
+    blockOutputStreamEntryPool =
+        new BlockOutputStreamEntryPool(clientMetrics, clientConfig, streamBufferArgs);
   }
 
   @VisibleForTesting
@@ -152,7 +156,7 @@ public class KeyOutputStream extends OutputStream
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
       ContainerClientMetrics clientMetrics,
-      boolean atomicKeyCreation
+      boolean atomicKeyCreation, StreamBufferArgs streamBufferArgs
   ) {
     this.config = config;
     this.replication = replicationConfig;
@@ -166,7 +170,7 @@ public class KeyOutputStream extends OutputStream
             unsafeByteBufferConversion,
             xceiverClientManager,
             handler.getId(),
-            clientMetrics);
+            clientMetrics, streamBufferArgs);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -174,6 +178,7 @@ public class KeyOutputStream extends OutputStream
     this.writeOffset = 0;
     this.clientID = handler.getId();
     this.atomicKeyCreation = atomicKeyCreation;
+    this.streamBufferArgs = streamBufferArgs;
   }
 
   /**
@@ -280,7 +285,7 @@ public class KeyOutputStream extends OutputStream
       // to or less than the max length of the buffer allocated.
       // The len specified here is the combined sum of the data length of
       // the buffers
-      Preconditions.checkState(!retry || len <= config
+      Preconditions.checkState(!retry || len <= streamBufferArgs
           .getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
       writeLen = retry ? (int) len : dataWritten;
@@ -331,7 +336,7 @@ public class KeyOutputStream extends OutputStream
           pipeline, totalSuccessfulFlushedData, bufferedDataLen, retryCount);
     }
     Preconditions.checkArgument(
-        bufferedDataLen <= config.getStreamBufferMaxSize());
+        bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
     Preconditions.checkArgument(
         offset - blockOutputStreamEntryPool.getKeyLength() == bufferedDataLen);
     long containerId = streamEntry.getBlockID().getContainerID();
@@ -609,6 +614,7 @@ public class KeyOutputStream extends OutputStream
     private ReplicationConfig replicationConfig;
     private ContainerClientMetrics clientMetrics;
     private boolean atomicKeyCreation = false;
+    private StreamBufferArgs streamBufferArgs;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -677,6 +683,15 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
+    public StreamBufferArgs getStreamBufferArgs() {
+      return streamBufferArgs;
+    }
+
+    public Builder setStreamBufferArgs(StreamBufferArgs streamBufferArgs) {
+      this.streamBufferArgs = streamBufferArgs;
+      return this;
+    }
+
     public boolean isUnsafeByteBufferConversionEnabled() {
       return unsafeByteBufferConversion;
     }
@@ -726,7 +741,8 @@ public class KeyOutputStream extends OutputStream
           isMultipartKey,
           unsafeByteBufferConversion,
           clientMetrics,
-          atomicKeyCreation);
+          atomicKeyCreation,
+          streamBufferArgs);
     }
 
   }
