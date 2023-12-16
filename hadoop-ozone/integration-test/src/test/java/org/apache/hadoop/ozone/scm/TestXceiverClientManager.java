@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.scm;
 
 import com.google.common.cache.Cache;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -37,11 +38,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test for XceiverClientManager caching and eviction.
@@ -73,14 +78,18 @@ public class TestXceiverClientManager {
     IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
   }
 
-  @Test
-  public void testCaching() throws IOException {
+  @ParameterizedTest(name = "Ozone security enabled: {0}")
+  @ValueSource(booleans = {false, true})
+  public void testCaching(boolean securityEnabled) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, securityEnabled);
     String metaDir = GenericTestUtils.getTempPath(
         TestXceiverClientManager.class.getName() + UUID.randomUUID());
     conf.set(HDDS_METADATA_DIR_NAME, metaDir);
 
-    try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
+    ClientTrustManager trustManager = mock(ClientTrustManager.class);
+    try (XceiverClientManager clientManager = new XceiverClientManager(conf,
+        conf.getObject(ScmClientConfig.class), trustManager)) {
 
       ContainerWithPipeline container1 = storageContainerLocationClient
           .allocateContainer(
@@ -105,9 +114,10 @@ public class TestXceiverClientManager {
       Assertions.assertEquals(2, client3.getRefcount());
       Assertions.assertEquals(2, client1.getRefcount());
       Assertions.assertEquals(client1, client3);
-      clientManager.releaseClient(client1, false);
-      clientManager.releaseClient(client2, false);
-      clientManager.releaseClient(client3, false);
+      clientManager.releaseClient(client1, true);
+      clientManager.releaseClient(client2, true);
+      clientManager.releaseClient(client3, true);
+      Assertions.assertTrue(clientManager.getClientCache().size() == 0);
     }
   }
 

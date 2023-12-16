@@ -341,12 +341,13 @@ public class TestECReplicationCheckHandler {
     assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
     assertTrue(result.hasUnreplicatedOfflineIndexes());
+    assertFalse(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
     // Unrecoverable so not added to the queue
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(0, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
@@ -354,12 +355,12 @@ public class TestECReplicationCheckHandler {
 
   @Test
   public void testUnderReplicatedAndUnrecoverableWithDecommissionPending() {
-    testUnderReplicatedAndUnrecoverableWithOffline(DECOMMISSIONING);
+    testUnderReplicatedAndUnrecoverableWithOfflinePending(DECOMMISSIONING);
   }
 
   @Test
   public void testUnderReplicatedAndUnrecoverableWithMaintenancePending() {
-    testUnderReplicatedAndUnrecoverableWithOffline(ENTERING_MAINTENANCE);
+    testUnderReplicatedAndUnrecoverableWithOfflinePending(ENTERING_MAINTENANCE);
   }
 
   private void testUnderReplicatedAndUnrecoverableWithOfflinePending(
@@ -383,10 +384,13 @@ public class TestECReplicationCheckHandler {
     assertFalse(result.isReplicatedOkAfterPending());
     assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
-    assertFalse(result.hasUnreplicatedOfflineIndexes());
+    // The pending has not completed yet, so the container is still under-replicated.
+    assertTrue(result.hasUnreplicatedOfflineIndexes());
+    assertTrue(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
-    // Unrecoverable so not added to the queue
+    // Unrecoverable, but there are offline indexes which need replicated. As there is a pending
+    // add on the offline index, it is not added to the queue.
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(

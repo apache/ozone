@@ -155,6 +155,12 @@ jobs:
       - name: Untar sources
         run: |
           tar --strip-components 1 -xzvf ozone*-src.tar.gz
+      - name: Workaround for HADOOP-19011
+        run: |
+          git init
+          git config user.name 'Github Actions'
+          git config user.email 'noreply@github.com'
+          git commit --allow-empty -a -m 'workaround for HADOOP-19011'
       - name: Cache for maven dependencies
         uses: actions/cache@v3
         with:

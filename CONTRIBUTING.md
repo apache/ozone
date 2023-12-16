@@ -119,7 +119,7 @@ We use GitHub pull requests for contributing changes to the repository. The main
 Basic code conventions followed by Ozone:
 
  * 2 spaces indentation
- * 80-char line length limit
+ * 120-char line length limit
  * Apache license header required in most files
  * no `@author` tags, authorship is indicated by Git history
 
