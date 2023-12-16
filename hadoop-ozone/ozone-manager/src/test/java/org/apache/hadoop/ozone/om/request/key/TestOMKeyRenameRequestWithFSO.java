@@ -86,8 +86,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     OMKeyRenameRequest omKeyRenameRequest =
         getOMKeyRenameRequest(modifiedOmRequest);
     OMClientResponse response =
-            omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
         response.getOMResponse().getStatus());
   }

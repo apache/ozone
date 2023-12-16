@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -55,7 +54,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     OmPrefixInfo omPrefixInfo = null;
 
@@ -138,8 +137,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(PREFIX_LOCK, getOzoneObj().getPath()));

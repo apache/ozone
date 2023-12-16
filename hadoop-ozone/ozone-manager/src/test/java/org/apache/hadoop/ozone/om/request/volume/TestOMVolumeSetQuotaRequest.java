@@ -86,8 +86,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     long quotaNamespaceBeforeSet = omVolumeArgs.getQuotaInNamespace();
 
     OMClientResponse omClientResponse =
-        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -134,8 +133,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     omVolumeSetQuotaRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -159,8 +157,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     omVolumeSetQuotaRequest.preExecute(ozoneManager);
     OMClientResponse omClientResponse =
-        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -192,8 +189,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
             );
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
     //capture the error log
     Assertions.assertTrue(logs.getOutput().contains(
         "Changing volume quota failed for volume"));
@@ -223,8 +219,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         new OMVolumeSetQuotaRequest(originalRequest);
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
     Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
   }
@@ -254,8 +249,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         new OMVolumeSetQuotaRequest(originalRequest);
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
     Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.OK);
   }
@@ -279,8 +273,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         new OMVolumeSetQuotaRequest(originalRequest);
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
     Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
     Assertions.assertTrue(omClientResponse.getOMResponse().getMessage()

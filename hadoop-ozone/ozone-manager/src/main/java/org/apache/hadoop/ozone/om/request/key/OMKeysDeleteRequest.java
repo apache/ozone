@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -82,7 +81,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   @Override @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
     DeleteKeysRequest deleteKeyRequest = getOmRequest().getDeleteKeysRequest();
 
     OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
@@ -209,8 +208,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }

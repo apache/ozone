@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.security.OMRenewDelegationTokenResponse;
@@ -128,8 +127,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     UpdateRenewDelegationTokenRequest updateRenewDelegationTokenRequest =
         getOmRequest().getUpdatedRenewDelegationTokenRequest();
@@ -181,9 +179,6 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, exception));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     auditLog(auditLogger,

@@ -191,8 +191,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
         modifiedOmRequest);
 
     OMClientResponse omClientResponse =
-        omRecoverLeaseRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omRecoverLeaseRequest.validateAndUpdateCache(ozoneManager, 100L);
     return omClientResponse;
   }
 
