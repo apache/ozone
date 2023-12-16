@@ -108,18 +108,7 @@ public class GrpcXceiverService extends
 
       @Override
       public void onNext(ContainerCommandRequestProto request) {
-        final DispatcherContext context;
-        switch (request.getCmdType()) {
-        case ReadChunk:
-          context = DispatcherContext.getHandleReadChunk();
-          break;
-        case GetSmallFile:
-          context = DispatcherContext.getHandleGetSmallFile();
-          break;
-        default:
-          context = null;
-        }
-
+        final DispatcherContext context = DispatcherContext.getDispatcherContext(request.getCmdType());
         try {
           final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
           responseObserver.onNext(resp);

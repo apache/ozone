@@ -22,6 +22,9 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -38,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -725,12 +729,11 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dispatchRequest(request, ContainerProtos.Result.SUCCESS);
   }
 
-  public void dispatchRequest(
-      ContainerProtos.ContainerCommandRequestProto request,
-      ContainerProtos.Result expectedResult) {
-    ContainerProtos.ContainerCommandResponseProto response =
-        dsm.getContainer().getDispatcher().dispatch(request, null);
+  public void dispatchRequest(ContainerCommandRequestProto request, Result expectedResult) {
+    final DispatcherContext context = DispatcherContext.getDispatcherContext(request.getCmdType());
+    ContainerCommandResponseProto response = dsm.getContainer().getDispatcher().dispatch(request, context);
     Assertions.assertEquals(expectedResult, response.getResult());
+    context.close();
   }
 
   /// VOLUME OPERATIONS ///

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -26,6 +27,8 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 
 /**
  * DispatcherContext class holds transport protocol specific context info
@@ -53,6 +56,17 @@ public final class DispatcherContext implements UncheckedAutoCloseable {
 
   public static DispatcherContext getHandlePutSmallFile() {
     return HANDLE_PUT_SMALL_FILE;
+  }
+
+  public static DispatcherContext getDispatcherContext(ContainerProtos.Type type) {
+    switch (type) {
+      case ReadChunk:
+        return DispatcherContext.getHandleReadChunk();
+      case GetSmallFile:
+        return DispatcherContext.getHandleGetSmallFile();
+      default:
+        return null;
+    }
   }
 
   /**

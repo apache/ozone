@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.*;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
@@ -680,12 +682,11 @@ public class TestDatanodeUpgradeToScmHA {
     dispatchRequest(request, ContainerProtos.Result.SUCCESS);
   }
 
-  public void dispatchRequest(
-      ContainerProtos.ContainerCommandRequestProto request,
-      ContainerProtos.Result expectedResult) {
-    ContainerProtos.ContainerCommandResponseProto response =
-        dsm.getContainer().getDispatcher().dispatch(request, null);
+  void dispatchRequest(ContainerCommandRequestProto request, Result expectedResult) {
+    final DispatcherContext context = DispatcherContext.getDispatcherContext(request.getCmdType());
+    final ContainerCommandResponseProto response = dsm.getContainer().getDispatcher().dispatch(request, context);
     Assertions.assertEquals(expectedResult, response.getResult());
+    context.close();
   }
 
   /// VOLUME OPERATIONS ///
