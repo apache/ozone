@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 public final class BlockOutPutStreamResourceProvider {
   private final Supplier<ExecutorService> threadFactorySupplier;
   private final ContainerClientMetrics clientMetrics;
-  private volatile ExecutorService executorService;
 
   /**
    * Creates an instance of BlockOutPutStreamResourceProvider.
@@ -49,14 +48,7 @@ public final class BlockOutPutStreamResourceProvider {
    * Provides an ExecutorService, lazily initialized upon first request.
    */
   public ExecutorService getThreadFactory() {
-    if (executorService == null) {
-      synchronized (this) {
-        if (executorService == null) {
-          executorService = threadFactorySupplier.get();
-        }
-      }
-    }
-    return executorService;
+    return threadFactorySupplier.get();
   }
 
   /**
