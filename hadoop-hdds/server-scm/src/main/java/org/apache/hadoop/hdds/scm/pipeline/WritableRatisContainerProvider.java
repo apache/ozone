@@ -50,7 +50,7 @@ public class WritableRatisContainerProvider
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
   // added in HDDS-8982, it shouldn't be exposed to users to configure
-  private static int MAX_RETRY_GET_CONTAINER = 4096;
+  private static int maxRetryGetContainer = 4096;
 
 
   public WritableRatisContainerProvider(ConfigurationSource conf,
@@ -231,7 +231,7 @@ public class WritableRatisContainerProvider
   }
 
   public int getMaxRetryGetContainer() {
-    return MAX_RETRY_GET_CONTAINER;
+    return maxRetryGetContainer;
   }
 
 }
