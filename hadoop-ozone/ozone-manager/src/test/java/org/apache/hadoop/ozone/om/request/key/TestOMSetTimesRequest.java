@@ -71,8 +71,7 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
     omKeySetTimesRequest = getOmKeySetTimesRequest(preExecuteRequest);
 
     OMClientResponse omClientResponse = omKeySetTimesRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     OMResponse omSetTimesResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omSetTimesResponse.getSetTimesResponse());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,

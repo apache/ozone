@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
@@ -93,9 +92,6 @@ public class TestS3GetSecretRequest {
   private OMMetrics omMetrics;
   private AuditLogger auditLogger;
   private OmMetadataManagerImpl omMetadataManager;
-  // Set ozoneManagerDoubleBuffer to do nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   // Multi-tenant related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
@@ -280,7 +276,7 @@ public class TestS3GetSecretRequest {
 
     // Validate and update cache to revoke the secret.
     OMClientResponse omRevokeResponse = omRevokeRequest.validateAndUpdateCache(
-        ozoneManager, 2, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 2);
 
     // Verify that the revoke operation was successful.
     Assertions.assertTrue(omRevokeResponse instanceof S3RevokeSecretResponse);
@@ -300,8 +296,7 @@ public class TestS3GetSecretRequest {
     // Verify that the secret for revoked user will be set to a new one upon
     // calling getSecret request.
     OMClientResponse omClientResponse =
-        s3GetSecretRequest.validateAndUpdateCache(
-            ozoneManager, 3, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager, 3);
 
     Assertions.assertTrue(omClientResponse instanceof S3GetSecretResponse);
     S3GetSecretResponse s3GetSecretResponse =
@@ -387,8 +382,7 @@ public class TestS3GetSecretRequest {
         );
     // Run validateAndUpdateCache for the first time
     OMClientResponse omClientResponse1 =
-        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-            1, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager, 1);
     // Check response type and cast
     Assertions.assertTrue(omClientResponse1 instanceof S3GetSecretResponse);
     final S3GetSecretResponse s3GetSecretResponse1 =
@@ -408,8 +402,7 @@ public class TestS3GetSecretRequest {
 
     // Run validateAndUpdateCache for the second time
     OMClientResponse omClientResponse2 =
-        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-            2, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager, 2);
     // Check response type and cast
     Assertions.assertTrue(omClientResponse2 instanceof S3GetSecretResponse);
     final S3GetSecretResponse s3GetSecretResponse2 =
@@ -443,8 +436,7 @@ public class TestS3GetSecretRequest {
         );
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
-        omTenantCreateRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
+        omTenantCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
     // Check response type and cast
     Assertions.assertTrue(omClientResponse instanceof OMTenantCreateResponse);
     final OMTenantCreateResponse omTenantCreateResponse =
@@ -474,8 +466,7 @@ public class TestS3GetSecretRequest {
         .thenReturn(TENANT_ID);
     // Run validateAndUpdateCache
     omClientResponse =
-        omTenantAssignUserAccessIdRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
+        omTenantAssignUserAccessIdRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     // Check response type and cast
     Assertions.assertTrue(
@@ -510,8 +501,7 @@ public class TestS3GetSecretRequest {
 
     // Run validateAndUpdateCache
     omClientResponse =
-        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     // Check response type and cast
     Assertions.assertTrue(omClientResponse instanceof S3GetSecretResponse);
@@ -543,8 +533,7 @@ public class TestS3GetSecretRequest {
 
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
-        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     // Check response type and cast
     Assertions.assertTrue(omClientResponse instanceof S3GetSecretResponse);

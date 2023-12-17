@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -79,8 +78,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse =
@@ -116,9 +114,6 @@ public class S3RevokeSecretRequest extends OMClientRequest {
       omClientResponse = new S3RevokeSecretResponse(null,
           ozoneManager.getS3SecretManager(),
           createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     Map<String, String> auditMap = new HashMap<>();
