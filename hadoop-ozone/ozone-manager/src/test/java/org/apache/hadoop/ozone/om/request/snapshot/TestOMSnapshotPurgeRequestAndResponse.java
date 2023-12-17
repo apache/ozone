@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
@@ -93,10 +92,6 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   private String volumeName;
   private String bucketName;
   private String keyName;
-
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private static final OzoneManagerDoubleBufferHelper
-      DOUBLE_BUFFER_HELPER = ((response, transactionIndex) -> null);
 
   @BeforeEach
   void setup(@TempDir File testDir) throws Exception {
@@ -193,8 +188,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     // validateAndUpdateCache OMSnapshotCreateResponse.
     OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            DOUBLE_BUFFER_HELPER);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
     // Add to batch and commit to DB.
     omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
@@ -231,8 +225,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     // validateAndUpdateCache for OMSnapshotPurgeRequest.
     OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
-        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L,
-            DOUBLE_BUFFER_HELPER);
+        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
 
     // Commit to DB.
     batchOperation = omMetadataManager.getStore().initBatchOperation();

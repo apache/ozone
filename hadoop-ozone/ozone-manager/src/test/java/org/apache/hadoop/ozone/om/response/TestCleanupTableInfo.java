@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
@@ -103,9 +102,6 @@ public class TestCleanupTableInfo {
 
   @Mock
   private OMMetrics omMetrics;
-
-  @Mock
-  private OzoneManagerDoubleBufferHelper dbh;
 
   @Mock
   private OzoneManager om;
@@ -182,7 +178,7 @@ public class TestCleanupTableInfo {
     OMFileCreateRequest request = anOMFileCreateRequest();
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
-    request.validateAndUpdateCache(om, 1, dbh);
+    request.validateAndUpdateCache(om, 1);
 
     assertCacheItemCounts(cacheItemCount, OMFileCreateResponse.class);
     verify(omMetrics, times(1)).incNumCreateFile();
@@ -197,7 +193,7 @@ public class TestCleanupTableInfo {
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
-    request.validateAndUpdateCache(om, 1, dbh);
+    request.validateAndUpdateCache(om, 1);
 
     assertCacheItemCounts(cacheItemCount, OMKeyCreateResponse.class);
     verify(omMetrics, times(1)).incNumKeyAllocates();
