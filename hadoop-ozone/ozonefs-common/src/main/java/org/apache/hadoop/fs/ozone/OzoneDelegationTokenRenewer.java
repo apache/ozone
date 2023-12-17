@@ -51,13 +51,12 @@ public class OzoneDelegationTokenRenewer extends TokenRenewer {
   }
 
   @Override
-  public boolean isManaged(Token<?> token) throws IOException {
+  public boolean isManaged(Token<?> token) {
     return true;
   }
 
   @Override
-  public long renew(Token<?> token, Configuration conf)
-      throws IOException, InterruptedException {
+  public long renew(Token<?> token, Configuration conf) throws IOException {
     Token<OzoneTokenIdentifier> ozoneDt =
         (Token<OzoneTokenIdentifier>) token;
     OzoneClient ozoneClient =
