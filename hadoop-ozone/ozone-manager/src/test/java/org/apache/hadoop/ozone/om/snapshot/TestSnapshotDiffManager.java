@@ -101,7 +101,6 @@ import org.rocksdb.RocksIterator;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -207,6 +206,8 @@ public class TestSnapshotDiffManager {
   private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
+  @TempDir
+  private File snapDiffDir;
   @Mock
   private RocksDBCheckpointDiffer differ;
   @Mock
@@ -431,7 +432,7 @@ public class TestSnapshotDiffManager {
     UUID snap1 = UUID.randomUUID();
     UUID snap2 = UUID.randomUUID();
 
-    String diffDir = Files.createTempDirectory("snapdiff_dir").toString();
+    String diffDir = snapDiffDir.getAbsolutePath();
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
         .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
         .collect(Collectors.toSet());
@@ -526,8 +527,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
-              .toString());
+          snapDiffDir.getAbsolutePath());
       assertEquals(deltaStrings, deltaFiles);
     }
   }
@@ -591,8 +591,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
-              .toString());
+          snapDiffDir.getAbsolutePath());
       assertEquals(deltaStrings, deltaFiles);
 
       rcFromSnapshot.close();

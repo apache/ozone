@@ -31,6 +31,7 @@ import org.apache.ozone.test.tag.Native;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
@@ -58,6 +59,9 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  */
 class TestManagedSstFileReader {
 
+  @TempDir
+  private File tempDir;
+
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
   private static final String KEY_PREFIX = IntStream.range(0, 256).boxed()
@@ -65,9 +69,8 @@ class TestManagedSstFileReader {
       .collect(Collectors.joining(""));
 
   private String createRandomSSTFile(TreeMap<String, Integer> keys)
-      throws IOException, RocksDBException {
-    File file = File.createTempFile("tmp_sst_file", ".sst");
-    file.deleteOnExit();
+      throws RocksDBException {
+    File file = new File(tempDir, "tmp_sst_file.sst");
 
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedEnvOptions managedEnvOptions = new ManagedEnvOptions();

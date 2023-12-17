@@ -67,7 +67,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
@@ -141,9 +140,11 @@ public class TestOMDbCheckpointServlet {
   private Path compactionDirPath;
   private DBCheckpoint dbCheckpoint;
   private String method;
+  @TempDir
   private File folder;
   private static final String FABRICATED_FILE_NAME = "fabricatedFile.sst";
   private FileOutputStream fileOutputStream;
+
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -152,12 +153,10 @@ public class TestOMDbCheckpointServlet {
    * @throws Exception
    */
   @BeforeEach
-  public void init(@TempDir File tempDir) throws Exception {
-    folder = tempDir;
+  void init() throws Exception {
     conf = new OzoneConfiguration();
 
-    tempFile = File.createTempFile("temp_" + System
-        .currentTimeMillis(), ".tar");
+    tempFile = new File(folder, "temp.tar");
 
     fileOutputStream = new FileOutputStream(tempFile);
 
@@ -186,7 +185,6 @@ public class TestOMDbCheckpointServlet {
     if (cluster != null) {
       cluster.shutdown();
     }
-    FileUtils.deleteQuietly(tempFile);
   }
 
   private void setupCluster() throws Exception {
@@ -557,7 +555,7 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(null);
 
     // Get the tarball.
-    Path tmpdir = Files.createTempDirectory("bootstrapData");
+    Path tmpdir = folder.toPath().resolve("bootstrapData");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream, new ArrayList<>(), new ArrayList<>(), tmpdir);
@@ -604,7 +602,7 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(null);
 
     // Get the tarball.
-    Path tmpdir = Files.createTempDirectory("bootstrapData");
+    Path tmpdir = folder.toPath().resolve("bootstrapData");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream, toExcludeList, excludedList, tmpdir);
